@@ -42,7 +42,7 @@ export default function ChatPage() {
         />
 
         {/* Input bar */}
-        <ChatInput onSend={sendMessage} isLoading={isLoading} />
+        <ChatInput onSend={(content) => sendMessage(content, activeSection)} isLoading={isLoading} />
 
         {/* Footer */}
         <DashboardFooter />
