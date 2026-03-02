@@ -13,7 +13,7 @@ import {
   getDocs,
   setDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SYSTEM_PROMPT, INTRO_MESSAGE } from "@/lib/chat-types";
 
@@ -33,8 +33,7 @@ export function useChat(
 
   // Check if Firebase is configured
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!apiKey || apiKey === "" || apiKey === "undefined") {
+    if (!isFirebaseConfigured()) {
       setFirebaseAvailable(false);
       setIsInitializing(false);
       // Load demo data
@@ -66,7 +65,7 @@ export function useChat(
   // Real-time listener for session metadata
   useEffect(() => {
     if (!firebaseAvailable) return;
-    const sessionRef = doc(db, `users/${userId}/dnaSessions/${sessionId}`);
+    const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
     const unsubscribe = onSnapshot(
       sessionRef,
       (docSnap) => {
@@ -120,7 +119,7 @@ export function useChat(
   useEffect(() => {
     if (!firebaseAvailable) return;
     const messagesRef = collection(
-      db,
+      getDb(),
       `users/${userId}/dnaSessions/${sessionId}/messages`
     );
     const q = query(messagesRef, orderBy("timestamp", "asc"));
@@ -202,6 +201,7 @@ export function useChat(
         return;
       }
 
+      const db = getDb();
       const messagesRef = collection(
         db,
         `users/${userId}/dnaSessions/${sessionId}/messages`
@@ -219,11 +219,12 @@ export function useChat(
       setStreamingContent("");
 
       try {
-        // Use Firebase AI Logic (Vertex AI / Gemini) via client-side
+        // Use Firebase AI Logic (Gemini Developer API) via client-side SDK
         const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
           "firebase/ai"
         );
-        const ai = getAI(db.app, { backend: new GoogleAIBackend() });
+        const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+        const ai = getAI(getFirebaseApp(), { backend: new GoogleAIBackend() });
         const model = getGenerativeModel(ai, { model: "gemini-2.0-flash" });
 
         // Build conversation history
@@ -241,10 +242,7 @@ export function useChat(
         const chatHistory = history.slice(0, -1);
 
         const chat = model.startChat({
-          systemInstruction: {
-            role: "system" as unknown as string,
-            parts: [{ text: SYSTEM_PROMPT }],
-          } as unknown as import("firebase/ai").Content,
+          systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
           history: chatHistory,
         });
 
@@ -267,7 +265,7 @@ export function useChat(
 
         // Update session metadata
         const sessionRef = doc(
-          db,
+          getDb(),
           `users/${userId}/dnaSessions/${sessionId}`
         );
         await updateDoc(sessionRef, {

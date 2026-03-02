@@ -1,6 +1,5 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,8 +10,28 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Lazy singletons — only initialized when first accessed, avoiding
+// module-evaluation crashes when env vars are missing or empty.
+let _app: FirebaseApp | null = null;
+let _db: Firestore | null = null;
 
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export { app };
+export function getApp(): FirebaseApp {
+  if (!_app) {
+    _app =
+      getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  }
+  return _app;
+}
+
+export function getDb(): Firestore {
+  if (!_db) {
+    _db = getFirestore(getApp());
+  }
+  return _db;
+}
+
+/** Quick check — returns true when the API key looks present */
+export function isFirebaseConfigured(): boolean {
+  const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  return !!key && key !== "undefined" && key.length > 0;
+}
