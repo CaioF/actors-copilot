@@ -8,8 +8,6 @@ import {
   Monitor,
   Dna,
   Settings,
-  Plus,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS } from "@/lib/chat-types";

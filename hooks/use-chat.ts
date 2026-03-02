@@ -83,7 +83,7 @@ export function useChat(
             createdAt: serverTimestamp() as DNASession["createdAt"],
             status: "active",
           };
-          setDoc(sessionRef, defaultSession);
+          void setDoc(sessionRef, defaultSession);
         }
       },
       () => {
@@ -168,10 +168,10 @@ export function useChat(
 
   // Send message
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, activeSection?: string) => {
       if (!content.trim()) return;
 
-      const currentSection = session?.currentSection ?? "introduction";
+      const currentSection = activeSection ?? session?.currentSection ?? "introduction";
 
       if (!firebaseAvailable) {
         // Demo mode: add messages locally

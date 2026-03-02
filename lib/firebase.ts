@@ -30,8 +30,13 @@ export function getDb(): Firestore {
   return _db;
 }
 
-/** Quick check — returns true when the API key looks present */
+/** Returns true only when all required Firebase config values are present */
 export function isFirebaseConfigured(): boolean {
-  const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  return !!key && key !== "undefined" && key.length > 0;
+  const required = [
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  ];
+  return required.every((v) => !!v && v !== "undefined" && v.length > 0);
 }
