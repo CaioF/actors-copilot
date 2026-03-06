@@ -25,7 +25,8 @@ export function getApp(): FirebaseApp {
 
 export function getDb(): Firestore {
   if (!_db) {
-    _db = getFirestore(getApp());
+    // Database id is different than the connection id, so we pass it here
+    _db = getFirestore(getApp(), "the-actors-copilot");
   }
   return _db;
 }

@@ -33,10 +33,12 @@ export function useChat(
 
   // Check if Firebase is configured
   useEffect(() => {
+    console.log("Firebase está configurado?", isFirebaseConfigured());
     if (!isFirebaseConfigured()) {
       setFirebaseAvailable(false);
       setIsInitializing(false);
       // Load demo data
+      console.log("ativando demo");
       setSession({
         id: DEFAULT_SESSION_ID,
         sessionNumber: 2,
@@ -88,6 +90,7 @@ export function useChat(
       },
       () => {
         // On error, fallback to demo mode
+        console.log("deu erro");
         setFirebaseAvailable(false);
         setSession({
           id: DEFAULT_SESSION_ID,
@@ -174,6 +177,7 @@ export function useChat(
       const currentSection = activeSection ?? session?.currentSection ?? "introduction";
 
       if (!firebaseAvailable) {
+        console.log("fireBase nao disponivel");
         // Demo mode: add messages locally
         const userMsg: ChatMessage = {
           id: `user-${Date.now()}`,
@@ -207,19 +211,25 @@ export function useChat(
         `users/${userId}/dnaSessions/${sessionId}/messages`
       );
 
-      // Write user message to Firestore
-      await addDoc(messagesRef, {
-        role: "user",
-        content: content.trim(),
-        timestamp: serverTimestamp(),
-        section: currentSection,
-      });
-
-      setIsLoading(true);
-      setStreamingContent("");
 
       try {
+        // Changed position of trying to send the message to firebase so that console.error can display what happens
+        setIsLoading(true);
+        setStreamingContent("");
+
+        // Write user message to Firestore
+        console.log("Tentando gravar no Firestore..");
+        await addDoc(messagesRef, {
+          role: "user",
+          content: content.trim(),
+          timestamp: serverTimestamp(),
+          section: currentSection,
+        });
+        console.log("Sucesso na gravação ");
+
+
         // Use Firebase AI Logic (Gemini Developer API) via client-side SDK
+        console.log("Use Firebase AI Logic (Gemini Developer API) via client-side SDK");
         const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
           "firebase/ai"
         );
@@ -239,7 +249,13 @@ export function useChat(
           }));
 
         // Remove the last entry (the user message we just added) since we pass it as the new message
-        const chatHistory = history.slice(0, -1);
+        const rawHistory = history.slice(0, -1);
+
+        // if intro message is the first one, we delete it because gemini needs the first message to come from the user
+        const chatHistory = rawHistory.filter((msg, index) => {
+        if (index === 0 && msg.role === "model") return false;
+          return true;
+        });
 
         const chat = model.startChat({
           systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
@@ -272,6 +288,8 @@ export function useChat(
           lastActiveAt: serverTimestamp(),
         });
       } catch (error) {
+        console.error("ERRO DETECTADO:", error);
+        console.error("caiu no chatch");
         console.error("AI response error:", error);
         // Fallback: write a static response
         await addDoc(messagesRef, {
