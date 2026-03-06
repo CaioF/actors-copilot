@@ -13,6 +13,9 @@ import {
   getDocs,
   setDoc,
 } from "firebase/firestore";
+//VertexAIBackend 
+import { initializeApp } from "firebase/app";
+import { getAI, getGenerativeModel, VertexAIBackend } from "firebase/ai";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SYSTEM_PROMPT, INTRO_MESSAGE } from "@/lib/chat-types";
@@ -229,12 +232,11 @@ export function useChat(
 
 
         // Use Firebase AI Logic (Gemini Developer API) via client-side SDK
-        console.log("Use Firebase AI Logic (Gemini Developer API) via client-side SDK");
-        const { getAI, getGenerativeModel, GoogleAIBackend } = await import(
-          "firebase/ai"
-        );
+
+        const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
-        const ai = getAI(getFirebaseApp(), { backend: new GoogleAIBackend() });
+
+        const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
         const model = getGenerativeModel(ai, { model: "gemini-2.0-flash" });
 
         // Build conversation history
