@@ -10,8 +10,9 @@ export default function InteriorLayout({
 }) {
   return (
     <div className="flex h-screen bg-[#F0E8DC]">
-      <AppSidebar />
+     
       <ProtectedRoute>
+         <AppSidebar />
         <div className="flex flex-1 flex-col overflow-y-auto">
           {children}
           <DashboardFooter />

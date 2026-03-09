@@ -13,9 +13,7 @@ import {
   getDocs,
   setDoc,
 } from "firebase/firestore";
-//VertexAIBackend 
-import { initializeApp } from "firebase/app";
-import { getAI, getGenerativeModel, VertexAIBackend } from "firebase/ai";
+
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SYSTEM_PROMPT, INTRO_MESSAGE } from "@/lib/chat-types";
@@ -36,12 +34,12 @@ export function useChat(
 
   // Check if Firebase is configured
   useEffect(() => {
-    console.log("Firebase está configurado?", isFirebaseConfigured());
+    
     if (!isFirebaseConfigured()) {
       setFirebaseAvailable(false);
       setIsInitializing(false);
       // Load demo data
-      console.log("ativando demo");
+     
       setSession({
         id: DEFAULT_SESSION_ID,
         sessionNumber: 2,
@@ -93,7 +91,6 @@ export function useChat(
       },
       () => {
         // On error, fallback to demo mode
-        console.log("deu erro");
         setFirebaseAvailable(false);
         setSession({
           id: DEFAULT_SESSION_ID,
@@ -180,7 +177,6 @@ export function useChat(
       const currentSection = activeSection ?? session?.currentSection ?? "introduction";
 
       if (!firebaseAvailable) {
-        console.log("fireBase nao disponivel");
         // Demo mode: add messages locally
         const userMsg: ChatMessage = {
           id: `user-${Date.now()}`,
@@ -221,14 +217,12 @@ export function useChat(
         setStreamingContent("");
 
         // Write user message to Firestore
-        console.log("Tentando gravar no Firestore..");
         await addDoc(messagesRef, {
           role: "user",
           content: content.trim(),
           timestamp: serverTimestamp(),
           section: currentSection,
         });
-        console.log("Sucesso na gravação ");
 
 
         // Use Firebase AI Logic (Gemini Developer API) via client-side SDK

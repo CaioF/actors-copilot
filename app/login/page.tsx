@@ -12,14 +12,14 @@ export default function LoginPage() {
     if (user && !loading) {
         router.push('/dashboard'); // if already logged
     }
-    }, [user, loading]);
+    }, [user, loading, router]);
 
     const handleLogin = async ()=> {
         try {
             await loginWithGoogle();
 
             //if log in sucessfull
-            router.push('dashboard');
+            router.push('/dashboard');
         } catch (error) {
             console.error("Fail to redirect: ", error);
         }
