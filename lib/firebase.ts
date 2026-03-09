@@ -25,7 +25,9 @@ export function getApp(): FirebaseApp {
 
 export function getDb(): Firestore {
   if (!_db) {
-    _db = getFirestore(getApp());
+    
+    const databaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "(default)";
+    _db = getFirestore(getApp(), databaseId);
   }
   return _db;
 }

@@ -1,7 +1,8 @@
 "use client"
 
+import { useAuth } from "@/lib/context/AuthContext";
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   MessageCircle,
@@ -23,6 +24,12 @@ const menuItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter();
+  const {logout} = useAuth();
+
+  const handleLogout = async ()=> {
+    await logout();
+  }
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col bg-[#3D4A3C] text-[#F5F0E8]">
