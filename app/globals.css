@@ -92,3 +92,26 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Custom thin scrollbar for the sidebar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  /* Make the track transparent to blend with the background */
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Style the thumb (the part that moves) with a subtle green */
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #4b6354;
+    border-radius: 10px;
+  }
+
+  /* Add a hover effect with the brand's orange color */
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #f97316;
+  }
+}

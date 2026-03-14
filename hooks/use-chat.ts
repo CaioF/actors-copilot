@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { where, limit } from "firebase/firestore";
 import {
   collection,
   query,
@@ -16,7 +17,9 @@ import {
 
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
-import { SYSTEM_PROMPT, INTRO_MESSAGE } from "@/lib/chat-types";
+// Add this new import at the top of your use-chat.ts file
+import { QUESTIONS } from "@/lib/question";
+import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId } from "@/lib/chat-types";
 
 const DEFAULT_USER_ID = "demo-user";
 const DEFAULT_SESSION_ID = "session-1";
@@ -34,12 +37,9 @@ export function useChat(
 
   // Check if Firebase is configured
   useEffect(() => {
-    
     if (!isFirebaseConfigured()) {
       setFirebaseAvailable(false);
       setIsInitializing(false);
-      // Load demo data
-     
       setSession({
         id: DEFAULT_SESSION_ID,
         sessionNumber: 2,
@@ -55,7 +55,7 @@ export function useChat(
         {
           id: "intro-msg",
           role: "assistant",
-          content: INTRO_MESSAGE,
+          content: SECTION_INTROS["introduction"],
           timestamp: null,
           section: "introduction",
         },
@@ -75,7 +75,6 @@ export function useChat(
         if (docSnap.exists()) {
           setSession({ id: docSnap.id, ...docSnap.data() } as DNASession);
         } else {
-          // Create the session document if it doesn't exist
           const defaultSession: Omit<DNASession, "id"> = {
             sessionNumber: 2,
             totalSessions: 7,
@@ -90,7 +89,6 @@ export function useChat(
         }
       },
       () => {
-        // On error, fallback to demo mode
         setFirebaseAvailable(false);
         setSession({
           id: DEFAULT_SESSION_ID,
@@ -107,7 +105,7 @@ export function useChat(
           {
             id: "intro-msg",
             role: "assistant",
-            content: INTRO_MESSAGE,
+            content: SECTION_INTROS["introduction"],
             timestamp: null,
             section: "introduction",
           },
@@ -138,11 +136,10 @@ export function useChat(
             }) as ChatMessage
         );
 
-        // Seed intro message if empty
         if (msgs.length === 0) {
           await addDoc(messagesRef, {
             role: "assistant",
-            content: INTRO_MESSAGE,
+            content: SECTION_INTROS["introduction"],
             timestamp: serverTimestamp(),
             section: "introduction",
           });
@@ -152,13 +149,12 @@ export function useChat(
         setIsInitializing(false);
       },
       () => {
-        // On error, fallback
         setFirebaseAvailable(false);
         setMessages([
           {
             id: "intro-msg",
             role: "assistant",
-            content: INTRO_MESSAGE,
+            content: SECTION_INTROS["introduction"],
             timestamp: null,
             section: "introduction",
           },
@@ -177,7 +173,6 @@ export function useChat(
       const currentSection = activeSection ?? session?.currentSection ?? "introduction";
 
       if (!firebaseAvailable) {
-        // Demo mode: add messages locally
         const userMsg: ChatMessage = {
           id: `user-${Date.now()}`,
           role: "user",
@@ -188,13 +183,12 @@ export function useChat(
         setMessages((prev) => [...prev, userMsg]);
         setIsLoading(true);
 
-        // Simulate AI response
         setTimeout(() => {
           const aiMsg: ChatMessage = {
             id: `ai-${Date.now()}`,
             role: "assistant",
             content:
-              "Good. That is a start. But I need you to go deeper. When you think about that moment, what was the first physical sensation? Not the emotion — the sensation. Where did you feel it in your body? What was the temperature of the room? What could you hear in the background? Give me the specifics that make this yours and no one else's.",
+              "Good. That is a start. But I need you to go deeper. When you think about that moment, what was the first physical sensation?",
             timestamp: null,
             section: currentSection,
           };
@@ -210,13 +204,11 @@ export function useChat(
         `users/${userId}/dnaSessions/${sessionId}/messages`
       );
 
-
       try {
-        // Changed position of trying to send the message to firebase so that console.error can display what happens
         setIsLoading(true);
         setStreamingContent("");
 
-        // Write user message to Firestore
+        // 1. Salva a mensagem limpa do usuário no banco
         await addDoc(messagesRef, {
           role: "user",
           content: content.trim(),
@@ -224,16 +216,21 @@ export function useChat(
           section: currentSection,
         });
 
-
-        // Use Firebase AI Logic (Gemini Developer API) via client-side SDK
-
+        // 2. Prepara o modelo com Firebase AI
         const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
         const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
-        const model = getGenerativeModel(ai, { model: "gemini-2.0-flash" });
+        const model = getGenerativeModel(ai, { 
+          model: "gemini-2.0-flash",
+          // ADIÇÃO: Forçando o output estruturado
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
+        });
 
-        // Build conversation history
+        // 3. Monta o Histórico
         const currentMessages = await getDocs(
           query(messagesRef, orderBy("timestamp", "asc"))
         );
@@ -241,52 +238,150 @@ export function useChat(
           .filter((d) => d.data().role !== undefined)
           .map((d) => ({
             role: d.data().role === "assistant" ? ("model" as const) : ("user" as const),
-            parts: [{ text: d.data().content as string }],
+            parts: [{ text: d.data().content as string || ""}],
           }));
 
-        // Remove the last entry (the user message we just added) since we pass it as the new message
-        const rawHistory = history.slice(0, -1);
+        const historyWithoutCurrent = history.slice(0, -1);
 
-        // if intro message is the first one, we delete it because gemini needs the first message to come from the user
-        const chatHistory = rawHistory.filter((msg, index) => {
-        if (index === 0 && msg.role === "model") return false;
-          return true;
-        });
+        const chatHistory: { role: "user" | "model"; parts: { text: string }[] }[] = [];
+        let expectedRole = "user"; // O Gemini exige que comece SEMPRE com 'user'
+
+        for (const msg of historyWithoutCurrent) {
+          if (msg.role === expectedRole) {
+            // Se é o turno certo, adiciona na lista e inverte a expectativa
+            chatHistory.push(msg);
+            expectedRole = expectedRole === "user" ? "model" : "user";
+          } else {
+            // Se veio repetido (ex: duas mensagens do Coach seguidas por causa da introdução),
+            // fundimos o texto na última mensagem para não quebrar a regra da IA.
+            if (chatHistory.length > 0) {
+              chatHistory[chatHistory.length - 1].parts[0].text += `\n\n${msg.parts[0].text}`;
+            }
+          }
+        }
 
         const chat = model.startChat({
           systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
           history: chatHistory,
         });
 
-        const result = await chat.sendMessageStream(content.trim());
-        let fullResponse = "";
+        //questions selection
+        // 1. Fetch all questions for the current section (Array of strings)
+        const allSectionQuestions: string[] = QUESTIONS[currentSection] || [];
 
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
-          fullResponse += text;
-          setStreamingContent(fullResponse);
-        }
+        // 2. Get the list of already used questions from the session (fallback to empty array)
+        // Ensure you declare this variable before the AI call
+        const previouslyAsked: string[] = session?.askedQuestions || [];
 
-        // Persist complete AI response
+        // 3. Filter out the questions that are already in the 'previouslyAsked' list
+        // Explicitly typing 'q: string' fixes the TypeScript TS(7006) error
+        const availableQuestions = allSectionQuestions.filter((q: string) => !previouslyAsked.includes(q));
+
+        // 4. Shuffle the remaining questions and pick up to 3
+        const shuffledQuestions = [...availableQuestions].sort(() => 0.5 - Math.random());
+        const selectedQuestions = shuffledQuestions.slice(0, 3);
+
+        // 5. Format them into a text list for the AI prompt
+        const questionsListText = selectedQuestions.map((q: string) => `- ${q}`).join("\n");
+
+        const finalPromptForAI = `[CURRENT EXPLORATION ARENA: ${currentSection.toUpperCase()}]\nKeep your tone and extractions strictly focused on this arena.\n\nActor's Input: "${content.trim()}"\n\nSuggested Thematic Directions (Use these as inspiration...):\n${questionsListText}`;
+
+        // 5. Chamada Simples (Sem Stream) para receber o JSON completo
+        const result = await chat.sendMessage(finalPromptForAI);
+        const fullResponse = result.response.text();
+        
+        console.log("🔍 1. TEXTO CRU DA IA:", fullResponse);
+        
+        const aiData = JSON.parse(fullResponse);
+        
+        console.log("🧩 2. JSON MONTADO:", aiData);
+        
+        // Tratamento de segurança (Fallback)
+        const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
+        const aiExtractions = aiData?.extractions || null;
+        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null; //depth grade
+
+        // 6. Salva apenas a fala do Coach no chat visível
         await addDoc(messagesRef, {
           role: "assistant",
-          content: fullResponse,
+          content: aiCoachReply,
           timestamp: serverTimestamp(),
           section: currentSection,
         });
 
-        // Update session metadata
-        const sessionRef = doc(
-          getDb(),
-          `users/${userId}/dnaSessions/${sessionId}`
+        //progress 
+        let unlockedAuditions = session?.auditionsUnlocked || false;
+        let newCompletedSecs = session?.completedSections || [];
+        let totalCount = session?.totalExtractions || 0;
+
+        let sectionCounts = session?.sectionHqCounts || {};
+        let currentSecCount = sectionCounts[currentSection] || 0;
+
+        if (aiExtractions ) {
+          totalCount += 1; // +1 tentativa no total
+
+          // Limpa a duplicação se a IA tiver colocado dentro de extractions
+          if (aiExtractions.progress_assessment) {
+            delete aiExtractions.progress_assessment;
+          }
+
+        // Salvamos o bloco no cofre (Vault) incluindo a avaliação da IA
+          const vaultRef = collection(getDb(), `users/${userId}/dnaVault`);
+          await addDoc(vaultRef, {
+            sessionId: sessionId,
+            section: currentSection,
+            timestamp: serverTimestamp(),
+            extractions: aiExtractions,
+            assessment: aiAssessment 
+          });
+
+          // AVALIAÇÃO RIGOROSA: Passou no teste de qualidade?
+          const isHighQuality = aiAssessment.has_actionable_pattern === true && aiAssessment.depth_score >= 6;
+
+          if (isHighQuality) {
+            currentSecCount += 1; // +1 no Placar Desta Aba
+            sectionCounts[currentSection] = currentSecCount; // Salva no objeto geral
+
+            if (currentSecCount >= 6 && !newCompletedSecs.includes(currentSection)) {
+              newCompletedSecs.push(currentSection);
+            }
+          }
+        }
+        // Precisa de 5 pepitas de ouro AND ter explorado 2 abas diferentes.
+        if (newCompletedSecs.length >= 4) {
+          unlockedAuditions = true;
+        }
+
+        // CALCULO DA BARRINHA (0% a 100%)
+        // Começa em 10%. Cada pepita de ouro dá 18%. (10 + (5 * 18) = 100%)
+        // Usamos Math.min para garantir que a barra nunca passe de 100.
+        const totalPepitasUteis = Object.values(sectionCounts).reduce(
+          (acc, count) => acc + Math.min(count as number, 6), 0
         );
-        await updateDoc(sessionRef, {
+        const newProgress = Math.min((totalPepitasUteis / 24) * 100, 100);
+
+        // add question options to already asked list
+        // Combine the previously asked questions with the newly selected ones
+        const newAskedQuestions = [...previouslyAsked, ...selectedQuestions];
+
+        // 8. Avisamos o Firebase dos novos números!
+        const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
+        await updateDoc(sessionRef, { 
           lastActiveAt: serverTimestamp(),
+          totalExtractions: totalCount,
+          highQualityExtractions: sectionCounts, // Salvando a quantidade de ouros
+          completedSections: newCompletedSecs, 
+          progress: newProgress,           // Salvando a nova % da barra
+          auditionsUnlocked: unlockedAuditions,
+          askedQuestions: newAskedQuestions
         });
+        
+
       } catch (error) {
         console.error("ERRO DETECTADO:", error);
-        console.error("caiu no chatch");
+        console.error("caiu no catch");
         console.error("AI response error:", error);
+        
         // Fallback: write a static response
         await addDoc(messagesRef, {
           role: "assistant",
@@ -303,10 +398,42 @@ export function useChat(
     [userId, sessionId, session, firebaseAvailable]
   );
 
+  // Sincroniza a mudança de aba com o Firebase
+  const changeSection = useCallback(async (newSection: string) => {
+    if (!firebaseAvailable || !session) return;
+    
+    const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
+    await updateDoc(sessionRef, { 
+      currentSection: newSection,
+      lastActiveAt: serverTimestamp()
+    });
+
+    //inject intro messages
+    const messagesRef = collection(getDb(), `users/${userId}/dnaSessions/${sessionId}/messages`);
+    const q = query(messagesRef, where("section", "==", newSection), limit(1));
+    const snapshot = await getDocs(q);
+
+    // 3. Se a aba estiver vazia, injeta a mensagem do nosso Dicionário!
+    if (snapshot.empty) {
+      const introText = SECTION_INTROS[newSection as DNASectionId];
+      if (introText) {
+        await addDoc(messagesRef, {
+          role: "assistant",
+          content: introText,
+          timestamp: serverTimestamp(),
+          section: newSection,
+        });
+      }
+    }
+
+    console.log("New section: ", newSection);
+  }, [userId, sessionId, session, firebaseAvailable]);
+
   return {
     messages,
     session,
     sendMessage,
+    changeSection,
     isLoading,
     streamingContent,
     isInitializing,

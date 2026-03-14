@@ -32,7 +32,7 @@ export function AppSidebar() {
   }
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col bg-[#3D4A3C] text-[#F5F0E8]">
+    <aside className="w-[220px] h-screen flex flex-col bg-[#3D4A3C] text-[#F5F0E8]">
       {/* Logo */}
       <div className="flex items-center justify-center px-5 pt-6 pb-5">
         <div className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-md border border-[#F5F0E8]/20 bg-[#2C3328]">
