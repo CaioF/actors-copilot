@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function LoginPage() {
-    const {loginWithGoogle, user, loading} = useAuth();
-    const router = useRouter(); 
+    const { loginWithKajabi, user, loading } = useAuth();
+    const router = useRouter();
     
     useEffect(() => {
     if (user && !loading) {
@@ -14,16 +14,8 @@ export default function LoginPage() {
     }
     }, [user, loading, router]);
 
-    const handleLogin = async ()=> {
-        try {
-            await loginWithGoogle();
-
-            //if log in sucessfull
-            router.push('/dashboard');
-        } catch (error) {
-            console.error("Fail to redirect: ", error);
-        }
-
+    const handleLogin = ()=> {
+        loginWithKajabi();
     }
 
     return (
@@ -34,7 +26,7 @@ export default function LoginPage() {
         disabled={loading}
         className="px-4 py-2 bg-orange-500 text-white rounded"
       >
-        {loading ? 'Logging in...' : 'Log in with Google'} 
+        {loading ? 'Logging in...' : 'Log in'} 
       </button>
     </div>
   );
