@@ -44,7 +44,7 @@ export function useChat(
         id: DEFAULT_SESSION_ID,
         sessionNumber: 2,
         totalSessions: 7,
-        currentSection: "introduction",
+        currentSection: "identity",
         progress: 10,
         lastActiveAt: null,
         durationMinutes: 18,
@@ -55,9 +55,9 @@ export function useChat(
         {
           id: "intro-msg",
           role: "assistant",
-          content: SECTION_INTROS["introduction"],
+          content: SECTION_INTROS["identity"],
           timestamp: null,
-          section: "introduction",
+          section: "identity",
         },
       ]);
       return;
@@ -78,7 +78,7 @@ export function useChat(
           const defaultSession: Omit<DNASession, "id"> = {
             sessionNumber: 2,
             totalSessions: 7,
-            currentSection: "introduction",
+            currentSection: "identity",
             progress: 10,
             lastActiveAt: serverTimestamp() as DNASession["lastActiveAt"],
             durationMinutes: 18,
@@ -94,7 +94,7 @@ export function useChat(
           id: DEFAULT_SESSION_ID,
           sessionNumber: 2,
           totalSessions: 7,
-          currentSection: "introduction",
+          currentSection: "identity",
           progress: 10,
           lastActiveAt: null,
           durationMinutes: 18,
@@ -105,9 +105,9 @@ export function useChat(
           {
             id: "intro-msg",
             role: "assistant",
-            content: SECTION_INTROS["introduction"],
+            content: SECTION_INTROS["identity"],
             timestamp: null,
-            section: "introduction",
+            section: "identity",
           },
         ]);
         setIsInitializing(false);
@@ -139,9 +139,9 @@ export function useChat(
         if (msgs.length === 0) {
           await addDoc(messagesRef, {
             role: "assistant",
-            content: SECTION_INTROS["introduction"],
+            content: SECTION_INTROS["identity"],
             timestamp: serverTimestamp(),
-            section: "introduction",
+            section: "identity",
           });
         } else {
           setMessages(msgs);
@@ -154,9 +154,9 @@ export function useChat(
           {
             id: "intro-msg",
             role: "assistant",
-            content: SECTION_INTROS["introduction"],
+            content: SECTION_INTROS["identity"],
             timestamp: null,
-            section: "introduction",
+            section: "identity",
           },
         ]);
         setIsInitializing(false);
@@ -170,7 +170,7 @@ export function useChat(
     async (content: string, activeSection?: string) => {
       if (!content.trim()) return;
 
-      const currentSection = activeSection ?? session?.currentSection ?? "introduction";
+      const currentSection = activeSection ?? session?.currentSection ?? "identity";
 
       if (!firebaseAvailable) {
         const userMsg: ChatMessage = {
@@ -188,7 +188,7 @@ export function useChat(
             id: `ai-${Date.now()}`,
             role: "assistant",
             content:
-              "Good. That is a start. But I need you to go deeper. When you think about that moment, what was the first physical sensation?",
+              "Good. That is a start. But I need you to go deeper. When you think about that moment, what was the first physical behaviour you noted? Blushing, tight shoulders, shortness of breath? Describe that outcome in detail.",
             timestamp: null,
             section: currentSection,
           };
@@ -311,21 +311,20 @@ export function useChat(
 
         //progress 
         let unlockedAuditions = session?.auditionsUnlocked || false;
-        let newCompletedSecs = session?.completedSections || [];
         let totalCount = session?.totalExtractions || 0;
-
-        let sectionCounts = session?.sectionHqCounts || {};
+        let newCompletedSecs = [...(session?.completedSections || [])]; // Copys array
+        let sectionCounts = { ...(session?.sectionHqCounts || {}) };    // Copys object
         let currentSecCount = sectionCounts[currentSection] || 0;
 
         if (aiExtractions ) {
-          totalCount += 1; // +1 tentativa no total
+          totalCount += 1; 
 
-          // Limpa a duplicação se a IA tiver colocado dentro de extractions
+          
           if (aiExtractions.progress_assessment) {
             delete aiExtractions.progress_assessment;
           }
 
-        // Salvamos o bloco no cofre (Vault) incluindo a avaliação da IA
+        // saves all extractions in a vault collection for future use
           const vaultRef = collection(getDb(), `users/${userId}/dnaVault`);
           await addDoc(vaultRef, {
             sessionId: sessionId,
@@ -335,28 +334,29 @@ export function useChat(
             assessment: aiAssessment 
           });
 
-          // AVALIAÇÃO RIGOROSA: Passou no teste de qualidade?
+          // quality check 
           const isHighQuality = aiAssessment.has_actionable_pattern === true && aiAssessment.depth_score >= 6;
 
           if (isHighQuality) {
-            currentSecCount += 1; // +1 no Placar Desta Aba
-            sectionCounts[currentSection] = currentSecCount; // Salva no objeto geral
+            currentSecCount += 1; 
+            sectionCounts[currentSection] = currentSecCount; // save the count for the current section
 
+            //if the user extracted 6 good insights in the same section, we consider it completed and move on to the next one
             if (currentSecCount >= 6 && !newCompletedSecs.includes(currentSection)) {
               newCompletedSecs.push(currentSection);
             }
           }
         }
-        // Precisa de 5 pepitas de ouro AND ter explorado 2 abas diferentes.
+        
         if (newCompletedSecs.length >= 4) {
           unlockedAuditions = true;
         }
 
-        // CALCULO DA BARRINHA (0% a 100%)
-        // Começa em 10%. Cada pepita de ouro dá 18%. (10 + (5 * 18) = 100%)
-        // Usamos Math.min para garantir que a barra nunca passe de 100.
+        // BAR CALCULATION (0% to 100%)
+        // The bar starts at 0%. The goal is to accumulate 24 high-quality extractions.
+        // We use Math.min to ensure the bar never exceeds 100%.
         const totalPepitasUteis = Object.values(sectionCounts).reduce(
-          (acc, count) => acc + Math.min(count as number, 6), 0
+            (acc, count) => acc + Math.min(count as number, 6), 0
         );
         const newProgress = Math.min((totalPepitasUteis / 24) * 100, 100);
 
@@ -364,14 +364,13 @@ export function useChat(
         // Combine the previously asked questions with the newly selected ones
         const newAskedQuestions = [...previouslyAsked, ...selectedQuestions];
 
-        // 8. Avisamos o Firebase dos novos números!
+        // Update firebase with new numbers
         const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
         await updateDoc(sessionRef, { 
           lastActiveAt: serverTimestamp(),
           totalExtractions: totalCount,
-          highQualityExtractions: sectionCounts, // Salvando a quantidade de ouros
-          completedSections: newCompletedSecs, 
-          progress: newProgress,           // Salvando a nova % da barra
+          sectionHqCounts: sectionCounts,
+          progress: newProgress,           
           auditionsUnlocked: unlockedAuditions,
           askedQuestions: newAskedQuestions
         });

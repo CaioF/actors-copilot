@@ -19,7 +19,7 @@ export default function ChatPage() {
     isInitializing,
   } = useChat();
 
-  const [activeSection, setActiveSection] = useState("introduction");
+  const [activeSection, setActiveSection] = useState("identity"); // Default to the first section
 
   //filter section messages
   const filteredMessages = messages.filter(

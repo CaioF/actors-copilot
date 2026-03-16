@@ -9,7 +9,6 @@ import {
   Dna,
   Settings,
   CheckCircle2,
-  Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS } from "@/lib/chat-types";
