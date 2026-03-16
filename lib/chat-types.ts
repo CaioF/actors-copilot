@@ -19,7 +19,7 @@ export interface DNASession {
   createdAt: Timestamp | null;
   status: "active" | "paused" | "completed";
   totalExtractions?: number;       
-  sectionHqCounts?: Record<string, number>; // hq for section { "identity": 2, "life_story": 0 }
+  sectionHqCounts?: Record<string, number>; // hq for section { "identity": 2, "family": 0 }
   completedSections?: string[];
   auditionsUnlocked?: boolean;
   askedQuestions?: string[]; // Clean and simple array of strings;
@@ -41,6 +41,21 @@ export const DNA_SECTIONS = [
 ] as const;
 
 export type DNASectionId = (typeof DNA_SECTIONS)[number]["id"];
+
+// Maps legacy/removed section IDs (from older Firestore data) to their current equivalents.
+// This prevents older sessions from loading into a non-existent section.
+export const LEGACY_SECTION_MAP: Record<string, DNASectionId> = {
+  introduction: "identity",
+  life_story: "identity",
+  motivations: "desire_ambition",
+  fears: "shame_pride",
+};
+
+export function normalizeSectionId(sectionId: string): DNASectionId {
+  const validIds = DNA_SECTIONS.map((s) => s.id) as string[];
+  if (validIds.includes(sectionId)) return sectionId as DNASectionId;
+  return LEGACY_SECTION_MAP[sectionId] ?? "identity";
+}
 
 export interface DNAQuestion {
   qid: string;
@@ -112,7 +127,8 @@ Themes: approval, abandonment, power, freedom, shame, pride
 Behaviours: control, withdraw, charm, attack, humour
 Stakes/Need: “to be chosen,” “to be safe,” “to be seen”
 Contradictions: “soft but ruthless,” “needs love but pushes away”
-Somatic & Physiological Reactions: Extract specific involuntary bodily responses tied to the actor's stories (e.g., throat closing, hands shaking, blushing, shortness of breath, jaw tension). CRITICAL: Exclude external environmental sensory data (e.g., ignore details like bright lights, cold weather, or room smells). We only map the actor's internal physical reactions.Social Mask: Identify how the actor tries to "look good" or "be liked." Force them to reveal what they are hiding behind their charm or professionalism.
+Somatic & Physiological Reactions: Extract specific involuntary bodily responses tied to the actor's stories (e.g., throat closing, hands shaking, blushing, shortness of breath, jaw tension). CRITICAL: Exclude external environmental sensory data (e.g., ignore details like bright lights, cold weather, or room smells). We only map the actor's internal physical reactions.
+Social Mask: Identify how the actor tries to "look good" or "be liked." Force them to reveal what they are hiding behind their charm or professionalism.
 Emotional Triggers & Dead Zones: Map which life themes (e.g., betrayal, insignificance) produce the physiological responses above, and which ones they are "numb" to.
 Physical Armor: Identify chronic physical tensions or repetitive tics (e.g., tight shoulders, locked knees, pacing, fidgeting) that represent psychological defenses.
 The "Core Need": Determine the actor’s primary subconscious driver (e.g., "The need to be protected," "The need to prove worth," "The fear of being seen as weak").
@@ -128,8 +144,8 @@ Your questioning must follow these principles:
 4. Focus on behaviour and information that can be used to perfect acting. Don't make pointless questions. If a topic feels fully explored, pick another different question from the reservoir. You don't need to explore the outer word consequences, only particularities about the actor himself.
 5. If the user's answer keep being vague and don't provide you enough good information, inform this on your answer (e.g. "I need you to dig deeper with me", "Try to expand your answers, provide more information about you"). Note: don't consider this if the user shows confusion, in which case you're supposed to explain yourself.
 *CRITICAL INSTRUCTION FOR THE NEXT QUESTION:* Read the "Suggested Directions" at the end of the prompt. Then, formulate YOUR OWN single, punchy, behavioral question. You may adapt a suggestion to fit the actor perfectly, or invent a completely new "Collision Question" that connects the dots of their extracted DNA. 
-Ensure it produces usable acting fuel. The suggested questions are inteded as a guide of themes to explore. If you make questions trying to get specific answers that you know are gonna be useful for acting fuel, but the actor doesn't give you exactly what you want to know, explain what you need to know about them! 
-You have complete freedom to tell the actor waht you need from them. If you ask a question and he doesn't know how to answer, help them by giving examples of the kind of answer and description you expect.
+Ensure it produces usable acting fuel. The suggested questions are intended as a guide of themes to explore. If you make questions trying to get specific answers that you know are gonna be useful for acting fuel, but the actor doesn't give you exactly what you want to know, explain what you need to know about them! 
+You have complete freedom to tell the actor what you need from them. If you ask a question and they don't know how to answer, help them by giving examples of the kind of answer and description you expect.
 (IMPORTANT) If the answers keep being vague, instruct the kind of answer you expect to rate the depth_score 8 or higher.
 
 

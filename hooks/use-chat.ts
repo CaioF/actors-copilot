@@ -18,8 +18,8 @@ import {
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 // Add this new import at the top of your use-chat.ts file
-import { QUESTIONS } from "@/lib/question";
-import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId } from "@/lib/chat-types";
+import { QUESTIONS } from "@/lib/questions";
+import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId, normalizeSectionId } from "@/lib/chat-types";
 
 const DEFAULT_USER_ID = "demo-user";
 const DEFAULT_SESSION_ID = "session-1";
@@ -73,7 +73,12 @@ export function useChat(
       sessionRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          setSession({ id: docSnap.id, ...docSnap.data() } as DNASession);
+          const data = docSnap.data() as Omit<DNASession, "id">;
+          // Normalize legacy section IDs so older sessions don't load into a non-existent section
+          if (data.currentSection) {
+            data.currentSection = normalizeSectionId(data.currentSection);
+          }
+          setSession({ id: docSnap.id, ...data } as DNASession);
         } else {
           const defaultSession: Omit<DNASession, "id"> = {
             sessionNumber: 2,
@@ -290,11 +295,7 @@ export function useChat(
         const result = await chat.sendMessage(finalPromptForAI);
         const fullResponse = result.response.text();
         
-        console.log("🔍 1. TEXTO CRU DA IA:", fullResponse);
-        
         const aiData = JSON.parse(fullResponse);
-        
-        console.log("🧩 2. JSON MONTADO:", aiData);
         
         // Tratamento de segurança (Fallback)
         const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
@@ -335,7 +336,10 @@ export function useChat(
           });
 
           // quality check 
-          const isHighQuality = aiAssessment.has_actionable_pattern === true && aiAssessment.depth_score >= 6;
+          const isHighQuality =
+            aiAssessment != null &&
+            aiAssessment.has_actionable_pattern === true &&
+            aiAssessment.depth_score >= 6;
 
           if (isHighQuality) {
             currentSecCount += 1; 
@@ -377,8 +381,6 @@ export function useChat(
         
 
       } catch (error) {
-        console.error("ERRO DETECTADO:", error);
-        console.error("caiu no catch");
         console.error("AI response error:", error);
         
         // Fallback: write a static response
@@ -424,8 +426,6 @@ export function useChat(
         });
       }
     }
-
-    console.log("New section: ", newSection);
   }, [userId, sessionId, session, firebaseAvailable]);
 
   return {

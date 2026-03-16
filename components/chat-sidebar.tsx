@@ -131,7 +131,7 @@ export function ChatSidebar({
       </div>
 
       {/* Menu */}
-      <div className="flex-1 px-4">
+      <div className="shrink-0 px-4">
         <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
           Menu
         </p>
