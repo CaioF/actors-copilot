@@ -42,21 +42,6 @@ export const DNA_SECTIONS = [
 
 export type DNASectionId = (typeof DNA_SECTIONS)[number]["id"];
 
-// Maps legacy/removed section IDs (from older Firestore data) to their current equivalents.
-// This prevents older sessions from loading into a non-existent section.
-export const LEGACY_SECTION_MAP: Record<string, DNASectionId> = {
-  introduction: "identity",
-  life_story: "identity",
-  motivations: "desire_ambition",
-  fears: "shame_pride",
-};
-
-export function normalizeSectionId(sectionId: string): DNASectionId {
-  const validIds = DNA_SECTIONS.map((s) => s.id) as string[];
-  if (validIds.includes(sectionId)) return sectionId as DNASectionId;
-  return LEGACY_SECTION_MAP[sectionId] ?? "identity";
-}
-
 export interface DNAQuestion {
   qid: string;
   section: DNASectionId; 

@@ -19,7 +19,7 @@ import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 // Add this new import at the top of your use-chat.ts file
 import { QUESTIONS } from "@/lib/questions";
-import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId, normalizeSectionId } from "@/lib/chat-types";
+import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId } from "@/lib/chat-types";
 
 const DEFAULT_USER_ID = "demo-user";
 const DEFAULT_SESSION_ID = "session-1";
@@ -73,12 +73,7 @@ export function useChat(
       sessionRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          const data = docSnap.data() as Omit<DNASession, "id">;
-          // Normalize legacy section IDs so older sessions don't load into a non-existent section
-          if (data.currentSection) {
-            data.currentSection = normalizeSectionId(data.currentSection);
-          }
-          setSession({ id: docSnap.id, ...data } as DNASession);
+          setSession({ id: docSnap.id, ...docSnap.data() } as DNASession);
         } else {
           const defaultSession: Omit<DNASession, "id"> = {
             sessionNumber: 2,
