@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardFooter } from "@/components/dashboard-footer";
@@ -13,12 +13,25 @@ export default function ChatPage() {
     messages,
     session,
     sendMessage,
+    changeSection,
     isLoading,
     streamingContent,
     isInitializing,
   } = useChat();
 
-  const [activeSection, setActiveSection] = useState("introduction");
+  const [activeSection, setActiveSection] = useState("identity"); // Default to the first section
+
+  //filter section messages
+  const filteredMessages = messages.filter(
+    (msg) => msg.section === activeSection
+  );
+
+  // Se a sessão for carregada do Firebase e tiver uma seção salva, a UI muda pra ela
+  useEffect(() => {
+    if (session?.currentSection && session.currentSection !== activeSection) {
+      setActiveSection(session.currentSection);
+    }
+  }, [session?.currentSection]); // Roda sempre que o Firebase avisar de mudança
 
   return (
     <div className="flex h-screen bg-[#F0E8DC]">
@@ -26,7 +39,12 @@ export default function ChatPage() {
       <ChatSidebar
         session={session}
         activeSection={activeSection}
-        onSectionClick={setActiveSection}
+        onSectionClick={(sectionClicked) => {
+          setActiveSection(sectionClicked);
+          if (changeSection) {
+            changeSection(sectionClicked);
+          }
+        } }
       />
 
       {/* Main content area */}
@@ -35,7 +53,7 @@ export default function ChatPage() {
 
         {/* Chat message area */}
         <ChatMessages
-          messages={messages}
+          messages={filteredMessages}
           isLoading={isLoading}
           streamingContent={streamingContent}
           isInitializing={isInitializing}

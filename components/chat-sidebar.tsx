@@ -8,6 +8,7 @@ import {
   Monitor,
   Dna,
   Settings,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS } from "@/lib/chat-types";
@@ -47,7 +48,7 @@ export function ChatSidebar({
   return (
     <aside className="flex w-[220px] shrink-0 flex-col bg-[#3D4A3C] text-[#F5F0E8]">
       {/* Logo */}
-      <div className="flex items-center justify-center px-5 pt-6 pb-4">
+      <div className="flex items-center justify-center px-5 pt-3 pb-1">
         <div className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-md border border-[#F5F0E8]/20 bg-[#2C3328]">
           <span className="text-[7px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">
             The
@@ -65,7 +66,7 @@ export function ChatSidebar({
       <div className="mx-5 mb-4 border-t border-[#F5F0E8]/10" />
 
       {/* Session Info */}
-      <div className="px-5 pb-4">
+      <div className="px-5 pb-2">
         <span className="inline-flex items-center rounded-full bg-[#E8721A] px-3 py-1 text-xs font-semibold text-[#ffffff]">
           Session {session?.sessionNumber ?? 2} of{" "}
           {session?.totalSessions ?? 7}
@@ -80,7 +81,7 @@ export function ChatSidebar({
       </div>
 
       {/* DNA Sections */}
-      <div className="px-5 pb-3">
+      <div className="px-5 flex-1 overflow-y-auto custom-scrollbar pb-3">
         <div className="mb-2 flex items-center gap-1.5">
           <Dna className="h-3.5 w-3.5 text-[#F5F0E8]/50" />
           <span className="text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
@@ -88,25 +89,36 @@ export function ChatSidebar({
           </span>
         </div>
         <nav className="flex flex-col gap-0.5 pl-1">
-          {DNA_SECTIONS.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => onSectionClick(section.id)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-left text-sm transition-colors",
-                activeSection === section.id
-                  ? "font-medium text-[#E8721A]"
-                  : "text-[#F5F0E8]/70 hover:text-[#F5F0E8]"
-              )}
-            >
-              {section.label}
-            </button>
-          ))}
+          {DNA_SECTIONS.map((section) => {
+
+            const isCompleted = session?.completedSections?.includes(section.id);
+
+            return (
+              <button
+                key={section.id}
+                onClick={() => onSectionClick(section.id)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-left text-sm transition-colors",
+                  activeSection === section.id
+                    ? "font-medium text-[#E8721A]"
+                    : "text-[#F5F0E8]/70 hover:text-[#F5F0E8]"
+                )}
+              >
+                {section.label}
+                
+                {isCompleted && (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#E8721A]" />
+                )}
+              </button>
+            )
+          }
+          
+          )}
         </nav>
       </div>
 
       {/* Progress Bar */}
-      <div className="px-5 pb-5">
+      <div className="px-5 pb-5 flex-shrink-0">
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#2C3328]">
           <div
             className="h-full rounded-full bg-[#E8721A] transition-all duration-500"
@@ -119,7 +131,7 @@ export function ChatSidebar({
       </div>
 
       {/* Menu */}
-      <div className="flex-1 px-4">
+      <div className="shrink-0 px-4">
         <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
           Menu
         </p>
@@ -146,15 +158,15 @@ export function ChatSidebar({
       </div>
 
       {/* Premium Plan */}
-      <div className="p-4">
-        <div className="rounded-xl bg-[#2C3328] p-4">
+      <div className="p-2 pt-1">
+        <div className="rounded-xl bg-[#2C3328] p-3">
           <h4 className="font-serif text-lg font-bold text-[#F5F0E8]">
             Premium Plan
           </h4>
           <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
             Upgrade to Premium Plan to unlock more features
           </p>
-          <button className="mt-3 w-full rounded-lg bg-[#E8721A] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90">
+          <button className="mt-3 w-full rounded-lg bg-[#E8721A] py-2 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90">
             Upgrade
           </button>
         </div>
