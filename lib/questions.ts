@@ -1,8 +1,7 @@
-
 export const QUESTIONS: Record<string, string[]> = {
-  
-    // Identity & Self-Story
-    identity: [
+
+  // Identity & Self-Story
+  identity: [
     "What do people assume about you that isn’t true?",
     "What part of you do you protect in public?",
     "When you’re at your best, what are you doing?",
