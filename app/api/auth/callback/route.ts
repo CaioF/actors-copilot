@@ -1,63 +1,158 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { auth } from '@/lib/firebase-admin';
+import { SignJWT } from 'jose';
 
-export async function GET(request: Request) {
-    // 1. extract the authorization code from the query parameters
-    // When Kajabi sends the user back, the URL will look like: 
-    // http://localhost:3000/api/auth/callback?code=abc123xyz
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get('code');
-
-    // If there is no code, something went wrong (e.g., user denied access)
-    if (!code) {
-        console.error("No authorization code provided by Kajabi");
-        return NextResponse.redirect(new URL('/login?error=access_denied', request.url));
-    }
+export async function POST(request: Request) {
 
     try {
-        // 2. exchange the code for an access token
-        const tokenResponse = await fetch(`${process.env.NEXT_PUBLIC_KAJABI_DOMAIN}/oauth/token`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                client_id: process.env.NEXT_PUBLIC_KAJABI_CLIENT_ID,
-                client_secret: process.env.KAJABI_CLIENT_SECRET, // Safe server-side secret
-                code: code,
-                grant_type: 'authorization_code',
-                redirect_uri: process.env.NEXT_PUBLIC_KAJABI_REDIRECT_URI,
-            }),
-        });
+        const authHeader = request.headers.get('Authorization');
 
-        const tokenData = await tokenResponse.json();
-        console.log("=== KAJABI TOKEN DATA ===", tokenData);
-
-        if (!tokenResponse.ok) {
-            throw new Error(tokenData.error_description || "Failed to exchange token");
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return NextResponse.json({ error: 'Token not found or invalid' }, { status: 401 });
         }
 
-        // 3. SEND THE USER TO THE DASHBOARD
-        // having the access_token, redirect the user to the frontend dashboard.
-        // secure, HttpOnly cookie
-        // This is invisible to the URL and protected from malicious JavaScript
-        const cookieStore = await cookies();
+        const idToken = authHeader.split('Bearer ')[1];
 
-        cookieStore.set({
-            name: 'kajabi_session',
-            value: tokenData.access_token,
-            httpOnly: true, // Crucial: prevents XSS attacks
-            secure: process.env.NODE_ENV === 'production', // Only sends over HTTPS in production
-            sameSite: 'lax', // CSRF protection
-            path: '/', // The cookie is valid for the whole website
-            maxAge: 60 * 60 * 24 * 7 // E.g., 7 days in seconds
-        })
-        
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+        // uncode the token to get the email and check if it is in the list of allowed emails for kajabi access
+        const decodedToken = await auth.verifyIdToken(idToken);
+        const UserEmail = decodedToken.email;
+
+        if (!UserEmail) {
+            return NextResponse.json({ error: 'Email not found in token' }, { status: 400 });
+        }
+
+        const hasAccess = await verifyKajabiPurchase(UserEmail);
+        if (!hasAccess.success) {
+            // Agora nós repassamos a mensagem exata do erro pro frontend!
+            return NextResponse.json({ error: hasAccess.message }, { status: 403 });
+        }
+
+        //cryptographically sign a new token with the user's email to create a session
+        if (!process.env.JWT_SECRET) {
+            console.error("ERRO: JWT_SECRET não configurado no .env.local");
+            return NextResponse.json({ error: 'Internal Configuration Error' }, { status: 500 });
+        }
+
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+        const token = await new SignJWT({ email: UserEmail }) 
+            .setProtectedHeader({ alg: 'HS256' })
+            .setIssuedAt()
+            .setExpirationTime('7d') // session expires in 7 days
+            .sign(secret);
+
+        // Give the user the signed token
+        const cookieStore = await cookies();
+        cookieStore.set('kajabi_session', token, {
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'strict', 
+            maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
+            path: '/', 
+        });
+
+        return NextResponse.json({ success: true, redirectUrl: '/dashboard' }, { status: 200 });
 
     } catch (error) {
-        console.error("Token exchange failed:", error);
-        return NextResponse.redirect(new URL('/login?error=auth_failed', request.url));
+        console.error("Error in auth callback: ", error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-}
+    
+} 
 
+async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; message?: string }> {
+
+        const clientId = process.env.KAJABI_CLIENT_ID;
+        const clientSecret = process.env.KAJABI_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+            return { success: false, message: "System configuration error. Please contact support." };
+        }
+
+        try {
+            const tokenResponse = await fetch('https://api.kajabi.com/v1/oauth/token',{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    grant_type: 'client_credentials',
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                })
+            } );
+
+            if (!tokenResponse.ok) return { success: false, message: "Failed to connect to Kajabi validation server." };
+
+            const tokenData = await tokenResponse.json();
+            const accessToken = tokenData.access_token;
+
+            const userResponse = await fetch(`https://api.kajabi.com/v1/contacts?email=${encodeURIComponent(email)}`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (!userResponse.ok) return { success: false, message: "Failed to fetch user data from Kajabi." };
+
+            const userData = await userResponse.json();
+            if (!userData || !userData.data || userData.data.length === 0 ) {
+                return { success: false, message: "We couldn't find a Kajabi account with this email. Please use the exact email you used to purchase." };
+            }
+
+            const userInKajabi = userData.data.find(
+                (contato: any) => contato.attributes.email === email
+            );
+
+            if (!userInKajabi) {
+              return { success: false, message: "Email not found in our members list. Are you using the right Google Account?" };
+            }
+
+            const userId = userInKajabi.id;
+            const offerUrl = userInKajabi.relationships.offers?.links.self;
+
+            if (!offerUrl) {
+              return { success: false, message: "Your account was found, but you don't have any active purchases." };
+            }
+
+            const offersResponse = await fetch(offerUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (!offersResponse.ok) return { success: false, message: "Failed to verify your active offers." }; 
+
+            const offersData = await offersResponse.json();
+            if (!offersData.data || offersData.data.length === 0) {
+                return { success: false, message: "You don't have any active offers in your account." };
+            }
+
+            const requiredOfferId = process.env.KAJABI_REQUIRED_OFFER_ID;
+            if (!requiredOfferId) {
+                return { success: false, message: "An unexpected error occurred during validation. Please try again." };
+            }
+            const hasRequiredOffer = offersData.data.some(
+                (offer: any) => String(offer.id) === String(requiredOfferId)
+            );
+
+            if (!hasRequiredOffer) {
+                
+                return { success: false, message: "You don't have the required 'The Actor's Copilot' offer. Please check your purchase history." };
+            }
+
+
+            const user = userInKajabi.attributes;
+            const relationships = userInKajabi.relationships ;
+            
+            return { success: true, message: "Purchase verified successfully." };
+
+        } catch (error) {
+            console.error("Error verifying Kajabi purchase: ", error);
+            return { success: false, message: "An unexpected error occurred during validation. Please try again." };
+        }
+
+}

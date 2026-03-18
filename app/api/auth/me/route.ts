@@ -1,35 +1,33 @@
-// app/api/auth/me/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { jwtVerify } from 'jose';
 
 export async function GET() {
-    // 1. Get the cookie store safely
-    const cookieStore = await cookies();
-    const token = cookieStore.get('kajabi_session')?.value;
-
-    // 2. If no token, the user is not logged in
-    if (!token) {
-        return NextResponse.json({ user: null }, { status: 401 });
-    }
-
     try {
-        // 3. Ask Kajabi who this token belongs to
-        // (You'll need to check Kajabi's API docs for the exact "me" endpoint)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_KAJABI_DOMAIN}/api/v1/users/me`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
+        const cookieStore = await cookies();
+        const sessionCookie = cookieStore.get('kajabi_session')?.value;
 
-        if (!response.ok) throw new Error("Invalid token");
+        // no cookie means no session, so the user is not authenticated
+        if (!sessionCookie) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
 
-        const userData = await response.json();
-        
-        // 4. Return the user data to our React frontend
-        return NextResponse.json({ user: userData });
-        
+        // Security check: ensure JWT_SECRET is set
+        if (!process.env.JWT_SECRET) {
+            console.error("[Auth] CRITICAL: JWT_SECRET missing in /me route");
+            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+        }
+
+        // Uncrypt (JWT)
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+        const { payload } = await jwtVerify(sessionCookie, secret);
+
+        return NextResponse.json({ 
+            user: { email: payload.email } 
+        }, { status: 200 });
+
     } catch (error) {
-        // If the token is expired or invalid, we clear it
-        return NextResponse.json({ user: null }, { status: 401 });
+        console.error("Error verifying session in /me:", error);
+        return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 });
     }
 }
