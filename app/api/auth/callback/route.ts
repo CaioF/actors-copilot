@@ -14,28 +14,28 @@ export async function POST(request: Request) {
 
         const idToken = authHeader.split('Bearer ')[1];
 
-        // uncode the token to get the email and check if it is in the list of allowed emails for kajabi access
+        // decode the token to get the email and check if it is in the list of allowed emails for kajabi access
         const decodedToken = await auth.verifyIdToken(idToken);
-        const UserEmail = decodedToken.email;
+        const userEmail = decodedToken.email;
 
-        if (!UserEmail) {
+        if (!userEmail) {
             return NextResponse.json({ error: 'Email not found in token' }, { status: 400 });
         }
 
-        const hasAccess = await verifyKajabiPurchase(UserEmail);
+        const hasAccess = await verifyKajabiPurchase(userEmail);
         if (!hasAccess.success) {
-            // Agora nós repassamos a mensagem exata do erro pro frontend!
+            //  We now forward the exact error message to the frontend
             return NextResponse.json({ error: hasAccess.message }, { status: 403 });
         }
 
-        //cryptographically sign a new token with the user's email to create a session
+        // cryptographically sign a new token with the user's email to create a session
         if (!process.env.JWT_SECRET) {
-            console.error("ERRO: JWT_SECRET não configurado no .env.local");
+            console.error("ERROR: JWT_SECRET not configured in .env.local");
             return NextResponse.json({ error: 'Internal Configuration Error' }, { status: 500 });
         }
 
         const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-        const token = await new SignJWT({ email: UserEmail }) 
+        const token = await new SignJWT({ email: userEmail }) 
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
             .setExpirationTime('7d') // session expires in 7 days
@@ -109,7 +109,6 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
               return { success: false, message: "Email not found in our members list. Are you using the right Google Account?" };
             }
 
-            const userId = userInKajabi.id;
             const offerUrl = userInKajabi.relationships.offers?.links.self;
 
             if (!offerUrl) {
@@ -143,10 +142,6 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
                 
                 return { success: false, message: "You don't have the required 'The Actor's Copilot' offer. Please check your purchase history." };
             }
-
-
-            const user = userInKajabi.attributes;
-            const relationships = userInKajabi.relationships ;
             
             return { success: true, message: "Purchase verified successfully." };
 
