@@ -17,13 +17,21 @@ import {
 
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
-// Add this new import at the top of your use-chat.ts file
 import { QUESTIONS } from "@/lib/questions";
 import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId } from "@/lib/chat-types";
 
 const DEFAULT_USER_ID = "demo-user";
 const DEFAULT_SESSION_ID = "session-1";
 
+/**
+ * Custom React hook to manage the AI Copilot DNA Extraction chat session.
+ * Handles real-time synchronization with Firebase Firestore, interactions with
+ * the Vertex AI Gemini model, and local state management for the chat UI.
+ *
+ * @param {string} userId - The unique identifier of the user.
+ * @param {string} sessionId - The unique identifier of the current DNA extraction session.
+ * @returns {Object} The chat state and action methods.
+ */
 export function useChat(
   userId: string = DEFAULT_USER_ID,
   sessionId: string = DEFAULT_SESSION_ID
@@ -35,7 +43,10 @@ export function useChat(
   const [isInitializing, setIsInitializing] = useState(true);
   const [firebaseAvailable, setFirebaseAvailable] = useState(true);
 
-  // Check if Firebase is configured
+  /**
+   * Validates Firebase configuration on mount.
+   * If Firebase is not configured, it falls back to a mocked state for UI demonstration purposes.
+   */
   useEffect(() => {
     if (!isFirebaseConfigured()) {
       setFirebaseAvailable(false);
@@ -65,7 +76,10 @@ export function useChat(
     setFirebaseAvailable(true);
   }, []);
 
-  // Real-time listener for session metadata
+  /**
+   * Establishes a real-time Firestore listener for session metadata.
+   * Automatically provisions a default session document if one does not exist.
+   */
   useEffect(() => {
     if (!firebaseAvailable) return;
     const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
@@ -116,7 +130,10 @@ export function useChat(
     return () => unsubscribe();
   }, [userId, sessionId, firebaseAvailable]);
 
-  // Real-time listener for messages
+  /**
+   * Establishes a real-time Firestore listener for chat messages in the current session.
+   * Automatically injects an initial greeting from the assistant if the chat history is empty.
+   */
   useEffect(() => {
     if (!firebaseAvailable) return;
     const messagesRef = collection(
@@ -165,13 +182,21 @@ export function useChat(
     return () => unsubscribe();
   }, [userId, sessionId, firebaseAvailable]);
 
-  // Send message
+  /**
+   * Processes and dispatches a user message to the AI model, then handles the structured response.
+   * Calculates progress based on the quality of AI extractions and updates session metadata.
+   *
+   * @param {string} content - The user's input text.
+   * @param {string} [activeSection] - The specific DNA section currently active in the UI.
+   * @returns {Promise<void>}
+   */
   const sendMessage = useCallback(
     async (content: string, activeSection?: string) => {
       if (!content.trim()) return;
 
       const currentSection = activeSection ?? session?.currentSection ?? "identity";
 
+      // Mock behavior for missing Firebase config
       if (!firebaseAvailable) {
         const userMsg: ChatMessage = {
           id: `user-${Date.now()}`,
@@ -198,6 +223,8 @@ export function useChat(
         return;
       }
 
+      // TODO: Security/Architecture Improvement: Consider migrating the Vertex AI initialization and prompt execution to a secure Next.js API route or Firebase Cloud Function. Executing AI logic client-side exposes your system prompts and structural logic to the browser.
+      
       const db = getDb();
       const messagesRef = collection(
         db,
@@ -208,7 +235,7 @@ export function useChat(
         setIsLoading(true);
         setStreamingContent("");
 
-        // 1. Salva a mensagem limpa do usuário no banco
+        // 1. Persist the sanitized user message to Firestore
         await addDoc(messagesRef, {
           role: "user",
           content: content.trim(),
@@ -216,21 +243,21 @@ export function useChat(
           section: currentSection,
         });
 
-        // 2. Prepara o modelo com Firebase AI
+        // 2. Initialize the Vertex AI Gemini model
         const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
         const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
         const model = getGenerativeModel(ai, { 
           model: "gemini-2.0-flash",
-          // ADIÇÃO: Forçando o output estruturado
+          // Enforce JSON structured output for programmatic parsing
           generationConfig: { 
             responseMimeType: "application/json",
             temperature: 0.3
           }
         });
 
-        // 3. Monta o Histórico
+        // 3. Construct the conversation history payload for the model
         const currentMessages = await getDocs(
           query(messagesRef, orderBy("timestamp", "asc"))
         );
@@ -244,16 +271,15 @@ export function useChat(
         const historyWithoutCurrent = history.slice(0, -1);
 
         const chatHistory: { role: "user" | "model"; parts: { text: string }[] }[] = [];
-        let expectedRole = "user"; // O Gemini exige que comece SEMPRE com 'user'
+        let expectedRole = "user"; // Note: The Gemini API requires the history array to start with a 'user' role
 
         for (const msg of historyWithoutCurrent) {
           if (msg.role === expectedRole) {
-            // Se é o turno certo, adiciona na lista e inverte a expectativa
+            // Append message and toggle the expected role
             chatHistory.push(msg);
             expectedRole = expectedRole === "user" ? "model" : "user";
           } else {
-            // Se veio repetido (ex: duas mensagens do Coach seguidas por causa da introdução),
-            // fundimos o texto na última mensagem para não quebrar a regra da IA.
+            // Merge consecutive messages of the same role to maintain strict 'user'/'model' alternation
             if (chatHistory.length > 0) {
               chatHistory[chatHistory.length - 1].parts[0].text += `\n\n${msg.parts[0].text}`;
             }
@@ -265,39 +291,37 @@ export function useChat(
           history: chatHistory,
         });
 
-        //questions selection
-        // 1. Fetch all questions for the current section (Array of strings)
+        // 4. Dynamic question selection
+        // Fetch all questions for the current section
         const allSectionQuestions: string[] = QUESTIONS[currentSection] || [];
 
-        // 2. Get the list of already used questions from the session (fallback to empty array)
-        // Ensure you declare this variable before the AI call
+        // Get the list of already used questions from the session state
         const previouslyAsked: string[] = session?.askedQuestions || [];
 
-        // 3. Filter out the questions that are already in the 'previouslyAsked' list
-        // Explicitly typing 'q: string' fixes the TypeScript TS(7006) error
+        // Filter out the questions that have already been presented
         const availableQuestions = allSectionQuestions.filter((q: string) => !previouslyAsked.includes(q));
 
-        // 4. Shuffle the remaining questions and pick up to 3
+        // Shuffle the remaining questions and select up to 3
         const shuffledQuestions = [...availableQuestions].sort(() => 0.5 - Math.random());
         const selectedQuestions = shuffledQuestions.slice(0, 3);
 
-        // 5. Format them into a text list for the AI prompt
+        // Format them into a text list for the AI prompt
         const questionsListText = selectedQuestions.map((q: string) => `- ${q}`).join("\n");
 
         const finalPromptForAI = `[CURRENT EXPLORATION ARENA: ${currentSection.toUpperCase()}]\nKeep your tone and extractions strictly focused on this arena.\n\nActor's Input: "${content.trim()}"\n\nSuggested Thematic Directions (Use these as inspiration...):\n${questionsListText}`;
 
-        // 5. Chamada Simples (Sem Stream) para receber o JSON completo
+        // 5. Execute the AI inference request and parse the JSON response
         const result = await chat.sendMessage(finalPromptForAI);
         const fullResponse = result.response.text();
         
         const aiData = JSON.parse(fullResponse);
         
-        // Tratamento de segurança (Fallback)
+        // Safely fallback if structured fields are missing from the AI response
         const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
         const aiExtractions = aiData?.extractions || null;
-        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null; //depth grade
+        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null; 
 
-        // 6. Salva apenas a fala do Coach no chat visível
+        // 6. Persist only the AI's conversational reply to the visible chat history
         await addDoc(messagesRef, {
           role: "assistant",
           content: aiCoachReply,
@@ -305,22 +329,21 @@ export function useChat(
           section: currentSection,
         });
 
-        //progress 
+        // Progress Calculation & Logic
         let unlockedAuditions = session?.auditionsUnlocked || false;
         let totalCount = session?.totalExtractions || 0;
-        let newCompletedSecs = [...(session?.completedSections || [])]; // Copys array
-        let sectionCounts = { ...(session?.sectionHqCounts || {}) };    // Copys object
+        let newCompletedSecs = [...(session?.completedSections || [])]; // Shallow copy array
+        let sectionCounts = { ...(session?.sectionHqCounts || {}) };    // Shallow copy object
         let currentSecCount = sectionCounts[currentSection] || 0;
 
-        if (aiExtractions ) {
+        if (aiExtractions) {
           totalCount += 1; 
 
-          
           if (aiExtractions.progress_assessment) {
             delete aiExtractions.progress_assessment;
           }
 
-        // saves all extractions in a vault collection for future use
+          // Archive high-value extractions into a dedicated user vault collection
           const vaultRef = collection(getDb(), `users/${userId}/dnaVault`);
           await addDoc(vaultRef, {
             sessionId: sessionId,
@@ -330,7 +353,7 @@ export function useChat(
             assessment: aiAssessment 
           });
 
-          // quality check 
+          // Evaluate extraction quality to determine progression
           const isHighQuality =
             aiAssessment != null &&
             aiAssessment.has_actionable_pattern === true &&
@@ -338,9 +361,9 @@ export function useChat(
 
           if (isHighQuality) {
             currentSecCount += 1; 
-            sectionCounts[currentSection] = currentSecCount; // save the count for the current section
+            sectionCounts[currentSection] = currentSecCount; // Store updated count for current section
 
-            //if the user extracted 6 good insights in the same section, we consider it completed and move on to the next one
+            // Mark section as completed if the required threshold (6) of high-quality insights is met
             if (currentSecCount >= 6 && !newCompletedSecs.includes(currentSection)) {
               newCompletedSecs.push(currentSection);
             }
@@ -351,19 +374,18 @@ export function useChat(
           unlockedAuditions = true;
         }
 
-        // BAR CALCULATION (0% to 100%)
-        // The bar starts at 0%. The goal is to accumulate 24 high-quality extractions.
-        // We use Math.min to ensure the bar never exceeds 100%.
+        // Global Progress Bar Calculation (0% to 100%)
+        // The goal is to accumulate 24 high-quality extractions across sections.
+        // Math.min ensures individual section over-performance doesn't erroneously inflate the total cap.
         const totalPepitasUteis = Object.values(sectionCounts).reduce(
             (acc, count) => acc + Math.min(count as number, 6), 0
         );
         const newProgress = Math.min((totalPepitasUteis / 24) * 100, 100);
 
-        // add question options to already asked list
         // Combine the previously asked questions with the newly selected ones
         const newAskedQuestions = [...previouslyAsked, ...selectedQuestions];
 
-        // Update firebase with new numbers
+        // Synchronize calculated progress and session metrics back to Firestore
         const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
         await updateDoc(sessionRef, { 
           lastActiveAt: serverTimestamp(),
@@ -374,11 +396,10 @@ export function useChat(
           askedQuestions: newAskedQuestions
         });
         
-
       } catch (error) {
         console.error("AI response error:", error);
         
-        // Fallback: write a static response
+        // Provide a graceful fallback response if AI inference fails
         await addDoc(messagesRef, {
           role: "assistant",
           content:
@@ -394,7 +415,13 @@ export function useChat(
     [userId, sessionId, session, firebaseAvailable]
   );
 
-  // Sincroniza a mudança de aba com o Firebase
+  /**
+   * Updates the currently active DNA section in Firestore and synchronizes the UI.
+   * Automatically injects the contextual introductory message if the newly opened section is empty.
+   *
+   * @param {string} newSection - The identifier of the section being navigated to.
+   * @returns {Promise<void>}
+   */
   const changeSection = useCallback(async (newSection: string) => {
     if (!firebaseAvailable || !session) return;
     
@@ -404,12 +431,12 @@ export function useChat(
       lastActiveAt: serverTimestamp()
     });
 
-    //inject intro messages
+    // Check for existing messages in the target section
     const messagesRef = collection(getDb(), `users/${userId}/dnaSessions/${sessionId}/messages`);
     const q = query(messagesRef, where("section", "==", newSection), limit(1));
     const snapshot = await getDocs(q);
 
-    // 3. Se a aba estiver vazia, injeta a mensagem do nosso Dicionário!
+    // Inject the domain-specific introductory prompt if the section is completely empty
     if (snapshot.empty) {
       const introText = SECTION_INTROS[newSection as DNASectionId];
       if (introText) {

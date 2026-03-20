@@ -1,5 +1,9 @@
 import type { Timestamp } from "firebase/firestore";
 
+/**
+ * Represents a single message within a DNA extraction chat session.
+ * @interface ChatMessage
+ */
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -8,7 +12,13 @@ export interface ChatMessage {
   section: string;
 }
 
+/**
+ * Represents the state and metadata of a user's DNA extraction session.
+ * Tracks global progress, section completion, and analytics.
+ * @interface DNASession
+ */
 export interface DNASession {
+  // TODO: Consider separating volatile session state (like progress and lastActiveAt) from immutable data (like createdAt) if Firestore write costs become a concern at scale.
   id: string;
   sessionNumber: number;
   totalSessions: number;
@@ -19,13 +29,17 @@ export interface DNASession {
   createdAt: Timestamp | null;
   status: "active" | "paused" | "completed";
   totalExtractions?: number;       
-  sectionHqCounts?: Record<string, number>; // hq for section { "identity": 2, "family": 0 }
+  sectionHqCounts?: Record<string, number>; // // Maps section IDs to the number of high-quality extractions (e.g., { "identity": 2 })
   completedSections?: string[];
   auditionsUnlocked?: boolean;
-  askedQuestions?: string[]; // Clean and simple array of strings;
+  askedQuestions?: string[]; // // Array of question strings already presented to the user to prevent repetition
 }
 
-// IDs must perfectly match the keys in QUESTIONS.
+/**
+ * Defines the core exploration arenas (sections) for the DNA extraction process.
+ * NOTE: The 'id' fields must perfectly align with the keys used in the QUESTIONS reservoir.
+ * @constant
+ */
 export const DNA_SECTIONS = [
   { id: "identity", label: "Identity & Self-Story" },
   { id: "family", label: "Belonging & Family" },
@@ -40,8 +54,17 @@ export const DNA_SECTIONS = [
   { id: "boundaries_ethics", label: "Boundaries & Ethics" },
 ] as const;
 
+/**
+ * Type definition extracting the valid string literal IDs from the DNA_SECTIONS constant.
+ * @typedef {string} DNASectionId
+ */
 export type DNASectionId = (typeof DNA_SECTIONS)[number]["id"];
 
+/**
+ * Represents a structured thematic question stored in the system's reservoir.
+ * Used to dynamically guide the AI based on the current context.
+ * @interface DNAQuestion
+ */
 export interface DNAQuestion {
   qid: string;
   section: DNASectionId; 
@@ -50,6 +73,12 @@ export interface DNAQuestion {
   question: string;
 }
 
+/**
+ * The core system instruction set for the AI Assistant ("The Coach").
+ * Defines the persona, behavioral constraints, extraction targets, and the strict JSON output schema.
+ * @constant {string}
+ */
+// TODO: moving this static system prompt to a remote configuration service (like Firebase Remote Config) to allow tweaking AI behavior in production without requiring a full app redeploy.
 export const SYSTEM_PROMPT = `# SYSTEM ROLE & PERSONA
 You are "The Coach": a world-class acting mentor inside "The Actor's Copilot" app. 
 Your objective is to guide the actor through a "Personal DNA Extraction" session to build their Individuality Bank Account.
@@ -176,7 +205,11 @@ Your response must perfectly match this schema:
 
 `;
 
-// The specific introductory messages injected when a user opens a new section.
+/**
+ * Pre-defined introductory messages injected by the system when a user enters a new DNA section.
+ * Sets the baseline expectations, tone, and context for both the actor and the AI.
+ * @constant {Record<string, string>}
+ */
 export const SECTION_INTROS: Record<string, string> = {
   
   identity: `This process exists for one reason only: to make you a more truthful, dangerous, and compelling actor.

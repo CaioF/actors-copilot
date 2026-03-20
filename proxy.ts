@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import {jwtVerify} from 'jose';
+import { jwtVerify } from 'jose';
 
+/**
+ * Edge Middleware to protect authenticated routes.
+ * Intercepts requests to restricted paths, cryptographically verifies the JWT session cookie,
+ * and redirects unauthenticated or tampered requests back to the login page.
+ *
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @returns {Promise<NextResponse>} The Next.js response (proceeds to route or redirects).
+ */
 export async function proxy(request: NextRequest) {
     const sessionCookie = request.cookies.get('kajabi_session');
 
@@ -17,20 +25,25 @@ export async function proxy(request: NextRequest) {
             return NextResponse.redirect(loginUrl);
         }
 
+        // TODO: Implement token rotation or a silent refresh mechanism to handle expiring sessions seamlessly.
         const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-        // jwtVerify checks if the token was tampered with or expired.
-        // If it's fake, this line will throw an error and jump to the catch block.
+        
+        // Cryptographically verify the token to ensure it has not been tampered with and is not expired
         await jwtVerify(sessionCookie.value, secret);
     } catch (error) {
+        // If the token is invalid, manipulated, or expired, destroy the cookie and force a new login
         const response = NextResponse.redirect(loginUrl);
         response.cookies.delete('kajabi_session');
         return response;
     }
 
-
     return NextResponse.next();
 }
 
+/**
+ * Next.js Edge Middleware configuration.
+ * Defines the URL patterns that should be intercepted and protected by this proxy.
+ */
 export const config = {
     matcher: [
         '/dashboard',

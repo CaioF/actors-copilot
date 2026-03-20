@@ -3,27 +3,36 @@
 import { useAuth } from '@/lib/context/AuthContext';
 import { Sparkles, FileText, Lock } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 
+/**
+ * Main authentication page component.
+ * Renders the login interface alongside app features and manages 
+ * the Google login flow utilizing the AuthContext.
+ *
+ * @returns {JSX.Element} The rendered login page component.
+ */
 export default function LoginPage() {
     const { loginWithGoogle, loading } = useAuth();
     const [errorMsg, setErrorMsg] = useState('');
 
+    /**
+     * Initiates the Google login flow and handles UI error state.
+     * Silently ignores errors caused by the user intentionally closing the OAuth pop-up.
+     * * @returns {Promise<void>}
+     */
     const handleLogin = async () => {
         setErrorMsg('');
         try {
             await loginWithGoogle();
         } catch (error: any) {
-            // If the error is related to the user closing the pop-up or cancelling the login, just return silently
             if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
                 return; 
             }
             
-            //string match the error message to show a user-friendly message on the frontend 
             setErrorMsg(error.message || 'Access denied. Please check your account.');
         }
-      }
-
+    }
 
     return (
         <div className="min-h-screen w-full flex">
@@ -105,23 +114,6 @@ export default function LoginPage() {
                         )}
                     </div>
 
-                    {/* Visual Divider (Demo purposes indicator) */}
-                    <div className="relative py-6">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-border"></div>
-                        </div>
-                        <div className="relative flex justify-center text-xs">
-                            <span className="bg-white px-4 text-muted-foreground">For demo purposes</span>
-                        </div>
-                    </div>
-
-                    {/* Secondary Action / Bypass (Demo purposes only) */}
-                    <button 
-                        type="button"
-                        className="w-full bg-white border border-border hover:bg-muted/30 text-foreground rounded-full py-3.5 px-4 font-medium transition-colors"
-                    >
-                        Skip to Dashboard
-                    </button>
 
                 </div>
             </div>
@@ -130,8 +122,16 @@ export default function LoginPage() {
     );
 }
 
-// Helper component to render feature items and maintain DRY principles
-function FeatureItem({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+/**
+ * UI Helper component to render feature items, maintaining DRY principles.
+ *
+ * @param {Object} props - The component properties.
+ * @param {React.ReactNode} props.icon - The Lucide React icon element.
+ * @param {string} props.title - The feature title.
+ * @param {string} props.description - The feature description.
+ * @returns {JSX.Element} A formatted feature item layout.
+ */
+function FeatureItem({ icon, title, description }: { icon: ReactNode, title: string, description: string }) {
     return (
         <div className="flex items-start gap-4">
             <div className="bg-muted p-2.5 rounded-full shrink-0">
