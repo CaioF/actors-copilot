@@ -1,5 +1,7 @@
 "use client";
 
+import { getAuth } from "firebase/auth";
+import { getApp } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -20,6 +22,7 @@ export default function ChatPage() {
   } = useChat();
 
   const [activeSection, setActiveSection] = useState("identity"); // Default to the first section
+  const [isSynthesizing, setIsSynthesizing] = useState(false); // State for our test button
 
   //filter section messages
   const filteredMessages = messages.filter(
@@ -32,6 +35,52 @@ export default function ChatPage() {
       setActiveSection(session.currentSection);
     }
   }, [session?.currentSection]); // Roda sempre que o Firebase avisar de mudança
+
+  /**
+   * TEST HANDLER: Securely calls the backend DNA Synthesizer route.
+   * Grabs the current user's Firebase token to authorize the request.
+   */
+  const handleTestSynthesis = async () => {
+    try {
+      setIsSynthesizing(true);
+      
+      const auth = getAuth(getApp());
+      const user = auth.currentUser;
+      
+      if (!user) {
+        console.error("Authentication Error: No user logged in.");
+        alert("Please log in to test the synthesis.");
+        return;
+      }
+
+      // Securely fetch the session token
+      const token = await user.getIdToken();
+
+      console.log("Triggering Synthesis AI...");
+      const response = await fetch('/api/dna/synthesize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log("✅ SYNTHESIS COMPLETE. Result:", data);
+        alert("Synthesis complete! Open your browser console to see the JSON profile.");
+      } else {
+        console.error("❌ SYNTHESIS FAILED:", data);
+        alert(`Synthesis failed: ${data.error}`);
+      }
+
+    } catch (error) {
+      console.error("Network or execution error during synthesis:", error);
+      alert("A critical error occurred. Check the console.");
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#F0E8DC]">
@@ -59,6 +108,19 @@ export default function ChatPage() {
           isInitializing={isInitializing}
         />
 
+        {/* =========================================
+            TEST BUTTON: DNA SYNTHESIZER
+            Placed directly above the input as requested
+            ========================================= */}
+        <div className="flex justify-center w-full py-2 bg-[#F0E8DC]">
+          <button
+            onClick={handleTestSynthesis}
+            disabled={isSynthesizing || isInitializing}
+            className="w-fit bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-2 px-6 rounded-full shadow-md transition-all ease-in-out duration-200 text-sm"
+          >
+            {isSynthesizing ? "Synthesizing Data (Check Console)..." : "🧪 Test AI Synthesis"}
+          </button>
+        </div>
         {/* Input bar */}
         <ChatInput onSend={(content) => sendMessage(content, activeSection)} isLoading={isLoading} />
 
