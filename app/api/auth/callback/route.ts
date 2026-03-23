@@ -33,7 +33,11 @@ export async function POST(request: Request) {
         
         if (!hasAccess.success) {
             // Forward the exact Kajabi validation error message to the frontend
-            return NextResponse.json({ error: hasAccess.message }, { status: 403 });
+            console.error("ERROR: Kajabi environment variables are not fully configured");  
+                return NextResponse.json(  
+                    { error: 'Internal Configuration Error: Kajabi is not properly configured' },  
+                    { status: 500 }  
+                );  
         }
 
         // Cryptographically sign a new JWT containing the user's email to establish a session
@@ -42,11 +46,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Internal Configuration Error' }, { status: 500 });
         }
 
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-        const token = await new SignJWT({ email: userEmail }) 
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'fallback_secret_for_dev');
+        
+        // Define standard claims for defense-in-depth security
+        const issuer = 'kajabi-auth-callback';
+        const audience = 'kajabi-dashboard';
+
+        const token = await new SignJWT({ email: userEmail })
             .setProtectedHeader({ alg: 'HS256' })
-            .setIssuedAt()
-            .setExpirationTime('7d') // Session expires in 7 days
+            .setIssuer(issuer)
+            .setAudience(audience)
+            .setSubject(decodedToken.uid)
+            .setExpirationTime('24h')
             .sign(secret);
 
         // Store the signed JWT in a secure, HTTP-only cookie

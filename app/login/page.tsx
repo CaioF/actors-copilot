@@ -2,7 +2,6 @@
 
 import { useAuth } from '@/lib/context/AuthContext';
 import { Sparkles, FileText, Lock } from 'lucide-react';
-import Image from 'next/image';
 import { useState, ReactNode } from 'react';
 
 /**
@@ -19,7 +18,7 @@ export default function LoginPage() {
     /**
      * Initiates the Google login flow and handles UI error state.
      * Silently ignores errors caused by the user intentionally closing the OAuth pop-up.
-     * * @returns {Promise<void>}
+     * @returns {Promise<void>}
      */
     const handleLogin = async () => {
         setErrorMsg('');

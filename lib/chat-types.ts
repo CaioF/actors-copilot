@@ -29,10 +29,10 @@ export interface DNASession {
   createdAt: Timestamp | null;
   status: "active" | "paused" | "completed";
   totalExtractions?: number;       
-  sectionHqCounts?: Record<string, number>; // // Maps section IDs to the number of high-quality extractions (e.g., { "identity": 2 })
+  sectionHqCounts?: Record<string, number>; // Maps section IDs to the number of high-quality extractions (e.g., { "identity": 2 })
   completedSections?: string[];
   auditionsUnlocked?: boolean;
-  askedQuestions?: string[]; // // Array of question strings already presented to the user to prevent repetition
+  askedQuestions?: string[]; // Array of question strings already presented to the user to prevent repetition
 }
 
 /**

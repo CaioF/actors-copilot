@@ -28,8 +28,12 @@ export async function proxy(request: NextRequest) {
         // TODO: Implement token rotation or a silent refresh mechanism to handle expiring sessions seamlessly.
         const secret = new TextEncoder().encode(process.env.JWT_SECRET);
         
-        // Cryptographically verify the token to ensure it has not been tampered with and is not expired
-        await jwtVerify(sessionCookie.value, secret);
+        // Verify the token AND enforce the claims we set during creation
+        await jwtVerify(sessionCookie.value, secret, {
+            issuer: 'kajabi-auth-callback',
+            audience: 'kajabi-dashboard',
+            algorithms: ['HS256'] // Restricting allowed algorithms as suggested
+        });
     } catch (error) {
         // If the token is invalid, manipulated, or expired, destroy the cookie and force a new login
         const response = NextResponse.redirect(loginUrl);
@@ -46,7 +50,10 @@ export async function proxy(request: NextRequest) {
  */
 export const config = {
     matcher: [
-        '/dashboard',
         '/dashboard/:path*',
+        '/chat/:path*',
+        '/auditions/:path*',
+        '/personal-dna/:path*',
+        '/settings/:path*',
     ],
 };
