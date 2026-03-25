@@ -1,31 +1,66 @@
 import { NextResponse } from 'next/server';
 import { SYNTHESIZER_PROMPT } from '@/lib/chat-types'; 
-import { getDb } from "@/lib/firebase";
-import {
-  collection,
-  query,
-  orderBy,
-  getDocs,
-  doc,
-  setDoc
-} from "firebase/firestore";
+// IMPORTAÇÃO NOVA: Usando o Admin SDK super-poderoso que você configurou
+import { auth, db } from "@/lib/firebase.admin"; 
 
 export async function POST(request: Request) {
     try {
-        // 1. Forçando o usuário de teste
-        const userId = "demo-user"; 
-        const db = getDb();
+        // security check - verify token and extract user ID
+        const authHeader = request.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Missing auth token" }, { status: 401 });
+        }
 
-        // 2. Fetch DNA Vault (Usando 100% Client SDK agora)
-        const vaultRef = collection(db, `users/${userId}/dnaVault`);
-        const vaultQuery = query(vaultRef, orderBy('timestamp', 'asc'));
-        const vaultSnapshot = await getDocs(vaultQuery);
+        const token = authHeader.substring(7);
+        const decodedToken = await auth.verifyIdToken(token);
+        const authenticatedUserId = decodedToken.uid;
+
+        // get payload
+        const body = await request.json();
+        const { userPath } = body;
+
+        // Regra de Ouro: O userPath SOLICITADO precisa começar com o UID de quem está LOGADO
+        if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
+            console.error(`🚨 ALERTA DE SEGURANÇA: Usuário ${authenticatedUserId} tentou acessar a pasta ${userPath}`);
+            return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
+        }
+
+        // database search
+        const profileRef = db.doc(`users/${userPath}/masterProfile/current`);
+        const profileSnap = await profileRef.get();
+
+        let existingProfileTime = 0;
+        if (profileSnap.exists) {
+            const profileData = profileSnap.data();
+            existingProfileTime = new Date(profileData?.lastUpdated).getTime();
+        }
+
+        const vaultRef = db.collection(`users/${userPath}/dnaVault`).orderBy('timestamp', 'asc');
+        const vaultSnapshot = await vaultRef.get();
 
         if (vaultSnapshot.empty) {
             return NextResponse.json({ error: 'No DNA extractions found. Complete a session first.' }, { status: 400 });
         }
 
-        // 3. Compile Payload
+        // ============================================================================
+        // 3. SMART CACHE CHECK
+        // ============================================================================
+        const latestExtractionDoc = vaultSnapshot.docs[vaultSnapshot.docs.length - 1].data();
+        const latestExtractionTime = latestExtractionDoc.timestamp?.toDate()?.getTime() || 0;
+
+        if (profileSnap.exists && latestExtractionTime <= existingProfileTime) {
+            console.log(`⚡ CACHE HIT: No new DNA found for ${userPath}. Returning existing Master Profile.`);
+            return NextResponse.json({ 
+                success: true, 
+                message: 'Returned cached profile.',
+                data: profileSnap.data(),
+                cached: true 
+            }, { status: 200 });
+        }
+
+        // AI generating (if new dna)
+        console.log(`🔄 NEW DNA DETECTED for ${userPath}. Initiating Vertex AI Synthesis...`);
+
         const compiledRawData = vaultSnapshot.docs.map((docSnap) => {
             const data = docSnap.data();
             return {
@@ -35,7 +70,6 @@ export async function POST(request: Request) {
             };
         });
 
-        // 4. INICIALIZAÇÃO DA IA (Exatamente o seu bloco)
         const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
@@ -49,10 +83,8 @@ export async function POST(request: Request) {
             }
         });
 
-        // 5. Execute AI
         const prompt = `Here is the actor's raw DNA Vault data. Synthesize it exactly as instructed:\n\n${JSON.stringify(compiledRawData, null, 2)}`;
         
-        console.log("Initiating Firebase AI Synthesis Call...");
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
         
@@ -64,7 +96,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
         }
 
-        // 6. Save Final Profile (Usando o setDoc do Client SDK)
+        // save
         const profilePayload = {
             status: "synthesis_complete",
             lastUpdated: new Date().toISOString(),
@@ -72,17 +104,16 @@ export async function POST(request: Request) {
             profile: masterProfile 
         };
 
-        const profileRef = doc(db, `users/${userId}/masterProfile/current`);
-        await setDoc(profileRef, profilePayload, { merge: true });
+        //  .set() insted of setDoc()
+        await profileRef.set(profilePayload, { merge: true });
 
-        // PROVA REAL NO TERMINAL
-        console.log("✅ DADO SALVO COM SUCESSO NO FIRESTORE! Aqui está a prova:");
-        console.dir(profilePayload.profile, { depth: null, colors: true });
+        console.log(`✅ DATA SAVED SUCCESSFULLY IN FIRESTORE FOR ${userPath}!`);
 
         return NextResponse.json({ 
             success: true, 
             message: 'Synthesis completed successfully.',
-            data: profilePayload 
+            data: profilePayload,
+            cached: false
         }, { status: 200 });
 
     } catch (error) {

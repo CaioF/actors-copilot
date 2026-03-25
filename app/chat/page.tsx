@@ -10,6 +10,14 @@ import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { useChat } from "@/hooks/use-chat";
 
+/**
+ * Main Chat Page component for the AI Copilot DNA Extraction feature.
+ * Orchestrates the layout, integrating the sidebar, chat history, and input mechanism.
+ * Manages the local UI state for the currently active chat section and synchronizes 
+ * it with the remote session state.
+ *
+ * @returns {JSX.Element} The rendered chat page layout.
+ */
 export default function ChatPage() {
   const {
     messages,
@@ -24,67 +32,30 @@ export default function ChatPage() {
   const [activeSection, setActiveSection] = useState("identity"); // Default to the first section
   const [isSynthesizing, setIsSynthesizing] = useState(false); // State for our test button
 
-  //filter section messages
+  /**
+   * Filters the global message history to only display messages relevant to the currently selected section.
+   * * // TODO: Consider wrapping this filtering logic in a useMemo hook if the messages array is expected to grow significantly, to prevent unnecessary recalculations on every render.
+   */
   const filteredMessages = messages.filter(
     (msg) => msg.section === activeSection
   );
 
-  // Se a sessão for carregada do Firebase e tiver uma seção salva, a UI muda pra ela
+  /**
+   * Synchronizes the local active section state with the remote session data from Firebase.
+   * Ensures that if the backend updates the current section (e.g., upon loading a saved session),
+   * the UI correctly reflects this change automatically.
+   */
   useEffect(() => {
     if (session?.currentSection && session.currentSection !== activeSection) {
       setActiveSection(session.currentSection);
     }
   }, [session?.currentSection]); // Roda sempre que o Firebase avisar de mudança
 
-  /**
-   * TEST HANDLER: Securely calls the backend DNA Synthesizer route.
-   * Grabs the current user's Firebase token to authorize the request.
-   */
-  const handleTestSynthesis = async () => {
-    try {
-      setIsSynthesizing(true);
-      
-      const auth = getAuth(getApp());
-      const user = auth.currentUser;
-      
-      if (!user) {
-        console.error("Authentication Error: No user logged in.");
-        alert("Please log in to test the synthesis.");
-        return;
-      }
-
-      // Securely fetch the session token
-      const token = await user.getIdToken();
-
-      console.log("Triggering Synthesis AI...");
-      const response = await fetch('/api/dna/synthesize', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        console.log("✅ SYNTHESIS COMPLETE. Result:", data);
-        alert("Synthesis complete! Open your browser console to see the JSON profile.");
-      } else {
-        console.error("❌ SYNTHESIS FAILED:", data);
-        alert(`Synthesis failed: ${data.error}`);
-      }
-
-    } catch (error) {
-      console.error("Network or execution error during synthesis:", error);
-      alert("A critical error occurred. Check the console.");
-    } finally {
-      setIsSynthesizing(false);
-    }
-  };
-
+  
   return (
     <div className="flex h-screen bg-[#F0E8DC]">
-      {/* Chat-specific sidebar with session info, DNA sections, progress */}
+      
+      {/* Chat-specific sidebar with session info, DNA sections, and progress tracking */}
       <ChatSidebar
         session={session}
         activeSection={activeSection}
@@ -93,14 +64,15 @@ export default function ChatPage() {
           if (changeSection) {
             changeSection(sectionClicked);
           }
-        } }
+        }}
       />
 
       {/* Main content area */}
+      {/* TODO: Implement an Error Boundary or empty state fallback in case the useChat hook fails to initialize properly. */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader title="AI Copilot DNA Extraction" />
 
-        {/* Chat message area */}
+        {/* Chat message display area */}
         <ChatMessages
           messages={filteredMessages}
           isLoading={isLoading}
@@ -109,18 +81,34 @@ export default function ChatPage() {
         />
 
         {/* =========================================
-            TEST BUTTON: DNA SYNTHESIZER
-            Placed directly above the input as requested
+            QUICK ACTIONS / SHORTCUTS
+            Help the actor navigate the conversation easily
             ========================================= */}
-        <div className="flex justify-center w-full py-2 bg-[#F0E8DC]">
+        <div className="flex justify-center items-center gap-3 w-full py-3 bg-[#F0E8DC]">
           <button
-            onClick={handleTestSynthesis}
-            disabled={isSynthesizing || isInitializing}
-            className="w-fit bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-2 px-6 rounded-full shadow-md transition-all ease-in-out duration-200 text-sm"
+            onClick={() => sendMessage("PASS", activeSection)}
+            disabled={isLoading || isInitializing}
+            className="text-xs font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#E8DFD0] hover:text-[#2C3328] px-5 py-2 rounded-full transition-colors disabled:opacity-50"
           >
-            {isSynthesizing ? "Synthesizing Data (Check Console)..." : "🧪 Test AI Synthesis"}
+            PASS
+          </button>
+          
+          <button
+            onClick={() => sendMessage("Change the subject, next question", activeSection)}
+            disabled={isLoading || isInitializing}
+            className="text-xs font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#E8DFD0] hover:text-[#2C3328] px-5 py-2 rounded-full transition-colors disabled:opacity-50"
+          >
+            Change the subject
+          </button>
+          <button
+            onClick={() => sendMessage("I don't understand the question", activeSection)}
+            disabled={isLoading || isInitializing}
+            className="text-xs font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#E8DFD0] hover:text-[#2C3328] px-5 py-2 rounded-full transition-colors disabled:opacity-50"
+          >
+            I don't understand the question
           </button>
         </div>
+        
         {/* Input bar */}
         <ChatInput onSend={(content) => sendMessage(content, activeSection)} isLoading={isLoading} />
 

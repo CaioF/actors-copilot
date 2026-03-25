@@ -11,6 +11,7 @@ import {
   Settings,
   Plus,
   Sparkles,
+  LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +27,7 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter();
   const {logout} = useAuth();
+  const isChatPage = pathname.includes('/chat');
 
   const handleLogout = async ()=> {
     await logout();
@@ -50,7 +52,7 @@ export function AppSidebar() {
         </p>
         <div className="flex flex-col gap-2">
           <Link
-            href="/auditions"
+            href="/auditions/new"
             className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
           >
             <Plus className="h-4 w-4" />
@@ -87,8 +89,20 @@ export function AppSidebar() {
               </Link>
             )
           })}
+          <button 
+          onClick={logout}
+          className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                     "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
+                )}
+          >
+          <LogOut className="h-5 w-5" /> 
+          <span className="">Logout</span> 
+        </button>
         </nav>
       </div>
+
+      
 
       {/* Premium Plan */}
       <div className="p-4">

@@ -2,6 +2,7 @@ export type AuditionStep = 1 | 2 | 3 | 4 | 5; // 5 is the generating state
 
 export interface AuditionFormData {
   // Step 1: Basics
+  projectType: "cinematic" | "commercial";
   project: string;
   role: string;
   deadline?: string;
@@ -16,6 +17,7 @@ export interface AuditionFormData {
 }
 
 export const initialAuditionData: AuditionFormData = {
+  projectType: "cinematic",
   project: "",
   role: "",
   deadline: "",
