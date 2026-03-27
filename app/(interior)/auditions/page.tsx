@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Calendar, Trash2, Loader2, Edit2, Eye, Printer, Film, ShoppingBag } from "lucide-react"
+import { Search, Calendar, Trash2, Loader2, Edit2, Eye, Printer, Film, ShoppingBag, Drama } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { useRouter } from "next/navigation"
 import {
@@ -29,7 +29,7 @@ interface Audition {
   role: string     // Maps to what used to be "title"
   date: string
   status: AuditionStatus
-  projectType?: "cinematic" | "commercial"
+  projectType?: "cinematic" | "commercial" | "theater"
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -61,7 +61,7 @@ export default function AuditionsPage() {
   const [editForm, setEditForm] = useState({ 
     project: "", 
     role: "", 
-    projectType: "cinematic" as "cinematic" | "commercial" 
+    projectType: "cinematic" as "cinematic" | "commercial" | "theater" 
   })
 
   /**
@@ -236,7 +236,7 @@ export default function AuditionsPage() {
 
               <div>
                 <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Project Type</label>
-                <div className="grid grid-cols-2 gap-3 mt-2">
+                <div className="grid grid-cols-3 gap-3 mt-2">
                   <button 
                     onClick={() => setEditForm({...editForm, projectType: "cinematic"})}
                     className={`flex items-center justify-center gap-2 py-2 rounded-lg border transition-colors ${editForm.projectType === "cinematic" ? "bg-[#E8721A] text-white border-[#E8721A]" : "bg-white text-[#6B6B6B] border-[#C7C0B5]"}`}
@@ -248,6 +248,12 @@ export default function AuditionsPage() {
                     className={`flex items-center justify-center gap-2 py-2 rounded-lg border transition-colors ${editForm.projectType === "commercial" ? "bg-[#E8721A] text-white border-[#E8721A]" : "bg-white text-[#6B6B6B] border-[#C7C0B5]"}`}
                   >
                     <ShoppingBag className="w-4 h-4" /> Commercial
+                  </button>
+                  <button 
+                    onClick={() => setEditForm({...editForm, projectType: "theater"})}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-lg border transition-colors text-sm ${editForm.projectType === "theater" ? "bg-[#E8721A] text-white border-[#E8721A]" : "bg-white text-[#6B6B6B] border-[#C7C0B5]"}`}
+                  >
+                    <Drama className="w-4 h-4" /> Theater
                   </button>
                 </div>
               </div>
@@ -338,11 +344,13 @@ export default function AuditionsPage() {
                 <div className="flex items-center gap-2 mb-1">
                   {audition.projectType === "commercial" ? (
                     <ShoppingBag className="w-3.5 h-3.5 text-[#E8721A]" />
+                  ) : audition.projectType === "theater" ? (
+                    <Drama className="w-3.5 h-3.5 text-[#E8721A]" />
                   ) : (
                     <Film className="w-3.5 h-3.5 text-[#E8721A]" />
                   )}
                   <p className="text-xs text-[#E8721A] uppercase tracking-wide font-semibold">
-                    {audition.projectType}
+                    {audition.projectType || "cinematic"}
                   </p>
                 </div>
                 <h3 className="font-serif text-xl font-bold text-white truncate group-hover:text-[#E8721A] transition-colors">

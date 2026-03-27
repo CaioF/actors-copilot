@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ShoppingBag, Film, Check } from "lucide-react";
+import { Calendar, ShoppingBag, Film, Check, Drama } from "lucide-react";
 import { AuditionFormData } from "@/lib/audition-types";
 import { cn } from "@/lib/utils"; // Using shadcn utility for cleaner class management
 
@@ -16,6 +16,12 @@ const projectTypes = [
     title: "Cinematic (Film/TV)", 
     icon: Film, // Movie clapboard icon
     description: "Narrative, characters, dramatic arcs, specific emotional objectives." 
+  },
+  {
+    id: "theater", 
+    title: "Theater", 
+    icon: Drama, // Theater mask icon
+    description: "Live performance, stage presence, character development."
   },
   { 
     id: "commercial", 
@@ -41,7 +47,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
         <label className="text-sm font-mediumtext-[#6B6B6B] mt-2">What kind of audition is this?</label>
         
         {/* We present the choice as large, visual cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {projectTypes.map((type) => {
             const Icon = type.icon;
             // Checks if this card is the currently selected one

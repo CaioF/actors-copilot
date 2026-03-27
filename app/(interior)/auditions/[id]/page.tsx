@@ -108,13 +108,13 @@ export default function AuditionDetailView() {
       </div>
 
       <div className=" max-w-5xl mx-auto">
-        {/* TÍTULO DA TELA */}
+        {/* Title */}
         <div className=" mb-10">
           <h1 className="text-4xl font-serif text-[#2C3328]">{auditionData.project}</h1>
           <p className="text-xl text-[#E8721A] mt-2 font-medium">{auditionData.role}</p>
         </div>
 
-        {/* REUTILIZANDO O COMPONENTE DE RESULTADO */}
+        {/* result component */}
         <div className="">
           {auditionData.performanceMap ? (
              <StepResult data={auditionData.performanceMap} />

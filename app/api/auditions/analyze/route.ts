@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
-import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, } from "@/lib/chat-types";
+import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
 // IMPORT THE ADMIN SDK FOR SECURE BACKEND OPERATIONS
 import { auth, db } from "@/lib/firebase.admin";
 
 /**
  * Helper function to safely extract raw text from a PDF buffer in a Node.js environment.
+ * Includes a 30-second timeout to prevent malformed PDFs from hanging the server thread.
  */
 const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
-  return new Promise((resolve, reject) => {
+  const parsePromise = new Promise<string>((resolve, reject) => {
     const pdfParser = new PDFParser(null, 1);
 
     pdfParser.on("pdfParser_dataError", (errData) => {
@@ -22,6 +23,13 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
     pdfParser.parseBuffer(buffer);
   });
+
+  // Security: Kill the process if the PDF is too complex or acting as a "Zip Bomb"
+  const timeoutPromise = new Promise<string>((_, reject) =>
+    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (60s). The file might be corrupted or too complex.")), 60000)
+  );
+
+  return Promise.race([parsePromise, timeoutPromise]);
 };
 
 export async function POST(request: Request) {
@@ -39,8 +47,11 @@ export async function POST(request: Request) {
     // 2. EXTRACT INCOMING DATA AND FILES
     const formData = await request.formData();
     const projectType = formData.get("projectType") as string || "cinematic"; // Default to cinematic if not provided
-    const project = formData.get("project") as string;
-    const role = formData.get("role") as string;
+    // Security: Bound string lengths to prevent excessive token usage (native prompt injection mitigation)
+    const rawProject = formData.get("project") as string || "";
+    const rawRole = formData.get("role") as string || "";
+    const project = rawProject.substring(0, 150).trim(); 
+    const role = rawRole.substring(0, 100).trim();
     const deadline = formData.get("deadline") as string;
     
     // Extract routing and personalization parameters
@@ -52,6 +63,26 @@ export async function POST(request: Request) {
 
     const sidesFile = formData.get("sidesFile") as File | null;
     const briefFile = formData.get("briefFile") as File | null;
+
+    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+  if (sidesFile) {
+    if (sidesFile.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "File exceeds 20MB limit" },
+        { status: 413 }
+      );
+    }
+    
+    // Validate MIME type more strictly
+    if (!["application/pdf"].includes(sidesFile.type)) {
+      return NextResponse.json(
+        { error: "Only PDFs allowed" },
+        { status: 400 }
+      );
+    }
+  
+}
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
@@ -90,11 +121,11 @@ export async function POST(request: Request) {
     let categoryInstruction = "";
     
     if (projectType === "commercial") {
-        // We instruct the AI to change its language for commercials
         categoryInstruction = COMMERCIAL_MODE_PROMPT;
-    } else {
-      categoryInstruction = ""; // For cinematic, we can use the default prompt which is more in-depth and nuanced
+    } else if (projectType === "theater") {
+        categoryInstruction = THEATHER_MODE_PROMPT;
     }
+    
 
 
     // 5. INITIALIZE VERTEX AI FOR FIREBASE

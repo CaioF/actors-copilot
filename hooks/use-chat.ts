@@ -19,8 +19,9 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
-import { QUESTIONS } from "@/lib/questions";
-import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId } from "@/lib/chat-types";
+import { SECTION_INTROS } from "@/lib/prompts";
+import {  DNASectionId } from "@/lib/chat-types";
+
 
 const DEFAULT_SESSION_ID = "session-1";
 
@@ -273,85 +274,73 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         });
 
         // 2. Initialize the Vertex AI Gemini model
-        const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
-        const { getApp: getFirebaseApp } = await import("@/lib/firebase");
-
-        const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
-        const model = getGenerativeModel(ai, { 
-          model: "gemini-2.0-flash",
-          // Enforce JSON structured output for programmatic parsing
-          generationConfig: { 
-            responseMimeType: "application/json",
-            temperature: 0.3
-          }
-        });
-
-        // 3. Construct the conversation history payload for the model
+        // 2. Prepare the history payload for the secure backend
         const currentMessages = await getDocs(
           query(messagesRef, orderBy("timestamp", "asc"))
         );
+
+        // Extract and map the conversation history
         const history = currentMessages.docs
           .filter((d) => d.data().role !== undefined)
           .map((d) => ({
             role: d.data().role === "assistant" ? ("model" as const) : ("user" as const),
-            parts: [{ text: d.data().content as string || ""}],
+            parts: [{ text: (d.data().content as string) || ""}],
           }));
 
+        // The Gemini API requires strictly alternating 'user' and 'model' roles.
+        // We compile the history excluding the current message.
         const historyWithoutCurrent = history.slice(0, -1);
-
         const chatHistory: { role: "user" | "model"; parts: { text: string }[] }[] = [];
-        let expectedRole = "user"; // Note: The Gemini API requires the history array to start with a 'user' role
+        let expectedRole = "user"; 
 
         for (const msg of historyWithoutCurrent) {
           if (msg.role === expectedRole) {
-            // Append message and toggle the expected role
             chatHistory.push(msg);
             expectedRole = expectedRole === "user" ? "model" : "user";
           } else {
-            // Merge consecutive messages of the same role to maintain strict 'user'/'model' alternation
+            // Merge consecutive messages to maintain strict alternating roles
             if (chatHistory.length > 0) {
               chatHistory[chatHistory.length - 1].parts[0].text += `\n\n${msg.parts[0].text}`;
             }
           }
         }
 
-        const chat = model.startChat({
-          systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-          history: chatHistory,
-        });
-
-        // 4. Dynamic question selection
-        // Fetch all questions for the current section
-        const allSectionQuestions: string[] = QUESTIONS[currentSection] || [];
-
-        // Get the list of already used questions from the session state
-        const previouslyAsked: string[] = session?.askedQuestions || [];
-
-        // Filter out the questions that have already been presented
-        const availableQuestions = allSectionQuestions.filter((q: string) => !previouslyAsked.includes(q));
-
-        // Shuffle the remaining questions and select up to 3
-        const shuffledQuestions = [...availableQuestions].sort(() => 0.5 - Math.random());
-        const selectedQuestions = shuffledQuestions.slice(0, 3);
-
-        // Format them into a text list for the AI prompt
-        const questionsListText = selectedQuestions.map((q: string) => `- ${q}`).join("\n");
-
         const auth = getAuth();
         const actorName = auth.currentUser?.displayName?.split(" ")[0] || "Actor";
-
-        const finalPromptForAI = `[CURRENT EXPLORATION ARENA: ${currentSection.toUpperCase()}]\nKeep your tone and extractions strictly focused on this arena.You are speaking directly to the actor, their name is ${actorName} . \n\nActor's Input: "${content.trim()}"\n\nSuggested Thematic Directions (Use these as inspiration...):\n${questionsListText}`;
-
-        // 5. Execute the AI inference request and parse the JSON response
-        const result = await chat.sendMessage(finalPromptForAI);
-        const fullResponse = result.response.text();
         
-        const aiData = JSON.parse(fullResponse);
-        
-        // Safely fallback if structured fields are missing from the AI response
+        // Retrieve the secure Firebase ID token for backend authentication
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) throw new Error("Authentication token not found.");
+
+        const previouslyAsked: string[] = session?.askedQuestions || [];
+
+        // 3. Execute Secure API Call to our Next.js backend
+        const response = await fetch('/api/dna/chat', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            content: content.trim(),
+            currentSection,
+            actorName,
+            history: chatHistory,
+            previouslyAsked
+          })
+        });
+
+        if (!response.ok) {
+           throw new Error(`Server responded with status: ${response.status}`);
+        }
+
+        // 4. Parse the secure response
+        const { aiData, selectedQuestions } = await response.json();
+
+        // Safely extract fields from the backend response
         const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
         const aiExtractions = aiData?.extractions || null;
-        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null; 
+        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null;
 
         // 6. Persist only the AI's conversational reply to the visible chat history
         await addDoc(messagesRef, {
@@ -414,8 +403,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         );
         const newProgress = Math.round(Math.min((totalPepitasUteis / 24) * 100, 100));
 
-        // Combine the previously asked questions with the newly selected ones
-        const newAskedQuestions = [...previouslyAsked, ...selectedQuestions];
+        // Combine the previously asked questions with the newly selected ones returned from the server
+        const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
 
         // Synchronize calculated progress and session metrics back to Firestore
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);

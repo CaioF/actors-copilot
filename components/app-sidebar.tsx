@@ -16,10 +16,9 @@ import {
 import { cn } from "@/lib/utils"
 
 const menuItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Chat", href: "/chat", icon: MessageCircle },
+  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
   { label: "Auditions", href: "/auditions", icon: Monitor },
-  { label: "Personal DNA", href: "/personal-dna", icon: Dna },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -58,10 +57,13 @@ export function AppSidebar() {
             <Plus className="h-4 w-4" />
             New Audition
           </Link>
-          <button className="flex items-center gap-2 rounded-lg border border-[#F5F0E8]/20 bg-[#F5F0E8]/10 px-4 py-2.5 text-sm font-medium text-[#F5F0E8] transition-colors hover:bg-[#F5F0E8]/15">
+          <Link
+            href="/chat"
+            className="flex items-center gap-2 rounded-lg border border-[#F5F0E8]/20 bg-[#F5F0E8]/10 px-4 py-2.5 text-sm font-medium text-[#F5F0E8] transition-colors hover:bg-[#F5F0E8]/15"
+          >
             <Sparkles className="h-4 w-4" />
             New Session
-          </button>
+          </Link>
         </div>
       </div>
 

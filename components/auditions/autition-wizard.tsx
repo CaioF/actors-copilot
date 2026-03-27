@@ -67,11 +67,11 @@ export function AuditionWizard() {
       const token = await currentUser.getIdToken();
       // STAGE 1: SMART DNA SYNTHESIS (Uses the cache logic we just built)
       console.log("Stage 1: Checking if Master Profile needs an update...");
-      const dnaResponse = await fetch('/api/dna-synthesis', {
+      const dnaResponse = await fetch('/api/dna/synthesize', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // 👇 ENVIANDO O CRACHÁ
+          'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify({ userPath: userPath })
       });
@@ -84,6 +84,7 @@ export function AuditionWizard() {
       console.log("Stage 2: Generating Audition Breakdown...");
       const payload = new FormData();
       
+      payload.append("projectType", formData.projectType || "cinematic"); // Defaults to cinematic if not set
       payload.append("project", formData.project);
       payload.append("role", formData.role);
       if (formData.deadline) payload.append("deadline", formData.deadline);
@@ -174,7 +175,7 @@ export function AuditionWizard() {
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-2 h-full">
       
       {/* Come back link */}
-      <Link href="/dashboard" className=" print:hidden flex items-center gap-2 text-sm text-[#FF7316] mb-6 hover:opacity-80 transition-opacity">
+      <Link href="/dashboard" className=" flex items-center gap-2 text-sm text-[#FF7316] mb-6 hover:opacity-80 transition-opacity">
         <ArrowLeft className="w-4 h-4" />
         Back to Dashboard
       </Link>
@@ -281,7 +282,7 @@ export function AuditionWizard() {
           ) : resultData ? (
             <div className="flex flex-col animate-in fade-in duration-700">
 
-               <div className=" print:hidden flex justify-between items-center mb-4">
+               <div className=" flex justify-between items-center mb-4">
                  <h2 className="text-3xl font-serif text-[#2C3328]">Your Performance Map</h2>
 
                   <div className="flex items-center gap-3">
@@ -302,9 +303,9 @@ export function AuditionWizard() {
                     </button>
                 </div>
                </div>
-               
+
                {/* PRINT-ONLY TITLE - This only shows up on the physical paper */}
-               <div className="hidden print:block mb-8 border-b-2 border-[#2C3328] pb-4">
+               <div className="hidden mb-8 border-b-2 border-[#2C3328] pb-4">
                  <h1 className="text-4xl font-serif text-black">{formData.project} - {formData.role}</h1>
                  <p className="text-gray-600 mt-2">AI Performance Map</p>
                </div>

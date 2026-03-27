@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SYNTHESIZER_PROMPT } from '@/lib/chat-types'; 
+import { SYNTHESIZER_PROMPT } from '@/lib/prompts'; 
 // IMPORTAÇÃO NOVA: Usando o Admin SDK super-poderoso que você configurou
 import { auth, db } from "@/lib/firebase.admin"; 
 
