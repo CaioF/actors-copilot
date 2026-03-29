@@ -12,8 +12,12 @@ import { useState, ReactNode } from 'react';
  * @returns {JSX.Element} The rendered login page component.
  */
 export default function LoginPage() {
-    const { loginWithGoogle, loading } = useAuth();
+    const { loginWithGoogle, loginWithEmail, signupWithEmail, loading } = useAuth();
+
     const [errorMsg, setErrorMsg] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
 
     /**
      * Initiates the Google login flow and handles UI error state.
@@ -33,6 +37,41 @@ export default function LoginPage() {
         }
     }
 
+    /**
+     * Handles form submission for Email/Password Authentication.
+     * Determines whether to execute login or signup based on component state,
+     * and maps Firebase error codes to user-friendly messages.
+     * * @param {React.FormEvent} e - The form submission event.
+     */
+    const handleEmailAuth = async (e: React.FormEvent) => {
+        e.preventDefault(); // Impede a página de recarregar
+        setErrorMsg('');
+        
+        if (!email || !password) {
+            setErrorMsg('Please enter both email and password.');
+            return;
+        }
+
+        try {
+            if (isSignUp) {
+                await signupWithEmail(email, password);
+            } else {
+                await loginWithEmail(email, password);
+            }
+        } catch (error: any) {
+            // Traduzindo os erros feios do Firebase para o usuário final
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+                setErrorMsg('Invalid email or password.');
+            } else if (error.code === 'auth/email-already-in-use') {
+                setErrorMsg('This email is already in use. Please log in.');
+            } else if (error.code === 'auth/weak-password') {
+                setErrorMsg('Password should be at least 6 characters.');
+            } else {
+                setErrorMsg(error.message || 'An error occurred. Please try again.');
+            }
+        }
+    }
+
     return (
         <div className="min-h-screen w-full flex">
             
@@ -42,12 +81,12 @@ export default function LoginPage() {
             <div className="hidden md:flex md:w-1/2 bg-background flex-col justify-between p-12 lg:p-20">
                 
                 {/* Logo Container*/}
-                <div>
-                    {/* <Image src="/logo.png" alt="The Actors Copilot" width={120} height={120} /> */}
-                    
-                    {/* placeholder for brand logo */}
-                    <div className="w-24 h-24 bg-card rounded-lg flex items-center justify-center text-card-foreground font-bold text-xs text-center p-2 border-2 border-primary">
-                        THE ACTORS<br/>COPILOT
+                <div className="flex items-left justify-left px-5 pt-6 pb-5">
+                    <div className="flex h-[110px] w-[110px] flex-col items-center justify-center rounded-md border border-[#F5F0E8]/20 bg-[#2C3328]">
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">The</span>
+                    <span className="font-sans text-[20px] font-extrabold uppercase leading-none tracking-wide text-[#F5F0E8]">Actors</span>
+                    <span className="text-[12px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">Copilot</span>
+                    <span className="mt-0.5 text-[6px] text-[#E8721A]">&#9733;</span>
                     </div>
                 </div>
 
@@ -88,29 +127,88 @@ export default function LoginPage() {
                 <div className="w-full max-w-sm space-y-8">
                     
                     {/* Form Header */}
-                    <div className="space-y-2">
-                        <h2 className="text-2xl font-bold text-foreground">Log in to continue</h2>
-                        <p className="text-sm text-muted-foreground">Sign in with your Google account to continue</p>
-                    </div>
+                    {/* 👇 O NOVO FORMULÁRIO DE E-MAIL/SENHA */}
+                    <form onSubmit={handleEmailAuth} className="space-y-4 pt-4">
+                        <div>
+                            <label className="text-m font-medium text-foreground mb-1 block"> Email</label> 
+                            <p className="text-sm text-muted-foreground" >Type in the same email you used in Kajabi</p>
+                            <input 
+                                type="email" 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="you@example.com"
+                                className="w-full bg-gray-50 border border-gray-200 text-black rounded-lg px-4 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="text-m font-medium text-foreground mb-1 block">Password</label>
+                            <input 
+                                type="password" 
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full bg-gray-50 border border-gray-200 text-black rounded-lg px-4 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                required
+                            />
+                        </div>
 
-                    {/* Primary Login Action (Secured via Firebase Auth Context) */}
-                    <div className="pt-4">
                         <button 
-                            onClick={handleLogin}
+                            type="submit"
                             disabled={loading}
-                            className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-3.5 px-4 flex items-center justify-center font-medium transition-colors disabled:opacity-70"
+                            className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-3.5 px-4 flex items-center justify-center font-medium transition-colors disabled:opacity-70 mt-2"
                         >
                             {loading ? (
-                                <span className="animate-pulse">Connecting...</span>
+                                <span className="animate-pulse">Processing...</span>
+                            ) : isSignUp ? (
+                                "Create Account"
                             ) : (
-                                "Continue with Google"
+                                "Log In"
                             )}
                         </button>
-                        {errorMsg && (
-                            <p className="text-destructive text-sm text-center mt-4 font-medium">
-                                {errorMsg}
-                            </p>
-                        )}
+                    </form>
+
+                    {/* Divisor "OR" */}
+                    <div className="relative flex items-center py-4">
+                        <div className="flex-grow border-t border-gray-200"></div>
+                        <span className="flex-shrink-0 mx-4 text-muted-foreground text-sm">or</span>
+                        <div className="flex-grow border-t border-gray-200"></div>
+                    </div>
+
+                    {/* Botão Antigo do Google */}
+                    <div>
+                        <button 
+                            type="button"
+                            onClick={handleLogin}
+                            disabled={loading}
+                            className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-foreground rounded-full py-3.5 px-4 flex items-center justify-center font-medium transition-colors disabled:opacity-70"
+                        >
+                            Continue with Google
+                        </button>
+                    </div>
+
+                    {/* Mensagens de Erro */}
+                    {errorMsg && (
+                        <p className="text-destructive text-sm text-center mt-4 font-medium animate-in fade-in slide-in-from-top-2">
+                            {errorMsg}
+                        </p>
+                    )}
+
+                    {/* Toggle Login/Cadastro */}
+                    <div className="text-center pt-4">
+                        <p className="text-sm text-muted-foreground">
+                            {isSignUp ? "Already have an account?" : "Don't have an account?"}
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setIsSignUp(!isSignUp);
+                                    setErrorMsg(''); // Limpa os erros ao trocar de tela
+                                }}
+                                className="ml-1 text-primary hover:underline font-medium outline-none"
+                            >
+                                {isSignUp ? "Log in" : "Sign up"}
+                            </button>
+                        </p>
                     </div>
 
 

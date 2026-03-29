@@ -1,5 +1,5 @@
 import { POST } from './route';
-import { auth } from '@/lib/firebase-admin';
+import { auth } from '@/lib/firebase.admin';
 import { cookies } from 'next/headers';
 import { SignJWT } from 'jose';
 

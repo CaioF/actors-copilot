@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
 
 /**
@@ -12,6 +12,8 @@ interface AuthContextType {
     user: User | null; // The authenticated Firebase user object, or null if unauthenticated.
     loading: boolean; // Indicates if the authentication state is currently being resolved.
     loginWithGoogle: () => Promise<void>;
+    loginWithEmail: (email: string, password: string) => Promise<void>;
+    signupWithEmail: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
 }
 
@@ -65,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     'Authorization': `Bearer ${idToken}`,
                     'Content-Type': 'application/json'
                 }
-            });
+            }); 
 
             const data = await response.json();
             
@@ -86,6 +88,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             console.error("Failed to log in: ", error);
             // Propagate the error to the calling component to ensure accurate UI feedback
+            throw error; 
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /**
+     * Logs in a user with email/password and establishes a secure server-side session.
+     * @param {string} email - The user's email.
+     * @param {string} password - The user's password.
+     * @throws {Error} Throws if Firebase auth fails or the backend rejects the session.
+     */
+    const loginWithEmail = async (email: string, password: string) => {
+        setLoading(true);
+        try {
+            const result = await signInWithEmailAndPassword(auth, email, password);
+            const idToken = await result.user.getIdToken();
+            
+            const response = await fetch('/api/auth/callback', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                const data = await response.json();
+                await signOut(auth);
+                throw new Error(data.error || "Failed to establish secure session.");
+            }
+            window.location.href = "/dashboard"; 
+        } catch (error) {
+            console.error("Failed to log in with email: ", error);
+            throw error; 
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /**
+     * Registers a user with email/password and establishes a secure server-side session.
+     * @param {string} email - The user's email.
+     * @param {string} password - The user's password.
+     * @throws {Error} Throws if Firebase registration fails or the backend rejects the session.
+     */
+    const signupWithEmail = async (email: string, password: string) => {
+        setLoading(true);
+        try {
+            const result = await createUserWithEmailAndPassword(auth, email, password);
+            const idToken = await result.user.getIdToken();
+            
+            const response = await fetch('/api/auth/callback', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                const data = await response.json();
+                await signOut(auth);
+                throw new Error(data.error || "Failed to establish secure session.");
+            }
+            window.location.href = "/dashboard"; 
+        } catch (error) {
+            console.error("Failed to sign up with email: ", error);
             throw error; 
         } finally {
             setLoading(false);
@@ -132,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [auth]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout }}>
+        <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, loginWithEmail, signupWithEmail }}>
             {children}
         </AuthContext.Provider>
     );

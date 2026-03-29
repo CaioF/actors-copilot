@@ -16,7 +16,7 @@ export default function DashboardPage() {
           description="Build the foundation of your craft. Through guided conversation, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns — creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing. It's about identifying what's usable. The more you invest here, the sharper your auditions become."
           ctaLabel="Start building DNA"
           ctaIcon={Dna}
-          variant="olive"
+          variant="orange"
           bodyVariant="dark"
         />
         <StepCard
@@ -35,7 +35,7 @@ export default function DashboardPage() {
           ctaLabel="Upload Character Brief"
           ctaIcon={Sparkles}
           variant="orange"
-          bodyVariant="sage"
+          bodyVariant="dark"
         />
       </div>
 

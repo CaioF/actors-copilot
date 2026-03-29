@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { auth } from '@/lib/firebase-admin';
+import { auth } from '@/lib/firebase.admin';
 import { SignJWT } from 'jose';
 
 /**
@@ -29,15 +29,24 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Email not found in token' }, { status: 400 });
         }
 
-        const hasAccess = await verifyKajabiPurchase(userEmail);
+        const isDevBypass = process.env.NODE_ENV === 'development';
+        
+        const hasAccess = isDevBypass 
+            ? { success: true, message: 'Bypassed for local development.' } 
+            : await verifyKajabiPurchase(userEmail);
         
         if (!hasAccess.success) {
             // Forward the exact Kajabi validation error message to the frontend
-            console.error("ERROR: Kajabi environment variables are not fully configured");  
-                return NextResponse.json(  
-                    { error: 'Internal Configuration Error: Kajabi is not properly configured' },  
-                    { status: 500 }  
-                );  
+            console.error(`Kajabi Validation Failed for ${userEmail}:`, hasAccess.message);
+            
+            // Check if it's an actual env configuration error vs a user access denial
+            const isConfigError = hasAccess.message?.includes("System configuration error");
+            const statusCode = isConfigError ? 500 : 403;
+
+            return NextResponse.json(  
+                { error: hasAccess.message || 'Access denied by Kajabi validation.' },  
+                { status: statusCode }  
+            );  
         }
 
         // Cryptographically sign a new JWT containing the user's email to establish a session

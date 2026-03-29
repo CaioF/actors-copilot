@@ -1,4 +1,5 @@
 'use client'
+import { Loader2, Clapperboard } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -29,12 +30,41 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
     // TODO: Replace this basic text with a proper UI Skeleton component or a branded loading spinner to improve perceived performance during initial auth checks.
     if (loading) {
-        return (
-            <div className="flex items-center justify-center">
-                <p>Loading...</p>
+    return (
+        // O fixed inset-0 z-50 garante que vai cobrir a tela TODA e ficar no meio exato
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#F0E8DC]">
+            
+            {/* Efeito visual "AI Thinking / DNA Scanning" */}
+            <div className="relative flex items-center justify-center mb-8">
+                {/* Anel externo pulsante (Efeito radar) */}
+                <div className="absolute w-24 h-24 border-2 border-[#E8721A] rounded-full animate-ping opacity-20"></div>
+                
+                {/* Anel intermediário respirando */}
+                <div className="absolute w-20 h-20 border-4 border-[#E8721A]/30 rounded-full animate-pulse"></div>
+                
+                {/* Círculo central com o ícone */}
+                <div className="relative z-10 bg-[#3D4A3C] p-4 rounded-full shadow-2xl">
+                    <Clapperboard className="w-8 h-8 text-[#E8721A]" />
+                </div>
             </div>
-        );
-    }
+
+            {/* Tipografia Premium */}
+            <h1 className="font-serif text-3xl text-[#2C3328] mb-3 tracking-wide">
+                The Actors Copilot
+            </h1>
+            
+            <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#E8721A] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-[#E8721A] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-[#E8721A] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+            
+            <p className="text-[#6B6B6B] text-sm uppercase tracking-[0.2em] mt-4 font-medium animate-pulse">
+                Preparing your studio...
+            </p>
+        </div>
+    );
+}
 
     return user ? <>{children}</> : null;
 }

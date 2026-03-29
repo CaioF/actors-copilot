@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 
 /**
  * Server-side Firebase Admin initialization.
@@ -45,3 +46,12 @@ if (!admin.apps.length) {
  * @type {admin.auth.Auth}
  */
 export const auth = admin.auth();
+
+/**
+ * The initialized Firebase Admin Firestore service.
+ * Used for secure, server-side database read/writes that bypass client-side security rules.
+ * @type {admin.firestore.Firestore}
+ */
+
+const databaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "(default)";
+export const db = getFirestore(admin.app(), databaseId);

@@ -15,12 +15,14 @@ import {
   setDoc,
 } from "firebase/firestore";
 
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
-import { QUESTIONS } from "@/lib/questions";
-import { SYSTEM_PROMPT, SECTION_INTROS, DNASectionId } from "@/lib/chat-types";
+import { SECTION_INTROS } from "@/lib/prompts";
+import {  DNASectionId } from "@/lib/chat-types";
 
-const DEFAULT_USER_ID = "demo-user";
+
 const DEFAULT_SESSION_ID = "session-1";
 
 /**
@@ -28,20 +30,21 @@ const DEFAULT_SESSION_ID = "session-1";
  * Handles real-time synchronization with Firebase Firestore, interactions with
  * the Vertex AI Gemini model, and local state management for the chat UI.
  *
- * @param {string} userId - The unique identifier of the user.
+ * @param {string} userPath - The unique identifier of the user.
  * @param {string} sessionId - The unique identifier of the current DNA extraction session.
  * @returns {Object} The chat state and action methods.
  */
-export function useChat(
-  userId: string = DEFAULT_USER_ID,
-  sessionId: string = DEFAULT_SESSION_ID
-) {
+export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [session, setSession] = useState<DNASession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [isInitializing, setIsInitializing] = useState(true);
   const [firebaseAvailable, setFirebaseAvailable] = useState(true);
+
+  //Handle Authentication and the customized Firestore path
+  const [userPath, setUserPath] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   /**
    * Validates Firebase configuration on mount.
@@ -77,12 +80,39 @@ export function useChat(
   }, []);
 
   /**
+   * AUTHENTICATION LISTENER
+   * Listens for the currently logged-in user and creates a readable Firestore path.
+   */
+  useEffect(() => {
+    if (!firebaseAvailable) return;
+    const auth = getAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // Extract the first name and remove special characters for a safe database path
+        const firstName = user.displayName 
+          ? user.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") 
+          : "Actor";
+        
+        // Combine UID and First Name (e.g., "12345abc_Gabrielli") 
+        // This makes it unique for security, but readable in the Firestore Console
+        setUserPath(`${user.uid}_${firstName}`);
+      } else {
+        setUserPath(null); // User is not logged in
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [firebaseAvailable]);
+
+  /**
    * Establishes a real-time Firestore listener for session metadata.
    * Automatically provisions a default session document if one does not exist.
    */
   useEffect(() => {
-    if (!firebaseAvailable) return;
-    const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
+    if (!firebaseAvailable || isAuthLoading || !userPath) return;
+    const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
     const unsubscribe = onSnapshot(
       sessionRef,
       (docSnap) => {
@@ -128,7 +158,7 @@ export function useChat(
       }
     );
     return () => unsubscribe();
-  }, [userId, sessionId, firebaseAvailable]);
+  }, [userPath, sessionId, isAuthLoading, firebaseAvailable]);
 
   /**
    * Establishes a real-time Firestore listener for chat messages in the current session.
@@ -138,7 +168,7 @@ export function useChat(
     if (!firebaseAvailable) return;
     const messagesRef = collection(
       getDb(),
-      `users/${userId}/dnaSessions/${sessionId}/messages`
+      `users/${userPath}/dnaSessions/${sessionId}/messages`
     );
     const q = query(messagesRef, orderBy("timestamp", "asc"));
 
@@ -180,7 +210,7 @@ export function useChat(
       }
     );
     return () => unsubscribe();
-  }, [userId, sessionId, firebaseAvailable]);
+  }, [userPath, sessionId, isAuthLoading, firebaseAvailable]);
 
   /**
    * Processes and dispatches a user message to the AI model, then handles the structured response.
@@ -228,7 +258,7 @@ export function useChat(
       const db = getDb();
       const messagesRef = collection(
         db,
-        `users/${userId}/dnaSessions/${sessionId}/messages`
+        `users/${userPath}/dnaSessions/${sessionId}/messages`
       );
 
       try {
@@ -244,82 +274,73 @@ export function useChat(
         });
 
         // 2. Initialize the Vertex AI Gemini model
-        const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
-        const { getApp: getFirebaseApp } = await import("@/lib/firebase");
-
-        const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
-        const model = getGenerativeModel(ai, { 
-          model: "gemini-2.0-flash",
-          // Enforce JSON structured output for programmatic parsing
-          generationConfig: { 
-            responseMimeType: "application/json",
-            temperature: 0.3
-          }
-        });
-
-        // 3. Construct the conversation history payload for the model
+        // 2. Prepare the history payload for the secure backend
         const currentMessages = await getDocs(
           query(messagesRef, orderBy("timestamp", "asc"))
         );
+
+        // Extract and map the conversation history
         const history = currentMessages.docs
           .filter((d) => d.data().role !== undefined)
           .map((d) => ({
             role: d.data().role === "assistant" ? ("model" as const) : ("user" as const),
-            parts: [{ text: d.data().content as string || ""}],
+            parts: [{ text: (d.data().content as string) || ""}],
           }));
 
+        // The Gemini API requires strictly alternating 'user' and 'model' roles.
+        // We compile the history excluding the current message.
         const historyWithoutCurrent = history.slice(0, -1);
-
         const chatHistory: { role: "user" | "model"; parts: { text: string }[] }[] = [];
-        let expectedRole = "user"; // Note: The Gemini API requires the history array to start with a 'user' role
+        let expectedRole = "user"; 
 
         for (const msg of historyWithoutCurrent) {
           if (msg.role === expectedRole) {
-            // Append message and toggle the expected role
             chatHistory.push(msg);
             expectedRole = expectedRole === "user" ? "model" : "user";
           } else {
-            // Merge consecutive messages of the same role to maintain strict 'user'/'model' alternation
+            // Merge consecutive messages to maintain strict alternating roles
             if (chatHistory.length > 0) {
               chatHistory[chatHistory.length - 1].parts[0].text += `\n\n${msg.parts[0].text}`;
             }
           }
         }
 
-        const chat = model.startChat({
-          systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-          history: chatHistory,
-        });
+        const auth = getAuth();
+        const actorName = auth.currentUser?.displayName?.split(" ")[0] || "Actor";
+        
+        // Retrieve the secure Firebase ID token for backend authentication
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) throw new Error("Authentication token not found.");
 
-        // 4. Dynamic question selection
-        // Fetch all questions for the current section
-        const allSectionQuestions: string[] = QUESTIONS[currentSection] || [];
-
-        // Get the list of already used questions from the session state
         const previouslyAsked: string[] = session?.askedQuestions || [];
 
-        // Filter out the questions that have already been presented
-        const availableQuestions = allSectionQuestions.filter((q: string) => !previouslyAsked.includes(q));
+        // 3. Execute Secure API Call to our Next.js backend
+        const response = await fetch('/api/dna/chat', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            content: content.trim(),
+            currentSection,
+            actorName,
+            history: chatHistory,
+            previouslyAsked
+          })
+        });
 
-        // Shuffle the remaining questions and select up to 3
-        const shuffledQuestions = [...availableQuestions].sort(() => 0.5 - Math.random());
-        const selectedQuestions = shuffledQuestions.slice(0, 3);
+        if (!response.ok) {
+           throw new Error(`Server responded with status: ${response.status}`);
+        }
 
-        // Format them into a text list for the AI prompt
-        const questionsListText = selectedQuestions.map((q: string) => `- ${q}`).join("\n");
+        // 4. Parse the secure response
+        const { aiData, selectedQuestions } = await response.json();
 
-        const finalPromptForAI = `[CURRENT EXPLORATION ARENA: ${currentSection.toUpperCase()}]\nKeep your tone and extractions strictly focused on this arena.\n\nActor's Input: "${content.trim()}"\n\nSuggested Thematic Directions (Use these as inspiration...):\n${questionsListText}`;
-
-        // 5. Execute the AI inference request and parse the JSON response
-        const result = await chat.sendMessage(finalPromptForAI);
-        const fullResponse = result.response.text();
-        
-        const aiData = JSON.parse(fullResponse);
-        
-        // Safely fallback if structured fields are missing from the AI response
+        // Safely extract fields from the backend response
         const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
         const aiExtractions = aiData?.extractions || null;
-        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null; 
+        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null;
 
         // 6. Persist only the AI's conversational reply to the visible chat history
         await addDoc(messagesRef, {
@@ -344,7 +365,7 @@ export function useChat(
           }
 
           // Archive high-value extractions into a dedicated user vault collection
-          const vaultRef = collection(getDb(), `users/${userId}/dnaVault`);
+          const vaultRef = collection(getDb(), `users/${userPath}/dnaVault`);
           await addDoc(vaultRef, {
             sessionId: sessionId,
             section: currentSection,
@@ -357,14 +378,14 @@ export function useChat(
           const isHighQuality =
             aiAssessment != null &&
             aiAssessment.has_actionable_pattern === true &&
-            aiAssessment.depth_score >= 6;
+            aiAssessment.depth_score >= 5;
 
           if (isHighQuality) {
             currentSecCount += 1; 
             sectionCounts[currentSection] = currentSecCount; // Store updated count for current section
 
-            // Mark section as completed if the required threshold (6) of high-quality insights is met
-            if (currentSecCount >= 6 && !newCompletedSecs.includes(currentSection)) {
+            // Mark section as completed if the required threshold (5) of high-quality insights is met
+            if (currentSecCount >= 5 && !newCompletedSecs.includes(currentSection)) {
               newCompletedSecs.push(currentSection);
             }
           }
@@ -380,13 +401,13 @@ export function useChat(
         const totalPepitasUteis = Object.values(sectionCounts).reduce(
             (acc, count) => acc + Math.min(count as number, 6), 0
         );
-        const newProgress = Math.min((totalPepitasUteis / 24) * 100, 100);
+        const newProgress = Math.round(Math.min((totalPepitasUteis / 24) * 100, 100));
 
-        // Combine the previously asked questions with the newly selected ones
-        const newAskedQuestions = [...previouslyAsked, ...selectedQuestions];
+        // Combine the previously asked questions with the newly selected ones returned from the server
+        const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
 
         // Synchronize calculated progress and session metrics back to Firestore
-        const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
+        const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
         await updateDoc(sessionRef, { 
           lastActiveAt: serverTimestamp(),
           totalExtractions: totalCount,
@@ -412,7 +433,7 @@ export function useChat(
         setStreamingContent("");
       }
     },
-    [userId, sessionId, session, firebaseAvailable]
+    [userPath, sessionId, session, firebaseAvailable]
   );
 
   /**
@@ -425,14 +446,14 @@ export function useChat(
   const changeSection = useCallback(async (newSection: string) => {
     if (!firebaseAvailable || !session) return;
     
-    const sessionRef = doc(getDb(), `users/${userId}/dnaSessions/${sessionId}`);
+    const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
     await updateDoc(sessionRef, { 
       currentSection: newSection,
       lastActiveAt: serverTimestamp()
     });
 
     // Check for existing messages in the target section
-    const messagesRef = collection(getDb(), `users/${userId}/dnaSessions/${sessionId}/messages`);
+    const messagesRef = collection(getDb(), `users/${userPath}/dnaSessions/${sessionId}/messages`);
     const q = query(messagesRef, where("section", "==", newSection), limit(1));
     const snapshot = await getDocs(q);
 
@@ -448,7 +469,7 @@ export function useChat(
         });
       }
     }
-  }, [userId, sessionId, session, firebaseAvailable]);
+  }, [userPath, sessionId, session, firebaseAvailable]);
 
   return {
     messages,

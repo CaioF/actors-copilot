@@ -1,0 +1,136 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { UploadCloud, FileText, X } from "lucide-react";
+
+interface StepUploadProps {
+  title: string;
+  description: string;
+  file: File | null;
+  text: string;
+  onFileChange: (file: File | null) => void;
+  onTextChange: (text: string) => void;
+}
+
+export function StepUpload({ title, description, file, text, onFileChange, onTextChange }: StepUploadProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Previne o comportamento padrão do navegador de abrir o arquivo
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      // Aceita apenas PDF ou arquivos de texto/word básicos
+      if (droppedFile.type === "application/pdf" || droppedFile.type.includes("text")) {
+        onFileChange(droppedFile);
+      } else {
+        alert("Please upload a PDF or Text file.");
+      }
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      onFileChange(e.target.files[0]);
+    }
+  };
+
+  return (
+    <div className="rounded-3xl bg-[#424842] shadow-xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
+      
+      {/* Cabeçalho do Card */}
+      <div className="mb-8">
+        <h2 className="text-xl font-medium text-[#EADDCE] mb-2">{title}</h2>
+        <p className="text-[#B7BCB6] text-sm">{description}</p>
+      </div>
+
+      <div className="space-y-8">
+        
+        {/* ZONA DE DRAG & DROP */}
+        {!file ? (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+              ${isDragging 
+                ? "border-[#FF7316] bg-[#FF7316]/10" 
+                : "border-[#B7BCB6]/40 hover:border-[#FF7316]/60 hover:bg-[#2C3328]/20"
+              }
+            `}
+          >
+            <input
+              type="file"
+              accept=".pdf,.txt,.doc,.docx"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+            />
+            <div className="bg-[#EADDCE] p-4 rounded-full mb-4">
+              <UploadCloud className="w-8 h-8 text-[#424842]" />
+            </div>
+            <p className="text-[#EADDCE] font-medium mb-1">
+              Click to upload <span className="text-[#B7BCB6] font-normal">or drag and drop</span>
+            </p>
+            <p className="text-[#B7BCB6] text-xs">PDF, TXT, or DOC (max. 10MB)</p>
+          </div>
+        ) : (
+          /* ARQUIVO SELECIONADO (PREVIEW) */
+          <div className="border border-[#B7BCB6]/30 bg-[#2C3328]/30 rounded-2xl p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4 text-[#EADDCE]">
+              <div className="bg-[#FF7316]/20 p-3 rounded-lg text-[#FF7316]">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="font-medium truncate max-w-[200px] sm:max-w-md">{file.name}</p>
+                <p className="text-xs text-[#B7BCB6]">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+            </div>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation(); // Evita abrir o seletor novamente
+                onFileChange(null);
+              }}
+              className="text-[#B7BCB6] hover:text-[#FF7316] p-2 transition-colors"
+              title="Remove file"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* DIVISOR */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-[1px] bg-[#B7BCB6]/20"></div>
+          <span className="text-[#B7BCB6] text-xs font-medium uppercase tracking-wider">or paste text</span>
+          <div className="flex-1 h-[1px] bg-[#B7BCB6]/20"></div>
+        </div>
+
+        {/* ÁREA DE TEXTO ALTERNATIVA */}
+        <div>
+          <textarea
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
+            placeholder="Paste your script or character details here..."
+            className="w-full bg-[#EADDCE] rounded-xl px-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/50 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all min-h-[160px] resize-y"
+          />
+        </div>
+
+      </div>
+    </div>
+  );
+}

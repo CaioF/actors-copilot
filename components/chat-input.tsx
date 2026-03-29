@@ -17,6 +17,16 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     inputRef.current?.focus();
   }, []);
 
+  // Focus automatically after AI finishes generating a response
+  useEffect(() => {
+    if (!isLoading && inputRef.current) {
+      // 10ms delay to ensure focus happens after any potential UI updates from the new message rendering
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 10);
+    }
+  }, [isLoading]);
+
   const handleSubmit = () => {
     if (!value.trim() || isLoading) return;
     onSend(value.trim());

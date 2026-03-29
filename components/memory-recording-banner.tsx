@@ -8,15 +8,10 @@ export function MemoryRecordingBanner() {
           {"Quick Memory Recording: Moments of truth don't wait."}
         </p>
         <p className="text-sm leading-relaxed text-[#2C3328]">
-          Neither should your tools. Press the button to start recording anytime.
+          Neither should your tools. Press the Mic button in the bottom-right corner of the page to start recording at any time.
         </p>
       </div>
-      <button
-        className="ml-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#E8721A] text-[#ffffff] shadow-lg transition-all hover:bg-[#E8721A]/90 hover:scale-105"
-        aria-label="Start recording"
-      >
-        <Mic className="h-5 w-5" />
-      </button>
+      
     </div>
   )
 }
