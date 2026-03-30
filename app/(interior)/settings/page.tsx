@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { User, Bell, Shield, AlertTriangle, Mail, Trash2, Camera, Save } from "lucide-react"
+import { User, Shield, AlertTriangle, Mail, Trash2, Camera, Save } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import {
   AlertDialog,
@@ -108,11 +108,30 @@ export default function SettingsPage() {
 
       const storage = getStorage(getApp());
       // Create a secure path in storage: avatars/userId.jpg
-      const fileExtension = file.name.split('.').pop();
+       // Create a secure path in storage: avatars/userId.<ext>
+      let fileExtension: string | undefined;
+      const nameParts = file.name.split(".");
+      if (nameParts.length > 1 && nameParts[nameParts.length - 1]) {
+        fileExtension = nameParts[nameParts.length - 1].toLowerCase();
+      } else if (file.type && file.type.includes("/")) {
+        // Derive extension from MIME type, e.g. "image/png" -> "png"
+        fileExtension = file.type.split("/").pop() || undefined;
+      }
+      if (!fileExtension) {
+        // Fallback to a safe default
+        fileExtension = "jpg";
+      }
       const storageRef = ref(storage, `avatars/${user.uid}.${fileExtension}`);
       
-      // Upload the file
-      await uploadBytes(storageRef, file);
+      // Upload the file with appropriate contentType metadata
+      const contentType =
+        file.type && file.type.trim().length > 0
+          ? file.type
+          : fileExtension === "jpg" || fileExtension === "jpeg"
+            ? "image/jpeg"
+            : `image/${fileExtension}`;
+      await uploadBytes(storageRef, file, { contentType });
+
       // Get the public URL
       const downloadURL = await getDownloadURL(storageRef);
 
@@ -166,23 +185,69 @@ export default function SettingsPage() {
     }
   };
 
-  // 6. DELETE ACCOUNT: Removes the user from Firebase Auth
+// 6. DELETE ACCOUNT: Removes ALL user data (Firestore & Storage) AND the Firebase Auth user
   const handleDeleteAccount = async () => {
     if (!user) return;
     
     // Extra safety confirmation before making the API call
-    const confirmFinal = window.confirm("Are you absolutely sure? This cannot be undone.");
+    const confirmFinal = window.confirm("Are you absolutely sure? This will permanently delete your profile, auditions, breakdowns, and account. This cannot be undone.");
     if (!confirmFinal) return;
 
     setIsDeletingAccount(true);
     try {
+      // --- 1. DYNAMIC PATH CALCULATION ---
+      const firstName = user.displayName ? user.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") : "Actor";
+      const userPath = `${user.uid}_${firstName}`;
+
+      // --- 2. DELETE ALL FIRESTORE DATA ---
+      const { getFirestore, collection, getDocs, deleteDoc, doc } = await import("firebase/firestore");
+      const { getApp } = await import("@/lib/firebase");
+      const db = getFirestore(getApp());
+
+      // Fetch all subcollections
+      const sessionsRef = collection(db, `users/${userPath}/dnaSessions`);
+      const vaultRef = collection(db, `users/${userPath}/dnaVault`);
+      const auditionsRef = collection(db, `users/${userPath}/auditions`);
+
+      const [sessionDocs, vaultDocs, auditionDocs] = await Promise.all([
+        getDocs(sessionsRef),
+        getDocs(vaultRef),
+        getDocs(auditionsRef)
+      ]);
+
+      // Map all documents to delete promises
+      const deletePromises = [
+        ...sessionDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/dnaSessions`, d.id))),
+        ...vaultDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/dnaVault`, d.id))),
+        ...auditionDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/auditions`, d.id))),
+        deleteDoc(doc(db, `users/${userPath}`)) // Delete the parent user document itself
+      ];
+
+      // Execute all database deletions simultaneously
+      await Promise.all(deletePromises);
+
+      // --- 3. DELETE AVATAR FROM STORAGE (If it exists) ---
+      if (user.photoURL && user.photoURL.includes('firebasestorage')) {
+        try {
+          const { getStorage, ref, deleteObject } = await import("firebase/storage");
+          const storage = getStorage(getApp());
+          // Firebase Storage 'ref' can accept the full download URL directly
+          const avatarRef = ref(storage, user.photoURL);
+          await deleteObject(avatarRef);
+        } catch (storageError) {
+          console.warn("Avatar not found or already deleted, moving on.");
+        }
+      }
+
+      // --- 4. FINALLY, DELETE FIREBASE AUTH USER ---
       const { getAuth, deleteUser } = await import("firebase/auth");
       const auth = getAuth();
       
       if (auth.currentUser) {
         await deleteUser(auth.currentUser);
-        alert("Account successfully deleted. We're sorry to see you go!");
+        // Note: AuthContext handles the redirect automatically when currentUser becomes null.
       }
+
     } catch (error: any) {
       console.error("Error deleting account:", error);
       // FIREBASE SECURITY PROTOCOL: Requires recent login for destructive actions

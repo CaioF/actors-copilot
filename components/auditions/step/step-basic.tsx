@@ -44,7 +44,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
 
       {/* --- NEW SECTION: Project Category Selection --- */}
       <div className="space-y-4">
-        <label className="text-sm font-medium mt-2 mb-4 block font-mediumtext-[#6B6B6B]">What kind of audition is this?</label>
+        <label className="text-sm font-medium mt-2 mb-4 block text-[#6B6B6B]">What kind of audition is this?</label>
         {/* present the choice as large, visual cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {projectTypes.map((type) => {
@@ -55,7 +55,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
             return (
               <button
                 key={type.id}
-                onClick={() => updateData({ projectType: type.id as "cinematic" | "commercial" })}
+                onClick={() => updateData({ projectType: type.id as "cinematic" | "commercial" | "theater" })}
                 className={cn(
                   "flex items-start gap-4 lg:gap-5 p-6 rounded-2xl border text-left transition-all duration-200",
                   "bg-[#f8ead2] border-[#C7C0B5] hover:border-[#E8721A] hover:ring-2 hover:ring-[#E8721A]/30",
