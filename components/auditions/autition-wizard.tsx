@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Printer} from "lucide-react";
+import { useReactToPrint } from "react-to-print";
+import ReactMarkdown from "react-markdown";
 import { AuditionFormData, initialAuditionData, AuditionStep } from "@/lib/audition-types";
 import { Stepper } from "./stepper";
 import { StepBasics } from "./step/step-basic";
@@ -14,6 +16,7 @@ import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 
+
 export function AuditionWizard() {
   const router = useRouter(); // Used for redirecting after saving
   const [currentStep, setCurrentStep] = useState<AuditionStep>(1);
@@ -21,6 +24,13 @@ export function AuditionWizard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // --- PRINTING SETUP ---
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrintDocument = useReactToPrint({
+    contentRef: printRef, // points to our hidden template
+    documentTitle: formData.project ? `${formData.project}_Breakdown` : "Audition_Breakdown",
+  });
 
   // --- AUTHENTICATION LISTENER ---
   useEffect(() => {
@@ -288,7 +298,7 @@ export function AuditionWizard() {
                   <div className="flex items-center gap-3">
                    {/* PRINT BUTTON */}
                    <button 
-                     onClick={() => window.print()}
+                     onClick={handlePrintDocument}
                      className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-5 py-2 rounded-full font-medium transition-colors text-sm"
                    >
                      <Printer className="w-4 h-4" />
@@ -304,10 +314,59 @@ export function AuditionWizard() {
                 </div>
                </div>
 
-               {/* PRINT-ONLY TITLE - This only shows up on the physical paper */}
-               <div className="hidden mb-8 border-b-2 border-[#2C3328] pb-4">
-                 <h1 className="text-4xl font-serif text-black">{formData.project} - {formData.role}</h1>
-                 <p className="text-gray-600 mt-2">AI Performance Map</p>
+               {/* UI Display for the Web */}
+               <StepResult data={resultData} />
+
+               {/* HIDDEN PRINT TEMPLATE - This will be extracted by react-to-print */}
+               <div className="hidden">
+                 <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-serif">
+                   
+                   {/* Header */}
+                   <div className="border-b-2 border-black pb-4 mb-8">
+                     <h1 className="text-4xl font-bold text-black">{formData.project || "Audition Project"}</h1>
+                     <p className="text-xl text-gray-800 mt-2">{formData.role || "Character Role"}</p>
+                     <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
+                   </div>
+
+                   {/* Intro Block */}
+                   {resultData?.intro && (
+                     <div className="mb-10 p-6 bg-gray-50 border-l-4 border-black break-inside-avoid">
+                       <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
+                         <ReactMarkdown>{resultData.intro}</ReactMarkdown>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Sections Loop */}
+                   <div className="space-y-10">
+                     {resultData?.sections?.map((sec: any, idx: number) => (
+                       <div key={idx} className="break-inside-avoid">
+                         <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
+                           {sec.title}
+                         </h3>
+                         <ul className="space-y-4">
+                           {sec.items.map((item: string, i: number) => (
+                             <li key={i} className="flex items-start text-black">
+                               <span className="mr-4 text-black font-bold text-lg">•</span>
+                               <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
+                                 <ReactMarkdown>{item}</ReactMarkdown>
+                               </div>
+                             </li>
+                           ))}
+                         </ul>
+                       </div>
+                     ))}
+                   </div>
+
+                   {/* Final Block */}
+                   {resultData?.outro && (
+                     <div className="mt-12 pt-8 border-t border-black text-center break-inside-avoid">
+                       <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
+                         <ReactMarkdown>{resultData.outro}</ReactMarkdown>
+                       </div>
+                     </div>
+                   )}
+                 </div>
                </div>
 
                <StepResult data={resultData} />
