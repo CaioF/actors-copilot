@@ -28,12 +28,8 @@ export async function POST(request: Request) {
         if (!userEmail) {
             return NextResponse.json({ error: 'Email not found in token' }, { status: 400 });
         }
-
-        const isDevBypass = process.env.NODE_ENV === 'development';
         
-        const hasAccess = isDevBypass 
-            ? { success: true, message: 'Bypassed for local development.' } 
-            : await verifyKajabiPurchase(userEmail);
+        const hasAccess = await verifyKajabiPurchase(userEmail);
         
         if (!hasAccess.success) {
             // Forward the exact Kajabi validation error message to the frontend

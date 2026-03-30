@@ -24,7 +24,7 @@ export default function AuditionDetailView() {
   
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrintDocument = useReactToPrint({
-    contentRef: printRef, // Pega APENAS o nosso template oculto
+    contentRef: printRef, // hidden template reference
     documentTitle: auditionData ? `${auditionData.project}_Breakdown` : "Audition_Breakdown",
   });
 
@@ -166,7 +166,6 @@ export default function AuditionDetailView() {
             ))}
           </div>
 
-          {/* Outro Block */}
           {auditionData?.performanceMap?.outro && (
             <div className="mt-12 pt-8 border-t border-black text-center break-inside-avoid">
               <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">

@@ -3,6 +3,8 @@
 import { useAuth } from '@/lib/context/AuthContext';
 import { Sparkles, FileText, Lock } from 'lucide-react';
 import { useState, ReactNode } from 'react';
+import Link from "next/link";
+import Image from "next/image"
 
 /**
  * Main authentication page component.
@@ -81,13 +83,20 @@ export default function LoginPage() {
             <div className="hidden md:flex md:w-1/2 bg-background flex-col justify-between p-12 lg:p-20">
                 
                 {/* Logo Container*/}
-                <div className="flex items-left justify-left px-5 pt-6 pb-5">
-                    <div className="flex h-[110px] w-[110px] flex-col items-center justify-center rounded-md border border-[#F5F0E8]/20 bg-[#2C3328]">
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">The</span>
-                    <span className="font-sans text-[20px] font-extrabold uppercase leading-none tracking-wide text-[#F5F0E8]">Actors</span>
-                    <span className="text-[12px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">Copilot</span>
-                    <span className="mt-0.5 text-[6px] text-[#E8721A]">&#9733;</span>
-                    </div>
+                {/* Logo */}
+                <div className="flex items-center justify-left px-5 pt-6 ">
+                    {/* We wrap the image in a Link so clicking the logo goes home. 
+                        Added a slight hover scale effect for interactivity */}
+                    <Link href="/dashboard" className="block transition-transform hover:scale-105">
+                    <Image 
+                        src="/logo.png" 
+                        alt="The Actors Copilot" 
+                        width={150} 
+                        height={150} 
+                        className="object-contain" // Ensures the image doesn't stretch or distort
+                        priority // Tells Next.js to load this immediately since it's above the fold
+                    />
+                    </Link>
                 </div>
 
                 {/* Main Heading & Copy */}

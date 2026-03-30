@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/context/AuthContext";
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import Image from "next/image"
 import {
   LayoutDashboard,
   MessageCircle,
@@ -36,12 +37,18 @@ export function AppSidebar() {
     <aside className="w-[220px] h-screen flex flex-col bg-[#3D4A3C] text-[#F5F0E8]">
       {/* Logo */}
       <div className="flex items-center justify-center px-5 pt-6 pb-5">
-        <div className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-md border border-[#F5F0E8]/20 bg-[#2C3328]">
-          <span className="text-[7px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">The</span>
-          <span className="font-sans text-[15px] font-extrabold uppercase leading-none tracking-wide text-[#F5F0E8]">Actors</span>
-          <span className="text-[7px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">Copilot</span>
-          <span className="mt-0.5 text-[6px] text-[#E8721A]">&#9733;</span>
-        </div>
+        {/* We wrap the image in a Link so clicking the logo goes home. 
+            Added a slight hover scale effect for interactivity */}
+        <Link href="/dashboard" className="block transition-transform hover:scale-105">
+          <Image 
+            src="/logo.png" 
+            alt="The Actors Copilot" 
+            width={100} 
+            height={100} 
+            className="object-contain" // Ensures the image doesn't stretch or distort
+            priority // Tells Next.js to load this immediately since it's above the fold
+          />
+        </Link>
       </div>
 
       {/* Quick Actions */}

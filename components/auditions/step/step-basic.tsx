@@ -33,21 +33,20 @@ const projectTypes = [
 
 export function StepBasics({ data, updateData }: StepBasicsProps) {
   return (
-    <div className="rounded-3xl bg-[#424842] shadow-xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
+    <div className="rounded-3xl font-sans bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
       
       {/* Título do Card */}
       <div className="mb-12">
-        <h2 className="text-xl font-medium text-[#EADDCE]">
+        <h2 className="text-2xl font-serif font-medium text-[#EADDCE]">
           Tell us about the audition
         </h2>
       </div>
 
       {/* --- NEW SECTION: Project Category Selection --- */}
       <div className="space-y-4">
-        <label className="text-sm font-mediumtext-[#6B6B6B] mt-2">What kind of audition is this?</label>
-        
-        {/* We present the choice as large, visual cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <label className="text-sm font-medium mt-2 mb-4 block text-[#6B6B6B]">What kind of audition is this?</label>
+        {/* present the choice as large, visual cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {projectTypes.map((type) => {
             const Icon = type.icon;
             // Checks if this card is the currently selected one
@@ -56,10 +55,10 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
             return (
               <button
                 key={type.id}
-                onClick={() => updateData({ projectType: type.id as "cinematic" | "commercial" })}
+                onClick={() => updateData({ projectType: type.id as "cinematic" | "commercial" | "theater" })}
                 className={cn(
-                  "flex items-start gap-5 p-6 rounded-2xl border text-left transition-all duration-200",
-                  "bg-[#f8ead2] border-[#C7C0B5] hover:border-[#E8721A]/50",
+                  "flex items-start gap-4 lg:gap-5 p-6 rounded-2xl border text-left transition-all duration-200",
+                  "bg-[#f8ead2] border-[#C7C0B5] hover:border-[#E8721A] hover:ring-2 hover:ring-[#E8721A]/30",
                   isSelected && "border-[#E8721A] ring-2 ring-[#E8721A]/30 bg-amber-50"
                 )}
               >
