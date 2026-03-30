@@ -81,14 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             window.location.href = "/dashboard"; 
 
         } catch (error: any) {
-            // Gracefully handle user-initiated pop-up closure without throwing an application error
+            // Gracefully handle user-initiated pop-up closure
             if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
                 return; 
             }
+            
+            // Handle collision when Firebase blocks duplicate emails
+            if (error.code === 'auth/account-exists-with-different-credential') {
+                throw new Error("This email is already registered with a password. Please log in using the Email/Password form.");
+            }
 
             console.error("Failed to log in: ", error);
-            // Propagate the error to the calling component to ensure accurate UI feedback
-            throw error; 
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -117,9 +121,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish secure session.");
             }
             window.location.href = "/dashboard"; 
-        } catch (error) {
+        } catch (error: any) {
+            // NEW: Give a helpful hint if they fail the password but might have used Google
+            if (error.code === 'auth/invalid-credential') {
+                throw new Error("Invalid credentials. If you originally signed up with Google, please use the Google button.");
+            }
             console.error("Failed to log in with email: ", error);
-            throw error; 
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -148,9 +156,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish secure session.");
             }
             window.location.href = "/dashboard"; 
-        } catch (error) {
+        } catch (error: any) {
+            // Handle if they try to sign up but already used Google or have an account
+            if (error.code === 'auth/email-already-in-use') {
+                throw new Error("This email is already registered. Try logging in with Google or your password instead.");
+            }
             console.error("Failed to sign up with email: ", error);
-            throw error; 
+            throw error;
         } finally {
             setLoading(false);
         }

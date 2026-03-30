@@ -31,9 +31,11 @@ export async function POST(request: Request) {
 
         const isDevBypass = process.env.NODE_ENV === 'development';
         
-        const hasAccess = isDevBypass 
-            ? { success: true, message: 'Bypassed for local development.' } 
-            : await verifyKajabiPurchase(userEmail);
+        // const hasAccess = isDevBypass 
+        //     ? { success: true, message: 'Bypassed for local development.' } 
+        //     : 
+        
+        const hasAccess = await verifyKajabiPurchase(userEmail);
         
         if (!hasAccess.success) {
             // Forward the exact Kajabi validation error message to the frontend
