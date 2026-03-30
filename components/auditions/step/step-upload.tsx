@@ -49,11 +49,11 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
   };
 
   return (
-    <div className="rounded-3xl bg-[#424842] shadow-xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
+    <div className="rounded-3xl font-sans bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
       
-      {/* Cabeçalho do Card */}
+      {/* Header */}
       <div className="mb-8">
-        <h2 className="text-xl font-medium text-[#EADDCE] mb-2">{title}</h2>
+        <h2 className="text-2xl font-serif font-medium text-[#EADDCE] mb-3">{title}</h2>
         <p className="text-[#B7BCB6] text-sm">{description}</p>
       </div>
 
@@ -120,7 +120,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
           <div className="flex-1 h-[1px] bg-[#B7BCB6]/20"></div>
         </div>
 
-        {/* ÁREA DE TEXTO ALTERNATIVA */}
+        {/* text area */}
         <div>
           <textarea
             value={text}

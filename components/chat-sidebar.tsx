@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image"
 import {
   LayoutDashboard,
   MessageCircle,
@@ -15,12 +16,11 @@ import { DNA_SECTIONS } from "@/lib/chat-types";
 import type { DNASession } from "@/lib/chat-types";
 
 const menuItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Chat", href: "/chat", icon: MessageCircle },
+  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
   { label: "Auditions", href: "/auditions", icon: Monitor },
-  { label: "Personal DNA", href: "/personal-dna", icon: Dna },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Settings", href: "/settings", icon: Settings },
-];
+]
 
 interface ChatSidebarProps {
   session: DNASession | null;
@@ -48,19 +48,19 @@ export function ChatSidebar({
   return (
     <aside className="flex w-[220px] shrink-0 flex-col bg-[#3D4A3C] text-[#F5F0E8]">
       {/* Logo */}
-      <div className="flex items-center justify-center px-5 pt-3 pb-1">
-        <div className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-md border border-[#F5F0E8]/20 bg-[#2C3328]">
-          <span className="text-[7px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">
-            The
-          </span>
-          <span className="font-sans text-[15px] font-extrabold uppercase leading-none tracking-wide text-[#F5F0E8]">
-            Actors
-          </span>
-          <span className="text-[7px] font-medium uppercase tracking-widest text-[#F5F0E8]/70">
-            Copilot
-          </span>
-          <span className="mt-0.5 text-[6px] text-[#E8721A]">&#9733;</span>
-        </div>
+      <div className="flex items-center justify-center px-5 pt-6 pb-5">
+        {/* We wrap the image in a Link so clicking the logo goes home. 
+            Added a slight hover scale effect for interactivity */}
+        <Link href="/dashboard" className="block transition-transform hover:scale-105">
+          <Image 
+            src="/logo.png" 
+            alt="The Actors Copilot" 
+            width={100} 
+            height={100} 
+            className="object-contain" // Ensures the image doesn't stretch or distort
+            priority // Tells Next.js to load this immediately since it's above the fold
+          />
+        </Link>
       </div>
 
       <div className="mx-5 mb-4 border-t border-[#F5F0E8]/10" />

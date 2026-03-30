@@ -9,18 +9,18 @@ interface StepReviewProps {
 
 export function StepReview({ data }: StepReviewProps) {
   return (
-    <div className="rounded-3xl bg-[#424842] shadow-xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
+    <div className="rounded-3xl bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto font-sans">
       
-      {/* Cabeçalho */}
+      {/* Header */}
       <div className="mb-10 text-center">
-        <h2 className="text-2xl font-medium text-[#EADDCE] mb-2">Ready to Generate</h2>
+        <h2 className="text-3xl font-serif font-medium text-[#EADDCE] mb-2">Ready to Generate</h2>
         <p className="text-[#B7BCB6] text-sm">Review your audition details before we synthesize the breakdown.</p>
       </div>
 
       <div className="space-y-6">
         
-        {/* Bloco 1: Basics */}
-        <div className="bg-[#2C3328]/30 rounded-2xl p-6 border border-[#B7BCB6]/10">
+        {/* Block 1: Basics */}
+        <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40">
           <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Basics
           </h3>
@@ -40,11 +40,11 @@ export function StepReview({ data }: StepReviewProps) {
           </div>
         </div>
 
-        {/* Bloco 2: Sides & Brief (Lado a lado em telas grandes) */}
+        {/* Block 2: Sides & Brief  */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Sides */}
-          <div className="bg-[#2C3328]/30 rounded-2xl p-6 border border-[#B7BCB6]/10">
+          <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40">
             <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" /> Sides
             </h3>
@@ -64,7 +64,7 @@ export function StepReview({ data }: StepReviewProps) {
           </div>
 
           {/* Brief */}
-          <div className="bg-[#2C3328]/30 rounded-2xl p-6 border border-[#B7BCB6]/10">
+          <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40">
             <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" /> Character Brief
             </h3>
