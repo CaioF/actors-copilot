@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 
 function StartEmblem() {
   return (
@@ -50,18 +51,20 @@ function StartEmblem() {
         &#9670; start here &#9670;
       </span>
 
-      {/* Center logo */}
-      <div className="flex flex-col items-center justify-center">
-        <span className="text-[7px] font-medium uppercase tracking-[0.25em] text-[#F5F0E8]/60">
-          The
-        </span>
-        <span className="font-sans text-[22px] font-extrabold uppercase leading-none tracking-wider text-[#F5F0E8]">
-          Actors
-        </span>
-        <span className="text-[7px] font-medium uppercase tracking-[0.25em] text-[#F5F0E8]/60">
-          Copilot
-        </span>
-        <span className="mt-1 text-[8px] text-[#F5F0E8]/60">&#9733;</span>
+      {/* Logo */}
+      <div className="flex items-center justify-center px-5 pt-6 pb-5">
+        {/* We wrap the image in a Link so clicking the logo goes home. 
+            Added a slight hover scale effect for interactivity */}
+        <Link href="/dashboard" className="block transition-transform hover:scale-105">
+          <Image 
+            src="/logo.png" 
+            alt="The Actors Copilot" 
+            width={130} 
+            height={130} 
+            className="object-contain" // Ensures the image doesn't stretch or distort
+            priority // Tells Next.js to load this immediately since it's above the fold
+          />
+        </Link>
       </div>
 
       {/* START HERE text - bottom */}
