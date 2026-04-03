@@ -211,7 +211,7 @@ export default function AuditionsPage() {
       {editingAudition && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="bg-[#F0E8DC] p-8 rounded-2xl w-full max-w-md shadow-2xl border border-[#C7C0B5]">
-            <h2 className="text-2xl font-serif text-[#2C3328] mb-6">Edit Audition Details</h2>
+            <h2 className="text-2xl font-title text-[#2C3328] mb-6">Edit Audition Details</h2>
             
             <div className="space-y-4">
               <div>
@@ -316,7 +316,7 @@ export default function AuditionsPage() {
         
         /* Empty State */
         <div className="flex flex-col items-center justify-center py-20 text-center px-8">
-          <h3 className="text-xl font-serif text-[#2C3328] mb-2">No auditions found</h3>
+          <h3 className="text-xl font-title text-[#2C3328] mb-2">No auditions found</h3>
           <p className="text-[#6B6B6B] max-w-md">
             You haven't generated any audition breakdowns yet, or none match your current filters.
           </p>
@@ -353,7 +353,7 @@ export default function AuditionsPage() {
                     {audition.projectType || "cinematic"}
                   </p>
                 </div>
-                <h3 className="font-serif text-xl font-bold text-white truncate group-hover:text-[#E8721A] transition-colors">
+                <h3 className="font-title text-xl font-bold text-white truncate group-hover:text-[#E8721A] transition-colors">
                   {audition.project}
                 </h3>
                 <p className="mt-1 text-sm text-[#F5F0E8]/70 truncate">{audition.role}</p>
@@ -409,7 +409,7 @@ export default function AuditionsPage() {
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-[#F0E8DC] border-[#C7C0B5]">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="font-serif text-[#2C3328]">Delete Audition</AlertDialogTitle>
+                        <AlertDialogTitle className="font-title text-[#2C3328]">Delete Audition</AlertDialogTitle>
                         <AlertDialogDescription className="text-[#6B6B6B]">
                           Are you sure you want to delete &quot;{audition.project}&quot;? This action cannot be undone.
                         </AlertDialogDescription>

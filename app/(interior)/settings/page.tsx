@@ -32,7 +32,7 @@ function SectionHeader({
     <div className={`flex items-center gap-3 rounded-t-2xl px-5 py-4 ${bg}`}>
       <Icon className="h-5 w-5 text-[#F5F0E8]" />
       <div>
-        <h3 className="font-serif text-base font-bold text-[#F5F0E8]">{title}</h3>
+        <h3 className="font-title text-base font-bold text-[#F5F0E8]">{title}</h3>
         <p className="text-xs text-[#F5F0E8]/60">{subtitle}</p>
       </div>
     </div>
@@ -268,7 +268,7 @@ export default function SettingsPage() {
       <div className="px-8 pb-8">
         {/* Page Title */}
         <div className="mb-6">
-          <h2 className="font-serif text-2xl font-bold text-[#2C3328]">Manage User Settings</h2>
+          <h2 className="font-title text-2xl font-bold text-[#2C3328]">Manage User Settings</h2>
           <p className="mt-1 text-sm text-[#6B6B6B]">Manage your account and preferences</p>
         </div>
 
@@ -413,7 +413,7 @@ export default function SettingsPage() {
                 </AlertDialogTrigger>
                 <AlertDialogContent className="bg-[#F0E8DC] border-[#C7C0B5]">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="font-serif text-[#2C3328]">Delete Chat Data</AlertDialogTitle>
+                    <AlertDialogTitle className="font-title text-[#2C3328]">Delete Chat Data</AlertDialogTitle>
                     <AlertDialogDescription className="text-[#6B6B6B]">
                       This will permanently delete all your chat data. This action cannot be undone.
                     </AlertDialogDescription>
@@ -443,7 +443,7 @@ export default function SettingsPage() {
                 </AlertDialogTrigger>
                 <AlertDialogContent className="bg-[#F0E8DC] border-[#C7C0B5]">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="font-serif text-[#2C3328]">Delete Account</AlertDialogTitle>
+                    <AlertDialogTitle className="font-title text-[#2C3328]">Delete Account</AlertDialogTitle>
                     <AlertDialogDescription className="text-[#6B6B6B]">
                       This will permanently delete your account and all associated data. This action cannot be undone.
                     </AlertDialogDescription>

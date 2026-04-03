@@ -101,7 +101,7 @@ export default function LoginPage() {
 
                 {/* Main Heading & Copy */}
                 <div className="max-w-md my-auto">
-                    <h1 className="text-4xl lg:text-5xl font-serif text-foreground leading-tight mb-6">
+                    <h1 className="text-4xl lg:text-5xl font-title text-foreground leading-tight mb-6">
                         Your AI Partner<br />for Self-Taping
                     </h1>
                     <p className="text-lg text-muted-foreground leading-relaxed">

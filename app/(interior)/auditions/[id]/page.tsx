@@ -69,7 +69,7 @@ export default function AuditionDetailView() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0E8DC]">
         <Loader2 className="h-10 w-10 animate-spin text-[#E8721A] mb-4" />
-        <p className="font-serif text-lg text-[#2C3328] animate-pulse">Loading breakdown...</p>
+        <p className="font-title text-lg text-[#2C3328] animate-pulse">Loading breakdown...</p>
       </div>
     )
   }
@@ -77,7 +77,7 @@ export default function AuditionDetailView() {
   if (error || !auditionData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0E8DC]">
-        <h2 className="text-2xl font-serif text-[#2C3328] mb-4">Audition not found</h2>
+        <h2 className="text-2xl font-title text-[#2C3328] mb-4">Audition not found</h2>
         <button onClick={() => router.push("/auditions")} className="text-[#E8721A] hover:underline">
           Return to Auditions List
         </button>
@@ -110,7 +110,7 @@ export default function AuditionDetailView() {
       <div className=" max-w-5xl mx-auto">
         {/* Title */}
         <div className=" mb-10">
-          <h1 className="text-4xl font-serif text-[#2C3328]">{auditionData.project}</h1>
+          <h1 className="text-4xl font-title text-[#2C3328]">{auditionData.project}</h1>
           <p className="text-xl text-[#E8721A] mt-2 font-medium">{auditionData.role}</p>
         </div>
 
@@ -127,7 +127,7 @@ export default function AuditionDetailView() {
        
       {/* hidden template for pdf printing */}
       <div className="hidden">
-        <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-serif">
+        <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
           
           {/* Cabeçalho do Documento */}
           <div className="border-b-2 border-black pb-4 mb-8">

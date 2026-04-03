@@ -13,6 +13,7 @@ import {
   updateDoc,
   getDocs,
   setDoc,
+  arrayUnion
 } from "firebase/firestore";
 
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -261,6 +262,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         `users/${userPath}/dnaSessions/${sessionId}/messages`
       );
 
+
       try {
         setIsLoading(true);
         setStreamingContent("");
@@ -272,6 +274,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           timestamp: serverTimestamp(),
           section: currentSection,
         });
+        
 
         // 2. Initialize the Vertex AI Gemini model
         // 2. Prepare the history payload for the secure backend
@@ -314,6 +317,15 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
         const previouslyAsked: string[] = session?.askedQuestions || [];
 
+        // Log the data being sent to the AI
+        console.log("Dados enviados para a IA:", {
+          content: content.trim(),
+          currentSection,
+          actorName,
+          history: chatHistory,
+          previouslyAsked
+        });
+
         // 3. Execute Secure API Call to our Next.js backend
         const response = await fetch('/api/dna/chat', {
           method: 'POST',
@@ -337,18 +349,31 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         // 4. Parse the secure response
         const { aiData, selectedQuestions } = await response.json();
 
+        console.log("------------RAW DATA------------", aiData);
+
+        // Log the data received from the AI
+        console.log("==========Dados recebidos da IA:==============", {
+          aiData,
+          selectedQuestions,
+          aiCoachReply: aiData?.coach_reply,
+          aiExtractions: aiData?.extractions,
+          aiAssessment: aiData?.progress_assessment || aiData?.extractions?.progress_assessment
+        });
+
         // Safely extract fields from the backend response
         const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
         const aiExtractions = aiData?.extractions || null;
         const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null;
 
         // 6. Persist only the AI's conversational reply to the visible chat history
+  
         await addDoc(messagesRef, {
           role: "assistant",
           content: aiCoachReply,
           timestamp: serverTimestamp(),
           section: currentSection,
         });
+        
 
         // Progress Calculation & Logic
         let unlockedAuditions = session?.auditionsUnlocked || false;
@@ -360,34 +385,118 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         if (aiExtractions) {
           totalCount += 1; 
 
-          if (aiExtractions.progress_assessment) {
-            delete aiExtractions.progress_assessment;
-          }
-
-          // Archive high-value extractions into a dedicated user vault collection
-          const vaultRef = collection(getDb(), `users/${userPath}/dnaVault`);
-          await addDoc(vaultRef, {
-            sessionId: sessionId,
-            section: currentSection,
-            timestamp: serverTimestamp(),
-            extractions: aiExtractions,
-            assessment: aiAssessment 
-          });
-
           // Evaluate extraction quality to determine progression
           const isHighQuality =
             aiAssessment != null &&
             aiAssessment.has_actionable_pattern === true &&
-            aiAssessment.depth_score >= 5;
+            aiAssessment.depth_score >= 4;
 
           if (isHighQuality) {
             currentSecCount += 1; 
-            sectionCounts[currentSection] = currentSecCount; // Store updated count for current section
+            sectionCounts[currentSection] = currentSecCount;
 
-            // Mark section as completed if the required threshold (5) of high-quality insights is met
             if (currentSecCount >= 5 && !newCompletedSecs.includes(currentSection)) {
               newCompletedSecs.push(currentSection);
             }
+
+            // --- THE MASTER PROFILE ARCHITECTURE ---
+            // Instead of scattered documents, we build a single, ever-growing psychological profile
+            const profileRef = doc(getDb(), `users/${userPath}/profile/master`);
+            
+            // Using dot notation to merge surgically
+            const updatePayload: any = {
+                lastUpdated: serverTimestamp(),
+            };
+
+            // --- START OF FIELD UPDATES ---
+            // Safely append new AI discoveries without destroying old ones
+            if (aiExtractions.new_traits?.length > 0) {
+                updatePayload['psychology.traits'] = arrayUnion(...aiExtractions.new_traits);
+            }
+            
+            if (aiExtractions.defense_mechanisms?.length > 0) {
+                updatePayload['psychology.defenseMechanisms'] = arrayUnion(...aiExtractions.defense_mechanisms);
+            }
+
+            if (aiExtractions.leaf_snippets?.length > 0) {
+                const snippetsWithContext = aiExtractions.leaf_snippets.map((quote: string) => ({
+                    quote,
+                    section: currentSection,
+                    timestamp: new Date().toISOString()
+                }));
+                updatePayload['psychology.leafSnippets'] = arrayUnion(...snippetsWithContext);
+            }
+            
+            if (aiExtractions.holistic_analysis) {
+                updatePayload['psychology.analysisTimeline'] = arrayUnion({
+                    inference: aiExtractions.holistic_analysis,
+                    section: currentSection,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            if (aiExtractions.somatic_tells?.length > 0) {
+                updatePayload['physicality.somaticTells'] = arrayUnion(...aiExtractions.somatic_tells);
+            }
+            if (aiExtractions.core_values?.length > 0) {
+                updatePayload['psychology.coreValues'] = arrayUnion(...aiExtractions.core_values);
+            }
+            if (aiExtractions.relational_dynamics?.length > 0) {
+                updatePayload['psychology.relationalDynamics'] = arrayUnion(...aiExtractions.relational_dynamics);
+            }
+            if (aiExtractions.milestones?.length > 0) {
+                // Attach the section context to each milestone before saving
+                const milestonesWithContext = aiExtractions.milestones.map((milestone: any) => ({
+                    ...milestone,
+                    section: currentSection,
+                    discoveredAt: new Date().toISOString()
+                }));
+                updatePayload['history.milestones'] = arrayUnion(...milestonesWithContext);
+            }
+            // core acting fuel
+            if (aiExtractions.core_wounds_and_fears?.length > 0) {
+                updatePayload['acting_fuel.coreWounds'] = arrayUnion(...aiExtractions.core_wounds_and_fears);
+            }
+            if (aiExtractions.unmet_needs?.length > 0) {
+                updatePayload['acting_fuel.unmetNeeds'] = arrayUnion(...aiExtractions.unmet_needs);
+            }
+            if (aiExtractions.public_masks?.length > 0) {
+                updatePayload['acting_fuel.publicMasks'] = arrayUnion(...aiExtractions.public_masks);
+            }
+
+            // advanced psychological profiling
+            if (aiExtractions.emotional_baseline) {
+                if (aiExtractions.emotional_baseline.conflict_response) {
+                    updatePayload['psychology.emotionalBaseline.conflictResponse'] = aiExtractions.emotional_baseline.conflict_response;
+                }
+                if (aiExtractions.emotional_baseline.internal_friction) {
+                    updatePayload['psychology.emotionalBaseline.internalFriction'] = aiExtractions.emotional_baseline.internal_friction;
+                }
+                if (aiExtractions.emotional_baseline.vulnerability_management) {
+                    updatePayload['psychology.emotionalBaseline.vulnerabilityManagement'] = aiExtractions.emotional_baseline.vulnerability_management;
+                }
+            }
+
+            if (aiExtractions.intellectual_framework) {
+                if (aiExtractions.intellectual_framework.cognitive_style) {
+                    updatePayload['psychology.intellectualFramework.cognitiveStyle'] = aiExtractions.intellectual_framework.cognitive_style;
+                }
+                if (aiExtractions.intellectual_framework.attention_to_detail) {
+                    updatePayload['psychology.intellectualFramework.attentionToDetail'] = aiExtractions.intellectual_framework.attention_to_detail;
+                }
+            }
+
+            if (aiExtractions.archetype_signals?.length > 0) {
+                updatePayload['acting_fuel.archetypes'] = arrayUnion(...aiExtractions.archetype_signals);
+            }
+            if (aiExtractions.key_entities_and_arenas?.length > 0) {
+                updatePayload['history.keyEntities'] = arrayUnion(...aiExtractions.key_entities_and_arenas);
+            }
+            // --- END OF FIELD UPDATES ---
+
+            // Execute the atomic merge to grow the profile
+            
+            await setDoc(profileRef, updatePayload, { merge: true });
+            
           }
         }
         
@@ -395,39 +504,41 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           unlockedAuditions = true;
         }
 
-        // Global Progress Bar Calculation (0% to 100%)
-        // The goal is to accumulate 24 high-quality extractions across sections.
-        // Math.min ensures individual section over-performance doesn't erroneously inflate the total cap.
+        // Global Progress Bar Calculation based on AI's autonomous decisions
         const totalPepitasUteis = Object.values(sectionCounts).reduce(
             (acc, count) => acc + Math.min(count as number, 6), 0
         );
         const newProgress = Math.round(Math.min((totalPepitasUteis / 24) * 100, 100));
 
-        // Combine the previously asked questions with the newly selected ones returned from the server
         const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
 
-        // Synchronize calculated progress and session metrics back to Firestore
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
-        await updateDoc(sessionRef, { 
+        
+        await setDoc(sessionRef, { 
           lastActiveAt: serverTimestamp(),
           totalExtractions: totalCount,
           sectionHqCounts: sectionCounts,
           progress: newProgress,           
           auditionsUnlocked: unlockedAuditions,
           askedQuestions: newAskedQuestions
-        });
+        }, { merge: true }); // shield existing fields from being overwritten by merging with the existing document
         
       } catch (error) {
         console.error("AI response error:", error);
         
+        
         // Provide a graceful fallback response if AI inference fails
-        await addDoc(messagesRef, {
-          role: "assistant",
-          content:
-            "I encountered an issue generating a response. Let us continue — tell me more about what you were describing.",
-          timestamp: serverTimestamp(),
-          section: currentSection,
-        });
+        try {
+          await addDoc(messagesRef, {
+            role: "assistant",
+            content:
+              "I encountered an issue generating a response. Let us continue — tell me more about what you were describing.",
+            timestamp: serverTimestamp(),
+            section: currentSection,
+          });
+        } catch (fallbackError) {
+          console.error("Error adding fallback message:", fallbackError);
+        }
       } finally {
         setIsLoading(false);
         setStreamingContent("");
@@ -447,10 +558,10 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
     if (!firebaseAvailable || !session) return;
     
     const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
-    await updateDoc(sessionRef, { 
+    await setDoc(sessionRef, { 
       currentSection: newSection,
       lastActiveAt: serverTimestamp()
-    });
+    }, { merge: true });
 
     // Check for existing messages in the target section
     const messagesRef = collection(getDb(), `users/${userPath}/dnaSessions/${sessionId}/messages`);

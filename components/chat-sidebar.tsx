@@ -71,7 +71,7 @@ export function ChatSidebar({
           Session {session?.sessionNumber ?? 2} of{" "}
           {session?.totalSessions ?? 7}
         </span>
-        <h3 className="mt-3 font-serif text-base italic leading-snug text-[#E8721A]">
+        <h3 className="mt-3 font-title text-base italic leading-snug text-[#E8721A]">
           Continue your discovery
         </h3>
         <p className="mt-1 text-[11px] leading-relaxed text-[#F5F0E8]/60">
@@ -160,7 +160,7 @@ export function ChatSidebar({
       {/* Premium Plan */}
       <div className="p-2 pt-1">
         <div className="rounded-xl bg-[#2C3328] p-3">
-          <h4 className="font-serif text-lg font-bold text-[#F5F0E8]">
+          <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
             Premium Plan
           </h4>
           <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">

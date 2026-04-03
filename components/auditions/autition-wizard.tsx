@@ -284,7 +284,7 @@ export function AuditionWizard() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 
-                <h2 className="text-2xl font-serif text-[#EADDCE] mb-3">Generating your breakdown...</h2>
+                <h2 className="text-2xl font-title text-[#EADDCE] mb-3">Generating your breakdown...</h2>
                 <p className="text-[#B7BCB6] text-base">This usually takes a few seconds</p>
               
               </div>
@@ -293,7 +293,7 @@ export function AuditionWizard() {
             <div className="flex flex-col animate-in fade-in duration-700">
 
                <div className=" flex justify-between items-center mb-4">
-                 <h2 className="text-3xl font-serif text-[#2C3328]">Your Performance Map</h2>
+                 <h2 className="text-3xl font-title text-[#2C3328]">Your Performance Map</h2>
 
                   <div className="flex items-center gap-3">
                    {/* PRINT BUTTON */}
@@ -319,7 +319,7 @@ export function AuditionWizard() {
 
                {/* HIDDEN PRINT TEMPLATE - This will be extracted by react-to-print */}
                <div className="hidden">
-                 <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-serif">
+                 <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
                    
                    {/* Header */}
                    <div className="border-b-2 border-black pb-4 mb-8">

@@ -13,7 +13,7 @@ export function StepReview({ data }: StepReviewProps) {
       
       {/* Header */}
       <div className="mb-10 text-center">
-        <h2 className="text-3xl font-serif font-medium text-[#EADDCE] mb-2">Ready to Generate</h2>
+        <h2 className="text-3xl font-title font-medium text-[#EADDCE] mb-2">Ready to Generate</h2>
         <p className="text-[#B7BCB6] text-sm">Review your audition details before we synthesize the breakdown.</p>
       </div>
 
