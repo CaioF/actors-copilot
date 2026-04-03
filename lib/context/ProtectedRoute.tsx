@@ -49,7 +49,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
             </div>
 
             {/* Tipografia Premium */}
-            <h1 className="font-serif text-3xl text-[#2C3328] mb-3 tracking-wide">
+            <h1 className="font-title text-3xl text-[#2C3328] mb-3 tracking-wide">
                 The Actors Copilot
             </h1>
             

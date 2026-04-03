@@ -35,7 +35,7 @@ export function StepResult({ data }: StepResultProps) {
         {data.sections.map((section, idx) => (
           <div key={idx} className="rounded-2xl bg-[#424842] shadow-lg p-6 sm:p-8 border border-[#B7BCB6]/10">
 
-            <h3 className="text-2xl font-serif text-[#FF7316] mb-5">{section.title}</h3>
+            <h3 className="text-2xl font-title text-[#FF7316] mb-5">{section.title}</h3>
 
             <ul className="space-y-5">
               {section.items.map((item, i) => (

@@ -37,7 +37,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
       
       {/* Título do Card */}
       <div className="mb-12">
-        <h2 className="text-2xl font-serif font-medium text-[#EADDCE]">
+        <h2 className="text-2xl font-title font-medium text-[#EADDCE]">
           Tell us about the audition
         </h2>
       </div>
@@ -46,7 +46,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
       <div className="space-y-4">
         <label className="text-sm font-medium mt-2 mb-4 block text-[#6B6B6B]">What kind of audition is this?</label>
         {/* present the choice as large, visual cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 xl:gap-6">
           {projectTypes.map((type) => {
             const Icon = type.icon;
             // Checks if this card is the currently selected one
@@ -57,7 +57,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
                 key={type.id}
                 onClick={() => updateData({ projectType: type.id as "cinematic" | "commercial" | "theater" })}
                 className={cn(
-                  "flex items-start gap-4 lg:gap-5 p-6 rounded-2xl border text-left transition-all duration-200",
+                  "flex items-start gap-3 sm:gap-4 xl:gap-5 p-5 sm:p-6 xl:p-7 rounded-2xl border text-left transition-all duration-200",
                   "bg-[#f8ead2] border-[#C7C0B5] hover:border-[#E8721A] hover:ring-2 hover:ring-[#E8721A]/30",
                   isSelected && "border-[#E8721A] ring-2 ring-[#E8721A]/30 bg-amber-50"
                 )}
@@ -74,7 +74,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
                 <div>
                   <div className="flex items-center gap-3">
                     <Icon className={cn("w-6 h-6 text-[#6B6B6B]", isSelected && "text-[#E8721A]")} />
-                    <h3 className="font-serif text-lg font-bold text-[#2C3328]">{type.title}</h3>
+                    <h3 className="font-title text-lg font-bold text-[#2C3328]">{type.title}</h3>
                   </div>
                   <p className="text-sm text-[#6B6B6B] mt-2 font-light">{type.description}</p>
                 </div>

@@ -53,7 +53,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
       
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-2xl font-serif font-medium text-[#EADDCE] mb-3">{title}</h2>
+        <h2 className="text-2xl font-title font-medium text-[#EADDCE] mb-3">{title}</h2>
         <p className="text-[#B7BCB6] text-sm">{description}</p>
       </div>
 

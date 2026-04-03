@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import { DM_Sans, Playfair_Display } from 'next/font/google'
+import { Antonio, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { AuthProvider } from '@/lib/context/AuthContext'
 
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' })
-const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
+const antonio = Antonio({ subsets: ['latin'], variable: '--font-antonio' })
+const inter = Inter({   subsets: ['latin'],   variable: '--font-inter',})
 
 export const metadata: Metadata = {
   title: 'The Actors Copilot - Self Tape Copilot',
@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${dmSans.variable} ${playfair.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${antonio.variable}`} >
         <AuthProvider>
           {children}
           <Analytics />

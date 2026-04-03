@@ -55,7 +55,7 @@ function StartEmblem() {
       <div className="flex items-center justify-center px-5 pt-6 pb-5">
         {/* We wrap the image in a Link so clicking the logo goes home. 
             Added a slight hover scale effect for interactivity */}
-        <Link href="/dashboard" className="block transition-transform hover:scale-105">
+        
           <Image 
             src="/logo.png" 
             alt="The Actors Copilot" 
@@ -64,7 +64,7 @@ function StartEmblem() {
             className="object-contain" // Ensures the image doesn't stretch or distort
             priority // Tells Next.js to load this immediately since it's above the fold
           />
-        </Link>
+        
       </div>
 
       {/* START HERE text - bottom */}
@@ -90,13 +90,13 @@ export default function WelcomePage() {
       <div className="relative z-10 flex flex-col items-center gap-10">
         {/* Title */}
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="font-serif text-5xl italic text-[#F5F0E8] md:text-6xl">
+          <h1 className="font-title text-5xl italic text-[#F5F0E8] md:text-6xl">
             Welcome to
           </h1>
-          <h2 className="font-serif text-6xl font-bold italic text-[#E8721A] md:text-7xl">
+          <h2 className="font-title text-6xl font-bold italic text-[#E8721A] md:text-7xl">
             The Actors Copilot
           </h2>
-          <h3 className="font-serif text-5xl italic text-[#F5F0E8] md:text-6xl">
+          <h3 className="font-title text-5xl italic text-[#F5F0E8] md:text-6xl">
             your acting assistant
           </h3>
         </div>
