@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, AudioLines } from "lucide-react";
+import { Paperclip, AudioLines, SendHorizonal, Send } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -75,7 +75,12 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
           }
           type="button"
         >
-          <AudioLines className="h-5 w-5" />
+          {/* Check if there is text typed. If yes, show Send arrow. If no, show Audio lines. */}
+          {value.trim().length > 0 ? (
+            <SendHorizonal size={20} className="text-white" />
+          ) : (
+            <AudioLines size={20} className="text-white" />
+          )}
         </button>
       </div>
     </div>
