@@ -54,7 +54,7 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
     <header className="flex items-center justify-between px-8 py-10">
       <h1 className="font-title text-3xl font-bold text-[#2C3328]">{title}</h1>
       <div className="flex items-center gap-3">
-        <Link href={""}
+        <Link href={"/settings"}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C7C0B5] text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0]"
           aria-label="Settings"
         >
