@@ -315,15 +315,13 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         const idToken = await auth.currentUser?.getIdToken();
         if (!idToken) throw new Error("Authentication token not found.");
 
-        const previouslyAsked: string[] = session?.askedQuestions || [];
 
         // Log the data being sent to the AI
-        console.log("Dados enviados para a IA:", {
+        console.log("Sent to IA:", {
           content: content.trim(),
           currentSection,
           actorName,
           history: chatHistory,
-          previouslyAsked
         });
 
         // 3. Execute Secure API Call to our Next.js backend
@@ -338,7 +336,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             currentSection,
             actorName,
             history: chatHistory,
-            previouslyAsked
+
           })
         });
 
@@ -349,10 +347,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         // 4. Parse the secure response
         const { aiData, selectedQuestions } = await response.json();
 
-        console.log("------------RAW DATA------------", aiData);
-
         // Log the data received from the AI
-        console.log("==========Dados recebidos da IA:==============", {
+        console.log("==========IA's Response:==============", {
           aiData,
           selectedQuestions,
           aiCoachReply: aiData?.coach_reply,
@@ -510,8 +506,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         );
         const newProgress = Math.round(Math.min((totalPepitasUteis / 24) * 100, 100));
 
-        const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
-
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
         
         await setDoc(sessionRef, { 
@@ -520,7 +514,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           sectionHqCounts: sectionCounts,
           progress: newProgress,           
           auditionsUnlocked: unlockedAuditions,
-          askedQuestions: newAskedQuestions
         }, { merge: true }); // shield existing fields from being overwritten by merging with the existing document
         
       } catch (error) {

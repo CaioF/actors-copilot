@@ -41,17 +41,18 @@ export interface DNASession {
  * @constant
  */
 export const DNA_SECTIONS = [
-  { id: "identity", label: "Identity & Self-Story" },
-  { id: "family", label: "Belonging & Family" },
-  { id: "relationships", label: "Relationships & Attachment" },
-  { id: "power", label: "Power & Authority" },
-  { id: "shame_pride", label: "Shame & Pride" },
-  { id: "loss_and_change", label: "Loss & Change" },
-  { id: "desire_ambition", label: "Desire & Ambition" },
-  { id: "joy_passion", label: "Joy & Vitality" },
-  { id: "conflict_style", label: "Conflict & Pressure" },
-  { id: "sensory_anchors", label: "Sensory Anchors" },
-  { id: "boundaries_ethics", label: "Boundaries & Ethics" },
+  { id: "childhood", label: "Early Childhood and Home" },
+  { id: "school_authority", label: "School, Authority and the Outside World" },
+  { id: "identity", label: "Identity and Self-Story" },
+  { id: "belonging", label: "Belonging and Exclusion" },
+  { id: "relationships", label: "Relationships and Attachment" },
+  { id: "power", label: "Power and Authority" },
+  { id: "shame", label: "Shame and Self-Worth" },
+  { id: "loss", label: "Loss and Change" },
+  { id: "desire", label: "Desire and Ambition" },
+  { id: "joy", label: "Joy and Vitality" },
+  { id: "conflict", label: "Conflict and Pressure" },
+  { id: "beliefs", label: " Beliefs and Life Patterns" },
 ] as const;
 
 /**
