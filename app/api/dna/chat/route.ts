@@ -20,29 +20,54 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { content, currentSection, actorName, history, previouslyAsked } = body;
 
-        // 3. INJEÇÃO DINÂMICA DE CONTEXTO
-        const allSectionQuestions: string[] = QUESTIONS[currentSection] || [];
-        const availableQuestions = allSectionQuestions.filter((q: string) => !(previouslyAsked || []).includes(q));
-        
-        const shuffledQuestions = [...availableQuestions].sort(() => 0.5 - Math.random());
-        const selectedQuestions = shuffledQuestions.slice(0, 3);
-        const questionsListText = selectedQuestions.map((q: string) => `- ${q}`).join("\n");
-
-        // 3. DYNAMIC CONTEXT INJECTION
+        // 3. INJEÇÃO DINÂMICA DE CONTEXTO E LISTA DE BLOQUEIO (BLACKLIST)
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
-        const finalPromptForAI = `
-            ${SYSTEM_PROMPT}
+        // Pegamos apenas as últimas 4 perguntas para a IA não ficar confusa com um texto gigante
+        const recentQuestions = previouslyAsked ? previouslyAsked.slice(-4) : [];
+        const blacklistText = recentQuestions.length > 0 
+            ? recentQuestions.map((q: string, i: number) => `Prior AI Question: "${q}"`).join('\n') 
+            : "No previous questions.";
 
+        //PIVOT ENGINE 
+        const questionCount = previouslyAsked?.length || 0;
+        
+        const isFrustrated = /what|why|don'?t know|don'?t remember|no|stop|uncomfortable|relevant|doesn'?t matter|tired/i.test(content) || content.trim().length < 10;
+        
+        const isMandatoryPivot = questionCount > 0 && questionCount % 5 === 0;
+
+        let dynamicCommand = "";
+        if (isFrustrated) {
+            dynamicCommand = `[SYSTEM OVERRIDE: HARD PIVOT REQUIRED - change the subject]
+            The user's input indicates frustration, confusion, or a refusal to elaborate. 
+            COMMAND: YOU MUST IMMEDIATELY DROP THE CURRENT MEMORY. 
+            Select a COMPLETELY DIFFERENT "Follow-up Route" from your arsenal.`;
+        } else if (isMandatoryPivot) {
+            dynamicCommand = `[SYSTEM OVERRIDE: MANDATORY THEME SHIFT]
+            You have spent enough time digging into this specific memory. To ensure a diverse range of data, PIVOT NOW. 
+            COMMAND: Look at the "Follow-up Routes" above. Select a NEW route that you haven't explored yet. Ask a question from that new route to open a completely different angle.`;
+        } else {
+            dynamicCommand = `[MOMENTUM CHECK]
+            Continue the Socratic extraction naturally. Ask ONE follow-up question. However, if you feel the current specific memory is fully explored, do not hesitate to pivot to a new Route.`;
+        }
+
+        const finalPromptForAI = `
+        system instruction: ${SYSTEM_PROMPT}
             ${specificSectionDirective}
 
-            Actor's Name: ${actorName}
-            Actor's Input: "${content.trim()}"
-            
-            Suggested Thematic Directions (Use these strictly as inspiration for your Socratic questioning, do not ask them verbatim):
-            ${questionsListText}
+            === YOUR PREVIOUS RECENT QUESTIONS ===
+            You are STRICTLY FORBIDDEN from repeating the essence of these questions. Do not ask them again:
+            ${blacklistText}
 
-        `;
+            === CONVERSATION STATE ===
+            Actor's Name: ${actorName}
+            Actor's Latest Input: "${content.trim()}"
+            
+            === YOUR DIRECTIVE FOR THIS TURN ===
+            ${dynamicCommand}
+            
+            `;
+            console.log(dynamicCommand);
 
         // 4. INICIALIZAÇÃO DA VERTEX AI (Agora importando SchemaType corretamente!)
         const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
@@ -224,6 +249,7 @@ export async function POST(request: Request) {
         if (functionCalls && functionCalls.length > 0) {
             extractionsData = functionCalls[0].args;
         }
+        
 
         // 7. FIRE-AND-FORGET LOGGING - TEMPORARIAMENTE DESABILITADO PARA DEBUG
         // saveRawMessageToFirestore(userId, {
@@ -239,7 +265,7 @@ export async function POST(request: Request) {
                 coach_reply: aiResponseText,
                 extractions: extractionsData 
             },
-            selectedQuestions 
+            selectedQuestions: [aiResponseText] 
         }, { status: 200 });
 
     } catch (error) {
