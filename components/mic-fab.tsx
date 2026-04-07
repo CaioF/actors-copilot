@@ -21,7 +21,7 @@ export function MicFab() {
 
   // Effect para esconder a mensagem automaticamente após 3 segundos
   useEffect(() => {
-    let timer: NodeJS.Timeout
+    let timer: ReturnType<typeof setTimeout> | undefined
     
     if (showMessage) {
       timer = setTimeout(() => {
@@ -30,7 +30,9 @@ export function MicFab() {
     }
     
     // Cleanup do timer para evitar vazamento de memória se o componente desmontar
-    return () => clearTimeout(timer)
+    return () => {
+      if (timer !== undefined) clearTimeout(timer)
+    }
   }, [showMessage])
 
   return (
@@ -39,6 +41,10 @@ export function MicFab() {
       
       {/* Mensagem Temporária (Toast) */}
       <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-hidden={!showMessage}
         className={`transition-all duration-300 ease-in-out ${
           showMessage
             ? "translate-y-0 opacity-100"
