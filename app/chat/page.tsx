@@ -7,6 +7,7 @@ import { DashboardFooter } from "@/components/dashboard-footer";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { useChat } from "@/hooks/use-chat";
+import { getAuth } from "firebase/auth";
 
 /**
  * Main Chat Page component for the AI Copilot DNA Extraction feature.
@@ -30,6 +31,19 @@ export default function ChatPage() {
 
   const [activeSection, setActiveSection] = useState("identity"); // Default to the first section
   const [isSynthesizing, setIsSynthesizing] = useState(false); // State for our test button
+
+  const [actorName, setActorName] = useState("ME");
+
+  // search name on firestore
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user && user.displayName) {
+        setActorName(user.displayName);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   /**
    * Filters the global message history to only display messages relevant to the currently selected section.
@@ -75,6 +89,7 @@ export default function ChatPage() {
         <ChatMessages
           messages={filteredMessages}
           isLoading={isLoading}
+          actorName={actorName}
           streamingContent={streamingContent}
           isInitializing={isInitializing}
         />

@@ -12,6 +12,14 @@ interface ChatMessagesProps {
   streamingContent: string;
   isInitializing: boolean;
   isReprocessing?: boolean;
+  actorName?: string;
+}
+
+function getInitials(name?: string) {
+  if (!name) return "ME";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function formatTime(timestamp: ChatMessage["timestamp"]): string {
@@ -46,8 +54,9 @@ function CopilotAvatar() {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({ message, userInitials }: { message: ChatMessage, userInitials: string }) {
   const isAssistant = message.role === "assistant";
+
 
   return (
     <div
@@ -85,7 +94,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         <div className="mt-auto mb-2">
           <Avatar className="h-9 w-9">
             <AvatarFallback className="bg-[#4A5548] text-xs text-[#F5F0E8]">
-              AS
+              {userInitials}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -157,12 +166,15 @@ export function ChatMessages({
   isLoading,
   streamingContent,
   isInitializing,
+  actorName,
   isReprocessing = false,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const lastMessage = messages[messages.length - 1];
   const isWaitingForAI = lastMessage?.role === "user";
+
+  const initials = getInitials(actorName);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -180,7 +192,7 @@ export function ChatMessages({
     <div className="flex-1 overflow-y-auto">
       <div className="flex flex-col gap-6 px-12 py-8">
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble key={msg.id} message={msg} userInitials={initials} />
         ))}
         
         {isLoading && streamingContent && (

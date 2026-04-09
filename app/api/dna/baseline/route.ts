@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/firebase.admin';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { auth, db } from '@/lib/firebase.admin'; 
+import { FieldValue } from 'firebase-admin/firestore';
 import PDFParser from 'pdf2json';
 
 // Função de extração do PDF
@@ -230,7 +230,6 @@ export async function POST(request: Request) {
         aiExtractions = functionCalls[0].args;
     }
 
-    const db = getFirestore();
     const userRecord = await auth.getUser(userId);
     const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
     const userPath = `${userId}_${firstName}`;

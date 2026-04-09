@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, AudioLines, SendHorizontal } from "lucide-react";
-
+import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic } from "lucide-react"; 
+import { getAuth } from "firebase/auth";
 interface ChatInputProps {
   onSend: (message: string) => void;
   isLoading: boolean;
@@ -11,6 +11,11 @@ interface ChatInputProps {
 export function ChatInput({ onSend, isLoading }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,6 +45,74 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        setIsTranscribing(true);
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64data = (reader.result as string).split(',')[1];
+          try {
+            const auth = getAuth();
+            const idToken = await auth.currentUser?.getIdToken();
+
+            const response = await fetch('/api/dna/transcribe/chat', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ audioBase64: base64data, mimeType: audioBlob.type })
+            });
+
+            const data = await response.json();
+            if (data.text) {
+               onSend(data.text);
+            }
+          } catch (error) {
+            console.error("Transcription error:", error);
+            alert("Failed to transcribe audio.");
+          } finally {
+            setIsTranscribing(false);
+          }
+        };
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Mic access denied", error);
+      alert("Please allow microphone access.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const handleMainAction = () => {
+    if (isTranscribing) return; 
+    if (isRecording) stopRecording();
+    else if (value.trim()) handleSubmit();
+    else startRecording();
+  };
+
   return (
     <div className="flex justify-center px-8 pb-3 pt-2">
       <div className="flex w-full max-w-2xl items-center gap-2 rounded-full border border-[#C7C0B5]/60 bg-[#F0E8DC] px-4 py-2 shadow-sm">
@@ -57,29 +130,32 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask me anything..."
-          disabled={isLoading}
+          placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : "Ask me anything..."}
+          disabled={isLoading || isRecording || isTranscribing}
           className="flex-1 bg-transparent text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
         />
 
         <button
-          onClick={isRecording ? () => setIsRecording(false) : value.trim() ? handleSubmit : () => setIsRecording(true)}
-          disabled={isLoading && !isRecording}
+          onClick={handleMainAction}
+          disabled={isLoading && !isRecording && !isTranscribing}
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
             isRecording
-              ? "animate-pulse bg-[#C45A3C] text-[#ffffff]"
-              : "bg-[#E8721A] text-[#ffffff] hover:bg-[#E8721A]/90"
+              ? "animate-pulse bg-red-500 text-white"
+              : isTranscribing
+              ? "bg-[#E8721A]/70 text-white cursor-not-allowed"
+              : "bg-[#E8721A] text-white hover:bg-[#E8721A]/90"
           }`}
-          aria-label={
-            isRecording ? "Stop recording" : value.trim() ? "Send message" : "Start recording"
-          }
+          aria-label={isRecording ? "Stop recording" : value.trim() ? "Send message" : "Start recording"}
           type="button"
         >
-          {/* Check if there is text typed. If yes, show Send arrow. If no, show Audio lines. */}
-          {value.trim().length > 0 ? (
+          {isTranscribing ? (
+            <Loader2 size={20} className="animate-spin text-white" />
+          ) : isRecording ? (
+            <Square size={16} className="fill-current text-white" />
+          ) : value.trim().length > 0 ? (
             <SendHorizontal size={20} className="text-white" />
           ) : (
-            <AudioLines size={20} className="text-white" />
+            <Mic size={20} className="text-white" />
           )}
         </button>
       </div>

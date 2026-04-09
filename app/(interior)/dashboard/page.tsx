@@ -5,7 +5,7 @@ import { Dna, Monitor, Sparkles, FileText } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { StepCard } from "@/components/step-card";
 import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
-import { HistoryUploadModal } from "@/components/history-upload";
+import { HistoryUploadModal } from "@/components/history-upload-modal";
 
 export default function DashboardPage() {
   const [isBaselineModalOpen, setIsBaselineModalOpen] = useState(false);
@@ -69,7 +69,7 @@ export default function DashboardPage() {
         </div>
         <button
           onClick={() => setIsBaselineModalOpen(true)}
-          className="px-6 py-3 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 shadow-lg shadow-[#FF7316]/20"
+          className="px-6 py-3 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 hover:scale-105 active:scale-95"
         >
           Upload Baseline
         </button>
@@ -81,7 +81,7 @@ export default function DashboardPage() {
           onClose={() => setIsBaselineModalOpen(false)} 
           onSuccess={() => {
             setIsBaselineModalOpen(false);
-            alert("Baseline History analyzed and saved successfully!"); 
+            
           }} 
         />
       )}
