@@ -1,7 +1,5 @@
 "use client";
 
-import { getAuth } from "firebase/auth";
-import { getApp } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -25,6 +23,7 @@ export default function ChatPage() {
     sendMessage,
     changeSection,
     isLoading,
+    isReprocessing,
     streamingContent,
     isInitializing,
   } = useChat();
@@ -79,6 +78,8 @@ export default function ChatPage() {
           streamingContent={streamingContent}
           isInitializing={isInitializing}
         />
+
+        
 
         {/* =========================================
             QUICK ACTIONS / SHORTCUTS

@@ -6,7 +6,6 @@ import { saveRawMessageToFirestore } from '@/lib/firestore.utils';
 
 export async function POST(request: Request) {
     try {
-        // 1. SEGURANÇA E AUTENTICAÇÃO
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -16,14 +15,11 @@ export async function POST(request: Request) {
         const decodedToken = await auth.verifyIdToken(token); 
         const userId = decodedToken.uid;
 
-        // 2. EXTRAÇÃO DOS DADOS DO FRONTEND
         const body = await request.json();
         const { content, currentSection, actorName, history, previouslyAsked } = body;
 
-        // 3. INJEÇÃO DINÂMICA DE CONTEXTO E LISTA DE BLOQUEIO (BLACKLIST)
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
-        // Pegamos apenas as últimas 4 perguntas para a IA não ficar confusa com um texto gigante
         const recentQuestions = previouslyAsked ? previouslyAsked.slice(-4) : [];
         const blacklistText = recentQuestions.length > 0 
             ? recentQuestions.map((q: string, i: number) => `Prior AI Question: "${q}"`).join('\n') 
@@ -32,9 +28,9 @@ export async function POST(request: Request) {
         //PIVOT ENGINE 
         const questionCount = previouslyAsked?.length || 0;
         
-        const isFrustrated = /what|why|don'?t know|don'?t remember|no|stop|uncomfortable|relevant|doesn'?t matter|tired/i.test(content) || content.trim().length < 10;
-        
-        const isMandatoryPivot = questionCount > 0 && questionCount % 5 === 0;
+        // const isFrustrated = /|don'?t remember|no|stop|uncomfortable|not relevant/i.test(content) || content.trim().length < 10;
+        const isFrustrated = false;
+        const isMandatoryPivot = questionCount > 0 && questionCount % 10 === 0;
 
         let dynamicCommand = "";
         if (isFrustrated) {
@@ -65,17 +61,17 @@ export async function POST(request: Request) {
             
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}
+            Don't use the connective "understood".
             
             `;
             console.log(dynamicCommand);
 
-        // 4. INICIALIZAÇÃO DA VERTEX AI (Agora importando SchemaType corretamente!)
         const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
         const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
         
-        // --- AGENTE 1: YAN (Conversacional) ---
+        // --- AGENT 1: YAN (Conversacional) ---
         const chatModel = getGenerativeModel(ai, { 
             model: "gemini-2.5-pro", 
             generationConfig: { temperature: 0.4 },
@@ -84,8 +80,7 @@ export async function POST(request: Request) {
             }
         } as any); // Type assertion to bypass the current typing issue with getGenerativeModel);
 
-        // --- AGENTE 2: MEMLISTENER (Extração) ---
-        // --- AGENT 2: MEMLISTENER (Contextual Extraction) ---
+        // --- AGENT 2: MEMLISTENER (Context Extraction) ---
         const extractionModel = getGenerativeModel(ai, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
@@ -210,7 +205,6 @@ export async function POST(request: Request) {
 
         console.log(`Iniciando IA dupla para a seção: ${currentSection}...`);
 
-        // 5. EXECUTANDO OS DOIS AGENTES EM PARALELO
         const chat = chatModel.startChat({
             systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
             history: history, 
@@ -238,12 +232,10 @@ export async function POST(request: Request) {
             extractionModel.generateContent(promptForExtraction)
         ]);
 
-        // 6. PROCESSANDO OS RESULTADOS
         const aiResponseText = chatResult.response.text();
         
         let extractionsData = null;
         
-        // Correção crítica: functionCalls é um método, exige os parênteses ()
         const functionCalls = extractionResult.response.functionCalls(); 
         
         if (functionCalls && functionCalls.length > 0) {
@@ -259,7 +251,6 @@ export async function POST(request: Request) {
         //     section: currentSection
         // }).catch((err: Error) => console.error("Failed to append to chat log:", err));
 
-        // 8. RETORNANDO O FORMATO EXATO
         return NextResponse.json({
             aiData: {
                 coach_reply: aiResponseText,
