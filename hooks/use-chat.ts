@@ -42,6 +42,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
   const [streamingContent, setStreamingContent] = useState("");
   const [isInitializing, setIsInitializing] = useState(true);
   const [firebaseAvailable, setFirebaseAvailable] = useState(true);
+  const [isReprocessing, setIsReprocessing] = useState(false);
 
   //Handle Authentication and the customized Firestore path
   const [userPath, setUserPath] = useState<string | null>(null);
@@ -262,9 +263,9 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         `users/${userPath}/dnaSessions/${sessionId}/messages`
       );
 
-
       try {
         setIsLoading(true);
+        setIsReprocessing(false);
         setStreamingContent("");
 
         // 1. Persist the sanitized user message to Firestore
@@ -275,8 +276,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           section: currentSection,
         });
         
-
-        // 2. Initialize the Vertex AI Gemini model
         // 2. Prepare the history payload for the secure backend
         const currentMessages = await getDocs(
           query(messagesRef, orderBy("timestamp", "asc"))
@@ -291,7 +290,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           }));
 
         // The Gemini API requires strictly alternating 'user' and 'model' roles.
-        // We compile the history excluding the current message.
         const historyWithoutCurrent = history.slice(0, -1);
         const chatHistory: { role: "user" | "model"; parts: { text: string }[] }[] = [];
         let expectedRole = "user"; 
@@ -315,73 +313,106 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         const idToken = await auth.currentUser?.getIdToken();
         if (!idToken) throw new Error("Authentication token not found.");
 
+        const previouslyAsked: string[] = session?.askedQuestions || [];
 
-        // Log the data being sent to the AI
-        console.log("Sent to IA:", {
-          content: content.trim(),
-          currentSection,
-          actorName,
-          history: chatHistory,
-        });
+        console.log("Sent to IA:", { content: content.trim(), currentSection, actorName });
 
-        // 3. Execute Secure API Call to our Next.js backend
-        const response = await fetch('/api/dna/chat', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            content: content.trim(),
-            currentSection,
-            actorName,
-            history: chatHistory,
+        // THE RETRY ENGINE (SILENT REPROCESSING) ---
+        let attempt = 0;
+        const maxAttempts = 3;
+        let success = false;
+        
+        let aiCoachReply = "";
+        let aiExtractions: any = null;
+        let selectedQuestions: string[] = [];
+        let aiAssessment: any = null;
 
-          })
-        });
+        while (attempt < maxAttempts && !success) {
+            try {
+                if (attempt > 0) {
+                    setIsReprocessing(true);
+                    console.log(`Reprocessando chamada para a IA... (Tentativa ${attempt + 1})`);
+                }
 
-        if (!response.ok) {
-           throw new Error(`Server responded with status: ${response.status}`);
+                // 3. Execute Secure API Call to our Next.js backend
+                const response = await fetch('/api/dna/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: content.trim(),
+                        currentSection,
+                        actorName,
+                        history: chatHistory,
+                        previouslyAsked
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+
+                // 4. Parse the secure response
+                const responseData = await response.json();
+                
+                // Validação de segurança para garantir que a IA não retornou um texto vazio
+                if (!responseData?.aiData?.coach_reply) {
+                    throw new Error("Empty or invalid response from AI");
+                }
+
+                aiCoachReply = responseData.aiData.coach_reply;
+                aiExtractions = responseData.aiData.extractions || null;
+                selectedQuestions = responseData.selectedQuestions || [];
+                aiAssessment = responseData.aiData.progress_assessment || responseData.aiData.extractions?.progress_assessment || null;
+
+                success = true; // Quebra o loop se deu tudo certo
+
+            } catch (error) {
+                attempt++;
+                console.error(`Tentativa ${attempt} falhou silenciosamente:`, error);
+                
+                if (attempt < maxAttempts) {
+                    // Espera 2 segundos antes de tentar de novo
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
         }
 
-        // 4. Parse the secure response
-        const { aiData, selectedQuestions } = await response.json();
+        // Se tentou 3 vezes e falhou, dá uma resposta graciosa e encerra.
+        if (!success) {
+            await addDoc(messagesRef, {
+                role: "assistant",
+                content: "I lost my train of thought for a second there. Could you rephrase what you just said?",
+                timestamp: serverTimestamp(),
+                section: currentSection,
+            });
+            setIsReprocessing(false);
+            setIsLoading(false);
+            return; 
+        }
 
-        // Log the data received from the AI
-        console.log("==========IA's Response:==============", {
-          aiData,
-          selectedQuestions,
-          aiCoachReply: aiData?.coach_reply,
-          aiExtractions: aiData?.extractions,
-          aiAssessment: aiData?.progress_assessment || aiData?.extractions?.progress_assessment
-        });
-
-        // Safely extract fields from the backend response
-        const aiCoachReply = aiData?.coach_reply || "I encountered an issue generating a response. Let us continue.";
-        const aiExtractions = aiData?.extractions || null;
-        const aiAssessment = aiData?.progress_assessment || aiData?.extractions?.progress_assessment || null;
+        console.log("==========IA's Response:==============", { aiCoachReply, aiExtractions, aiAssessment });
 
         // 6. Persist only the AI's conversational reply to the visible chat history
-  
         await addDoc(messagesRef, {
           role: "assistant",
           content: aiCoachReply,
           timestamp: serverTimestamp(),
           section: currentSection,
         });
-        
 
         // Progress Calculation & Logic
         let unlockedAuditions = session?.auditionsUnlocked || false;
         let totalCount = session?.totalExtractions || 0;
-        let newCompletedSecs = [...(session?.completedSections || [])]; // Shallow copy array
-        let sectionCounts = { ...(session?.sectionHqCounts || {}) };    // Shallow copy object
+        let newCompletedSecs = [...(session?.completedSections || [])]; 
+        let sectionCounts = { ...(session?.sectionHqCounts || {}) };    
         let currentSecCount = sectionCounts[currentSection] || 0;
 
         if (aiExtractions) {
           totalCount += 1; 
 
-          // Evaluate extraction quality to determine progression
           const isHighQuality =
             aiAssessment != null &&
             aiAssessment.has_actionable_pattern === true &&
@@ -396,115 +427,51 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             }
 
             // --- THE MASTER PROFILE ARCHITECTURE ---
-            // Instead of scattered documents, we build a single, ever-growing psychological profile
             const profileRef = doc(getDb(), `users/${userPath}/profile/master`);
-            
-            // Using dot notation to merge surgically
-            const updatePayload: any = {
-                lastUpdated: serverTimestamp(),
-            };
+            const updatePayload: any = { lastUpdated: serverTimestamp() };
 
-            // --- START OF FIELD UPDATES ---
-            // Safely append new AI discoveries without destroying old ones
-            if (aiExtractions.new_traits?.length > 0) {
-                updatePayload['psychology.traits'] = arrayUnion(...aiExtractions.new_traits);
-            }
-            
-            if (aiExtractions.defense_mechanisms?.length > 0) {
-                updatePayload['psychology.defenseMechanisms'] = arrayUnion(...aiExtractions.defense_mechanisms);
-            }
-
+            if (aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = arrayUnion(...aiExtractions.new_traits);
+            if (aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = arrayUnion(...aiExtractions.defense_mechanisms);
             if (aiExtractions.leaf_snippets?.length > 0) {
-                const snippetsWithContext = aiExtractions.leaf_snippets.map((quote: string) => ({
-                    quote,
-                    section: currentSection,
-                    timestamp: new Date().toISOString()
-                }));
+                const snippetsWithContext = aiExtractions.leaf_snippets.map((quote: string) => ({ quote, section: currentSection, timestamp: new Date().toISOString() }));
                 updatePayload['psychology.leafSnippets'] = arrayUnion(...snippetsWithContext);
             }
-            
-            if (aiExtractions.holistic_analysis) {
-                updatePayload['psychology.analysisTimeline'] = arrayUnion({
-                    inference: aiExtractions.holistic_analysis,
-                    section: currentSection,
-                    timestamp: new Date().toISOString()
-                });
-            }
-            if (aiExtractions.somatic_tells?.length > 0) {
-                updatePayload['physicality.somaticTells'] = arrayUnion(...aiExtractions.somatic_tells);
-            }
-            if (aiExtractions.core_values?.length > 0) {
-                updatePayload['psychology.coreValues'] = arrayUnion(...aiExtractions.core_values);
-            }
-            if (aiExtractions.relational_dynamics?.length > 0) {
-                updatePayload['psychology.relationalDynamics'] = arrayUnion(...aiExtractions.relational_dynamics);
-            }
+            if (aiExtractions.holistic_analysis) updatePayload['psychology.analysisTimeline'] = arrayUnion({ inference: aiExtractions.holistic_analysis, section: currentSection, timestamp: new Date().toISOString() });
+            if (aiExtractions.somatic_tells?.length > 0) updatePayload['physicality.somaticTells'] = arrayUnion(...aiExtractions.somatic_tells);
+            if (aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = arrayUnion(...aiExtractions.core_values);
+            if (aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = arrayUnion(...aiExtractions.relational_dynamics);
             if (aiExtractions.milestones?.length > 0) {
-                // Attach the section context to each milestone before saving
-                const milestonesWithContext = aiExtractions.milestones.map((milestone: any) => ({
-                    ...milestone,
-                    section: currentSection,
-                    discoveredAt: new Date().toISOString()
-                }));
+                const milestonesWithContext = aiExtractions.milestones.map((milestone: any) => ({ ...milestone, section: currentSection, discoveredAt: new Date().toISOString() }));
                 updatePayload['history.milestones'] = arrayUnion(...milestonesWithContext);
             }
-            // core acting fuel
-            if (aiExtractions.core_wounds_and_fears?.length > 0) {
-                updatePayload['acting_fuel.coreWounds'] = arrayUnion(...aiExtractions.core_wounds_and_fears);
-            }
-            if (aiExtractions.unmet_needs?.length > 0) {
-                updatePayload['acting_fuel.unmetNeeds'] = arrayUnion(...aiExtractions.unmet_needs);
-            }
-            if (aiExtractions.public_masks?.length > 0) {
-                updatePayload['acting_fuel.publicMasks'] = arrayUnion(...aiExtractions.public_masks);
-            }
+            if (aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = arrayUnion(...aiExtractions.core_wounds_and_fears);
+            if (aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = arrayUnion(...aiExtractions.unmet_needs);
+            if (aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = arrayUnion(...aiExtractions.public_masks);
 
-            // advanced psychological profiling
             if (aiExtractions.emotional_baseline) {
-                if (aiExtractions.emotional_baseline.conflict_response) {
-                    updatePayload['psychology.emotionalBaseline.conflictResponse'] = aiExtractions.emotional_baseline.conflict_response;
-                }
-                if (aiExtractions.emotional_baseline.internal_friction) {
-                    updatePayload['psychology.emotionalBaseline.internalFriction'] = aiExtractions.emotional_baseline.internal_friction;
-                }
-                if (aiExtractions.emotional_baseline.vulnerability_management) {
-                    updatePayload['psychology.emotionalBaseline.vulnerabilityManagement'] = aiExtractions.emotional_baseline.vulnerability_management;
-                }
+                if (aiExtractions.emotional_baseline.conflict_response) updatePayload['psychology.emotionalBaseline.conflictResponse'] = aiExtractions.emotional_baseline.conflict_response;
+                if (aiExtractions.emotional_baseline.internal_friction) updatePayload['psychology.emotionalBaseline.internalFriction'] = aiExtractions.emotional_baseline.internal_friction;
+                if (aiExtractions.emotional_baseline.vulnerability_management) updatePayload['psychology.emotionalBaseline.vulnerabilityManagement'] = aiExtractions.emotional_baseline.vulnerability_management;
             }
-
             if (aiExtractions.intellectual_framework) {
-                if (aiExtractions.intellectual_framework.cognitive_style) {
-                    updatePayload['psychology.intellectualFramework.cognitiveStyle'] = aiExtractions.intellectual_framework.cognitive_style;
-                }
-                if (aiExtractions.intellectual_framework.attention_to_detail) {
-                    updatePayload['psychology.intellectualFramework.attentionToDetail'] = aiExtractions.intellectual_framework.attention_to_detail;
-                }
+                if (aiExtractions.intellectual_framework.cognitive_style) updatePayload['psychology.intellectualFramework.cognitiveStyle'] = aiExtractions.intellectual_framework.cognitive_style;
+                if (aiExtractions.intellectual_framework.attention_to_detail) updatePayload['psychology.intellectualFramework.attentionToDetail'] = aiExtractions.intellectual_framework.attention_to_detail;
             }
 
-            if (aiExtractions.archetype_signals?.length > 0) {
-                updatePayload['acting_fuel.archetypes'] = arrayUnion(...aiExtractions.archetype_signals);
-            }
-            if (aiExtractions.key_entities_and_arenas?.length > 0) {
-                updatePayload['history.keyEntities'] = arrayUnion(...aiExtractions.key_entities_and_arenas);
-            }
-            // --- END OF FIELD UPDATES ---
-
-            // Execute the atomic merge to grow the profile
+            if (aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = arrayUnion(...aiExtractions.archetype_signals);
+            if (aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = arrayUnion(...aiExtractions.key_entities_and_arenas);
             
             await setDoc(profileRef, updatePayload, { merge: true });
-            
           }
         }
         
-        if (newCompletedSecs.length >= 4) {
-          unlockedAuditions = true;
-        }
+        if (newCompletedSecs.length >= 4) unlockedAuditions = true;
 
-        // Global Progress Bar Calculation based on AI's autonomous decisions
-        const totalPepitasUteis = Object.values(sectionCounts).reduce(
-            (acc, count) => acc + Math.min(count as number, 6), 0
-        );
+        const totalPepitasUteis = Object.values(sectionCounts).reduce((acc, count) => acc + Math.min(count as number, 6), 0);
         const newProgress = Math.round(Math.min((totalPepitasUteis / 24) * 100, 100));
+        
+        // ATENÇÃO AQUI: Salvando a pergunta recém gerada na Blacklist!
+        const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
 
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
         
@@ -514,26 +481,15 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           sectionHqCounts: sectionCounts,
           progress: newProgress,           
           auditionsUnlocked: unlockedAuditions,
-        }, { merge: true }); // shield existing fields from being overwritten by merging with the existing document
+          askedQuestions: newAskedQuestions // <-- Isso estava faltando e garante que a repetição não ocorra!
+        }, { merge: true });
         
       } catch (error) {
-        console.error("AI response error:", error);
-        
-        
-        // Provide a graceful fallback response if AI inference fails
-        try {
-          await addDoc(messagesRef, {
-            role: "assistant",
-            content:
-              "I encountered an issue generating a response. Let us continue — tell me more about what you were describing.",
-            timestamp: serverTimestamp(),
-            section: currentSection,
-          });
-        } catch (fallbackError) {
-          console.error("Error adding fallback message:", fallbackError);
-        }
+        // Se der algum erro muito fora da curva (como a internet do usuário cair de vez)
+        console.error("Fatal error out of retry loop:", error);
       } finally {
         setIsLoading(false);
+        setIsReprocessing(false);
         setStreamingContent("");
       }
     },
@@ -581,6 +537,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
     sendMessage,
     changeSection,
     isLoading,
+    isReprocessing,
     streamingContent,
     isInitializing,
     firebaseAvailable,

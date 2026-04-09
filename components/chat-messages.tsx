@@ -4,12 +4,14 @@ import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatMessage } from "@/lib/chat-types";
+import { AiThinkingBlock } from "./ai-thinking-block";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
   isLoading: boolean;
   streamingContent: string;
   isInitializing: boolean;
+  isReprocessing?: boolean;
 }
 
 function formatTime(timestamp: ChatMessage["timestamp"]): string {
@@ -110,9 +112,10 @@ function StreamingBubble({ content }: { content: string }) {
   );
 }
 
+// O TypingIndicator voltou!
 function TypingIndicator() {
   return (
-    <div className="flex justify-start gap-3">
+    <div className="flex justify-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="mt-auto mb-2">
         <CopilotAvatar />
       </div>
@@ -154,12 +157,16 @@ export function ChatMessages({
   isLoading,
   streamingContent,
   isInitializing,
+  isReprocessing = false,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const lastMessage = messages[messages.length - 1];
+  const isWaitingForAI = lastMessage?.role === "user";
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, isLoading]);
+  }, [messages, streamingContent, isLoading, isReprocessing]);
 
   if (isInitializing) {
     return (
@@ -175,10 +182,18 @@ export function ChatMessages({
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
+        
         {isLoading && streamingContent && (
           <StreamingBubble content={streamingContent} />
         )}
-        {isLoading && !streamingContent && <TypingIndicator />}
+        
+        {isLoading && !streamingContent && isWaitingForAI &&(
+          <div className="flex flex-col gap-4">
+            <AiThinkingBlock isReprocessing={isReprocessing} />
+            <TypingIndicator />
+          </div>
+        )}
+        
         <div ref={bottomRef} />
       </div>
     </div>
