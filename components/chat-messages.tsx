@@ -57,7 +57,6 @@ function CopilotAvatar() {
 function MessageBubble({ message, userInitials }: { message: ChatMessage, userInitials: string }) {
   const isAssistant = message.role === "assistant";
 
-
   return (
     <div
       className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"}`}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
+import mammoth from "mammoth";
 import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
 // IMPORT THE ADMIN SDK FOR SECURE BACKEND OPERATIONS
 import { auth, db } from "@/lib/firebase.admin";
@@ -74,10 +75,18 @@ export async function POST(request: Request) {
       );
     }
     
-    // Validate MIME type more strictly
-    if (!["application/pdf"].includes(sidesFile.type)) {
+    // Validate MIME type more strictly (Allow PDF and Word)
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword", // .doc
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
+    ];
+    
+    const isWordExt = sidesFile.name.toLowerCase().endsWith('.doc') || sidesFile.name.toLowerCase().endsWith('.docx');
+
+    if (!allowedTypes.includes(sidesFile.type) && !isWordExt) {
       return NextResponse.json(
-        { error: "Only PDFs allowed" },
+        { error: "Only PDFs and Word documents (.docx) are allowed" },
         { status: 400 }
       );
     }
@@ -86,24 +95,39 @@ export async function POST(request: Request) {
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      console.error(`🚨 SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}`);
+      console.error(` SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}`);
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
     // 3. PARSE PDFS SAFELY
-    if (sidesFile && sidesFile.type === "application/pdf") {
+    // 3. PARSE FILES SAFELY (PDFs & DOCX)
+    if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();
-      sidesText = await extractTextFromPDF(Buffer.from(arrayBuffer));
+      const buffer = Buffer.from(arrayBuffer);
+      
+      if (sidesFile.type === "application/pdf") {
+        sidesText = await extractTextFromPDF(buffer);
+      } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        sidesText = result.value;
+      }
     }
 
-    if (briefFile && briefFile.type === "application/pdf") {
+    if (briefFile) {
       const arrayBuffer = await briefFile.arrayBuffer();
-      briefText = await extractTextFromPDF(Buffer.from(arrayBuffer));
+      const buffer = Buffer.from(arrayBuffer);
+
+      if (briefFile.type === "application/pdf") {
+        briefText = await extractTextFromPDF(buffer);
+      } else if (briefFile.name.toLowerCase().endsWith(".docx") || briefFile.type.includes("wordprocessingml")) {
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        briefText = result.value;
+      }
     }
 
     // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
     console.log(`Fetching Master Profile for ${userPath}...`);
-    const profileRef = db.doc(`users/${userPath}/masterProfile/current`);
+    const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
     
     let actorDNAContext = "No DNA profile found. Provide high-level, generalized acting coaching based solely on the script.";

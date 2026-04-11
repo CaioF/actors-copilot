@@ -33,11 +33,21 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
-      // Aceita apenas PDF ou arquivos de texto/word básicos
-      if (droppedFile.type === "application/pdf" || droppedFile.type.includes("text")) {
+      
+      // Validação aprimorada de tipos
+      const isPDF = droppedFile.type === "application/pdf";
+      const isText = droppedFile.type.includes("text");
+      const isWordType = droppedFile.type === "application/msword" || 
+                         droppedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      
+      // Fallback de segurança olhando a extensão do arquivo
+      const isWordExt = droppedFile.name.toLowerCase().endsWith('.doc') || 
+                        droppedFile.name.toLowerCase().endsWith('.docx');
+
+      if (isPDF || isText || isWordType || isWordExt) {
         onFileChange(droppedFile);
       } else {
-        alert("Please upload a PDF or Text file.");
+        alert("Please upload a PDF, Text, or Word (.docx) file.");
       }
     }
   };
