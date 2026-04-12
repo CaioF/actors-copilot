@@ -5,6 +5,11 @@ import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } f
 // IMPORT THE ADMIN SDK FOR SECURE BACKEND OPERATIONS
 import { auth, db } from "@/lib/firebase.admin";
 
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
+];
+
 /**
  * Helper function to safely extract raw text from a PDF buffer in a Node.js environment.
  * Includes a 30-second timeout to prevent malformed PDFs from hanging the server thread.
@@ -67,11 +72,6 @@ export async function POST(request: Request) {
 
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-  const allowedMimeTypes = [
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
-  ];
-
   if (sidesFile) {
     if (sidesFile.size > MAX_FILE_SIZE) {
       return NextResponse.json(
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     const isDocx = sidesFile.name.toLowerCase().endsWith('.docx');
 
-    if (!allowedMimeTypes.includes(sidesFile.type) && !isDocx) {
+    if (!ALLOWED_MIME_TYPES.includes(sidesFile.type) && !isDocx) {
       return NextResponse.json(
         { error: "Only PDFs and Word documents (.docx) are allowed" },
         { status: 400 }
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
     const isDocx = briefFile.name.toLowerCase().endsWith('.docx');
 
-    if (!allowedMimeTypes.includes(briefFile.type) && !isDocx) {
+    if (!ALLOWED_MIME_TYPES.includes(briefFile.type) && !isDocx) {
       return NextResponse.json(
         { error: "Only PDFs and Word documents (.docx) are allowed for the brief" },
         { status: 400 }
