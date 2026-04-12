@@ -124,7 +124,7 @@ export function MemoryRecordingBanner() {
         return (
           <button
             onClick={startRecording}
-            className="flex items-center gap-3 px-4 py-4 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 shadow-lg shadow-[#FF7316]/20 hover:scale-105 active:scale-95"
+            className="flex items-center gap-3 px-4 py-4 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 hover:scale-105 active:scale-95"
           >
             <Mic className="h-5 w-5" />
             <span>Capture a Memory</span>

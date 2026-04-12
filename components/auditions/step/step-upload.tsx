@@ -33,11 +33,15 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
-      // Aceita apenas PDF ou arquivos de texto/word básicos
-      if (droppedFile.type === "application/pdf" || droppedFile.type.includes("text")) {
+      
+      const isPDF = droppedFile.type === "application/pdf";
+      const isDocxType = droppedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isDocxExt = droppedFile.name.toLowerCase().endsWith('.docx');
+
+      if (isPDF || isDocxType || isDocxExt) {
         onFileChange(droppedFile);
       } else {
-        alert("Please upload a PDF or Text file.");
+        alert("Please upload a PDF or Word (.docx) file.");
       }
     }
   };
@@ -75,7 +79,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
           >
             <input
               type="file"
-              accept=".pdf,.txt,.doc,.docx"
+              accept=".pdf,.docx"
               className="hidden"
               ref={fileInputRef}
               onChange={handleFileSelect}
@@ -86,7 +90,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
             <p className="text-[#EADDCE] font-medium mb-1">
               Click to upload <span className="text-[#B7BCB6] font-normal">or drag and drop</span>
             </p>
-            <p className="text-[#B7BCB6] text-xs">PDF, TXT, or DOC (max. 10MB)</p>
+            <p className="text-[#B7BCB6] text-xs">PDF or DOCX (max. 20MB)</p>
           </div>
         ) : (
           /* ARQUIVO SELECIONADO (PREVIEW) */
