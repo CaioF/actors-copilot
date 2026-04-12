@@ -67,6 +67,11 @@ export async function POST(request: Request) {
 
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
+  const allowedMimeTypes = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
+  ];
+
   if (sidesFile) {
     if (sidesFile.size > MAX_FILE_SIZE) {
       return NextResponse.json(
@@ -74,24 +79,34 @@ export async function POST(request: Request) {
         { status: 413 }
       );
     }
-    
-    // Validate MIME type more strictly (Allow PDF and Word)
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword", // .doc
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
-    ];
-    
-    const isWordExt = sidesFile.name.toLowerCase().endsWith('.doc') || sidesFile.name.toLowerCase().endsWith('.docx');
 
-    if (!allowedTypes.includes(sidesFile.type) && !isWordExt) {
+    const isDocx = sidesFile.name.toLowerCase().endsWith('.docx');
+
+    if (!allowedMimeTypes.includes(sidesFile.type) && !isDocx) {
       return NextResponse.json(
         { error: "Only PDFs and Word documents (.docx) are allowed" },
         { status: 400 }
       );
     }
-  
-}
+  }
+
+  if (briefFile) {
+    if (briefFile.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Brief file exceeds 20MB limit" },
+        { status: 413 }
+      );
+    }
+
+    const isDocx = briefFile.name.toLowerCase().endsWith('.docx');
+
+    if (!allowedMimeTypes.includes(briefFile.type) && !isDocx) {
+      return NextResponse.json(
+        { error: "Only PDFs and Word documents (.docx) are allowed for the brief" },
+        { status: 400 }
+      );
+    }
+  }
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
@@ -99,7 +114,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
-    // 3. PARSE PDFS SAFELY
     // 3. PARSE FILES SAFELY (PDFs & DOCX)
     if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();

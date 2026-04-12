@@ -34,20 +34,14 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
       
-      // Validação aprimorada de tipos
       const isPDF = droppedFile.type === "application/pdf";
-      const isText = droppedFile.type.includes("text");
-      const isWordType = droppedFile.type === "application/msword" || 
-                         droppedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      
-      // Fallback de segurança olhando a extensão do arquivo
-      const isWordExt = droppedFile.name.toLowerCase().endsWith('.doc') || 
-                        droppedFile.name.toLowerCase().endsWith('.docx');
+      const isDocxType = droppedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isDocxExt = droppedFile.name.toLowerCase().endsWith('.docx');
 
-      if (isPDF || isText || isWordType || isWordExt) {
+      if (isPDF || isDocxType || isDocxExt) {
         onFileChange(droppedFile);
       } else {
-        alert("Please upload a PDF, Text, or Word (.docx) file.");
+        alert("Please upload a PDF or Word (.docx) file.");
       }
     }
   };
@@ -85,7 +79,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
           >
             <input
               type="file"
-              accept=".pdf,.txt,.doc,.docx"
+              accept=".pdf,.docx"
               className="hidden"
               ref={fileInputRef}
               onChange={handleFileSelect}
@@ -96,7 +90,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
             <p className="text-[#EADDCE] font-medium mb-1">
               Click to upload <span className="text-[#B7BCB6] font-normal">or drag and drop</span>
             </p>
-            <p className="text-[#B7BCB6] text-xs">PDF, TXT, or DOC (max. 10MB)</p>
+            <p className="text-[#B7BCB6] text-xs">PDF or DOCX (max. 20MB)</p>
           </div>
         ) : (
           /* ARQUIVO SELECIONADO (PREVIEW) */
