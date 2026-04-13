@@ -32,6 +32,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: profile.headshot ? [{ url: profile.headshot }] : [],
       type: "profile",
     },
+    alternates: {
+      types: {
+        "text/markdown": `/actors/${slug}/index.md`,
+      },
+    },
   };
 }
 

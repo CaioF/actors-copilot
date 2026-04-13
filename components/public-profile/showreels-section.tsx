@@ -25,8 +25,8 @@ export function ShowreelsSection({ showreels }: ShowreelsSectionProps) {
                   <Video className="h-5 w-5 text-white" />
                 </div>
               </div>
-              {/* Bottom area: slightly lighter olive with title */}
-              <div className="bg-[#494E3E] px-3 py-2.5">
+              {/* Bottom area: fixed height so all cards match */}
+              <div className="flex h-12 items-center bg-[#494E3E] px-3">
                 <p className="line-clamp-2 text-xs leading-tight text-white">
                   {showreel.title}
                 </p>
