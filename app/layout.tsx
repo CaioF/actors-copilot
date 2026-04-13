@@ -3,6 +3,7 @@ import { Antonio, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { AuthProvider } from '@/lib/context/AuthContext'
+import { PostHogProvider } from '@/lib/analytics/posthog-provider'
 
 const antonio = Antonio({ subsets: ['latin'], variable: '--font-antonio' })
 const inter = Inter({   subsets: ['latin'],   variable: '--font-inter',})
@@ -28,8 +29,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} ${antonio.variable}`} >
         <AuthProvider>
-          {children}
-          <Analytics />
+          <PostHogProvider>
+            {children}
+            <Analytics />
+          </PostHogProvider>
         </AuthProvider>
       </body>
     </html>
