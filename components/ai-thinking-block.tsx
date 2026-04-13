@@ -20,7 +20,7 @@ export function AiThinkingBlock({ isReprocessing = false }: AiThinkingBlockProps
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsTakingLong(true);
-    }, 700);
+    }, 7000);
 
     return () => clearTimeout(timer);
   }, []);
