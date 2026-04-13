@@ -9,7 +9,7 @@
  * - family: Family-of-origin dynamics, survival rules, attachment patterns
  * - relationships: Intimacy, trust, loyalty, and relationship patterns
  * - power: Authority, status, rebellion, and approval-seeking behaviors
- * - shame_pride: Secrets,暴露, self-worth, and dignity
+ * - shame_pride: Secrets, exposure, self-worth, and dignity
  * - loss_and_change: Ruptures, transitions, and turning points
  * - desire_ambition: Wants, hunger, envy, and sacrifice
  * - joy_passion: Flow states, vitality, and core passions

@@ -171,6 +171,7 @@ export function ProfileLivePreview() {
           {cvUrl && (
             <button
               type="button"
+              onClick={() => window.open(cvUrl, "_blank", "noopener,noreferrer")}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/20 px-3 py-2 text-xs font-medium text-white"
             >
               <Download className="h-3 w-3" />

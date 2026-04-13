@@ -26,14 +26,16 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
   const fullName = watch("fullName");
   const [copied, setCopied] = useState(false);
 
-  const profileUrl = `theactorscopilot.com/actors/${slug || generateSlug(fullName || "")}`;
+  const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://theactorscopilot.com';
+  const profilePath = `actors/${slug || generateSlug(fullName || "")}`;
+  const profileUrl = `${siteOrigin.replace(/^https?:\/\//, '')}/${profilePath}`;
 
   /**
    * Copies the profile URL to the clipboard and shows a temporary success indicator.
    */
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`https://${profileUrl}`);
+      await navigator.clipboard.writeText(`${siteOrigin}/${profilePath}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {

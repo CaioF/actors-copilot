@@ -229,47 +229,42 @@ export default function ProfilePage() {
   const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) => {
     const currentValues = methods.getValues();
 
-    // Build merge: existing values take priority, AI data fills empty
-    // Ensure array fields have defaults to prevent crashes during render
+    // Start from ALL current values so no existing user-entered data is wiped.
+    // Only fill a field with autofill data when the current value is empty/missing.
     const merged: Partial<ActorProfile> = {
-      additionalPhotos: [],
-      credits: [],
-      showreels: [],
-      training: [],
-      skillsAndAccents: [],
-      nationalities: [],
-      appearance: [],
-      workPermits: [],
-      ...autofillData,
+      ...currentValues,
+      // String fields: keep current non-empty value, else use autofill
+      fullName: currentValues.fullName || autofillData.fullName || '',
+      slug: currentValues.slug || autofillData.slug || '',
+      bio: currentValues.bio || autofillData.bio || '',
+      headshot: currentValues.headshot || autofillData.headshot || '',
+      height: currentValues.height || autofillData.height || '',
+      heightUnit: currentValues.heightUnit || autofillData.heightUnit || 'imperial',
+      location: currentValues.location || autofillData.location || '',
+      gender: currentValues.gender || autofillData.gender || '',
+      awardsCallout: currentValues.awardsCallout || autofillData.awardsCallout || '',
+      // Array fields: keep current non-empty array, else use autofill; ensure defaults
+      credits: (currentValues.credits && currentValues.credits.length > 0)
+        ? currentValues.credits
+        : (autofillData.credits ?? []),
+      showreels: (currentValues.showreels && currentValues.showreels.length > 0)
+        ? currentValues.showreels
+        : (autofillData.showreels ?? []),
+      additionalPhotos: (currentValues.additionalPhotos && currentValues.additionalPhotos.length > 0)
+        ? currentValues.additionalPhotos
+        : (autofillData.additionalPhotos ?? []),
+      nationalities: (currentValues.nationalities && currentValues.nationalities.length > 0)
+        ? currentValues.nationalities
+        : (autofillData.nationalities ?? []),
+      skillsAndAccents: (currentValues.skillsAndAccents && currentValues.skillsAndAccents.length > 0)
+        ? currentValues.skillsAndAccents
+        : (autofillData.skillsAndAccents ?? []),
+      training: currentValues.training ?? autofillData.training ?? [],
+      appearance: currentValues.appearance ?? autofillData.appearance ?? [],
+      workPermits: currentValues.workPermits ?? autofillData.workPermits ?? [],
     };
 
-    // Preserve user's non-empty values over AI data
-    if (currentValues.fullName) {
-      merged.fullName = currentValues.fullName;
-    }
-    if (currentValues.slug) {
-      merged.slug = currentValues.slug;
-    }
-    if (currentValues.bio) {
-      merged.bio = currentValues.bio;
-    }
-    if (currentValues.headshot) {
-      merged.headshot = currentValues.headshot;
-    }
-    if (currentValues.height) {
-      merged.height = currentValues.height;
-    }
-    if (currentValues.location) {
-      merged.location = currentValues.location;
-    }
-    if (currentValues.credits && currentValues.credits.length > 0) {
-      merged.credits = currentValues.credits;
-    }
-    if (currentValues.showreels && currentValues.showreels.length > 0) {
-      merged.showreels = currentValues.showreels;
-    }
-
-    // Preserve slug generation from name if name was filled
+    // Generate slug from name if still missing
     if (merged.fullName && !merged.slug) {
       merged.slug = generateSlug(merged.fullName);
     }

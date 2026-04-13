@@ -187,7 +187,7 @@ describe('POST /api/profile/autofill', () => {
             const data = await res.json();
 
             expect(res.status).toBe(400);
-            expect(data.error).toBe('Invalid IMDB URL format. Must match pattern: /name/nm\\d+');
+            expect(data.error).toBe('URL must be from imdb.com');
         });
 
         it('returns 400 when url does not have /name/nm pattern', async () => {

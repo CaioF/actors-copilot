@@ -113,19 +113,24 @@ describe('toast', () => {
   });
 
   it('dismiss dispatches DISMISS_TOAST', () => {
-    const { dismiss, id } = toast({ title: 'Test' });
-    dismiss();
-    const module = require('@/hooks/use-toast');
-    const state = module.reducer({ toasts: [] }, { type: 'REMOVE_TOAST', toastId: id });
-    expect(state.toasts).toHaveLength(0);
+    const { id } = toast({ title: 'Test' });
+    // DISMISS_TOAST sets open:false for the toast
+    const state = reducer(
+      { toasts: [{ id, title: 'Test', open: true }] },
+      { type: 'DISMISS_TOAST', toastId: id }
+    );
+    expect(state.toasts[0].open).toBe(false);
   });
 
   it('update dispatches UPDATE_TOAST', () => {
-    const { update, id } = toast({ title: 'Test' });
-    update({ description: 'Updated' });
-    const module = require('@/hooks/use-toast');
-    const state = module.reducer({ toasts: [] }, { type: 'REMOVE_TOAST', toastId: id });
-    expect(state.toasts).toHaveLength(0);
+    const { id } = toast({ title: 'Test' });
+    // UPDATE_TOAST merges the new properties into the existing toast
+    const state = reducer(
+      { toasts: [{ id, title: 'Test', open: true }] },
+      { type: 'UPDATE_TOAST', toast: { id, description: 'Updated' } }
+    );
+    expect(state.toasts[0].description).toBe('Updated');
+    expect(state.toasts[0].title).toBe('Test');
   });
 });
 

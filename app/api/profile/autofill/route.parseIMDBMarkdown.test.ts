@@ -47,8 +47,8 @@ Actress
 
             expect(result.fullName).toBe('Tracey Collis');
             expect(result.knownFor).toEqual([
-                { title: '- The Great Film', year: '2020', role: 'The Great Film' },
-                { title: '- Another Show', year: '2019', role: 'Another Show' },
+                { title: 'The Great Film', year: '2020', role: 'Actress' },
+                { title: 'Another Show', year: '2019', role: 'Lead Role' },
             ]);
         });
 
@@ -116,7 +116,7 @@ Just an actor with no credits yet.`;
             const result = parseIMDBMarkdown(markdown, baseMetadata);
 
             expect(result.knownFor).toHaveLength(1);
-            expect(result.knownFor[0].title).toBe('- Another Movie');
+            expect(result.knownFor[0].title).toBe('Another Movie');
         });
 
         it('skips lines without year in credits section', () => {
@@ -129,7 +129,7 @@ Just an actor with no credits yet.`;
 
             const result = parseIMDBMarkdown(markdown, baseMetadata);
 
-            expect(result.credits.some(c => c.title === '- Movie With Year')).toBe(true);
+            expect(result.credits.some(c => c.title === 'Movie With Year')).toBe(true);
         });
     });
 

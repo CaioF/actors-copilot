@@ -3,21 +3,7 @@ import { auth } from '@/lib/firebase.admin';
 import { IMDB_AUTOFILL_PROMPT } from '@/lib/prompts';
 import type { ImdbExtractedData, Credit, Showreel } from '@/lib/imdb-types';
 import { logger, createChildLogger } from '@/lib/logger';
-
-/**
- * Converts a person's name into a URL-friendly slug by lowercasing, removing special
- * characters, and replacing spaces with hyphens.
- * @param name - The full name to convert to a slug
- * @returns A lowercase, hyphen-separated slug string
- */
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
+import { generateSlug } from '@/lib/profile-types';
 
 /**
  * Parses IMDB page markdown content to extract actor profile data including name,
@@ -67,8 +53,10 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
 
     // Extract height from personal details
     if (line.includes("Height") && line.includes('(')) {
-      const heightMatch = line.match(/\((\d+['"′"]?\s*\d*["′"]?\s*\/?\s*\d+\s*(cm|m)?\))/);
-      if (!heightMatch) {
+      const heightMatch = line.match(/\((\d+['"′"]?\s*\d*["′"]?\s*\/?\s*\d+\s*(cm|m)?)\)/);
+      if (heightMatch) {
+        height = heightMatch[1];
+      } else {
         const simpleMatch = line.match(/(\d+′+\s*\d+″+|\d+\s*cm)/);
         if (simpleMatch) {
           height = simpleMatch[1];
@@ -82,15 +70,14 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
       for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
         const creditLine = lines[j].trim();
         if (creditLine.startsWith('- ') && creditLine.includes('(')) {
-          const yearMatch = creditLine.match(/\((\d{4})\)/);
-          const roleMatch = creditLine.match(/\-\s+(.+?)\s+\(/);
-          const titleMatch = creditLine.match(/^(.+?)\s+\(/);
+          const normalizedCreditLine = creditLine.replace(/^-\s+/, '');
+          const knownForMatch = normalizedCreditLine.match(/^(.+?)\s+\((\d{4})\)\s*(?:-\s*(.*))?$/);
 
-          if (titleMatch && yearMatch) {
+          if (knownForMatch) {
             knownFor.push({
-              title: titleMatch[1].trim(),
-              year: yearMatch[1],
-              role: roleMatch ? roleMatch[1].trim() : '',
+              title: knownForMatch[1].trim(),
+              year: knownForMatch[2],
+              role: knownForMatch[3] ? knownForMatch[3].trim() : '',
             });
           }
         }
@@ -110,13 +97,13 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
         }
 
         if (creditLine.startsWith('- ') && creditLine.match(/\(\d{4}\)/)) {
-          const yearMatch = creditLine.match(/\((\d{4})\)/);
-          const roleMatch = creditLine.match(/\-\s+(.+?)\s+\(/);
-          const titleMatch = creditLine.match(/^(.+?)\s+\(/);
+          const normalizedCreditLine = creditLine.replace(/^-\s+/, '');
+          const creditMatch = normalizedCreditLine.match(/^(.+?)\s+\((\d{4})\)\s*(?:-\s*(.*))?$/);
 
-          if (titleMatch && yearMatch) {
-            const title = titleMatch[1].trim();
-            const year = yearMatch[1];
+          if (creditMatch) {
+            const title = creditMatch[1].trim();
+            const year = creditMatch[2];
+            const role = creditMatch[3] ? creditMatch[3].trim() : '';
 
             // Determine category based on context
             let category: Credit['category'] = 'further';
@@ -132,7 +119,7 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
 
             credits.push({
               title,
-              role: roleMatch ? roleMatch[1].trim() : '',
+              role,
               year,
               category,
               featured: knownFor.some(k => k.title === title),
@@ -228,9 +215,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    // IMDB URL format validation
+    // IMDB URL format validation: parse URL and allowlist IMDb hostnames
+    let parsedImdbUrl: URL;
+    try {
+      parsedImdbUrl = new URL(url);
+    } catch {
+      log.warn({ url, msg: 'Could not parse URL' });
+      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    }
+
+    const allowedHostnames = ['imdb.com', 'www.imdb.com', 'm.imdb.com'];
+    if (!allowedHostnames.includes(parsedImdbUrl.hostname)) {
+      log.warn({ url, hostname: parsedImdbUrl.hostname, msg: 'URL hostname not allowed' });
+      return NextResponse.json(
+        { error: 'URL must be from imdb.com' },
+        { status: 400 }
+      );
+    }
+
     const imdbPattern = /\/name\/nm\d+/;
-    if (!imdbPattern.test(url)) {
+    if (!imdbPattern.test(parsedImdbUrl.pathname)) {
       log.warn({ url, msg: 'Invalid IMDB URL format' });
       return NextResponse.json(
         { error: 'Invalid IMDB URL format. Must match pattern: /name/nm\\d+' },
@@ -276,7 +280,7 @@ export async function POST(request: Request) {
     // Fetch DNA profile from Firestore using admin SDK (has full permissions in server context)
     const { db } = await import('@/lib/firebase.admin');
 
-    const firstName = decodedToken.name?.split(' ')[0] || 'Actor';
+    const firstName = (decodedToken.name?.split(' ')[0] || 'Actor').replace(/[^a-zA-Z0-9]/g, '');
     const userPath = `${decodedToken.uid}_${firstName}`;
     log.debug({ userPath, firestorePath: `users/${userPath}/profile/master`, msg: 'Fetching DNA profile from Firestore using admin SDK' });
     
