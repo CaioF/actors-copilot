@@ -5,6 +5,7 @@ import { useFormContext } from "react-hook-form";
 import { Plus, X } from "lucide-react";
 import { ActorProfile, WORK_PERMIT_OPTIONS } from "@/lib/profile-types";
 import { cn } from "@/lib/utils";
+import { parseImperialToCm, parseCmToImperial } from "@/lib/height-utils";
 
 /**
  * Form section for capturing actor physical details including height, eye/hair color,
@@ -19,45 +20,6 @@ export function PhysicalDetailsSection() {
 
   const [nationalityInput, setNationalityInput] = useState("");
   const [appearanceInput, setAppearanceInput] = useState("");
-
-  /**
-   * Parses imperial height values (e.g., "5ft 9in", "5'9\"", "5ft") to centimeters.
-   * @param value - The imperial height string to parse
-   * @returns The height in centimeters, or null if parsing fails
-   */
-  const parseImperialToCm = (value: string): number | null => {
-    const patterns = [
-      /(\d+)\s*[\′']\s*(\d+)\s*[\″"]?$/,
-      /(\d+)\s*ft\s*(\d+)\s*in$/i,
-      /(\d+)\s*ft$/i,
-    ];
-    for (const pattern of patterns) {
-      const match = value.match(pattern);
-      if (match) {
-        const feet = parseInt(match[1], 10);
-        const inches = match[2] ? parseInt(match[2], 10) : 0;
-        return Math.round((feet * 12 + inches) * 2.54);
-      }
-    }
-    return null;
-  };
-
-  /**
-   * Parses a centimeter value string and converts it to imperial format (e.g., "175cm" to "5' 9").
-   * @param value - The metric height string to parse
-   * @returns The height in imperial format, or null if parsing fails
-   */
-  const parseCmToImperial = (value: string): string | null => {
-    const cmMatch = value.match(/(\d+)\s*cm$/i);
-    if (cmMatch) {
-      const cm = parseInt(cmMatch[1], 10);
-      const totalInches = cm / 2.54;
-      const feet = Math.floor(totalInches / 12);
-      const inches = Math.round(totalInches % 12);
-      return inches === 12 ? `${feet + 1}' 0"` : `${feet}' ${inches}"`;
-    }
-    return null;
-  };
 
   /**
    * Toggles the height unit between imperial and metric, converting the existing value if present.

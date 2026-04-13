@@ -26,7 +26,7 @@ function generateSlug(name: string): string {
  * @param metadata - Additional metadata from the scraped page (title, ogImage, description)
  * @returns Structured ImdbExtractedData object with parsed actor information
  */
-function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtractedData {
+export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtractedData {
   const lines = markdown.split('\n');
   let fullName = metadata?.title?.replace(' - IMDb', '') || '';
   let bio = '';

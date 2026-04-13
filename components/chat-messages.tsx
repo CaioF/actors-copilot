@@ -15,12 +15,7 @@ interface ChatMessagesProps {
   actorName?: string;
 }
 
-/**
- * Extracts initials from a name for avatar display.
- * @param name - The full name to extract initials from (optional)
- * @returns Two-letter initials (e.g., "John Doe" -> "JD", empty/undefined -> "ME")
- */
-function getInitials(name?: string) {
+export function getInitials(name?: string) {
   if (!name) return "ME";
   const parts = name.trim().split(" ");
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
@@ -32,12 +27,13 @@ function getInitials(name?: string) {
  * @param timestamp - The timestamp to format (supports Firebase Timestamp format)
  * @returns Formatted time string (e.g., "2:30PM")
  */
-function formatTime(timestamp: ChatMessage["timestamp"]): string {
+export function formatTime(timestamp: ChatMessage["timestamp"]): string {
   if (!timestamp) return "2:30PM";
   try {
-    const date = new Date(
-      (timestamp as unknown as { seconds: number }).seconds * 1000
-    );
+    const ts = timestamp as unknown as { seconds: number } | number;
+    const ms = typeof ts === "number" ? ts : ts.seconds * 1000;
+    const date = new Date(ms);
+    if (isNaN(date.getTime())) return "2:30PM";
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
