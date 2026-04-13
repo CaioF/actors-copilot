@@ -280,7 +280,7 @@ export async function POST(request: Request) {
     // Fetch DNA profile from Firestore using admin SDK (has full permissions in server context)
     const { db } = await import('@/lib/firebase.admin');
 
-    const firstName = (decodedToken.name?.split(' ')[0] || 'Actor').replace(/[^a-zA-Z0-9]/g, '');
+    const firstName = ((decodedToken.name?.split(' ')[0] || 'Actor').replace(/[^a-zA-Z0-9]/g, '') || 'Actor');
     const userPath = `${decodedToken.uid}_${firstName}`;
     log.debug({ userPath, firestorePath: `users/${userPath}/profile/master`, msg: 'Fetching DNA profile from Firestore using admin SDK' });
     

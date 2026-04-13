@@ -28,14 +28,16 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
 
   const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://theactorscopilot.com';
   const profilePath = `actors/${slug || generateSlug(fullName || "")}`;
+  // Display URL without protocol; full URL (with protocol) is used for copy/share
   const profileUrl = `${siteOrigin.replace(/^https?:\/\//, '')}/${profilePath}`;
+  const profileFullUrl = `${siteOrigin}/${profilePath}`;
 
   /**
    * Copies the profile URL to the clipboard and shows a temporary success indicator.
    */
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${siteOrigin}/${profilePath}`);
+      await navigator.clipboard.writeText(profileFullUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
