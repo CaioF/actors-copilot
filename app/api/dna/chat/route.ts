@@ -62,6 +62,7 @@ export async function POST(request: Request) {
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}
             Don't use the connective "understood".
+            Don't repeat what they just said.
             
             `;
             console.log(dynamicCommand);

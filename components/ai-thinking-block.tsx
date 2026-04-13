@@ -12,12 +12,12 @@ export function AiThinkingBlock({ isReprocessing = false }: AiThinkingBlockProps
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsTakingLong(true);
-    }, 700);
+    }, 7000);
 
     return () => clearTimeout(timer);
   }, []);
 
-  const showReprocessingText = isReprocessing || isTakingLong;
+  const showReprocessingText =  isTakingLong;
 
   return (
     <div className="flex w-full justify-start my-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
