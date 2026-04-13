@@ -235,6 +235,41 @@ components/
 |----------|--------|---------|
 | `/api/auditions/analyze` | POST | Generate audition performance coaching |
 
+### Profile
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/profile/autofill` | POST | IMDB AI Autofill - scrape IMDB profile and synthesize with DNA |
+
+### IMDB AI Autofill Feature
+
+The IMDB AI Autofill feature (`/api/profile/autofill`) allows actors to paste their IMDB URL and auto-fill their profile using Vertex AI synthesis combining IMDB career data with their DNA psychological profile.
+
+**Flow:**
+1. User pastes IMDB URL (e.g., `https://www.imdb.com/name/nm0000000/`)
+2. Firecrawl API scrapes IMDB page, bypassing AWS WAF JavaScript challenge
+3. API fetches actor's DNA profile from Firestore (`users/{userPath}/profile/master`)
+4. Vertex AI synthesizes IMDB data with DNA (archetypes, traits, values, influences)
+5. Structured data returned to client for merge with existing profile
+
+**Implementation:**
+- `app/api/profile/autofill/route.ts` - API route with auth, Firecrawl, Vertex AI
+- `app/api/profile/autofill/route.test.ts` - 21 passing tests
+- `components/profile/imdb-autofill.tsx` - UI component with loading/success/error states
+- `lib/imdb-types.ts` - Firecrawl and ActorProfile types
+- `lib/prompts.ts` - `IMDB_AUTOFILL_PROMPT` for Vertex AI synthesis
+
+**Data Extracted:**
+- fullName, slug, headshot, additionalPhotos (up to 10)
+- bio (AI-synthesized with DNA)
+- height, heightUnit, location, gender, nationalities
+- awardsCallout, skillsAndAccents
+- credits (filmography with categorization)
+- showreels (video URLs)
+
+**DNA Enrichment:**
+The AI prompt instructs synthesis of career facts with creative DNA for authentic biography.
+
 ### Response Pattern
 
 All endpoints follow consistent response patterns:
@@ -867,6 +902,29 @@ interface ProfileHeaderProps {
 | ExternalProfilesSection | 21 platform URL fields (IMDB, Spotlight, etc.) |
 | SkillsAccentsSection | skillsAndAccents[] (chip-based) |
 | CvUploadSection | cvUrl, cvFilename (PDF only, max 100MB) |
+
+### ImdbAutofill (`components/profile/imdb-autofill.tsx`)
+
+AI Autofill component for importing actor data from IMDB.
+
+**Props:**
+```typescript
+interface ImdbAutofillProps {
+  onSuccess: (data: Partial<ActorProfile>) => void;
+}
+```
+
+**States:**
+- `idle` - Default input form
+- `loading` - Spinner + "Importing..." button
+- `success` - Check icon + "Profile updated!" (3s auto-reset)
+- `error` - Error message + Retry button
+
+**Features:**
+- Firebase Auth token for API authentication
+- Firecrawl API for IMDB scraping
+- Debounced save triggered on success
+- URL validation (IMDB format: `/name/nm\d+`)
 
 ### ProfileLivePreview (`components/profile/profile-live-preview.tsx`)
 

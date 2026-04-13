@@ -1,5 +1,5 @@
 import { POST } from './route';
-import { auth } from '@/lib/firebase.admin';
+import { auth, db } from '@/lib/firebase.admin';
 import { doc, getDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 
@@ -7,6 +7,14 @@ import { getDb } from '@/lib/firebase';
 
 jest.mock('@/lib/firebase.admin', () => ({
     auth: { verifyIdToken: jest.fn() },
+    db: {
+        doc: jest.fn(() => ({
+            get: jest.fn(() => Promise.resolve({ 
+                exists: false,
+                data: () => undefined,
+            })),
+        })),
+    },
 }));
 
 jest.mock('@/lib/firebase', () => ({
@@ -33,6 +41,10 @@ jest.mock('firebase/ai', () => ({
                     location: 'United States',
                     credits: [],
                     showreels: [],
+                    additionalPhotos: [
+                        'https://example.com/photo2.jpg',
+                        'https://example.com/photo3.jpg',
+                    ],
                 })),
             },
         })),
@@ -407,18 +419,15 @@ describe('POST /api/profile/autofill', () => {
                 ok: true,
                 json: async () => ({ success: true, data: { markdown: '# Test' } }),
             });
-            (getDb as jest.Mock).mockReturnValue({});
-            (doc as jest.Mock).mockReturnValue('mock-doc-ref');
-
-            const mockGetDoc = jest.fn().mockResolvedValueOnce({
-                exists: () => true,
+            
+            const mockGet = jest.fn().mockResolvedValueOnce({
+                exists: true,
                 data: () => ({
                     psychology: { traits: ['creative', 'empathetic'] },
                     acting_fuel: { archetypes: ['The Rebel'] },
                 }),
             });
-
-            (getDoc as jest.Mock).mockImplementation(mockGetDoc);
+            (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
 
             const req = new Request('http://localhost/api/profile/autofill', {
                 method: 'POST',
@@ -431,9 +440,9 @@ describe('POST /api/profile/autofill', () => {
 
             await POST(req);
 
-            // Verify getDoc was called with correct path
-            expect(doc).toHaveBeenCalled();
-            expect(mockGetDoc).toHaveBeenCalled();
+            // Verify db.doc was called with correct path
+            expect(db.doc).toHaveBeenCalledWith('users/user123_Actor/profile/master');
+            expect(mockGet).toHaveBeenCalled();
         });
 
         it('handles missing DNA profile gracefully', async () => {
@@ -441,9 +450,7 @@ describe('POST /api/profile/autofill', () => {
                 ok: true,
                 json: async () => ({ success: true, data: { markdown: '# Test' } }),
             });
-            (getDb as jest.Mock).mockReturnValue({});
-            (doc as jest.Mock).mockReturnValue('mock-doc-ref');
-            (getDoc as jest.Mock).mockResolvedValueOnce({ exists: () => false });
+            (db.doc as jest.Mock).mockReturnValue({ get: jest.fn().mockResolvedValueOnce({ exists: false, data: () => undefined }) });
 
             const req = new Request('http://localhost/api/profile/autofill', {
                 method: 'POST',
@@ -481,11 +488,7 @@ describe('POST /api/profile/autofill', () => {
                     }
                 }),
             });
-            (getDb as jest.Mock).mockReturnValue({});
-            (doc as jest.Mock).mockReturnValue('mock-doc-ref');
-            (getDoc as jest.Mock).mockResolvedValueOnce({
-                exists: () => false,
-            });
+            (db.doc as jest.Mock).mockReturnValue({ get: jest.fn().mockResolvedValueOnce({ exists: false, data: () => undefined }) });
 
             const req = new Request('http://localhost/api/profile/autofill', {
                 method: 'POST',
@@ -514,9 +517,7 @@ describe('POST /api/profile/autofill', () => {
                     }
                 }),
             });
-            (getDb as jest.Mock).mockReturnValue({});
-            (doc as jest.Mock).mockReturnValue('mock-doc-ref');
-            (getDoc as jest.Mock).mockResolvedValueOnce({ exists: () => false });
+            (db.doc as jest.Mock).mockReturnValue({ get: jest.fn().mockResolvedValueOnce({ exists: false, data: () => undefined }) });
 
             const req = new Request('http://localhost/api/profile/autofill', {
                 method: 'POST',
@@ -534,6 +535,42 @@ describe('POST /api/profile/autofill', () => {
             expect(data.success).toBe(true);
             expect(data.data).toBeDefined();
             expect(typeof data.data).toBe('object');
+        });
+
+        it('returns additionalPhotos from AI response', async () => {
+            (global.fetch as jest.Mock).mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    success: true,
+                    data: {
+                        markdown: '# Tracey Collis\n\nActress',
+                        metadata: { title: 'Tracey Collis - IMDb' }
+                    }
+                }),
+            });
+            (db.doc as jest.Mock).mockReturnValue({ get: jest.fn().mockResolvedValueOnce({ exists: false, data: () => undefined }) });
+
+            const req = new Request('http://localhost/api/profile/autofill', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer valid-token',
+                },
+                body: JSON.stringify({ url: 'https://www.imdb.com/name/nm2415058/' }),
+            });
+
+            const res = await POST(req);
+            const data = await res.json();
+
+            expect(res.status).toBe(200);
+            expect(data.success).toBe(true);
+            expect(data.data.additionalPhotos).toBeDefined();
+            expect(Array.isArray(data.data.additionalPhotos)).toBe(true);
+            expect(data.data.additionalPhotos).toHaveLength(2);
+            expect(data.data.additionalPhotos).toEqual([
+                'https://example.com/photo2.jpg',
+                'https://example.com/photo3.jpg',
+            ]);
         });
     });
 });

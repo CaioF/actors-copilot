@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
+import { logger } from '@/lib/logger';
 
 /**
  * Server-side Firebase Admin initialization.
@@ -35,7 +36,7 @@ if (!admin.apps.length) {
         });
 
     } catch (error) {
-        console.error("Error initializing Firebase Admin:", error);
+        logger.error({ err: error, msg: 'Error initializing Firebase Admin' });
         throw error;
     }
 }

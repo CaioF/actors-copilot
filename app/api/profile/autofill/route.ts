@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/firebase.admin';
 import { IMDB_AUTOFILL_PROMPT } from '@/lib/prompts';
 import type { ImdbExtractedData, Credit, Showreel } from '@/lib/imdb-types';
+import { logger, createChildLogger } from '@/lib/logger';
 
 function generateSlug(name: string): string {
   return name
@@ -163,10 +164,15 @@ function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtractedData {
 }
 
 export async function POST(request: Request) {
+  const log = createChildLogger({ route: 'autofill' });
+  
   try {
+    log.debug({ msg: 'Starting autofill request' });
+
     // Authentication
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      log.warn({ msg: 'Missing or invalid Authorization header' });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const token = authHeader.split('Bearer ')[1];
@@ -174,8 +180,9 @@ export async function POST(request: Request) {
     let decodedToken;
     try {
       decodedToken = await auth.verifyIdToken(token);
+      log.debug({ uid: decodedToken.uid, email: decodedToken.email, msg: 'Token verified successfully' });
     } catch (error: any) {
-      console.error('Token verification failed:', error.message);
+      log.error({ err: error, msg: 'Token verification failed' });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -184,6 +191,7 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
+      log.warn({ msg: 'Invalid JSON body' });
       return NextResponse.json({ error: 'Request body is required' }, { status: 400 });
     }
 
@@ -191,21 +199,26 @@ export async function POST(request: Request) {
 
     // URL validation
     if (!url) {
+      log.warn({ msg: 'URL is required but was not provided' });
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
     if (typeof url !== 'string' || url.trim() === '') {
+      log.warn({ msg: 'URL is empty or invalid' });
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
     // IMDB URL format validation
     const imdbPattern = /\/name\/nm\d+/;
     if (!imdbPattern.test(url)) {
+      log.warn({ url, msg: 'Invalid IMDB URL format' });
       return NextResponse.json(
         { error: 'Invalid IMDB URL format. Must match pattern: /name/nm\\d+' },
         { status: 400 }
       );
     }
+
+    log.debug({ url, msg: 'Fetching IMDB data via Firecrawl' });
 
     // Firecrawl API call
     const firecrawlResponse = await fetch('https://api.firecrawl.dev/v2/scrape', {
@@ -221,6 +234,7 @@ export async function POST(request: Request) {
     });
 
     if (!firecrawlResponse.ok) {
+      log.error({ status: firecrawlResponse.status, msg: 'Firecrawl API request failed' });
       return NextResponse.json(
         { error: 'Failed to fetch data from IMDB' },
         { status: 502 }
@@ -230,23 +244,31 @@ export async function POST(request: Request) {
     const firecrawlData = await firecrawlResponse.json();
 
     if (!firecrawlData.success) {
+      log.error({ msg: 'Firecrawl returned unsuccessful response' });
       return NextResponse.json(
         { error: 'Failed to fetch data from IMDB' },
         { status: 502 }
       );
     }
 
-    // Fetch DNA profile from Firestore
-    const { doc, getDoc } = await import('firebase/firestore');
-    const { getDb } = await import('@/lib/firebase');
+    log.debug({ msg: 'Firecrawl request successful, fetching DNA profile' });
 
-    const userPath = `${decodedToken.uid}_${decodedToken.email?.split('@')[0] || 'user'}`;
-    const profileRef = doc(getDb(), `users/${userPath}/profile/master`);
-    const profileSnap = await getDoc(profileRef);
+    // Fetch DNA profile from Firestore using admin SDK (has full permissions in server context)
+    const { db } = await import('@/lib/firebase.admin');
+
+    const firstName = decodedToken.name?.split(' ')[0] || 'Actor';
+    const userPath = `${decodedToken.uid}_${firstName}`;
+    log.debug({ userPath, firestorePath: `users/${userPath}/profile/master`, msg: 'Fetching DNA profile from Firestore using admin SDK' });
+    
+    const profileRef = db.doc(`users/${userPath}/profile/master`);
+    const profileSnap = await profileRef.get();
 
     let dnaData = null;
-    if (profileSnap.exists()) {
+    if (profileSnap.exists) {
       dnaData = profileSnap.data();
+      log.debug({ userPath, msg: 'DNA profile found' });
+    } else {
+      log.debug({ userPath, msg: 'No DNA profile found, using IMDB data only' });
     }
 
     // Extract IMDB data from markdown
@@ -254,6 +276,8 @@ export async function POST(request: Request) {
       firecrawlData.data.markdown,
       firecrawlData.data.metadata
     );
+
+    log.debug({ fullName: imdbExtracted.fullName, creditsCount: imdbExtracted.credits.length, msg: 'IMDB data extracted' });
 
     // Initialize Vertex AI
     const { getAI, getGenerativeModel, VertexAIBackend } = await import('firebase/ai');
@@ -268,6 +292,8 @@ export async function POST(request: Request) {
       coreValues: dnaData.psychology?.coreValues || [],
       keyInfluences: dnaData.history?.keyEntities?.slice(0, 5) || [],
     } : null;
+
+    log.debug({ hasDnaContext: !!dnaContext, msg: 'Calling Vertex AI for synthesis' });
 
     // Call Vertex AI for synthesis
     const model = getGenerativeModel(ai, {
@@ -290,14 +316,17 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
     const result = await model.generateContent(synthesisPrompt);
     const responseText = result.response.text().trim();
 
+    log.debug({ responseLength: responseText.length, msg: 'Received response from Vertex AI' });
+
     // Parse AI response
     let synthesizedData;
     try {
       // Remove markdown code blocks if present
       const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       synthesizedData = JSON.parse(cleanJson);
+      log.debug({ msg: 'AI response parsed successfully' });
     } catch (error) {
-      console.error('Failed to parse AI response:', error);
+      log.error({ err: error, msg: 'Failed to parse AI response, using fallback data' });
       // Fallback to extracted data
       synthesizedData = {
         fullName: imdbExtracted.fullName,
@@ -318,10 +347,18 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       headshot: synthesizedData.headshot || imdbExtracted.headshot,
       bio: synthesizedData.bio || imdbExtracted.bio,
       height: synthesizedData.height || imdbExtracted.height,
+      heightUnit: synthesizedData.heightUnit || 'imperial',
       location: synthesizedData.location || imdbExtracted.location,
+      gender: synthesizedData.gender || '',
+      nationalities: synthesizedData.nationalities?.length > 0 ? synthesizedData.nationalities : [],
+      awardsCallout: synthesizedData.awardsCallout || '',
+      skillsAndAccents: synthesizedData.skillsAndAccents?.length > 0 ? synthesizedData.skillsAndAccents : [],
       credits: synthesizedData.credits?.length > 0 ? synthesizedData.credits : imdbExtracted.credits,
       showreels: synthesizedData.showreels?.length > 0 ? synthesizedData.showreels : imdbExtracted.showreels,
+      additionalPhotos: synthesizedData.additionalPhotos?.length > 0 ? synthesizedData.additionalPhotos : [],
     };
+
+    log.info({ fullName: finalData.fullName, creditsCount: finalData.credits.length, msg: 'Autofill completed successfully' });
 
     return NextResponse.json({
       success: true,
@@ -329,7 +366,7 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error('Autofill error:', error);
+    log.error({ err: error, msg: 'Autofill request failed' });
 
     return NextResponse.json(
       { error: error.message || 'Internal Server Error' },

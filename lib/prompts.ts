@@ -1222,23 +1222,29 @@ Return ONLY a valid JSON object. No markdown, no conversational filler.
 {
   "fullName": "Actor's full name from IMDB",
   "slug": "url-safe-slug-from-name",
-  "headshot": "First photo URL from IMDB metadata (or null if not available)",
+  "headshot": "First photo URL from IMDB metadata (ogImage field, ends with _V1_...jpg)",
+  "additionalPhotos": ["Array of up to 10 photo URLs extracted from markdown. Look for patterns like https://m.media-amazon.com/images/M/...QL75_UX175_.jpg. Extract from [![View Poster](https://m.media-amazon.com/...)](https://www.imdb.com/name/nm.../mediaviewer/...) links in the markdown."],
   "bio": "A compelling 1-3 sentence bio under 500 characters that combines career highlights with creative DNA. Make it memorable and authentic.",
-  "height": "Height from IMDB if available (e.g., \"5'9\\\"\" or \"175cm\")",
-  "location": "Birthplace/location from IMDB",
+  "height": "Height in format like \"5′ 9″\" or \"175cm\" - extract from 'Height' section in markdown like '5′ 9″ (1.75 m)'",
+  "heightUnit": "Either 'imperial' for feet/inches (like 5′ 9″) or 'metric' for cm (like 175cm). Check which format is used.",
+  "location": "Birthplace/location - extract from 'Born' section with country like 'United Kingdom' or 'Maidenhead, UK'",
+  "gender": "Gender if identifiable from IMDB profile title or pronouns in bio (e.g., 'Actress' = Female, 'Actor' = Male), otherwise omit",
+  "nationalities": ["Array of nationalities inferred from birthplace links like '[United Kingdom](https://www.imdb.com/search/name/?birth_place=...)' in the markdown"],
+  "awardsCallout": "Extract notable achievements from bio text - look for patterns like 'Winner of...', 'No1 Ranking in...', 'Best Actress award'. Example: 'No1 Ranking in World Monologue Games 2024'",
+  "skillsAndAccents": ["Array of relevant skills and accents/dialects suggested by the actor's archetypes and career. E.g., ['Stage combat', 'Improvisation', 'British RP', 'Stage']"],
   "credits": [
     {
-      "title": "Show/film title",
-      "role": "Character name or role description",
-      "year": "Year as string",
-      "category": "television | feature_film | stage | commercial | further",
-      "featured": true
+      "title": "Show/film title - extract from markdown links like [Title Name](https://www.imdb.com/title/tt.../)",
+      "role": "Character name - appears after title in format 'Title Name\\n- Character Name'",
+      "year": "Year as string - appears in parentheses like '(2024)' or '(2025)'",
+      "category": "television | feature_film | stage | commercial | further - infer from context like 'TV Series', 'TV Mini Series', 'Feature Film', 'Stage'",
+      "featured": boolean - true if appears in 'Known for' section
     }
   ],
   "showreels": [
     {
-      "title": "Title or description",
-      "url": "Video URL if available"
+      "title": "Title like 'Showreel 2025', 'Demo Reel 2:19' - extract from [Title](https://www.imdb.com/video/vi.../) patterns",
+      "url": "Full video URL like https://www.imdb.com/video/vi2837170201/"
     }
   ]
 }

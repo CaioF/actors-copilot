@@ -196,7 +196,16 @@ export default function ProfilePage() {
     const currentValues = methods.getValues();
 
     // Build merge: existing values take priority, AI data fills empty
+    // Ensure array fields have defaults to prevent crashes during render
     const merged: Partial<ActorProfile> = {
+      additionalPhotos: [],
+      credits: [],
+      showreels: [],
+      training: [],
+      skillsAndAccents: [],
+      nationalities: [],
+      appearance: [],
+      workPermits: [],
       ...autofillData,
     };
 

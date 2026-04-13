@@ -103,8 +103,13 @@ export interface SynthesizedProfile {
     headshot: string | null;
     bio: string;
     height: string;
+    heightUnit?: 'imperial' | 'metric';
     location: string;
+    gender?: string;
+    nationalities?: string[];
+    awardsCallout?: string;
+    skillsAndAccents?: string[];
     credits: Credit[];
     showreels: Showreel[];
-    awardsCallout?: string;
+    additionalPhotos?: string[];
 }
