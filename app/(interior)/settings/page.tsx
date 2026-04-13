@@ -15,6 +15,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/context/AuthContext"
+import { collection, getDocs, doc, writeBatch } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 
 /**
  * Renders a section header with icon, title, and subtitle.
@@ -181,38 +183,57 @@ export default function SettingsPage() {
    * @returns void (side effects: deletes Firestore collections and shows alert)
    * @async
    */
-  const handleDeleteChatData = async () => {
+  const handleDeleteChatData = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault(); 
+    
     if (!user) return;
+    
     setIsDeletingChat(true);
+    
     try {
-      const { getFirestore, collection, getDocs, deleteDoc, doc } = await import("firebase/firestore");
-      const { getApp } = await import("@/lib/firebase");
-      const db = getFirestore(getApp());
+      const db = getDb();
 
-      // Construct the exact same userPath you use in use-chat.ts
       const firstName = user.displayName ? user.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") : "Actor";
       const userPath = `${user.uid}_${firstName}`;
 
-      // Fetch and delete all active sessions
-      const sessionsRef = collection(db, `users/${userPath}/dnaSessions`);
-      const sessionDocs = await getDocs(sessionsRef);
-      const deleteSessions = sessionDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/dnaSessions`, d.id)));
-      
-      // Fetch and delete all saved vault extractions
-      const vaultRef = collection(db, `users/${userPath}/dnaVault`);
-      const vaultDocs = await getDocs(vaultRef);
-      const deleteVault = vaultDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/dnaVault`, d.id)));
+      const batch = writeBatch(db);
+      let operationsCount = 0;
 
-      // Wait for all deletions to finish
-      await Promise.all([...deleteSessions, ...deleteVault]);
+      const sessionsRef = collection(db, `users/${userPath}/dnaSessions`);
+      const sessionDocs = await getDocs(sessionsRef).catch((err) => {
+         console.error("🔥 ERRO FATAL AO LER O BANCO:", err);
+         throw err;
+      });
+
+      for (const sessionDoc of sessionDocs.docs) {
+        const messagesRef = collection(db, `users/${userPath}/dnaSessions/${sessionDoc.id}/messages`);
+        const messagesSnap = await getDocs(messagesRef);
+
+        messagesSnap.docs.forEach((msgDoc) => {
+          batch.delete(doc(db, `users/${userPath}/dnaSessions/${sessionDoc.id}/messages`, msgDoc.id));
+          operationsCount++;
+        });
+
+        batch.delete(doc(db, `users/${userPath}/dnaSessions`, sessionDoc.id));
+        operationsCount++;
+      }
+
+      const profileRef = doc(db, `users/${userPath}/profile/master`);
+      batch.delete(profileRef);
+      operationsCount++;
+
+      if (operationsCount > 0) {
+        await batch.commit();
+      }
       
-      alert("Chat data successfully deleted.");
+      alert("Chat data and DNA profile successfully deleted.");
+      window.location.reload(); 
+
     } catch (error) {
-      console.error("Error deleting chat data:", error);
-      alert("Failed to delete chat data. Please try again.");
-    } finally {
+      console.error("deletion eror: ", error);
+      alert("Failed to delete chat data. ");
       setIsDeletingChat(false);
-    }
+    } 
   };
 
 // 6. DELETE ACCOUNT: Removes ALL user data (Firestore & Storage) AND the Firebase Auth user

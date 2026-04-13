@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         const extractionModel = getGenerativeModel(ai, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
-            thinkingConfig: { thinkingLevel: "HIGH" },
+            thinkingConfig: { thinkingLevel: "MEDIUM" },
             tools: [{
                 functionDeclarations: [{
                     name: "update_master_profile",
