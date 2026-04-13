@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   description: 'Your AI-powered self-tape audition preparation tool. Build your Personal DNA, break down sides, and nail every audition.',
 }
 
+/**
+ * Root layout component that wraps the entire application.
+ * Provides Firebase authentication context and global styling.
+ * @param props - Component props including children
+ * @param props.children - Child components to render
+ * @returns The root layout with auth provider
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

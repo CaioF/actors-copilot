@@ -1,3 +1,12 @@
+/**
+ * Types for IMDB/Firecrawl data extraction, including metadata, responses,
+ * credits, showreels, and DNA/synthesized profile structures.
+ * @module
+ * @exports FirecrawlMetadata, FirecrawlSuccessResponse, FirecrawlErrorResponse,
+ *          FirecrawlResponse, ImdbExtractedData, Credit, Showreel, KnownForEntry,
+ *          DnaProfile, SynthesizedProfile
+ */
+
 export interface FirecrawlMetadata {
     title?: string;
     description?: string;

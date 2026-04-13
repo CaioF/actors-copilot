@@ -20,6 +20,11 @@ import { useAuth } from "@/lib/context/AuthContext";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+/**
+ * Main profile page component that renders the actor profile editor.
+ * Handles loading, saving (auto-save and manual), publishing, and IMDB autofill.
+ * @returns The rendered profile page with form and live preview
+ */
 export default function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +40,13 @@ export default function ProfilePage() {
     defaultValues: defaultActorProfile,
   });
 
-  // Core save function — used by auto-save, manual save, and publish
+  /**
+   * Core save function that persists the actor profile to Firestore.
+   * Used by auto-save, manual save, and publish flows.
+   * @param data - Optional actor profile data to save; defaults to current form values
+   * @returns void (side effects: updates saveStatus state)
+   * @async
+   */
   const saveDraft = useCallback(async (data?: ActorProfile) => {
     if (!user) return;
     setSaveStatus("saving");
@@ -64,7 +75,11 @@ export default function ProfilePage() {
     }
   }, [user, methods]);
 
-  // Debounced auto-save: triggers 2s after the last form change
+  /**
+   * Debounced auto-save trigger that waits 2 seconds after the last form change
+   * before calling saveDraft to avoid excessive Firestore writes.
+   * @returns void (side effect: schedules a delayed saveDraft call)
+   */
   const debouncedSave = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -90,6 +105,12 @@ export default function ProfilePage() {
 
     let cancelled = false;
 
+    /**
+     * Loads the existing actor profile from Firestore and populates the form.
+     * Falls back to default values if no profile exists or on error.
+     * @returns void (side effects: updates form values and isLoading state)
+     * @async
+     */
     const loadProfile = async () => {
       try {
         const { doc, getDoc } = await import("firebase/firestore");
@@ -151,13 +172,22 @@ export default function ProfilePage() {
     };
   }, []);
 
-  // Manual save (flushes any pending debounce)
+  /**
+   * Manual save handler that immediately triggers saveDraft.
+   * Clears any pending debounce timer to ensure instant save.
+   * @returns void (side effect: calls saveDraft immediately)
+   */
   const saveProfile = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     saveDraft();
   }, [saveDraft]);
 
-  // Publish
+  /**
+   * Publishes the actor profile, setting status to "published" and recording publishedAt timestamp.
+   * Reverts to draft status if publish fails.
+   * @returns void (side effects: updates profile status in Firestore and saveStatus state)
+   * @async
+   */
   const publishProfile = useCallback(async () => {
     if (!user) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -190,8 +220,12 @@ export default function ProfilePage() {
     }
   }, [user, methods]);
 
-  // Handle IMDB autofill success - merge AI data with existing form data
-  // AI data fills empty fields only, preserving user input
+  /**
+   * Handles successful IMDB autofill by merging AI-generated data with existing form data.
+   * AI data fills empty fields only, preserving user's existing values.
+   * @param autofillData - Partial actor profile data from IMDB autofill
+   * @returns void (side effects: resets form with merged data and triggers debouncedSave)
+   */
   const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) => {
     const currentValues = methods.getValues();
 

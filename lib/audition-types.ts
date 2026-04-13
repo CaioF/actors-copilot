@@ -1,3 +1,9 @@
+/**
+ * Types for the Audition flow, including form data structure and step definitions.
+ * @module
+ * @exports AuditionStep, AuditionFormData, initialAuditionData
+ */
+
 export type AuditionStep = 1 | 2 | 3 | 4 | 5; // 5 is the generating state
 
 export interface AuditionFormData {

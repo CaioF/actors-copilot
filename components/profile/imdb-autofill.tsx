@@ -10,6 +10,10 @@ interface ImdbAutofillProps {
 
 type AutofillState = "idle" | "loading" | "success" | "error";
 
+/**
+ * AI-powered IMDB autofill component that imports actor profile data from an IMDB URL.
+ * @param onSuccess - Callback with the imported profile data
+ */
 export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
   const [url, setUrl] = useState("");
   const [state, setState] = useState<AutofillState>("idle");
@@ -147,6 +151,10 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
   );
 }
 
+/**
+ * Retrieves a Firebase authentication token for API authorization.
+ * @throws Error if the user is not authenticated
+ */
 async function getFirebaseToken(): Promise<string> {
   const { getAuth } = await import("firebase/auth");
   const { getApp } = await import("@/lib/firebase");

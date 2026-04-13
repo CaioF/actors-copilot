@@ -6,8 +6,12 @@ import { Plus, X } from "lucide-react";
 import { ActorProfile, WORK_PERMIT_OPTIONS } from "@/lib/profile-types";
 import { cn } from "@/lib/utils";
 
+/**
+ * Form section for capturing actor physical details including height, eye/hair color,
+ * nationalities, work permits, ethnicity, and appearance attributes.
+ */
 export function PhysicalDetailsSection() {
-  const { register, watch, setValue } = useFormContext<ActorProfile>();
+  const { register, watch, setValue, getValues } = useFormContext<ActorProfile>();
   const heightUnit = watch("heightUnit");
   const nationalities = watch("nationalities");
   const workPermits = watch("workPermits");
@@ -16,10 +20,73 @@ export function PhysicalDetailsSection() {
   const [nationalityInput, setNationalityInput] = useState("");
   const [appearanceInput, setAppearanceInput] = useState("");
 
-  const toggleHeightUnit = () => {
-    setValue("heightUnit", heightUnit === "imperial" ? "metric" : "imperial", { shouldDirty: true });
+  /**
+   * Parses imperial height values (e.g., "5ft 9in", "5'9\"", "5ft") to centimeters.
+   * @param value - The imperial height string to parse
+   * @returns The height in centimeters, or null if parsing fails
+   */
+  const parseImperialToCm = (value: string): number | null => {
+    const patterns = [
+      /(\d+)\s*[\′']\s*(\d+)\s*[\″"]?$/,
+      /(\d+)\s*ft\s*(\d+)\s*in$/i,
+      /(\d+)\s*ft$/i,
+    ];
+    for (const pattern of patterns) {
+      const match = value.match(pattern);
+      if (match) {
+        const feet = parseInt(match[1], 10);
+        const inches = match[2] ? parseInt(match[2], 10) : 0;
+        return Math.round((feet * 12 + inches) * 2.54);
+      }
+    }
+    return null;
   };
 
+  /**
+   * Parses a centimeter value string and converts it to imperial format (e.g., "175cm" to "5' 9").
+   * @param value - The metric height string to parse
+   * @returns The height in imperial format, or null if parsing fails
+   */
+  const parseCmToImperial = (value: string): string | null => {
+    const cmMatch = value.match(/(\d+)\s*cm$/i);
+    if (cmMatch) {
+      const cm = parseInt(cmMatch[1], 10);
+      const totalInches = cm / 2.54;
+      const feet = Math.floor(totalInches / 12);
+      const inches = Math.round(totalInches % 12);
+      return inches === 12 ? `${feet + 1}' 0"` : `${feet}' ${inches}"`;
+    }
+    return null;
+  };
+
+  /**
+   * Toggles the height unit between imperial and metric, converting the existing value if present.
+   */
+  const convertHeight = () => {
+    const currentHeight = getValues("height");
+    if (!currentHeight) {
+      setValue("heightUnit", heightUnit === "imperial" ? "metric" : "imperial", { shouldDirty: true });
+      return;
+    }
+
+    if (heightUnit === "imperial") {
+      const cm = parseImperialToCm(currentHeight);
+      if (cm !== null) {
+        setValue("height", `${cm}cm`, { shouldDirty: true });
+      }
+      setValue("heightUnit", "metric", { shouldDirty: true });
+    } else {
+      const imperial = parseCmToImperial(currentHeight);
+      if (imperial !== null) {
+        setValue("height", imperial, { shouldDirty: true });
+      }
+      setValue("heightUnit", "imperial", { shouldDirty: true });
+    }
+  };
+
+  /**
+   * Adds a new nationality to the profile if it's not already in the list.
+   */
   const addNationality = () => {
     const val = nationalityInput.trim();
     if (val && !nationalities.includes(val)) {
@@ -28,10 +95,18 @@ export function PhysicalDetailsSection() {
     }
   };
 
+  /**
+   * Removes a nationality from the profile at the specified index.
+   * @param index - The index of the nationality to remove
+   */
   const removeNationality = (index: number) => {
     setValue("nationalities", nationalities.filter((_, i) => i !== index), { shouldDirty: true });
   };
 
+  /**
+   * Toggles a work permit selection - adds if not present, removes if present.
+   * @param permit - The work permit to toggle
+   */
   const toggleWorkPermit = (permit: string) => {
     if (workPermits.includes(permit)) {
       setValue("workPermits", workPermits.filter((p) => p !== permit), { shouldDirty: true });
@@ -40,6 +115,9 @@ export function PhysicalDetailsSection() {
     }
   };
 
+  /**
+   * Adds a new appearance/heritage attribute to the profile if not already present.
+   */
   const addAppearance = () => {
     const val = appearanceInput.trim();
     if (val && !appearance.includes(val)) {
@@ -48,6 +126,10 @@ export function PhysicalDetailsSection() {
     }
   };
 
+  /**
+   * Removes an appearance attribute from the profile at the specified index.
+   * @param index - The index of the appearance to remove
+   */
   const removeAppearance = (index: number) => {
     setValue("appearance", appearance.filter((_, i) => i !== index), { shouldDirty: true });
   };
@@ -68,7 +150,7 @@ export function PhysicalDetailsSection() {
           />
           <button
             type="button"
-            onClick={toggleHeightUnit}
+            onClick={convertHeight}
             className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4A5548]"
           >
             <Plus className="h-3.5 w-3.5" />

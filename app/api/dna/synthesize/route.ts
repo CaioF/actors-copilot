@@ -3,6 +3,13 @@ import { SYNTHESIZER_PROMPT } from '@/lib/prompts';
 // IMPORTAÇÃO NOVA: Usando o Admin SDK super-poderoso que você configurou
 import { auth, db } from "@/lib/firebase.admin"; 
 
+/**
+ * Synthesizes accumulated DNA vault data into a master actor profile using AI.
+ * Implements smart caching to avoid re-synthesis if no new extractions exist.
+ * @param request - HTTP request with authorization token and user path for profile lookup
+ * @returns JSON response with synthesized master profile data or cached profile
+ * @async
+ */
 export async function POST(request: Request) {
     try {
         // security check - verify token and extract user ID

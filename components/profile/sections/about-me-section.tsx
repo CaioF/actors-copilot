@@ -3,6 +3,9 @@
 import { useFormContext } from "react-hook-form";
 import { ActorProfile } from "@/lib/profile-types";
 
+/**
+ * Form section for capturing actor bio information including awards callout and biography text.
+ */
 export function AboutMeSection() {
   const { register, watch } = useFormContext<ActorProfile>();
   const bio = watch("bio");

@@ -1,7 +1,16 @@
 /**
- * The core system instruction set for the AI Assistant ("The Coach").
- * Defines the persona, behavioral constraints, extraction targets, and the strict JSON output schema.
- * @constant {string}
+ * AI prompt definitions for The Coach conversational agent.
+ *
+ * This module exports the core system prompt and section-specific prompts that define
+ * The Coach's persona as a Socratic investigator for actors. It contains:
+ * - SYSTEM_PROMPT: The foundational instructions defining The Coach's behavior, rules, and methodology
+ * - SECTION_PROMPTS: Arena-specific prompts that scope The Coach's investigation to particular topics
+ * - SECTION_INTROS: Pre-written introductions shown when users enter new DNA sections
+ *
+ * The prompts follow a trauma-informed, zero-repetition methodology designed to extract
+ * deep psychological and behavioral truths from actors for character development.
+ *
+ * @module prompts
  */
 // TODO: moving this static system prompt to a remote configuration service (like Firebase Remote Config) to allow tweaking AI behavior in production without requiring a full app redeploy.
 /**

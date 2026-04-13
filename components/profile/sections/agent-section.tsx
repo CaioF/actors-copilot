@@ -3,6 +3,9 @@
 import { useFormContext } from "react-hook-form";
 import { ActorProfile } from "@/lib/profile-types";
 
+/**
+ * Form section for agent/representation details including agency name, contact info, and publicity toggle.
+ */
 export function AgentSection() {
   const { register, watch, setValue } = useFormContext<ActorProfile>();
   const showContactPublicly = watch("showContactPublicly");

@@ -3,6 +3,9 @@
 import { useFormContext } from "react-hook-form";
 import { ActorProfile } from "@/lib/profile-types";
 
+/**
+ * Form section for capturing basic actor information including name, playing age range, location, and gender.
+ */
 export function BasicInfoSection() {
   const { register } = useFormContext<ActorProfile>();
 

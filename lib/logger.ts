@@ -24,6 +24,13 @@ const createLogger = () => {
 
 export const logger = createLogger();
 
+/**
+ * Creates a child logger with additional contextual fields.
+ * All subsequent log entries from the child logger will include the provided context.
+ *
+ * @param context - Key-value pairs to attach to all logs from the child logger
+ * @returns A pino logger instance with the additional context baked in
+ */
 export const createChildLogger = (context: Record<string, unknown>) => {
   return logger.child(context);
 };

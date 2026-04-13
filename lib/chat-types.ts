@@ -1,6 +1,13 @@
 import type { Timestamp } from "firebase/firestore";
 
 /**
+ * Types for DNA extraction chat sessions, including messages, session state,
+ * section definitions, and thematic questions.
+ * @module
+ * @exports ChatMessage, DNASession, DNA_SECTIONS, DNASectionId, DNAQuestion
+ */
+
+/**
  * Represents a single message within a DNA extraction chat session.
  * @interface ChatMessage
  */

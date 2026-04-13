@@ -12,21 +12,45 @@ interface StepUploadProps {
   onTextChange: (text: string) => void;
 }
 
+/**
+ * StepUpload Component
+ * Renders a file upload zone with drag-and-drop support and text input fallback.
+ * Used for uploading sides and character briefs in the audition wizard.
+ * @param title - Section title
+ * @param description - Section description
+ * @param file - Currently selected file or null
+ * @param text - Currently entered text or empty string
+ * @param onFileChange - Callback when file changes
+ * @param onTextChange - Callback when text changes
+ */
 export function StepUpload({ title, description, file, text, onFileChange, onTextChange }: StepUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Previne o comportamento padrão do navegador de abrir o arquivo
+  /**
+   * Handles drag-over event to indicate a valid drop zone.
+   * @param e - DragEvent from the drag operation
+   */
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
+  /**
+   * Handles drag-leave event when user exits the drop zone.
+   * @param e - DragEvent from the drag operation
+   */
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
+  /**
+   * Handles the drop event when a file is dropped onto the upload zone.
+   * Validates that dropped files are PDF or DOCX format.
+   * @param e - DragEvent from the drop operation
+   */
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -46,6 +70,10 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
     }
   };
 
+  /**
+   * Handles file selection from the file input dialog.
+   * @param e - ChangeEvent from the file input
+   */
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       onFileChange(e.target.files[0]);

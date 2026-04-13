@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/firebase.admin';
 
+/**
+ * Transcribes audio input (typically voice recordings for chat input) to text using AI.
+ * @param request - HTTP request with authorization token, base64-encoded audio, and mime type
+ * @returns JSON response with transcribed text or error message
+ * @async
+ */
 export async function POST(request: Request) {
   try {
     // auth

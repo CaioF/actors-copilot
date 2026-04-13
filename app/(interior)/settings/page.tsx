@@ -16,6 +16,15 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/context/AuthContext"
 
+/**
+ * Renders a section header with icon, title, and subtitle.
+ * Used to categorize settings into distinct sections.
+ * @param icon - Lucide icon component to display
+ * @param title - Section title text
+ * @param subtitle - Section subtitle/description text
+ * @param variant - Visual variant ("default" or "danger")
+ * @returns The styled section header element
+ */
 function SectionHeader({
   icon: Icon,
   title,
@@ -39,6 +48,10 @@ function SectionHeader({
   )
 }
 
+/**
+ * Settings page for managing user account, profile, privacy, and danger zone actions.
+ * @returns The rendered settings page
+ */
 export default function SettingsPage() {
   const { user } = useAuth(); // 1. Get the current logged-in user
   
@@ -64,6 +77,11 @@ export default function SettingsPage() {
   }, [user]);
 
   // 3. SAVE TEXT DATA: Updates the Display Name in Firebase Auth
+  /**
+   * Saves the user's display name to Firebase Auth.
+   * @returns void (side effects: updates Firebase Auth profile)
+   * @async
+   */
   const handleSaveProfile = async () => {
     if (!user) return;
     setIsSaving(true);
@@ -89,6 +107,13 @@ export default function SettingsPage() {
   };
 
   // 4. HANDLE IMAGE UPLOAD: Uploads to Firebase Storage and updates Auth Profile
+  /**
+   * Handles profile image upload to Firebase Storage and updates Auth profile.
+   * Validates file size (max 2MB) and image types.
+   * @param e - React change event from file input
+   * @returns void (side effects: uploads to Firebase Storage and updates auth photoURL)
+   * @async
+   */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -151,6 +176,11 @@ export default function SettingsPage() {
   };
 
   // 5. DELETE CHAT DATA: Wipes out the user's sessions and vault in Firestore
+  /**
+   * Permanently deletes all chat data including DNA sessions and vault extractions from Firestore.
+   * @returns void (side effects: deletes Firestore collections and shows alert)
+   * @async
+   */
   const handleDeleteChatData = async () => {
     if (!user) return;
     setIsDeletingChat(true);
@@ -186,6 +216,12 @@ export default function SettingsPage() {
   };
 
 // 6. DELETE ACCOUNT: Removes ALL user data (Firestore & Storage) AND the Firebase Auth user
+  /**
+   * Permanently deletes the entire user account including all Firestore data,
+   * Firebase Storage files, and Firebase Auth user.
+   * @returns void (side effects: deletes all user data and triggers auth redirect)
+   * @async
+   */
   const handleDeleteAccount = async () => {
     if (!user) return;
     

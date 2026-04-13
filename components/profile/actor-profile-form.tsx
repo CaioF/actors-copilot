@@ -19,6 +19,10 @@ interface ActorProfileFormProps {
   saveStatus: SaveStatus;
 }
 
+/**
+ * A styled card container that wraps form sections with consistent padding and background.
+ * @param children - The content to display inside the card
+ */
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-[#C7C0B5]/50 bg-[#F5F0E8] p-6">
@@ -27,6 +31,12 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The main actor profile form component that renders all profile sections in a card layout.
+ * Provides a save button to persist profile changes.
+ * @param onSave - Callback function to trigger profile save
+ * @param saveStatus - Current save status state
+ */
 export function ActorProfileForm({ onSave, saveStatus }: ActorProfileFormProps) {
   return (
     <div className="space-y-6">

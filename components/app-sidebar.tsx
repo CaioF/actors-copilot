@@ -25,12 +25,20 @@ const menuItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ]
 
+/**
+ * AppSidebar Component
+ * Renders the main application sidebar with logo, quick actions, navigation menu,
+ * and premium plan upgrade section. Includes logout functionality.
+ */
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter();
   const {logout} = useAuth();
   const isChatPage = pathname.includes('/chat');
 
+  /**
+   * Handles user logout by calling the logout function from AuthContext.
+   */
   const handleLogout = async ()=> {
     await logout();
   }

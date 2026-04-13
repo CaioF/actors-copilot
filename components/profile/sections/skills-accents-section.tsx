@@ -5,11 +5,18 @@ import { useFormContext } from "react-hook-form";
 import { Plus, X } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 
+/**
+ * Form section for managing actor skills and accents as tag-based entries.
+ * Supports adding and removing skills/accent tags.
+ */
 export function SkillsAccentsSection() {
   const { watch, setValue } = useFormContext<ActorProfile>();
   const skills = watch("skillsAndAccents");
   const [input, setInput] = useState("");
 
+  /**
+   * Adds a new skill or accent tag if it doesn't already exist in the list.
+   */
   const addSkill = () => {
     const val = input.trim();
     if (val && !skills.includes(val)) {
@@ -18,6 +25,10 @@ export function SkillsAccentsSection() {
     }
   };
 
+  /**
+   * Removes a skill or accent tag at the specified index.
+   * @param index - The index of the skill to remove
+   */
   const removeSkill = (index: number) => {
     setValue("skillsAndAccents", skills.filter((_, i) => i !== index), { shouldDirty: true });
   };

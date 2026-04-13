@@ -4,6 +4,10 @@ import { useFormContext, useFieldArray } from "react-hook-form";
 import { Trash2 } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 
+/**
+ * Form section for managing actor showreels with title and URL for each entry.
+ * Supports adding and removing multiple showreel entries.
+ */
 export function ShowreelsSection() {
   const { register, control } = useFormContext<ActorProfile>();
   const { fields, append, remove } = useFieldArray({

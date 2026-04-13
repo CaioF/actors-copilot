@@ -4,6 +4,10 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Play, Download, ArrowRight, Award } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 
+/**
+ * A live preview component that displays how the actor profile will appear publicly.
+ * Updates in real-time as form values change.
+ */
 export function ProfileLivePreview() {
   const { control } = useFormContext<ActorProfile>();
 
@@ -30,6 +34,7 @@ export function ProfileLivePreview() {
 
   const featuredCredits = credits?.filter((c) => c.title).slice(0, 3) || [];
   const hasShowreels = showreels?.some((s) => s.url);
+  const firstShowreelUrl = showreels?.find((s) => s.url)?.url;
 
   return (
     <div className="sticky top-8">
@@ -153,9 +158,10 @@ export function ProfileLivePreview() {
 
         {/* Action Buttons */}
         <div className="flex gap-2 px-5 py-4">
-          {hasShowreels && (
+          {hasShowreels && firstShowreelUrl && (
             <button
               type="button"
+              onClick={() => window.open(firstShowreelUrl, "_blank", "noopener,noreferrer")}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#E8721A] px-3 py-2 text-xs font-medium text-white"
             >
               <Play className="h-3 w-3" />

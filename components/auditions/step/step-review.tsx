@@ -7,6 +7,12 @@ interface StepReviewProps {
   data: AuditionFormData;
 }
 
+/**
+ * StepReview Component
+ * Renders a review summary of all audition details before generation.
+ * Displays project basics, sides info, and character brief status.
+ * @param data - Current audition form data to review
+ */
 export function StepReview({ data }: StepReviewProps) {
   return (
     <div className="rounded-3xl bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto font-sans">

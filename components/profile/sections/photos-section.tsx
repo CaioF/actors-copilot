@@ -6,6 +6,10 @@ import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 import { useAuth } from "@/lib/context/AuthContext";
 
+/**
+ * Form section for managing actor photos including primary headshot and additional gallery images.
+ * Supports uploading images to Firebase storage with drag-and-drop functionality.
+ */
 export function PhotosSection() {
   const { user } = useAuth();
   const { watch, setValue } = useFormContext<ActorProfile>();
@@ -15,6 +19,12 @@ export function PhotosSection() {
   const additionalInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
 
+  /**
+   * Uploads an image file to Firebase storage and returns the download URL.
+   * @param file - The image file to upload
+   * @param path - The storage path for the file
+   * @returns The download URL of the uploaded image
+   */
   const uploadImage = async (file: File, path: string): Promise<string> => {
     const { getStorage, ref, uploadBytes, getDownloadURL } = await import("firebase/storage");
     const { getApp } = await import("@/lib/firebase");
@@ -25,6 +35,10 @@ export function PhotosSection() {
     return getDownloadURL(storageRef);
   };
 
+  /**
+   * Handles the headshot image upload event, validating file size and updating form state.
+   * @param e - The change event from the file input
+   */
   const handleHeadshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -45,6 +59,10 @@ export function PhotosSection() {
     }
   };
 
+  /**
+   * Handles additional photo upload events, with limit of 10 photos.
+   * @param e - The change event from the file input
+   */
   const handleAdditionalUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -70,6 +88,10 @@ export function PhotosSection() {
     }
   };
 
+  /**
+   * Removes an additional photo at the specified index from the profile.
+   * @param index - The index of the photo to remove
+   */
   const removeAdditionalPhoto = (index: number) => {
     setValue(
       "additionalPhotos",

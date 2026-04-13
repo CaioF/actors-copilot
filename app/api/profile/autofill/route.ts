@@ -4,6 +4,12 @@ import { IMDB_AUTOFILL_PROMPT } from '@/lib/prompts';
 import type { ImdbExtractedData, Credit, Showreel } from '@/lib/imdb-types';
 import { logger, createChildLogger } from '@/lib/logger';
 
+/**
+ * Converts a person's name into a URL-friendly slug by lowercasing, removing special
+ * characters, and replacing spaces with hyphens.
+ * @param name - The full name to convert to a slug
+ * @returns A lowercase, hyphen-separated slug string
+ */
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -13,6 +19,13 @@ function generateSlug(name: string): string {
     .replace(/-+/g, '-');
 }
 
+/**
+ * Parses IMDB page markdown content to extract actor profile data including name,
+ * bio, height, location, credits, showreels, and known-for works.
+ * @param markdown - The IMDB page content in markdown format
+ * @param metadata - Additional metadata from the scraped page (title, ogImage, description)
+ * @returns Structured ImdbExtractedData object with parsed actor information
+ */
 function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtractedData {
   const lines = markdown.split('\n');
   let fullName = metadata?.title?.replace(' - IMDb', '') || '';
@@ -163,6 +176,13 @@ function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtractedData {
   };
 }
 
+/**
+ * Autofills an actor's profile by scraping IMDB data and synthesizing it with their
+ * existing DNA profile using AI for enhanced, personalized content.
+ * @param request - HTTP request with authorization token and IMDB profile URL
+ * @returns JSON response with synthesized profile data or error message
+ * @async
+ */
 export async function POST(request: Request) {
   const log = createChildLogger({ route: 'autofill' });
   

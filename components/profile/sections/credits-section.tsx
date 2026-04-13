@@ -6,6 +6,10 @@ import { Trash2 } from "lucide-react";
 import { ActorProfile, CREDIT_CATEGORIES, CREDIT_CATEGORY_LABELS, CreditCategory } from "@/lib/profile-types";
 import { cn } from "@/lib/utils";
 
+/**
+ * Form section for managing actor credits organized by category (television, film, theatre, etc.).
+ * Supports adding, removing, and filtering credits by category type.
+ */
 export function CreditsSection() {
   const { register, control, watch } = useFormContext<ActorProfile>();
   const { fields, append, remove } = useFieldArray({

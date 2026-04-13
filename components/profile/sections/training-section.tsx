@@ -6,6 +6,10 @@ import { Trash2 } from "lucide-react";
 import { ActorProfile, CREDIT_CATEGORIES, CREDIT_CATEGORY_LABELS, CreditCategory } from "@/lib/profile-types";
 import { cn } from "@/lib/utils";
 
+/**
+ * Form section for managing actor training organized by category (television, film, theatre, etc.).
+ * Supports adding, removing, and filtering training entries by category type.
+ */
 export function TrainingSection() {
   const { register, control, watch } = useFormContext<ActorProfile>();
   const { fields, append, remove } = useFieldArray({

@@ -12,6 +12,13 @@ interface ProfileHeaderProps {
   saveStatus: SaveStatus;
 }
 
+/**
+ * Header component for the profile page displaying profile status, URL, and publish controls.
+ * Allows users to copy the profile link, unpublish a live profile, or publish a draft.
+ * @param onPublish - Callback to publish the profile
+ * @param onSave - Callback to save the profile
+ * @param saveStatus - Current save status
+ */
 export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderProps) {
   const { watch, setValue } = useFormContext<ActorProfile>();
   const status = watch("status");
@@ -21,16 +28,21 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
 
   const profileUrl = `theactorscopilot.com/actors/${slug || generateSlug(fullName || "")}`;
 
+  /**
+   * Copies the profile URL to the clipboard and shows a temporary success indicator.
+   */
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(`https://${profileUrl}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for older browsers
     }
   };
 
+  /**
+   * Sets the profile status to draft and triggers a save.
+   */
   const unpublish = () => {
     setValue("status", "draft", { shouldDirty: true });
     onSave();

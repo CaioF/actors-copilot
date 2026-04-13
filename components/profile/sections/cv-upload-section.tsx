@@ -6,6 +6,10 @@ import { Upload, X } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 import { useAuth } from "@/lib/context/AuthContext";
 
+/**
+ * Form section for uploading and managing actor CV/resume as a PDF file.
+ * Supports drag-and-drop upload with file validation.
+ */
 export function CvUploadSection() {
   const { user } = useAuth();
   const { watch, setValue } = useFormContext<ActorProfile>();
@@ -15,6 +19,10 @@ export function CvUploadSection() {
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  /**
+   * Uploads a CV PDF file to Firebase storage with validation (PDF only, max 100MB).
+   * @param file - The PDF file to upload
+   */
   const uploadCv = async (file: File) => {
     if (!user) return;
     if (file.size > 100 * 1024 * 1024) {
@@ -43,11 +51,19 @@ export function CvUploadSection() {
     }
   };
 
+  /**
+   * Handles file input change events to trigger CV upload.
+   * @param e - The change event from the file input
+   */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) uploadCv(file);
   };
 
+  /**
+   * Handles drag-and-drop events for CV file upload.
+   * @param e - The drag event containing the dropped file
+   */
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -55,6 +71,9 @@ export function CvUploadSection() {
     if (file) uploadCv(file);
   };
 
+  /**
+   * Removes the uploaded CV from the profile.
+   */
   const removeCv = () => {
     setValue("cvUrl", null, { shouldDirty: true });
     setValue("cvFilename", null, { shouldDirty: true });

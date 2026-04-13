@@ -7,6 +7,12 @@ interface AiThinkingBlockProps {
   isReprocessing?: boolean;
 }
 
+/**
+ * AiThinkingBlock Component
+ * Displays an animated thinking indicator with rotating loading text
+ * when the AI is processing or reprocessing a response.
+ * @param isReprocessing - Whether the AI is currently reprocessing a response
+ */
 export function AiThinkingBlock({ isReprocessing = false }: AiThinkingBlockProps) {
   const [isTakingLong, setIsTakingLong] = useState(false);
   const rotatingText = useLoadingText("ai");

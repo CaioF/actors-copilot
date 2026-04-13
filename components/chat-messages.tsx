@@ -15,6 +15,11 @@ interface ChatMessagesProps {
   actorName?: string;
 }
 
+/**
+ * Extracts initials from a name for avatar display.
+ * @param name - The full name to extract initials from (optional)
+ * @returns Two-letter initials (e.g., "John Doe" -> "JD", empty/undefined -> "ME")
+ */
 function getInitials(name?: string) {
   if (!name) return "ME";
   const parts = name.trim().split(" ");
@@ -22,6 +27,11 @@ function getInitials(name?: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/**
+ * Formats a timestamp into a human-readable time string.
+ * @param timestamp - The timestamp to format (supports Firebase Timestamp format)
+ * @returns Formatted time string (e.g., "2:30PM")
+ */
 function formatTime(timestamp: ChatMessage["timestamp"]): string {
   if (!timestamp) return "2:30PM";
   try {
@@ -38,6 +48,10 @@ function formatTime(timestamp: ChatMessage["timestamp"]): string {
   }
 }
 
+/**
+ * Renders the Copilot avatar icon displaying "The Actors Copilot" branding.
+ * @returns The Copilot avatar JSX element
+ */
 function CopilotAvatar() {
   return (
     <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-full border border-[#F5F0E8]/20 bg-[#2C3328]">
@@ -54,6 +68,13 @@ function CopilotAvatar() {
   );
 }
 
+/**
+ * Renders a chat message bubble with appropriate styling based on role (user/assistant).
+ * @param props - The component props
+ * @param props.message - The chat message to display
+ * @param props.userInitials - The user's initials for their avatar
+ * @returns The message bubble JSX element
+ */
 function MessageBubble({ message, userInitials }: { message: ChatMessage, userInitials: string }) {
   const isAssistant = message.role === "assistant";
 
@@ -102,6 +123,12 @@ function MessageBubble({ message, userInitials }: { message: ChatMessage, userIn
   );
 }
 
+/**
+ * Renders a streaming message bubble with animated cursor indicating content is being generated.
+ * @param props - The component props
+ * @param props.content - The current streaming content to display
+ * @returns The streaming bubble JSX element
+ */
 function StreamingBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-start gap-3">
@@ -120,6 +147,10 @@ function StreamingBubble({ content }: { content: string }) {
   );
 }
 
+/**
+ * Renders an animated typing indicator showing three bouncing dots.
+ * @returns The typing indicator JSX element
+ */
 // O TypingIndicator voltou!
 function TypingIndicator() {
   return (
@@ -138,6 +169,10 @@ function TypingIndicator() {
   );
 }
 
+/**
+ * Renders a loading skeleton with placeholder message bubbles.
+ * @returns The loading skeleton JSX element
+ */
 function LoadingSkeleton() {
   return (
     <div className="flex flex-col gap-6 px-12 py-8">
@@ -160,6 +195,17 @@ function LoadingSkeleton() {
   );
 }
 
+/**
+ * Main chat messages container component that renders all messages, streaming content, and indicators.
+ * @param props - The component props
+ * @param props.messages - Array of chat messages to display
+ * @param props.isLoading - Whether the AI is currently loading/generating a response
+ * @param props.streamingContent - Current streaming content being generated
+ * @param props.isInitializing - Whether the component is in initial loading state
+ * @param props.actorName - Optional name of the actor for user initials
+ * @param props.isReprocessing - Whether the AI is reprocessing (shows different thinking indicator)
+ * @returns The chat messages container JSX element
+ */
 export function ChatMessages({
   messages,
   isLoading,
