@@ -23,7 +23,7 @@ export function PublicFooter() {
       </div>
 
       {/* Branding bar */}
-      <div className="bg-[#3D4A3C]">
+      <div className="bg-[#3A4F5A]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <Image src="/logo.png" alt="The Actors Copilot" width={24} height={24} />

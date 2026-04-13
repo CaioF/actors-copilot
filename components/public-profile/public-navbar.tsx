@@ -4,7 +4,7 @@ import { HelpCircle, User } from "lucide-react";
 
 export function PublicNavbar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-[#C7C0B5]/50 bg-[#3D4A3C] px-6 py-3">
+    <header className="sticky top-0 z-50 border-b border-[#3A4F5A]/30 bg-[#3A4F5A] px-6 py-3">
       <div className="mx-auto flex max-w-6xl items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="The Actors Copilot" width={28} height={28} />

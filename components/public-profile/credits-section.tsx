@@ -53,7 +53,7 @@ export function CreditsSection({ credits }: CreditsSectionProps) {
       </div>
 
       {/* Credits table */}
-      <div className="overflow-x-auto rounded-lg">
+      <div className="overflow-x-auto rounded-lg bg-[#EAE2D4]">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#494E3E] text-white">
@@ -71,7 +71,7 @@ export function CreditsSection({ credits }: CreditsSectionProps) {
                 key={i}
                 className={
                   i < filtered.length - 1
-                    ? "border-b border-[#C7C0B5]/40"
+                    ? "border-b border-[#C7C0B5]/50"
                     : ""
                 }
               >
