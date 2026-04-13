@@ -5,9 +5,17 @@ import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } f
 // IMPORT THE ADMIN SDK FOR SECURE BACKEND OPERATIONS
 import { auth, db } from "@/lib/firebase.admin";
 
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
+];
+
 /**
- * Helper function to safely extract raw text from a PDF buffer in a Node.js environment.
- * Includes a 30-second timeout to prevent malformed PDFs from hanging the server thread.
+ * Safely extracts raw text content from a PDF buffer using pdf2json.
+ * Includes a 60-second timeout to prevent malformed or malicious PDFs from hanging the server.
+ * @param buffer - The PDF file content as a Node.js Buffer
+ * @returns A promise resolving to the extracted text content
+ * @async
  */
 const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   const parsePromise = new Promise<string>((resolve, reject) => {
@@ -33,6 +41,14 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   return Promise.race([parsePromise, timeoutPromise]);
 };
 
+/**
+ * Analyzes audition materials (sides, briefs, project context) using AI to generate
+ * a personalized performance coaching breakdown for an actor.
+ * @param request - HTTP request containing form data with project type, sides text/file,
+ *                  brief text/file, actor name, and user path for DNA profile lookup
+ * @returns JSON response with structured performance coaching data or error
+ * @async
+ */
 export async function POST(request: Request) {
   try {
     // 1. SECURITY & AUTHENTICATION (Token Verification)
@@ -74,24 +90,34 @@ export async function POST(request: Request) {
         { status: 413 }
       );
     }
-    
-    // Validate MIME type more strictly (Allow PDF and Word)
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword", // .doc
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
-    ];
-    
-    const isWordExt = sidesFile.name.toLowerCase().endsWith('.doc') || sidesFile.name.toLowerCase().endsWith('.docx');
 
-    if (!allowedTypes.includes(sidesFile.type) && !isWordExt) {
+    const isDocx = sidesFile.name.toLowerCase().endsWith('.docx');
+
+    if (!ALLOWED_MIME_TYPES.includes(sidesFile.type) && !isDocx) {
       return NextResponse.json(
         { error: "Only PDFs and Word documents (.docx) are allowed" },
         { status: 400 }
       );
     }
-  
-}
+  }
+
+  if (briefFile) {
+    if (briefFile.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Brief file exceeds 20MB limit" },
+        { status: 413 }
+      );
+    }
+
+    const isDocx = briefFile.name.toLowerCase().endsWith('.docx');
+
+    if (!ALLOWED_MIME_TYPES.includes(briefFile.type) && !isDocx) {
+      return NextResponse.json(
+        { error: "Only PDFs and Word documents (.docx) are allowed for the brief" },
+        { status: 400 }
+      );
+    }
+  }
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
@@ -99,7 +125,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
-    // 3. PARSE PDFS SAFELY
     // 3. PARSE FILES SAFELY (PDFs & DOCX)
     if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();

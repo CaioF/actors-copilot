@@ -31,6 +31,13 @@ const projectTypes = [
   },
 ];
 
+/**
+ * StepBasics Component
+ * Renders the first step of the audition wizard for collecting basic project information.
+ * Includes project type selection (cinematic/theater/commercial) and project/role/deadline inputs.
+ * @param data - Current audition form data
+ * @param updateData - Callback to update form data
+ */
 export function StepBasics({ data, updateData }: StepBasicsProps) {
   return (
     <div className="rounded-3xl font-sans bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">

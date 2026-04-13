@@ -12,12 +12,29 @@ interface HistoryUploadModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * Modal component for uploading and submitting user history/baseline data.
+ * Allows users to upload a PDF file or enter text, then sends it to the API
+ * for processing and storage in the user's DNA vault.
+ * 
+ * @param props - Component props
+ * @param props.onClose - Callback to close the modal
+ * @param props.onSuccess - Callback to execute after successful upload
+ * @returns JSX element representing the history upload modal
+ */
 export function HistoryUploadModal({ onClose, onSuccess }: HistoryUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  /**
+   * Handles the submission of history/baseline data.
+   * Validates input, authenticates the user, and uploads the file and/or text
+   * to the API endpoint for processing.
+   * 
+   * @returns Promise<void> - Resolves when submission completes, or throws on error
+   */
   const handleSubmit = async () => {
     if (!text && !file) return;
     

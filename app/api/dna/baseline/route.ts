@@ -3,7 +3,13 @@ import { auth, db } from '@/lib/firebase.admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import PDFParser from 'pdf2json';
 
-// Função de extração do PDF
+/**
+ * Extracts text content from a PDF buffer using pdf2json with a 60-second timeout
+ * to handle complex or malformed PDF files safely.
+ * @param buffer - The PDF file content as a Node.js Buffer
+ * @returns A promise resolving to the extracted text content
+ * @async
+ */
 const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   const parsePromise = new Promise<string>((resolve, reject) => {
     const pdfParser = new PDFParser(null, 1);
@@ -27,6 +33,13 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   return Promise.race([parsePromise, timeoutPromise]);
 };
 
+/**
+ * Processes an actor's baseline document (journal entries, therapy notes, biography)
+ * to extract psychological profile data using AI and stores results in Firestore.
+ * @param request - HTTP request containing either a PDF file or text content for analysis
+ * @returns JSON response indicating success with extraction count, or error status
+ * @async
+ */
 export async function POST(request: Request) {
   try {
     // 1. Segurança e Autenticação

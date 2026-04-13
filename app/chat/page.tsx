@@ -12,10 +12,9 @@ import { getAuth } from "firebase/auth";
 /**
  * Main Chat Page component for the AI Copilot DNA Extraction feature.
  * Orchestrates the layout, integrating the sidebar, chat history, and input mechanism.
- * Manages the local UI state for the currently active chat section and synchronizes 
+ * Manages the local UI state for the currently active chat section and synchronizes
  * it with the remote session state.
- *
- * @returns {JSX.Element} The rendered chat page layout.
+ * @returns The rendered chat page layout
  */
 export default function ChatPage() {
   const {
@@ -47,7 +46,7 @@ export default function ChatPage() {
 
   /**
    * Filters the global message history to only display messages relevant to the currently selected section.
-   * * // TODO: Consider wrapping this filtering logic in a useMemo hook if the messages array is expected to grow significantly, to prevent unnecessary recalculations on every render.
+   * @returns Array of messages that belong to the active section
    */
   const filteredMessages = messages.filter(
     (msg) => msg.section === activeSection

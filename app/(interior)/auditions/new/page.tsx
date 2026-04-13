@@ -1,6 +1,11 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { AuditionWizard } from "@/components/auditions/autition-wizard";
 
+/**
+ * Page for creating a new audition breakdown.
+ * Renders the AuditionWizard component for guided audition creation.
+ * @returns The rendered new audition page with wizard
+ */
 export default function NewAuditionPage() {
   return (
     <main className="flex flex-1 flex-col h-full bg-[#F5F0E8]">

@@ -28,6 +28,14 @@ interface ChatSidebarProps {
   onSectionClick: (sectionId: string) => void;
 }
 
+/**
+ * ChatSidebar Component
+ * Renders the chat interface sidebar with session info, DNA sections navigation,
+ * progress bar, menu items, and premium plan upgrade section.
+ * @param session - The current DNA session data or null
+ * @param activeSection - The ID of the currently active DNA section
+ * @param onSectionClick - Callback when a DNA section is clicked
+ */
 export function ChatSidebar({
   session,
   activeSection,

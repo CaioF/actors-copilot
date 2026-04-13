@@ -13,6 +13,11 @@ const steps = [
   { num: 4, label: "Review & Generate" },
 ];
 
+/**
+ * Stepper Component
+ * Renders a step progress indicator showing the current step in the audition wizard.
+ * @param currentStep - The current step number (1-4)
+ */
 export function Stepper({ currentStep }: StepperProps) {
   return (
     <div className="flex items-center justify-center w-full max-w-5xl mx-auto mb-16">

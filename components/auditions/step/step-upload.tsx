@@ -12,21 +12,45 @@ interface StepUploadProps {
   onTextChange: (text: string) => void;
 }
 
+/**
+ * StepUpload Component
+ * Renders a file upload zone with drag-and-drop support and text input fallback.
+ * Used for uploading sides and character briefs in the audition wizard.
+ * @param title - Section title
+ * @param description - Section description
+ * @param file - Currently selected file or null
+ * @param text - Currently entered text or empty string
+ * @param onFileChange - Callback when file changes
+ * @param onTextChange - Callback when text changes
+ */
 export function StepUpload({ title, description, file, text, onFileChange, onTextChange }: StepUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Previne o comportamento padrão do navegador de abrir o arquivo
+  /**
+   * Handles drag-over event to indicate a valid drop zone.
+   * @param e - DragEvent from the drag operation
+   */
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
+  /**
+   * Handles drag-leave event when user exits the drop zone.
+   * @param e - DragEvent from the drag operation
+   */
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
+  /**
+   * Handles the drop event when a file is dropped onto the upload zone.
+   * Validates that dropped files are PDF or DOCX format.
+   * @param e - DragEvent from the drop operation
+   */
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -34,24 +58,22 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
       
-      // Validação aprimorada de tipos
       const isPDF = droppedFile.type === "application/pdf";
-      const isText = droppedFile.type.includes("text");
-      const isWordType = droppedFile.type === "application/msword" || 
-                         droppedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      
-      // Fallback de segurança olhando a extensão do arquivo
-      const isWordExt = droppedFile.name.toLowerCase().endsWith('.doc') || 
-                        droppedFile.name.toLowerCase().endsWith('.docx');
+      const isDocxType = droppedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isDocxExt = droppedFile.name.toLowerCase().endsWith('.docx');
 
-      if (isPDF || isText || isWordType || isWordExt) {
+      if (isPDF || isDocxType || isDocxExt) {
         onFileChange(droppedFile);
       } else {
-        alert("Please upload a PDF, Text, or Word (.docx) file.");
+        alert("Please upload a PDF or Word (.docx) file.");
       }
     }
   };
 
+  /**
+   * Handles file selection from the file input dialog.
+   * @param e - ChangeEvent from the file input
+   */
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       onFileChange(e.target.files[0]);
@@ -85,7 +107,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
           >
             <input
               type="file"
-              accept=".pdf,.txt,.doc,.docx"
+              accept=".pdf,.docx"
               className="hidden"
               ref={fileInputRef}
               onChange={handleFileSelect}
@@ -96,7 +118,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
             <p className="text-[#EADDCE] font-medium mb-1">
               Click to upload <span className="text-[#B7BCB6] font-normal">or drag and drop</span>
             </p>
-            <p className="text-[#B7BCB6] text-xs">PDF, TXT, or DOC (max. 10MB)</p>
+            <p className="text-[#B7BCB6] text-xs">PDF or DOCX (max. 20MB)</p>
           </div>
         ) : (
           /* ARQUIVO SELECIONADO (PREVIEW) */

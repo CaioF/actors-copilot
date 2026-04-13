@@ -4,6 +4,14 @@ import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { QUESTIONS } from '@/lib/questions';
 import { saveRawMessageToFirestore } from '@/lib/firestore.utils'; 
 
+/**
+ * Handles conversational DNA extraction chat, running dual AI models: one for Socratic
+ * questioning and another for silent psychological data extraction from user responses.
+ * @param request - HTTP request with authorization token, chat content, current section,
+ *                  actor name, conversation history, and previously asked questions
+ * @returns JSON response with AI coach reply and extracted psychological data
+ * @async
+ */
 export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get('Authorization');

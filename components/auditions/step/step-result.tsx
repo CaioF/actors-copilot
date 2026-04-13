@@ -16,6 +16,12 @@ interface StepResultProps {
   };
 }
 
+/**
+ * StepResult Component
+ * Renders the generated audition breakdown results including intro, sections, and outro.
+ * Supports markdown rendering for formatted content display.
+ * @param data - Generated breakdown data with intro, sections, and outro
+ */
 export function StepResult({ data }: StepResultProps) {
 
   if (!data || !data.sections) return null;

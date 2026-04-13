@@ -24,7 +24,7 @@ const actionTypes = {
 
 let count = 0
 
-function genId() {
+export function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER
   return count.toString()
 }
@@ -144,7 +144,7 @@ type Toast = Omit<ToasterToast, 'id'>
 function toast({ ...props }: Toast) {
   const id = genId()
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Omit<ToasterToast, 'id'>) =>
     dispatch({
       type: 'UPDATE_TOAST',
       toast: { ...props, id },

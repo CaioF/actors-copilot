@@ -12,6 +12,11 @@ import ReactMarkdown from "react-markdown"
 // Importa o seu componente visual que desenha os cards verdes da IA
 import { StepResult } from "@/components/auditions/step/step-result"
 
+/**
+ * Detailed view page for a single audition breakdown.
+ * Displays performance map data and provides print functionality.
+ * @returns The rendered audition detail page
+ */
 export default function AuditionDetailView() {
   const params = useParams()
   const searchParams = useSearchParams()
@@ -45,6 +50,13 @@ export default function AuditionDetailView() {
     return () => unsubscribe()
   }, [auditionId])
 
+  /**
+   * Fetches the full audition details from Firestore for the specified user and audition ID.
+   * @param userPath - The user's unique path (uid_firstName format)
+   * @param id - The unique identifier of the audition
+   * @returns void (side effects: updates auditionData and isLoading state)
+   * @async
+   */
   const fetchAuditionDetails = async (userPath: string, id: string) => {
     try {
       const db = getDb()
