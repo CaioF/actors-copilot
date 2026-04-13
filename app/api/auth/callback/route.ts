@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { auth } from '@/lib/firebase.admin';
 import { SignJWT } from 'jose';
+import { logger, createChildLogger } from '@/lib/logger';
 
 /**
  * Authenticates a user via Firebase, verifies their Kajabi access, 
@@ -11,11 +12,13 @@ import { SignJWT } from 'jose';
  * @returns {Promise<NextResponse>} A JSON response indicating success with a redirect URL, or an error status and message.
  */
 export async function POST(request: Request) {
+    const log = createChildLogger({ route: 'auth-callback' });
     // TODO: Implement rate limiting (e.g., Upstash Redis) to prevent brute-force attacks on this endpoint.
     try {
         const authHeader = request.headers.get('Authorization');
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            log.warn({ msg: 'Missing or invalid Authorization header' });
             return NextResponse.json({ error: 'Token not found or invalid' }, { status: 401 });
         }
 
@@ -26,6 +29,7 @@ export async function POST(request: Request) {
         const userEmail = decodedToken.email;
 
         if (!userEmail) {
+            log.warn({ msg: 'Email not found in token' });
             return NextResponse.json({ error: 'Email not found in token' }, { status: 400 });
         }
         
@@ -33,7 +37,7 @@ export async function POST(request: Request) {
         
         if (!hasAccess.success) {
             // Forward the exact Kajabi validation error message to the frontend
-            console.error(`Kajabi Validation Failed for ${userEmail}:`, hasAccess.message);
+            log.error({ email: userEmail, message: hasAccess.message, msg: 'Kajabi validation failed' });
             
             // Check if it's an actual env configuration error vs a user access denial
             const isConfigError = hasAccess.message?.includes("System configuration error");
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
 
         // Cryptographically sign a new JWT containing the user's email to establish a session
         if (!process.env.JWT_SECRET) {
-            console.error("ERROR: JWT_SECRET not configured in .env.local");
+            log.error({ msg: 'JWT_SECRET not configured' });
             return NextResponse.json({ error: 'Internal Configuration Error' }, { status: 500 });
         }
 
@@ -75,10 +79,11 @@ export async function POST(request: Request) {
             path: '/', 
         });
 
+        log.info({ email: userEmail, msg: 'Authentication successful' });
         return NextResponse.json({ success: true, redirectUrl: '/dashboard' }, { status: 200 });
 
     } catch (error) {
-        console.error("Error in auth callback: ", error);
+        log.error({ err: error, msg: 'Authentication error' });
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 } 
@@ -177,7 +182,7 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
         return { success: true, message: "Purchase verified successfully." };
 
     } catch (error) {
-        console.error("Error verifying Kajabi purchase: ", error);
+        logger.error({ err: error, email, msg: 'Error verifying Kajabi purchase' });
         return { success: false, message: "An unexpected error occurred during validation. Please try again." };
     }
 }

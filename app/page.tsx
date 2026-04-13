@@ -1,6 +1,11 @@
 import Link from "next/link"
 import Image from "next/image"
 
+/**
+ * Start emblem component that displays the app logo as a clickable link to the dashboard.
+ * Features a hover scale animation for interactive feedback.
+ * @returns Link component containing the app logo image
+ */
 function StartEmblem() {
   return (
     <Link
@@ -21,6 +26,11 @@ function StartEmblem() {
   )
 }
 
+/**
+ * Welcome page component displaying the landing page for The Actors Copilot.
+ * Shows animated background effects and a logo link to the dashboard.
+ * @returns The welcome page with branding and navigation
+ */
 export default function WelcomePage() {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#152323]">

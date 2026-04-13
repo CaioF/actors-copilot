@@ -11,8 +11,11 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 /**
- * Helper function to safely extract raw text from a PDF buffer in a Node.js environment.
- * Includes a 30-second timeout to prevent malformed PDFs from hanging the server thread.
+ * Safely extracts raw text content from a PDF buffer using pdf2json.
+ * Includes a 60-second timeout to prevent malformed or malicious PDFs from hanging the server.
+ * @param buffer - The PDF file content as a Node.js Buffer
+ * @returns A promise resolving to the extracted text content
+ * @async
  */
 const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   const parsePromise = new Promise<string>((resolve, reject) => {
@@ -38,6 +41,14 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   return Promise.race([parsePromise, timeoutPromise]);
 };
 
+/**
+ * Analyzes audition materials (sides, briefs, project context) using AI to generate
+ * a personalized performance coaching breakdown for an actor.
+ * @param request - HTTP request containing form data with project type, sides text/file,
+ *                  brief text/file, actor name, and user path for DNA profile lookup
+ * @returns JSON response with structured performance coaching data or error
+ * @async
+ */
 export async function POST(request: Request) {
   try {
     // 1. SECURITY & AUTHENTICATION (Token Verification)

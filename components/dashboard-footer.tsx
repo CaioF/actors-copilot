@@ -1,5 +1,9 @@
 import { Lock, Trash2, Shield } from "lucide-react"
 
+/**
+ * DashboardFooter Component
+ * Displays security and privacy messaging footer with icons for NDA Safe, Delete Anytime, and Private By Default.
+ */
 export function DashboardFooter() {
   return (
     <footer className="mt-auto flex items-center justify-center gap-6 px-8 py-5 text-xs text-[#6B6B6B]">

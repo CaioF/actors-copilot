@@ -1,6 +1,11 @@
 import { Dna } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 
+/**
+ * Personal DNA page that serves as a placeholder/routing page.
+ * Displays a CTA to start building the user's Personal DNA Vault.
+ * @returns The rendered personal DNA landing page
+ */
 export default function PersonalDnaPage() {
   return (
     <main className="flex flex-1 flex-col">

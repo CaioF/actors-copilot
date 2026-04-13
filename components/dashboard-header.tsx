@@ -17,6 +17,12 @@ interface DashboardHeaderProps {
  * * This component displays the page title and the authenticated user's profile.
  * It listens to the Firebase Auth state to dynamically update user info.
  */
+/**
+ * DashboardHeader Component
+ * Displays the page title and authenticated user's profile.
+ * Listens to Firebase Auth state to dynamically update user info.
+ * @param title - Optional page title, defaults to "My Self Tape Copilot"
+ */
 export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHeaderProps) {
 
   // We initialize the state as null because when the page loads, 

@@ -8,6 +8,13 @@ interface ChatInputProps {
   isLoading: boolean;
 }
 
+/**
+ * Chat input component with text input, voice recording, and message submission.
+ * @param props - The component props
+ * @param props.onSend - Callback function to send a message
+ * @param props.isLoading - Whether the AI is currently processing a request
+ * @returns The chat input JSX element
+ */
 export function ChatInput({ onSend, isLoading }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -32,12 +39,20 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     }
   }, [isLoading]);
 
+  /**
+   * Handles form submission by sending the trimmed message and clearing the input.
+   */
   const handleSubmit = () => {
     if (!value.trim() || isLoading) return;
     onSend(value.trim());
     setValue("");
   };
 
+  /**
+   * Handles keyboard events for the input field.
+   * Submits the message when Enter is pressed (without Shift).
+   * @param e - The keyboard event
+   */
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -45,6 +60,10 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     }
   };
 
+  /**
+   * Starts audio recording, requests microphone access, and sets up transcription on stop.
+   * @async
+   */
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -98,6 +117,9 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     }
   };
 
+  /**
+   * Stops the currently active audio recording and releases microphone resources.
+   */
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -106,6 +128,10 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
     }
   };
 
+  /**
+   * Handles the main action button click based on current state.
+   * Stops recording if recording, submits if text exists, otherwise starts recording.
+   */
   const handleMainAction = () => {
     if (isTranscribing) return; 
     if (isRecording) stopRecording();

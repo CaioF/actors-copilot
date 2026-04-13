@@ -6,11 +6,20 @@ import { getAuth } from "firebase/auth";
 
 type RecordStatus = "idle" | "recording" | "processing" | "success" | "error";
 
+/**
+ * MemoryRecordingBanner Component
+ * Provides a UI for recording voice memories to be added to the user's DNA Vault.
+ * Handles microphone access, audio recording, and transcription via API.
+ */
 export function MemoryRecordingBanner() {
   const [status, setStatus] = useState<RecordStatus>("idle");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  /**
+   * Initiates audio recording by requesting microphone access,
+   * setting up MediaRecorder, and preparing chunks for upload.
+   */
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -71,6 +80,9 @@ export function MemoryRecordingBanner() {
     }
   };
 
+  /**
+   * Stops the current audio recording and releases microphone tracks.
+   */
   const stopRecording = () => {
     if (mediaRecorderRef.current && status === "recording") {
       mediaRecorderRef.current.stop();
@@ -79,6 +91,10 @@ export function MemoryRecordingBanner() {
   };
 
   // Renderização dinâmica do botão baseada no status
+  /**
+   * Renders the appropriate button based on the current recording status.
+   * @returns React button element appropriate for the current status
+   */
   const renderButton = () => {
     switch (status) {
       case "recording":

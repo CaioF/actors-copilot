@@ -3,10 +3,18 @@
 import { Mic } from "lucide-react"
 import { useState, useEffect } from "react"
 
+/**
+ * MicFab Component
+ * Floating action button for toggling microphone recording.
+ * Shows a toast message when recording is stopped.
+ */
 export function MicFab() {
   const [isRecording, setIsRecording] = useState(false)
   const [showMessage, setShowMessage] = useState(false)
 
+  /**
+   * Toggles the recording state and manages the visibility of the toast message.
+   */
   const handleToggleRecording = () => {
     if (isRecording) {
       // Quando parar de gravar: desativa o botão e mostra a mensagem

@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
+/**
+ * Transcribes audio recordings and extracts psychological DNA data from spoken memories.
+ * Saves both raw transcription and AI-extracted profile data to Firestore.
+ * @param request - HTTP request with authorization token, base64-encoded audio, and mime type
+ * @returns JSON response with transcribed text or error status
+ * @async
+ */
 export async function POST(request: Request) {
   try {
     // auth

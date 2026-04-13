@@ -1,3 +1,24 @@
+/**
+ * Structured interview questions organized by DNA section.
+ *
+ * This module exports the question banks used by The Coach to conduct
+ * Socratic interviews with actors across different psychological and biographical domains.
+ *
+ * Questions are organized into the following sections:
+ * - identity: Self-perception, public vs private self, masks and core identity
+ * - family: Family-of-origin dynamics, survival rules, attachment patterns
+ * - relationships: Intimacy, trust, loyalty, and relationship patterns
+ * - power: Authority, status, rebellion, and approval-seeking behaviors
+ * - shame_pride: Secrets, exposure, self-worth, and dignity
+ * - loss_and_change: Ruptures, transitions, and turning points
+ * - desire_ambition: Wants, hunger, envy, and sacrifice
+ * - joy_passion: Flow states, vitality, and core passions
+ * - conflict_style: Defense mechanisms, pressure responses, and coping
+ * - sensory_anchors: Grounding techniques and sensory-based memory triggers
+ * - boundaries_ethics: Limits, ethics, and off-limits topics for acting work
+ *
+ * @module questions
+ */
 export const QUESTIONS: Record<string, string[]> = {
 
   // Identity & Self-Story

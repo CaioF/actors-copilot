@@ -34,6 +34,11 @@ interface Audition {
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
 
+/**
+ * Renders a colored badge displaying the audition status.
+ * @param status - The audition status to display (Completed, Processing, or Draft)
+ * @returns The styled status badge element
+ */
 function StatusBadge({ status }: { status: AuditionStatus }) {
   const colors: Record<AuditionStatus, string> = {
     Completed: "bg-[#4A5548]/60 text-[#D4DDD6]",
@@ -47,6 +52,11 @@ function StatusBadge({ status }: { status: AuditionStatus }) {
   )
 }
 
+/**
+ * Main auditions list page component.
+ * Displays user's auditions with search, filtering, and CRUD operations.
+ * @returns The rendered auditions list page
+ */
 export default function AuditionsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeFilter, setActiveFilter] = useState<"All" | AuditionStatus>("All")
@@ -87,8 +97,10 @@ export default function AuditionsPage() {
   }, []);
 
   /**
-   * FETCH AUDITIONS
-   * Pulls all documents from the user's specific auditions sub-collection, ordered by newest first.
+   * Fetches all audition documents from Firestore for the specified user path.
+   * @param path - The user's unique path (uid_firstName format)
+   * @returns void (side effects: updates auditionList and isLoading state)
+   * @async
    */
   const fetchAuditions = async (path: string) => {
     try {
@@ -132,8 +144,9 @@ export default function AuditionsPage() {
   };
 
   /**
-   * UPDATE HANDLER (Edit Basic Info)
-   * Updates only the metadata in Firestore, leaving the AI performanceMap untouched.
+   * Updates audition metadata (project, role, projectType) in Firestore.
+   * @returns void (side effects: updates Firestore doc and local auditionList state)
+   * @async
    */
   const handleUpdate = async () => {
     if (!editingAudition || !userPath) return;
@@ -161,20 +174,29 @@ export default function AuditionsPage() {
   }
 
   /**
-   * NAVIGATION HANDLERS
+   * Navigates to the audition detail view for the specified audition.
+   * @param id - The unique identifier of the audition to view
+   * @returns void (side effect: router navigation)
    */
   const handleView = (id: string) => {
     router.push(`/auditions/${id}`);
   }
 
+  /**
+   * Navigates to the audition detail view with a print action parameter.
+   * @param id - The unique identifier of the audition to print
+   * @returns void (side effect: router navigation with print query param)
+   */
   const handlePrint = (id: string) => {
     // Navigates to the view page and passes a print command in the URL
     router.push(`/auditions/${id}?action=print`);
   }
 
   /**
-   * DELETE HANDLER
-   * Removes the document from Firestore and updates the UI instantly.
+   * Deletes an audition document from Firestore and removes it from local state.
+   * @param id - The unique identifier of the audition to delete
+   * @returns void (side effects: deletes Firestore doc and updates auditionList)
+   * @async
    */
   const handleDelete = async (id: string) => {
     if (!userPath) return;

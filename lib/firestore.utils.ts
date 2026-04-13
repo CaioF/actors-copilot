@@ -1,6 +1,14 @@
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getApp } from '@/lib/firebase';
 
+/**
+ * Saves a chat message pair (user message and AI response) to Firestore.
+ * Stores the message under the user's chatLogs subcollection with a server timestamp.
+ *
+ * @param userId - The Firebase user ID to associate the message with
+ * @param messageData - The message data including userMessage, aiResponse, timestamp, and section
+ * @throws {Error} Throws if the Firestore write operation fails
+ */
 export async function saveRawMessageToFirestore(
     userId: string,
     messageData: {

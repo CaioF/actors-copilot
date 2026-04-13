@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 /**
  * Handles user logout by destroying the secure HTTP-only session cookie.
@@ -20,7 +21,7 @@ export async function POST() {
         
         return NextResponse.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
-        console.error("Error during logout: ", error);
+        logger.error({ err: error, msg: 'Error during logout' });
         return NextResponse.json({ success: false, error: 'Failed to log out' }, { status: 500 });
     }
 }

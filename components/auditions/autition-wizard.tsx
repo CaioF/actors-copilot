@@ -17,6 +17,11 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 
 
+/**
+ * AuditionWizard Component
+ * Multi-step wizard for creating audition breakdowns. Handles project info collection,
+ * sides/brief upload, review, AI generation, and saving to Firestore.
+ */
 export function AuditionWizard() {
   const router = useRouter(); // Used for redirecting after saving
   const [currentStep, setCurrentStep] = useState<AuditionStep>(1);
@@ -42,18 +47,29 @@ export function AuditionWizard() {
   }, []);
 
   // Handlers para navegação
+  /**
+   * Navigates to the next step in the audition wizard.
+   */
   const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 5) as AuditionStep);
+
+  /**
+   * Navigates to the previous step in the audition wizard.
+   */
   const handleBack = () => setCurrentStep((prev) => Math.max(prev - 1, 1) as AuditionStep);
 
   // Handler para atualizar dados do form de qualquer etapa
+  /**
+   * Updates the form data with new values while preserving existing data.
+   * @param data - Partial audition form data to merge with existing state
+   */
   const updateFormData = (data: Partial<AuditionFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
   /**
-   * GENERATE HANDLER
-   * Step 1: Smart-checks the DNA Vault and updates the Master Profile ONLY if needed.
-   * Step 2: Generates the Audition Breakdown.
+   * Handles the generation of an audition breakdown.
+   * Step 1: Smart-checks the DNA Vault and updates the Master Profile if needed.
+   * Step 2: Generates the Audition Breakdown via API.
    */
   const handleGenerate = async () => {
     setCurrentStep(5); 
@@ -138,8 +154,7 @@ export function AuditionWizard() {
   };
 
   /**
-   * SAVE AND FINISH HANDLER
-   * Secures the AI-generated Performance Map into the user's specific Firestore directory.
+   * Saves the generated audition breakdown to Firestore and redirects to the auditions page.
    */
   const handleSaveAndFinish = async () => {
     if (!currentUser) {

@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             // Handle collision when Firebase blocks duplicate emails
             if (error.code === 'auth/account-exists-with-different-credential') {
-                throw new Error("This email is already registered with a password. Please log in using the Email/Password form.");
+                throw new Error("This email is already registered with a password. Please log in using the Email/Password form.", { cause: error });
             }
 
             console.error("Failed to log in: ", error);
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error: any) {
             // NEW: Give a helpful hint if they fail the password but might have used Google
             if (error.code === 'auth/invalid-credential') {
-                throw new Error("Invalid credentials. If you originally signed up with Google, please use the Google button.");
+                throw new Error("Invalid credentials. If you originally signed up with Google, please use the Google button.", { cause: error });
             }
             console.error("Failed to log in with email: ", error);
             throw error;
@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error: any) {
             // Handle if they try to sign up but already used Google or have an account
             if (error.code === 'auth/email-already-in-use') {
-                throw new Error("This email is already registered. Try logging in with Google or your password instead.");
+                throw new Error("This email is already registered. Try logging in with Google or your password instead.", { cause: error });
             }
             console.error("Failed to sign up with email: ", error);
             throw error;

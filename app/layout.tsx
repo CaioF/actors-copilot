@@ -3,6 +3,7 @@ import { Antonio, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { AuthProvider } from '@/lib/context/AuthContext'
+import { PostHogProvider } from '@/lib/analytics/posthog-provider'
 
 const antonio = Antonio({ subsets: ['latin'], variable: '--font-antonio' })
 const inter = Inter({   subsets: ['latin'],   variable: '--font-inter',})
@@ -12,6 +13,13 @@ export const metadata: Metadata = {
   description: 'Your AI-powered self-tape audition preparation tool. Build your Personal DNA, break down sides, and nail every audition.',
 }
 
+/**
+ * Root layout component that wraps the entire application.
+ * Provides Firebase authentication context and global styling.
+ * @param props - Component props including children
+ * @param props.children - Child components to render
+ * @returns The root layout with auth provider
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -21,8 +29,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} ${antonio.variable}`} >
         <AuthProvider>
-          {children}
-          <Analytics />
+          <PostHogProvider>
+            {children}
+            <Analytics />
+          </PostHogProvider>
         </AuthProvider>
       </body>
     </html>

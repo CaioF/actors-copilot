@@ -12,6 +12,19 @@ interface StepCardProps {
   bodyVariant?: "dark" | "sage"
 }
 
+/**
+ * A card component that displays a step in a multi-step process or guide.
+ *
+ * @param props - The component props
+ * @param props.stepNumber - The step number to display in the header
+ * @param props.title - The title of the step
+ * @param props.description - The description text for the step
+ * @param props.link - The URL the CTA button links to
+ * @param props.ctaLabel - The label text for the CTA button
+ * @param props.ctaIcon - The Lucide icon component for the CTA button
+ * @param props.variant - Color variant affecting header and accent colors ("olive" | "orange")
+ * @param props.bodyVariant - Optional body background variant ("dark" | "sage"), defaults to "dark"
+ */
 export function StepCard({
   stepNumber,
   title,

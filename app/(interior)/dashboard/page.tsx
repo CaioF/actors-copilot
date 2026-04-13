@@ -7,6 +7,11 @@ import { StepCard } from "@/components/step-card";
 import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
 import { HistoryUploadModal } from "@/components/history-upload-modal";
 
+/**
+ * Main dashboard page showing the self-tape copilot workflow.
+ * Displays step cards for Personal DNA, Audition Sides, and Casting Brief uploads.
+ * @returns The rendered dashboard page
+ */
 export default function DashboardPage() {
   const [isBaselineModalOpen, setIsBaselineModalOpen] = useState(false);
 
