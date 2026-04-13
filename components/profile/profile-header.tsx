@@ -36,7 +36,8 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
       await navigator.clipboard.writeText(`https://${profileUrl}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      // Clipboard access denied - silently ignore
     }
   };
 

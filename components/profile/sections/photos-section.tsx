@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 import { useAuth } from "@/lib/context/AuthContext";
 

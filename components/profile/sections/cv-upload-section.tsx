@@ -13,7 +13,6 @@ import { useAuth } from "@/lib/context/AuthContext";
 export function CvUploadSection() {
   const { user } = useAuth();
   const { watch, setValue } = useFormContext<ActorProfile>();
-  const cvUrl = watch("cvUrl");
   const cvFilename = watch("cvFilename");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
