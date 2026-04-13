@@ -25,3 +25,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# demo folders
+*.demo/
+new-page-design.demo/
+
+# feature plans (keep locally)
+docs/feature-plans/
+
+# ai
+.claude/
+.coderlm/
+.agents/

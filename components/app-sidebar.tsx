@@ -13,13 +13,15 @@ import {
   Plus,
   Sparkles,
   LogOut,
+  User,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const menuItems = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Personal DNA", href: "/chat", icon: MessageCircle },
   { label: "Auditions", href: "/auditions", icon: Monitor },
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
 ]
 

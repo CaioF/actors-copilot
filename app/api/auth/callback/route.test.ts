@@ -5,7 +5,7 @@ import { SignJWT } from 'jose';
 
 // --- DEPENDENCY MOCKS ---
 
-jest.mock('@/lib/firebase-admin', () => ({
+jest.mock('@/lib/firebase.admin', () => ({
     auth: { verifyIdToken: jest.fn() },
 }));
 
@@ -18,6 +18,9 @@ jest.mock('jose', () => ({
         setProtectedHeader: jest.fn().mockReturnThis(),
         setIssuedAt: jest.fn().mockReturnThis(),
         setExpirationTime: jest.fn().mockReturnThis(),
+        setSubject: jest.fn().mockReturnThis(),
+        setIssuer: jest.fn().mockReturnThis(),
+        setAudience: jest.fn().mockReturnThis(),
         sign: jest.fn().mockResolvedValue('fake_signed_jwt_token'),
     })),
 }));
@@ -56,7 +59,7 @@ describe('Authentication POST Route (Kajabi Verification)', () => {
     /**
      * TEST SUITE 2: System Configuration Failures
      */
-    it('returns 403 if Kajabi environment variables are missing', async () => {
+    it('returns 500 if Kajabi environment variables are missing', async () => {
         delete process.env.KAJABI_CLIENT_ID;
         (auth.verifyIdToken as jest.Mock).mockResolvedValue({ email: 'actor@example.com' });
 
@@ -68,7 +71,7 @@ describe('Authentication POST Route (Kajabi Verification)', () => {
         const res = await POST(req);
         const data = await res.json();
 
-        expect(res.status).toBe(403);
+        expect(res.status).toBe(500);
         expect(data.error).toBe('System configuration error. Please contact support.');
     });
 

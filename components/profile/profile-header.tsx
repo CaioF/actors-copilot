@@ -1,0 +1,137 @@
+"use client";
+
+import { useState } from "react";
+import { useFormContext } from "react-hook-form";
+import { ExternalLink, Copy, Share2, Check, Loader2, Cloud, CloudOff } from "lucide-react";
+import { ActorProfile, generateSlug } from "@/lib/profile-types";
+import type { SaveStatus } from "@/app/(interior)/profile/page";
+
+interface ProfileHeaderProps {
+  onPublish: () => void;
+  onSave: () => void;
+  saveStatus: SaveStatus;
+}
+
+export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderProps) {
+  const { watch, setValue } = useFormContext<ActorProfile>();
+  const status = watch("status");
+  const slug = watch("slug");
+  const fullName = watch("fullName");
+  const [copied, setCopied] = useState(false);
+
+  const profileUrl = `theactorscopilot.com/actors/${slug || generateSlug(fullName || "")}`;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`https://${profileUrl}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+    }
+  };
+
+  const unpublish = () => {
+    setValue("status", "draft", { shouldDirty: true });
+    onSave();
+  };
+
+  return (
+    <div className="mb-6 space-y-4">
+      {/* Title Row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <h2 className="font-title text-2xl font-bold text-[#2C3328]">
+              Your Actor Profile
+            </h2>
+            <span
+              className={`rounded-full px-3 py-0.5 text-xs font-medium ${
+                status === "published"
+                  ? "bg-[#E8721A]/15 text-[#E8721A]"
+                  : "bg-[#C7C0B5]/30 text-[#6B6B6B]"
+              }`}
+            >
+              {status === "published" ? "Published" : "Draft"}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-[#6B6B6B]">
+            Build your professional presence. Control what the world sees.
+          </p>
+        </div>
+
+        {/* Save Status Indicator */}
+        <div className="flex items-center gap-1.5 text-xs text-[#6B6B6B]">
+          {saveStatus === "saving" && (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#E8721A]" />
+              <span>Saving...</span>
+            </>
+          )}
+          {saveStatus === "saved" && (
+            <>
+              <Cloud className="h-3.5 w-3.5 text-[#4A5548]" />
+              <span className="text-[#4A5548]">Saved</span>
+            </>
+          )}
+          {saveStatus === "error" && (
+            <>
+              <CloudOff className="h-3.5 w-3.5 text-[#C45A3C]" />
+              <span className="text-[#C45A3C]">Save failed</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* URL Bar + Actions */}
+      <div className="flex items-center gap-2 rounded-lg border border-[#C7C0B5] bg-white px-3 py-2">
+        <ExternalLink className="h-4 w-4 flex-shrink-0 text-[#6B6B6B]" />
+        <span className="flex-1 truncate text-sm text-[#2C3328]">{profileUrl}</span>
+
+        {/* Copy Link */}
+        <button
+          type="button"
+          onClick={copyLink}
+          className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#4A5548]"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? "Copied!" : "Copy Link"}
+        </button>
+
+        {/* Share */}
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#E8DFD0]"
+        >
+          <Share2 className="h-3.5 w-3.5" />
+          Share
+        </button>
+
+        {/* Draft / Unpublish */}
+        {status === "published" ? (
+          <button
+            type="button"
+            onClick={unpublish}
+            className="flex items-center gap-1 rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#E8DFD0]"
+          >
+            Unpublish
+          </button>
+        ) : (
+          <span className="rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#6B6B6B]">
+            Draft
+          </span>
+        )}
+
+        {/* Publish */}
+        <button
+          type="button"
+          onClick={onPublish}
+          disabled={saveStatus === "saving" || status === "published"}
+          className="rounded-lg bg-[#E8721A] px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#E8721A]/90 disabled:opacity-70"
+        >
+          {status === "published" ? "Published" : "Publish"}
+        </button>
+      </div>
+    </div>
+  );
+}
