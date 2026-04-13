@@ -128,3 +128,7 @@ describe('toast', () => {
     expect(state.toasts).toHaveLength(0);
   });
 });
+
+afterAll(() => {
+  jest.clearAllTimers();
+});
