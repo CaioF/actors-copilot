@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const transcriptionModel = getGenerativeModel(ai, {
       model: "gemini-2.5-flash",
       generationConfig: { temperature: 0.1 }, 
-    } as any);
+    } );
 
     const audioPart = {
       inlineData: { data: audioBase64, mimeType: mimeType || "audio/webm" }

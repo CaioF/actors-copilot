@@ -10,6 +10,15 @@ const ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
 ];
 
+interface PerformanceMap {
+  intro: string;
+  sections: {
+    title: string;
+    items: string[];
+  }[];
+  outro: string;
+}
+
 /**
  * Safely extracts raw text content from a PDF buffer using pdf2json.
  * Includes a 60-second timeout to prevent malformed or malicious PDFs from hanging the server.
@@ -178,7 +187,7 @@ export async function POST(request: Request) {
 
 
     // 5. INITIALIZE VERTEX AI FOR FIREBASE
-    const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
+    const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
     const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
@@ -190,24 +199,24 @@ export async function POST(request: Request) {
         responseMimeType: "application/json",
         temperature: 0.3,
         responseSchema: {
-          type: "OBJECT",
+          type: SchemaType.OBJECT,
           properties: {
-            intro: { type: "STRING" },
+            intro: { type: SchemaType.STRING },
             sections: {
-              type: "ARRAY",
+              type: SchemaType.ARRAY,
               items: {
-                type: "OBJECT",
+                type: SchemaType.OBJECT,
                 properties: {
-                  title: { type: "STRING" },
-                  items: { type: "ARRAY", items: { type: "STRING" } }
+                  title: { type: SchemaType.STRING },
+                  items: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
                 },
                 required: ["title", "items"]
               }
             },
-            outro: { type: "STRING" }
+            outro: { type: SchemaType.STRING }
           },
           required: ["intro", "sections", "outro"]
-        } as any
+        } 
       }
     });
 
@@ -239,9 +248,9 @@ export async function POST(request: Request) {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
-    let performanceMap;
+    let performanceMap: PerformanceMap;
     try {
-        performanceMap = JSON.parse(responseText);
+        performanceMap = JSON.parse(responseText) as PerformanceMap;
     } catch (parseError) {
         console.error("Failed to parse AI JSON output:", responseText);
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });

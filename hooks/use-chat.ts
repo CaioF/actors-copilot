@@ -10,14 +10,11 @@ import {
   addDoc,
   serverTimestamp,
   doc,
-  updateDoc,
   getDocs,
   setDoc,
   arrayUnion
 } from "firebase/firestore";
-
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SECTION_INTROS } from "@/lib/prompts";
@@ -25,6 +22,53 @@ import {  DNASectionId } from "@/lib/chat-types";
 
 
 const DEFAULT_SESSION_ID = "session-1";
+
+interface ProgressAssessment {
+  has_actionable_pattern: boolean;
+  depth_score: number;
+}
+
+interface Milestone {
+  event: string;
+  emotional_cost: string;
+  section: string;
+  discoveredAt: string;
+}
+
+interface AIExtractions {
+  new_traits?: string[];
+  defense_mechanisms?: string[];
+  leaf_snippets?: string[];
+  holistic_analysis?: string;
+  somatic_tells?: string[];
+  core_values?: string[];
+  relational_dynamics?: string[];
+  milestones?: Milestone[];
+  core_wounds_and_fears?: string[];
+  unmet_needs?: string[];
+  public_masks?: string[];
+  emotional_baseline?: {
+    conflict_response?: string;
+    internal_friction?: string;
+    vulnerability_management?: string;
+  };
+  intellectual_framework?: {
+    cognitive_style?: string;
+    attention_to_detail?: string;
+  };
+  archetype_signals?: string[];
+  key_entities_and_arenas?: string[];
+  progress_assessment?: ProgressAssessment; // Campo crucial para o progresso
+}
+
+interface ChatApiResponse {
+  aiData: {
+    coach_reply: string;
+    extractions: AIExtractions | null;
+    progress_assessment?: ProgressAssessment | null;
+  };
+  selectedQuestions: string[];
+}
 
 /**
  * Custom React hook to manage the AI Copilot DNA Extraction chat session.
@@ -315,26 +359,23 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
         const previouslyAsked: string[] = session?.askedQuestions || [];
 
-        console.log("Sent to IA:", { content: content.trim(), currentSection, actorName });
-
         // THE RETRY ENGINE (SILENT REPROCESSING) ---
         let attempt = 0;
         const maxAttempts = 3;
         let success = false;
         
         let aiCoachReply = "";
-        let aiExtractions: any = null;
+        let aiExtractions: AIExtractions | null = null;
         let selectedQuestions: string[] = [];
-        let aiAssessment: any = null;
+        let aiAssessment: ProgressAssessment | null = null;
 
         while (attempt < maxAttempts && !success) {
             try {
                 if (attempt > 0) {
                     setIsReprocessing(true);
-                    console.log(`Reprocessando chamada para a IA... (Tentativa ${attempt + 1})`);
                 }
 
-                // 3. Execute Secure API Call to our Next.js backend
+                // Execute Secure API Call to our Next.js backend
                 const response = await fetch('/api/dna/chat', {
                     method: 'POST',
                     headers: {
@@ -355,7 +396,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                 }
 
                 // 4. Parse the secure response
-                const responseData = await response.json();
+                const responseData = (await response.json()) as ChatApiResponse;
                 
                 // Validação de segurança para garantir que a IA não retornou um texto vazio
                 if (!responseData?.aiData?.coach_reply) {
@@ -365,22 +406,20 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                 aiCoachReply = responseData.aiData.coach_reply;
                 aiExtractions = responseData.aiData.extractions || null;
                 selectedQuestions = responseData.selectedQuestions || [];
-                aiAssessment = responseData.aiData.progress_assessment || responseData.aiData.extractions?.progress_assessment || null;
+                aiAssessment = responseData.aiData.progress_assessment ?? aiExtractions?.progress_assessment ?? null;
 
-                success = true; // Quebra o loop se deu tudo certo
+                success = true; 
 
             } catch (error) {
                 attempt++;
                 console.error(`Tentativa ${attempt} falhou silenciosamente:`, error);
                 
                 if (attempt < maxAttempts) {
-                    // Espera 2 segundos antes de tentar de novo
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
         }
 
-        // Se tentou 3 vezes e falhou, dá uma resposta graciosa e encerra.
         if (!success) {
             await addDoc(messagesRef, {
                 role: "assistant",
@@ -393,7 +432,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             return; 
         }
 
-        console.log("==========IA's Response:==============", { aiCoachReply, aiExtractions, aiAssessment });
 
         // 6. Persist only the AI's conversational reply to the visible chat history
         await addDoc(messagesRef, {
@@ -428,25 +466,25 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
             // --- THE MASTER PROFILE ARCHITECTURE ---
             const profileRef = doc(getDb(), `users/${userPath}/profile/master`);
-            const updatePayload: any = { lastUpdated: serverTimestamp() };
+            const updatePayload: Record<string, unknown> = { lastUpdated: serverTimestamp() };
 
-            if (aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = arrayUnion(...aiExtractions.new_traits);
-            if (aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = arrayUnion(...aiExtractions.defense_mechanisms);
-            if (aiExtractions.leaf_snippets?.length > 0) {
+            if (aiExtractions.new_traits && aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = arrayUnion(...aiExtractions.new_traits);
+            if (aiExtractions.defense_mechanisms && aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = arrayUnion(...aiExtractions.defense_mechanisms);
+            if (aiExtractions.leaf_snippets && aiExtractions.leaf_snippets?.length > 0) {
                 const snippetsWithContext = aiExtractions.leaf_snippets.map((quote: string) => ({ quote, section: currentSection, timestamp: new Date().toISOString() }));
                 updatePayload['psychology.leafSnippets'] = arrayUnion(...snippetsWithContext);
             }
             if (aiExtractions.holistic_analysis) updatePayload['psychology.analysisTimeline'] = arrayUnion({ inference: aiExtractions.holistic_analysis, section: currentSection, timestamp: new Date().toISOString() });
-            if (aiExtractions.somatic_tells?.length > 0) updatePayload['physicality.somaticTells'] = arrayUnion(...aiExtractions.somatic_tells);
-            if (aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = arrayUnion(...aiExtractions.core_values);
-            if (aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = arrayUnion(...aiExtractions.relational_dynamics);
-            if (aiExtractions.milestones?.length > 0) {
-                const milestonesWithContext = aiExtractions.milestones.map((milestone: any) => ({ ...milestone, section: currentSection, discoveredAt: new Date().toISOString() }));
+            if (aiExtractions.somatic_tells && aiExtractions.somatic_tells?.length > 0) updatePayload['physicality.somaticTells'] = arrayUnion(...aiExtractions.somatic_tells);
+            if (aiExtractions.core_values && aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = arrayUnion(...aiExtractions.core_values);
+            if (aiExtractions.relational_dynamics && aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = arrayUnion(...aiExtractions.relational_dynamics);
+            if (aiExtractions.milestones && aiExtractions.milestones?.length > 0) {
+                const milestonesWithContext = aiExtractions.milestones.map((milestone: Milestone) => ({ ...milestone, section: currentSection, discoveredAt: new Date().toISOString() }));
                 updatePayload['history.milestones'] = arrayUnion(...milestonesWithContext);
             }
-            if (aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = arrayUnion(...aiExtractions.core_wounds_and_fears);
-            if (aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = arrayUnion(...aiExtractions.unmet_needs);
-            if (aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = arrayUnion(...aiExtractions.public_masks);
+            if (aiExtractions.core_wounds_and_fears && aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = arrayUnion(...aiExtractions.core_wounds_and_fears);
+            if (aiExtractions.unmet_needs && aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = arrayUnion(...aiExtractions.unmet_needs);
+            if (aiExtractions.public_masks && aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = arrayUnion(...aiExtractions.public_masks);
 
             if (aiExtractions.emotional_baseline) {
                 if (aiExtractions.emotional_baseline.conflict_response) updatePayload['psychology.emotionalBaseline.conflictResponse'] = aiExtractions.emotional_baseline.conflict_response;
@@ -458,8 +496,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                 if (aiExtractions.intellectual_framework.attention_to_detail) updatePayload['psychology.intellectualFramework.attentionToDetail'] = aiExtractions.intellectual_framework.attention_to_detail;
             }
 
-            if (aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = arrayUnion(...aiExtractions.archetype_signals);
-            if (aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = arrayUnion(...aiExtractions.key_entities_and_arenas);
+            if (aiExtractions.archetype_signals && aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = arrayUnion(...aiExtractions.archetype_signals);
+            if (aiExtractions.key_entities_and_arenas && aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = arrayUnion(...aiExtractions.key_entities_and_arenas);
             
             await setDoc(profileRef, updatePayload, { merge: true });
           }
@@ -467,10 +505,21 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         
         if (newCompletedSecs.length >= 4) unlockedAuditions = true;
 
-        const totalPepitasUteis = Object.values(sectionCounts).reduce((acc, count) => acc + Math.min(count as number, 6), 0);
-        const newProgress = Math.round(Math.min((totalPepitasUteis / 24) * 100, 100));
-        
-        // ATENÇÃO AQUI: Salvando a pergunta recém gerada na Blacklist!
+        const TOTAL_SECTIONS = 12; 
+        const EXTRACTIONS_TO_COMPLETE_SECTION = 12; 
+
+        let totalProgressPercentage = 0;
+
+        Object.values(sectionCounts).forEach(count => {
+          const validExtractions = Math.min(count as number, EXTRACTIONS_TO_COMPLETE_SECTION);
+          
+          const sectionContribution = (validExtractions / EXTRACTIONS_TO_COMPLETE_SECTION) * (100 / TOTAL_SECTIONS);
+          
+          totalProgressPercentage += sectionContribution;
+        });
+
+        const newProgress = Math.round(Math.min(totalProgressPercentage, 100));
+
         const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
 
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
@@ -481,12 +530,12 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           sectionHqCounts: sectionCounts,
           progress: newProgress,           
           auditionsUnlocked: unlockedAuditions,
-          askedQuestions: newAskedQuestions // <-- Isso estava faltando e garante que a repetição não ocorra!
+          askedQuestions: newAskedQuestions 
         }, { merge: true });
         
-      } catch (error) {
-        // Se der algum erro muito fora da curva (como a internet do usuário cair de vez)
-        console.error("Fatal error out of retry loop:", error);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unexpected session error";
+        console.error("Fatal error out of retry loop:", errorMessage);
       } finally {
         setIsLoading(false);
         setIsReprocessing(false);

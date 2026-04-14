@@ -2,6 +2,7 @@
 import { render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
+import { signOut, onAuthStateChanged, getAuth, Auth, User } from 'firebase/auth';
 
 jest.mock('@/lib/firebase', () => ({
     getApp: jest.fn(),
@@ -19,9 +20,9 @@ jest.mock('firebase/auth', () => ({
 
 global.fetch = jest.fn();
 
-const mockSignOut = require('firebase/auth').signOut;
-const mockOnAuthStateChanged = require('firebase/auth').onAuthStateChanged;
-const mockGetAuth = require('firebase/auth').getAuth;
+const mockSignOut = jest.mocked(signOut);
+const mockOnAuthStateChanged = jest.mocked(onAuthStateChanged);
+const mockGetAuth = jest.mocked(getAuth);
 
 describe('AuthContext', () => {
     let consoleErrorSpy: jest.SpyInstance;
@@ -41,10 +42,14 @@ describe('AuthContext', () => {
         jest.clearAllMocks();
         consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-        mockGetAuth.mockReturnValue({});
-        mockOnAuthStateChanged.mockImplementation((_auth: any, callback: (user: null) => void) => {
-            callback(null);
-            return jest.fn();
+        mockGetAuth.mockReturnValue({} as Auth);
+        mockOnAuthStateChanged.mockImplementation((_auth, nextOrObserver) => {
+        if (typeof nextOrObserver === 'function') {
+            nextOrObserver(null);
+        } else if (nextOrObserver && typeof nextOrObserver === 'object' && 'next' in nextOrObserver) {
+            nextOrObserver.next?.(null);
+        }
+        return jest.fn(); 
         });
     });
 
