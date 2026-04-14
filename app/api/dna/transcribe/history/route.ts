@@ -2,6 +2,47 @@ import { NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
+interface TranscriptionRequest {
+  audioBase64: string;
+  mimeType?: string;
+}
+
+interface Milestone {
+  event: string;
+  emotional_cost: string;
+  discoveredAt?: string;
+}
+
+interface AIExtractions {
+  is_valuable_extraction?: boolean;
+  new_traits?: string[];
+  defense_mechanisms?: string[];
+  leaf_snippets?: string[];
+  holistic_analysis?: string;
+  somatic_tells?: string[];
+  core_values?: string[];
+  relational_dynamics?: string[];
+  milestones?: Milestone[];
+  core_wounds_and_fears?: string[];
+  unmet_needs?: string[];
+  public_masks?: string[];
+  emotional_baseline?: {
+    conflict_response?: string;
+    internal_friction?: string;
+    vulnerability_management?: string;
+  };
+  intellectual_framework?: {
+    cognitive_style?: string;
+    attention_to_detail?: string;
+  };
+  archetype_signals?: string[];
+  key_entities_and_arenas?: string[];
+  progress_assessment: {
+    has_actionable_pattern: boolean;
+    depth_score: number;
+  };
+}
+
 /**
  * Transcribes audio recordings and extracts psychological DNA data from spoken memories.
  * Saves both raw transcription and AI-extracted profile data to Firestore.
@@ -21,7 +62,7 @@ export async function POST(request: Request) {
     const userId = decodedToken.uid;
 
     // get audio
-    const body = await request.json();
+    const body = await request.json() as TranscriptionRequest;
     const { audioBase64, mimeType } = body;
 
     if (!audioBase64) {
@@ -37,13 +78,12 @@ export async function POST(request: Request) {
     const transcriptionModel = getGenerativeModel(ai, {
       model: "gemini-2.5-flash",
       generationConfig: { temperature: 0.1 }, 
-    } as any);
+    } );
 
     const audioPart = {
       inlineData: { data: audioBase64, mimeType: mimeType || "audio/webm" }
     };
 
-    console.log("Transcrevendo áudio rápido...");
     const transcriptionResult = await transcriptionModel.generateContent([
       "Transcribe this audio exactly as spoken. Return only the raw text.", 
       audioPart
@@ -58,6 +98,7 @@ export async function POST(request: Request) {
     const extractionModel = getGenerativeModel(ai, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
+            // @ts-expect-error
             thinkingConfig: { thinkingLevel: "HIGH" },
             tools: [{
                 functionDeclarations: [{
@@ -174,9 +215,8 @@ export async function POST(request: Request) {
                     }
                 }]
             }]
-        } as any); 
+        } ); 
 
-    console.log("Extraindo dados da memória...");
     const extractionPrompt = `
       You are an elite Psychological Profiler. The actor just recorded a raw, spoken memory.
       Read the transcription and extract maximum psychological value. Read between the lines.
@@ -187,11 +227,14 @@ export async function POST(request: Request) {
 
     const extractionResult = await extractionModel.generateContent(extractionPrompt);
     
-    let aiExtractions: any = null;
+    let aiExtractions: AIExtractions | null = null;
     const functionCalls = extractionResult.response.functionCalls(); 
-    if (functionCalls && functionCalls.length > 0) {
-        aiExtractions = functionCalls[0].args;
+
+    if (functionCalls && functionCalls?.length > 0) {
+        // Forçamos o tipo após a validação da chamada de função
+        aiExtractions = functionCalls[0].args as unknown as AIExtractions;
     }
+    
 
     //saving
     const userRecord = await auth.getUser(userId);
@@ -201,7 +244,7 @@ export async function POST(request: Request) {
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     
     // save plain transcription
-    const updatePayload: any = {
+    const updatePayload: Record<string, unknown> = {
       lastUpdated: FieldValue.serverTimestamp(),
       rawMemories: FieldValue.arrayUnion({
         text: transcribedText,
@@ -210,23 +253,23 @@ export async function POST(request: Request) {
     };
 
     if (aiExtractions) {
-      if (aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = FieldValue.arrayUnion(...aiExtractions.new_traits);
-        if (aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = FieldValue.arrayUnion(...aiExtractions.defense_mechanisms);
-        if (aiExtractions.leaf_snippets?.length > 0) {
+      if (aiExtractions.new_traits && aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = FieldValue.arrayUnion(...aiExtractions.new_traits);
+        if (aiExtractions.defense_mechanisms && aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = FieldValue.arrayUnion(...aiExtractions.defense_mechanisms);
+        if (aiExtractions.leaf_snippets && aiExtractions.leaf_snippets?.length > 0) {
             const snippetsWithContext = aiExtractions.leaf_snippets.map((quote: string) => ({ quote, timestamp: new Date().toISOString() }));
             updatePayload['psychology.leafSnippets'] = FieldValue.arrayUnion(...snippetsWithContext);
         }
         if (aiExtractions.holistic_analysis) updatePayload['psychology.analysisTimeline'] = FieldValue.arrayUnion({ inference: aiExtractions.holistic_analysis, timestamp: new Date().toISOString() });
-        if (aiExtractions.somatic_tells?.length > 0) updatePayload['physicality.somaticTells'] = FieldValue.arrayUnion(...aiExtractions.somatic_tells);
-        if (aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...aiExtractions.core_values);
-        if (aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = FieldValue.arrayUnion(...aiExtractions.relational_dynamics);
-        if (aiExtractions.milestones?.length > 0) {
+        if (aiExtractions.somatic_tells && aiExtractions.somatic_tells?.length > 0) updatePayload['physicality.somaticTells'] = FieldValue.arrayUnion(...aiExtractions.somatic_tells);
+        if (aiExtractions.core_values && aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...aiExtractions.core_values);
+        if (aiExtractions.relational_dynamics && aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = FieldValue.arrayUnion(...aiExtractions.relational_dynamics);
+        if (aiExtractions.milestones && aiExtractions.milestones?.length > 0) {
             const milestonesWithContext = aiExtractions.milestones.map((milestone: any) => ({ ...milestone, discoveredAt: new Date().toISOString() }));
             updatePayload['history.milestones'] = FieldValue.arrayUnion(...milestonesWithContext);
         }
-        if (aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = FieldValue.arrayUnion(...aiExtractions.core_wounds_and_fears);
-        if (aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = FieldValue.arrayUnion(...aiExtractions.unmet_needs);
-        if (aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = FieldValue.arrayUnion(...aiExtractions.public_masks);
+        if (aiExtractions.core_wounds_and_fears && aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = FieldValue.arrayUnion(...aiExtractions.core_wounds_and_fears);
+        if (aiExtractions.unmet_needs && aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = FieldValue.arrayUnion(...aiExtractions.unmet_needs);
+        if (aiExtractions.public_masks && aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = FieldValue.arrayUnion(...aiExtractions.public_masks);
 
         if (aiExtractions.emotional_baseline) {
             if (aiExtractions.emotional_baseline.conflict_response) updatePayload['psychology.emotionalBaseline.conflictResponse'] = aiExtractions.emotional_baseline.conflict_response;
@@ -238,8 +281,8 @@ export async function POST(request: Request) {
             if (aiExtractions.intellectual_framework.attention_to_detail) updatePayload['psychology.intellectualFramework.attentionToDetail'] = aiExtractions.intellectual_framework.attention_to_detail;
         }
 
-        if (aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = FieldValue.arrayUnion(...aiExtractions.archetype_signals);
-        if (aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = FieldValue.arrayUnion(...aiExtractions.key_entities_and_arenas);
+        if (aiExtractions.archetype_signals && aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = FieldValue.arrayUnion(...aiExtractions.archetype_signals);
+        if (aiExtractions.key_entities_and_arenas && aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = FieldValue.arrayUnion(...aiExtractions.key_entities_and_arenas);
         
     }
 
@@ -247,8 +290,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, text: transcribedText }, { status: 200 });
 
-  } catch (error: any) {
-    console.error("Memory Processing Error:", error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
-  }
+  } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Internal Server Error";
+        console.error("Memory Processing Error:", message);
+        return NextResponse.json({ error: message }, { status: 500 });
+}
 }

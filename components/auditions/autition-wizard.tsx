@@ -16,6 +16,16 @@ import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 
+interface PerformanceSection {
+  title: string;
+  items: string[];
+}
+
+interface AuditionAnalysisResult {
+  intro?: string;
+  sections: PerformanceSection[];
+  outro?: string;
+}
 
 /**
  * AuditionWizard Component
@@ -27,7 +37,7 @@ export function AuditionWizard() {
   const [currentStep, setCurrentStep] = useState<AuditionStep>(1);
   const [formData, setFormData] = useState<AuditionFormData>(initialAuditionData);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [resultData, setResultData] = useState<any>(null);
+  const [resultData, setResultData] = useState<AuditionAnalysisResult | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // --- PRINTING SETUP ---
@@ -136,7 +146,7 @@ export function AuditionWizard() {
       const data = await response.json();
 
       if (response.ok && data.data?.sections) { 
-        setResultData(data.data); 
+        setResultData(data.data as AuditionAnalysisResult); 
         setIsGenerating(false);
       } else {
         console.error("Server Error:", data.error);
@@ -354,7 +364,7 @@ export function AuditionWizard() {
 
                    {/* Sections Loop */}
                    <div className="space-y-10">
-                     {resultData?.sections?.map((sec: any, idx: number) => (
+                     {resultData?.sections?.map((sec: PerformanceSection, idx: number) => (
                        <div key={idx} className="break-inside-avoid">
                          <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
                            {sec.title}

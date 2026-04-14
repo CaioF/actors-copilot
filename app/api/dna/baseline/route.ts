@@ -1,7 +1,34 @@
 import { NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin'; 
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, DocumentData } from 'firebase-admin/firestore';
 import PDFParser from 'pdf2json';
+
+interface Milestone {
+  event: string;
+  emotional_cost: string;
+  section?: string;
+  discoveredAt?: string;
+}
+
+interface EmotionalBaseline {
+  conflict_response?: string;
+  internal_friction?: string;
+  vulnerability_management?: string;
+}
+
+interface ActorProfileExtraction {
+  new_traits?: string[];
+  defense_mechanisms?: string[];
+  core_values?: string[];
+  relational_dynamics?: string[];
+  milestones?: Milestone[];
+  core_wounds_and_fears?: string[];
+  unmet_needs?: string[];
+  public_masks?: string[];
+  emotional_baseline?: EmotionalBaseline;
+  archetype_signals?: string[];
+  key_entities_and_arenas?: string[];
+}
 
 /**
  * Extracts text content from a PDF buffer using pdf2json with a 60-second timeout
@@ -14,7 +41,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
   const parsePromise = new Promise<string>((resolve, reject) => {
     const pdfParser = new PDFParser(null, 1);
 
-    pdfParser.on("pdfParser_dataError", (errData: any) => {
+    pdfParser.on("pdfParser_dataError", (errData:{ parserError: Error | string }) => {
       reject(errData.parserError);
     });
 
@@ -104,7 +131,8 @@ export async function POST(request: Request) {
     const extractionModel = getGenerativeModel(ai, {
       model: "gemini-2.5-pro",
       generationConfig: { temperature: 0.2 }, // low temperature so that it's analytical, not creative 
-      thinkingConfig: { thinkingLevel: "HIGH" },
+      // @ts-expect-error
+      thinkingConfig: { thinkingLevel: "MEDIUM" },
       tools: [{
         functionDeclarations: [{
                   name: "update_master_profile",
@@ -220,7 +248,7 @@ export async function POST(request: Request) {
                   }
               }]
           }]
-      } as any); 
+      } ); 
 
 
     console.log("Iniciando extração profunda do Baseline Document...");
@@ -236,7 +264,7 @@ export async function POST(request: Request) {
       Execute the extraction function now based on the text above.
     `);
 
-    let aiExtractions: any = null;
+    let aiExtractions: ActorProfileExtraction | null = null
     const functionCalls = extractionResult.response.functionCalls(); 
     
     if (functionCalls && functionCalls.length > 0) {
@@ -249,27 +277,26 @@ export async function POST(request: Request) {
 
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     
-    const updatePayload: any = {
+    const updatePayload: DocumentData = {
       baselineHistory: finalContent,
       lastUpdated: FieldValue.serverTimestamp()
     };
 
     if (aiExtractions) {
-      console.log("Extração concluída com sucesso! Populando banco de dados...");
 
-      if (aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = FieldValue.arrayUnion(...aiExtractions.new_traits);
-      if (aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = FieldValue.arrayUnion(...aiExtractions.defense_mechanisms);
-      if (aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...aiExtractions.core_values);
-      if (aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = FieldValue.arrayUnion(...aiExtractions.relational_dynamics);
+      if (aiExtractions.new_traits && aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = FieldValue.arrayUnion(...aiExtractions.new_traits);
+      if (aiExtractions.defense_mechanisms && aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = FieldValue.arrayUnion(...aiExtractions.defense_mechanisms);
+      if (aiExtractions.core_values && aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...aiExtractions.core_values);
+      if (aiExtractions.relational_dynamics && aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = FieldValue.arrayUnion(...aiExtractions.relational_dynamics);
       
-      if (aiExtractions.milestones?.length > 0) {
-          const milestonesWithContext = aiExtractions.milestones.map((m: any) => ({ ...m, section: "baseline_upload", discoveredAt: new Date().toISOString() }));
+      if (aiExtractions.milestones && aiExtractions.milestones?.length > 0) {
+          const milestonesWithContext = aiExtractions.milestones.map((m: Milestone) => ({ ...m, section: "baseline_upload", discoveredAt: new Date().toISOString() }));
           updatePayload['history.milestones'] = FieldValue.arrayUnion(...milestonesWithContext);
       }
       
-      if (aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = FieldValue.arrayUnion(...aiExtractions.core_wounds_and_fears);
-      if (aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = FieldValue.arrayUnion(...aiExtractions.unmet_needs);
-      if (aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = FieldValue.arrayUnion(...aiExtractions.public_masks);
+      if (aiExtractions.core_wounds_and_fears && aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = FieldValue.arrayUnion(...aiExtractions.core_wounds_and_fears);
+      if (aiExtractions.unmet_needs && aiExtractions.unmet_needs?.length > 0) updatePayload['acting_fuel.unmetNeeds'] = FieldValue.arrayUnion(...aiExtractions.unmet_needs);
+      if (aiExtractions.public_masks && aiExtractions.public_masks?.length > 0) updatePayload['acting_fuel.publicMasks'] = FieldValue.arrayUnion(...aiExtractions.public_masks);
 
       if (aiExtractions.emotional_baseline) {
           if (aiExtractions.emotional_baseline.conflict_response) updatePayload['psychology.emotionalBaseline.conflictResponse'] = aiExtractions.emotional_baseline.conflict_response;
@@ -277,8 +304,8 @@ export async function POST(request: Request) {
           if (aiExtractions.emotional_baseline.vulnerability_management) updatePayload['psychology.emotionalBaseline.vulnerabilityManagement'] = aiExtractions.emotional_baseline.vulnerability_management;
       }
 
-      if (aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = FieldValue.arrayUnion(...aiExtractions.archetype_signals);
-      if (aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = FieldValue.arrayUnion(...aiExtractions.key_entities_and_arenas);
+      if (aiExtractions.archetype_signals && aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = FieldValue.arrayUnion(...aiExtractions.archetype_signals);
+      if (aiExtractions.key_entities_and_arenas && aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = FieldValue.arrayUnion(...aiExtractions.key_entities_and_arenas);
     }
 
     await profileRef.set(updatePayload, { merge: true });
@@ -289,8 +316,10 @@ export async function POST(request: Request) {
       extractionsCount: aiExtractions ? Object.keys(aiExtractions).length : 0 
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Baseline Upload Error:", error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    // Type narrowing 
+    const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

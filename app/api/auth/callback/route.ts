@@ -4,6 +4,34 @@ import { auth } from '@/lib/firebase.admin';
 import { SignJWT } from 'jose';
 import { logger, createChildLogger } from '@/lib/logger';
 
+interface KajabiContact {
+  id: string;
+  attributes: {
+    email: string;
+    [key: string]: unknown; 
+  };
+  relationships: {
+    offers?: {
+      links: {
+        self: string;
+      };
+    };
+  };
+}
+
+interface KajabiOffer {
+  id: string | number;
+  attributes?: {
+    name?: string;
+  };
+}
+
+interface KajabiTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
 /**
  * Authenticates a user via Firebase, verifies their Kajabi access, 
  * and establishes a secure session by issuing an HTTP-only JWT cookie.
@@ -82,9 +110,11 @@ export async function POST(request: Request) {
         log.info({ email: userEmail, msg: 'Authentication successful' });
         return NextResponse.json({ success: true, redirectUrl: '/dashboard' }, { status: 200 });
 
-    } catch (error) {
+    }catch (error: unknown) {
         log.error({ err: error, msg: 'Authentication error' });
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 } 
 
@@ -120,7 +150,7 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
 
         if (!tokenResponse.ok) return { success: false, message: "Failed to connect to Kajabi validation server." };
 
-        const tokenData = await tokenResponse.json();
+        const tokenData = (await tokenResponse.json()) as KajabiTokenResponse;
         const accessToken = tokenData.access_token;
 
         const userResponse = await fetch(`https://api.kajabi.com/v1/contacts?email=${encodeURIComponent(email)}`, {
@@ -131,14 +161,14 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
         });
 
         if (!userResponse.ok) return { success: false, message: "Failed to fetch user data from Kajabi." };
-
-        const userData = await userResponse.json();
+            
+        const userData = (await userResponse.json()) as { data: KajabiContact[] };
         if (!userData || !userData.data || userData.data.length === 0 ) {
             return { success: false, message: "We couldn't find a Kajabi account with this email. Please use the exact email you used to purchase." };
         }
 
         const userInKajabi = userData.data.find(
-            (contato: any) => contato.attributes.email === email
+            (contato: KajabiContact) => contato.attributes.email === email
         );
 
         if (!userInKajabi) {
@@ -161,7 +191,7 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
 
         if (!offersResponse.ok) return { success: false, message: "Failed to verify your active offers." }; 
 
-        const offersData = await offersResponse.json();
+        const offersData = (await offersResponse.json()) as { data: KajabiOffer[] };
         if (!offersData.data || offersData.data.length === 0) {
             return { success: false, message: "You don't have any active offers in your account." };
         }
@@ -172,7 +202,7 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
         }
         
         const hasRequiredOffer = offersData.data.some(
-            (offer: any) => String(offer.id) === String(requiredOfferId)
+            (offer: KajabiOffer) => String(offer.id) === String(requiredOfferId)
         );
 
         if (!hasRequiredOffer) {

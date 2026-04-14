@@ -4,6 +4,46 @@ import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { QUESTIONS } from '@/lib/questions';
 import { saveRawMessageToFirestore } from '@/lib/firestore.utils'; 
 
+interface ChatHistoryMessage {
+  role: string;
+  parts: { text: string }[];
+}
+
+interface ExtractionMilestone {
+    event: string;
+    emotional_cost: string;
+}
+
+interface ExtractedPsychData {
+    is_valuable_extraction?: boolean;
+    new_traits?: string[];
+    defense_mechanisms?: string[];
+    leaf_snippets?: string[];
+    holistic_analysis?: string;
+    somatic_tells?: string[];
+    core_values?: string[];
+    relational_dynamics?: string[];
+    milestones?: ExtractionMilestone[];
+    core_wounds_and_fears?: string[];
+    unmet_needs?: string[];
+    public_masks?: string[];
+    emotional_baseline?: {
+        conflict_response?: string;
+        internal_friction?: string;
+        vulnerability_management?: string;
+    };
+    intellectual_framework?: {
+        cognitive_style?: string;
+        attention_to_detail?: string;
+    };
+    archetype_signals?: string[];
+    key_entities_and_arenas?: string[];
+    progress_assessment?: {
+        has_actionable_pattern: boolean;
+        depth_score: number;
+    };
+}
+
 /**
  * Handles conversational DNA extraction chat, running dual AI models: one for Socratic
  * questioning and another for silent psychological data extraction from user responses.
@@ -69,11 +109,8 @@ export async function POST(request: Request) {
             
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}
-            Don't use the connective "understood".
-            Don't repeat what they just said.
             
             `;
-            console.log(dynamicCommand);
 
         const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
@@ -82,17 +119,19 @@ export async function POST(request: Request) {
         
         // --- AGENT 1: YAN (Conversacional) ---
         const chatModel = getGenerativeModel(ai, { 
-            model: "gemini-2.5-pro", 
+            model: "gemini-3.1-pro-preview", 
             generationConfig: { temperature: 0.4 },
-            thinkingConfig: {
-                thinkingLevel: "HIGH" // Forces the model to use internal deliberation before answering
-            }
-        } as any); // Type assertion to bypass the current typing issue with getGenerativeModel);
+            
+            // thinkingConfig: {
+            //     thinkingLevel: "HIGH" // Forces the model to use internal deliberation before answering
+            // }
+        } ); // Type assertion to bypass the current typing issue with getGenerativeModel);
 
         // --- AGENT 2: MEMLISTENER (Context Extraction) ---
         const extractionModel = getGenerativeModel(ai, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
+            // @ts-expect-error
             thinkingConfig: { thinkingLevel: "MEDIUM" },
             tools: [{
                 functionDeclarations: [{
@@ -209,10 +248,8 @@ export async function POST(request: Request) {
                     }
                 }]
             }]
-        } as any); 
+        } ); 
 
-
-        console.log(`Iniciando IA dupla para a seção: ${currentSection}...`);
 
         const chat = chatModel.startChat({
             systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
@@ -220,7 +257,7 @@ export async function POST(request: Request) {
         });
 
         // Build the history context for the extraction model to read
-        const recentHistoryText = history.slice(-7).map((msg: any) => `${msg.role.toUpperCase()}: ${msg.parts[0].text}`).join('\n');
+        const recentHistoryText = history.slice(-7).map((msg: ChatHistoryMessage) => `${msg.role.toUpperCase()}: ${msg.parts[0].text}`).join('\n');
 
         const promptForExtraction = `
             [SYSTEM INSTRUCTION FOR EXTRACTION]
@@ -243,12 +280,13 @@ export async function POST(request: Request) {
 
         const aiResponseText = chatResult.response.text();
         
-        let extractionsData = null;
+
+        let extractionsData: ExtractedPsychData | null = null;
         
         const functionCalls = extractionResult.response.functionCalls(); 
         
         if (functionCalls && functionCalls.length > 0) {
-            extractionsData = functionCalls[0].args;
+            extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
         }
         
 

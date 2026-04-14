@@ -23,7 +23,14 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+    }
+  }, [value]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -98,7 +105,11 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
 
             const data = await response.json();
             if (data.text) {
-               onSend(data.text);
+               setValue(data.text);
+               
+               setTimeout(() => {
+                 inputRef.current?.focus();
+               }, 10);
             }
           } catch (error) {
             console.error("Transcription error:", error);
@@ -141,30 +152,33 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
 
   return (
     <div className="flex justify-center px-8 pb-3 pt-2">
-      <div className="flex w-full max-w-2xl items-center gap-2 rounded-full border border-[#C7C0B5]/60 bg-[#F0E8DC] px-4 py-2 shadow-sm">
+      {/* Mudamos de items-center para items-end para os botões ficarem no fundo quando a caixa crescer */}
+      <div className="flex w-full max-w-2xl items-end gap-2 rounded-3xl border border-[#C7C0B5]/60 bg-[#F0E8DC] px-4 py-2 shadow-sm transition-all">
+        
         <button
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0] hover:text-[#2C3328]"
+          className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0] hover:text-[#2C3328]"
           aria-label="Attach file"
           type="button"
+          disabled={isRecording || isTranscribing}
         >
           <Paperclip className="h-5 w-5" />
         </button>
 
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          rows={1}
           placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : "Ask me anything..."}
           disabled={isLoading || isRecording || isTranscribing}
-          className="flex-1 bg-transparent text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
+          className="max-h-[150px] min-h-[24px] flex-1 resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50 scrollbar-thin"
         />
 
         <button
           onClick={handleMainAction}
           disabled={isLoading && !isRecording && !isTranscribing}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
+          className={`mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
             isRecording
               ? "animate-pulse bg-red-500 text-white"
               : isTranscribing

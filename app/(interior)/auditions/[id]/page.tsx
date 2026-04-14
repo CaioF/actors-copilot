@@ -9,8 +9,24 @@ import { Loader2, ArrowLeft, Printer } from "lucide-react"
 import { useReactToPrint } from "react-to-print"
 import ReactMarkdown from "react-markdown"
 
-// Importa o seu componente visual que desenha os cards verdes da IA
 import { StepResult } from "@/components/auditions/step/step-result"
+
+interface PerformanceSection {
+  title: string;
+  items: string[];
+}
+
+interface PerformanceMap {
+  intro?: string;
+  sections: PerformanceSection[];
+  outro?: string;
+}
+
+interface AuditionData {
+  project: string;
+  role: string;
+  performanceMap?: PerformanceMap;
+}
 
 /**
  * Detailed view page for a single audition breakdown.
@@ -23,7 +39,7 @@ export default function AuditionDetailView() {
   const router = useRouter()
   const auditionId = params.id as string
 
-  const [auditionData, setAuditionData] = useState<any>(null)
+  const [auditionData, setAuditionData] = useState<AuditionData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(false)
   
@@ -62,11 +78,9 @@ export default function AuditionDetailView() {
       const db = getDb()
       const docRef = doc(db, `users/${userPath}/auditions/${id}`)
       const docSnap = await getDoc(docRef)
-
       if (docSnap.exists()) {
-        const data = docSnap.data()
+        const data = docSnap.data() as AuditionData
         setAuditionData(data)
-        
         
       }
     } catch (err) {
@@ -159,7 +173,7 @@ export default function AuditionDetailView() {
 
           {/* Sections Loop */}
           <div className="space-y-10">
-            {auditionData?.performanceMap?.sections.map((sec: any, idx: number) => (
+            {auditionData?.performanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
               <div key={idx} className="break-inside-avoid">
                 <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
                   {sec.title}
