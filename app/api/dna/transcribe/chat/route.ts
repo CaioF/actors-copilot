@@ -39,8 +39,6 @@ export async function POST(request: Request) {
     const audioPart = {
       inlineData: { data: audioBase64, mimeType: mimeType || "audio/webm" }
     };
-
-    console.log("Transcrevendo áudio rápido para o ChatInput...");
     
     const transcriptionResult = await transcriptionModel.generateContent([
       "Transcribe this audio exactly as spoken. Do not add any conversational filler. Return only the raw text.", 
@@ -55,8 +53,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ text: transcribedText }, { status: 200 });
 
-  } catch (error: any) {
-    console.error("Transcription Error:", error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  } catch (error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
+  console.error("Transcription Error:", error);
+  return NextResponse.json(    { error: errorMessage },     { status: 500 }  );
   }
 }

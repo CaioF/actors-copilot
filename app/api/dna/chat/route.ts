@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/firebase.admin';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
-import { QUESTIONS } from '@/lib/questions';
-import { saveRawMessageToFirestore } from '@/lib/firestore.utils'; 
 
 interface ChatHistoryMessage {
   role: string;
@@ -58,10 +55,6 @@ export async function POST(request: Request) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        
-        const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await auth.verifyIdToken(token); 
-        const userId = decodedToken.uid;
 
         const body = await request.json();
         const { content, currentSection, actorName, history, previouslyAsked } = body;
@@ -119,7 +112,7 @@ export async function POST(request: Request) {
         
         // --- AGENT 1: YAN (Conversacional) ---
         const chatModel = getGenerativeModel(ai, { 
-            model: "gemini-2.5-pro", 
+            model: "gemini-3.1-pro-preview", 
             generationConfig: { temperature: 0.4 },
             
             // thinkingConfig: {

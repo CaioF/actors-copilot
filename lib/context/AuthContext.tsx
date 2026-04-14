@@ -17,6 +17,25 @@ interface AuthContextType {
     logout: () => Promise<void>;
 }
 
+// TODO: defining more specific error types for better error handling and user feedback in the UI, especially for common authentication issues like network errors, invalid credentials, or account conflicts.
+interface FirebaseError {
+  code: string;
+  message: string;
+}
+
+/**
+ * Type Guard to identify firebase errors
+ */
+function isFirebaseError(error: unknown): error is FirebaseError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as Record<string, unknown>).code === 'string'
+  );
+}
+
+
 /**
  * React Context for managing global authentication state.
  */
@@ -80,19 +99,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Redirect to the protected dashboard upon successful session creation
             window.location.href = "/dashboard"; 
 
-        } catch (error: any) {
-            // Gracefully handle user-initiated pop-up closure
-            if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-                return; 
-            }
-            
-            // Handle collision when Firebase blocks duplicate emails
-            if (error.code === 'auth/account-exists-with-different-credential') {
-                throw new Error("This email is already registered with a password. Please log in using the Email/Password form.", { cause: error });
+        } catch (error: unknown) {
+            if (isFirebaseError(error)) {
+                if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                    return; 
+                }
+                
+                if (error.code === 'auth/account-exists-with-different-credential') {
+                    throw new Error("This email is already registered. Please log in using the Email/Password form.", { cause: error });
+                }
             }
 
-            console.error("Failed to log in: ", error);
+            const message = error instanceof Error ? error.message : "An unexpected error occurred";
+            console.error("Failed to log in: ", message);
             throw error;
+           
         } finally {
             setLoading(false);
         }
@@ -121,13 +142,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish secure session.");
             }
             window.location.href = "/dashboard"; 
-        } catch (error: any) {
-            // NEW: Give a helpful hint if they fail the password but might have used Google
-            if (error.code === 'auth/invalid-credential') {
-                throw new Error("Invalid credentials. If you originally signed up with Google, please use the Google button.", { cause: error });
+        } catch (error: unknown) {
+            if (isFirebaseError(error)) {
+                if (error.code === 'auth/invalid-credential') {
+                    throw new Error("Invalid credentials. If you originally signed up with Google, please use the Google button.", { cause: error });
+                }
             }
-            console.error("Failed to log in with email: ", error);
+
+            const message = error instanceof Error ? error.message : "Failed to log in with email";
+            console.error("Login Error: ", message);
             throw error;
+
         } finally {
             setLoading(false);
         }
@@ -156,12 +181,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish secure session.");
             }
             window.location.href = "/dashboard"; 
-        } catch (error: any) {
-            // Handle if they try to sign up but already used Google or have an account
-            if (error.code === 'auth/email-already-in-use') {
-                throw new Error("This email is already registered. Try logging in with Google or your password instead.", { cause: error });
+        } catch (error: unknown) {
+            if (isFirebaseError(error)) {
+                if (error.code === 'auth/email-already-in-use') {
+                    throw new Error("This email is already registered. Try logging in with Google or your password instead.", { cause: error });
+                }
             }
-            console.error("Failed to sign up with email: ", error);
+            const message = error instanceof Error ? error.message : "Failed to sign up with email";
+            console.error("Signup Error: ", message);
             throw error;
         } finally {
             setLoading(false);
@@ -187,8 +214,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             
             window.location.href = "/login"; 
-        } catch (error) {
-            console.error("Error signing out: ", error);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown logout error";
+            console.error("Error signing out: ", message);
         } finally {
             setLoading(false);
         }
