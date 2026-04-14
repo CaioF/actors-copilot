@@ -119,7 +119,7 @@ export async function POST(request: Request) {
         
         // --- AGENT 1: YAN (Conversacional) ---
         const chatModel = getGenerativeModel(ai, { 
-            model: "gemini-3.1-pro-preview", 
+            model: "gemini-2.5-pro", 
             generationConfig: { temperature: 0.4 },
             
             // thinkingConfig: {
