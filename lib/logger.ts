@@ -9,6 +9,7 @@ const createLogger = () => {
       colorize: true,
       translateTime: 'SYS:standard',
       ignore: 'pid,hostname',
+      minimumLevel: 'trace',
     });
     return pino({ level: LOG_LEVEL }, stream);
   }
