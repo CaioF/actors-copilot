@@ -19,9 +19,43 @@ import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SECTION_INTROS } from "@/lib/prompts";
 import { ARENA_THEMES, DNASectionId } from "@/lib/chat-types";
+import {
+  type ExtractionTracker,
+  DEFAULT_THRESHOLDS,
+  shouldTriggerPivot,
+  updateTracker,
+} from "@/lib/pivot-logic";
 
 
 const DEFAULT_SESSION_ID = "session-1";
+
+const TRACKER_STORAGE_KEY_PREFIX = "dna_extraction_tracker_";
+
+function trackerStorageKey(userPath: string, sessionId: string): string {
+  return `${TRACKER_STORAGE_KEY_PREFIX}${userPath}_${sessionId}`;
+}
+
+function loadTrackerFromStorage(userPath: string, sessionId: string): ExtractionTracker | null {
+  if (typeof window === "undefined") return null;
+  if (!userPath) return null;
+  try {
+    const stored = localStorage.getItem(trackerStorageKey(userPath, sessionId));
+    if (stored) return JSON.parse(stored) as ExtractionTracker;
+  } catch (e) {
+    console.warn("[ExtractionTracker] Failed to load from localStorage:", e);
+  }
+  return null;
+}
+
+function saveTrackerToStorage(userPath: string, sessionId: string, tracker: ExtractionTracker): void {
+  if (typeof window === "undefined") return;
+  if (!userPath) return;
+  try {
+    localStorage.setItem(trackerStorageKey(userPath, sessionId), JSON.stringify(tracker));
+  } catch (e) {
+    console.warn("[ExtractionTracker] Failed to save to localStorage:", e);
+  }
+}
 
 interface ProgressAssessment {
   has_actionable_pattern: boolean;
@@ -89,10 +123,33 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [firebaseAvailable, setFirebaseAvailable] = useState(true);
   const [isReprocessing, setIsReprocessing] = useState(false);
+  const [extractionTracker, setExtractionTracker] = useState<ExtractionTracker>({
+    currentSection: "identity",
+    extractedThemes: [],
+    hqExtractionHistory: [],
+    questionCounter: 0,
+    pivotFlag: false,
+  });
 
   //Handle Authentication and the customized Firestore path
   const [userPath, setUserPath] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  /**
+   * Writes tracker state AND persists to localStorage in one step so nothing
+   * slips through. Keyed by userPath+sessionId to prevent cross-user collision
+   * on a shared device.
+   */
+  const updateTrackerState = useCallback(
+    (updater: ExtractionTracker | ((prev: ExtractionTracker) => ExtractionTracker)) => {
+      setExtractionTracker((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        if (userPath) saveTrackerToStorage(userPath, sessionId, next);
+        return next;
+      });
+    },
+    [userPath, sessionId]
+  );
 
   /**
    * Validates Firebase configuration on mount.
@@ -165,7 +222,26 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
       sessionRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          setSession({ id: docSnap.id, ...docSnap.data() } as DNASession);
+          const data = { id: docSnap.id, ...docSnap.data() } as DNASession;
+          setSession(data);
+
+          // Initialize or restore the extraction tracker.
+          if (userPath) {
+            const stored = loadTrackerFromStorage(userPath, sessionId);
+            const sessionThemes =
+              data.sectionThemes?.[data.currentSection as DNASectionId] || [];
+            if (stored && stored.currentSection === data.currentSection) {
+              updateTrackerState(stored);
+            } else {
+              updateTrackerState({
+                currentSection: data.currentSection,
+                extractedThemes: sessionThemes,
+                hqExtractionHistory: [],
+                questionCounter: 0,
+                pivotFlag: false,
+              });
+            }
+          }
         } else {
           const defaultSession: Omit<DNASession, "id"> = {
             sessionNumber: 2,
@@ -206,7 +282,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
       }
     );
     return () => unsubscribe();
-  }, [userPath, sessionId, isAuthLoading, firebaseAvailable]);
+  }, [userPath, sessionId, isAuthLoading, firebaseAvailable, updateTrackerState]);
 
   /**
    * Establishes a real-time Firestore listener for chat messages in the current session.
@@ -389,7 +465,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                         currentSection,
                         actorName,
                         history: chatHistory,
-                        previouslyAsked
+                        previouslyAsked,
+                        pivotFlag: extractionTracker.pivotFlag,
                     })
                 });
 
@@ -442,6 +519,20 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           timestamp: serverTimestamp(),
           section: currentSection,
         });
+
+        // Update local extraction tracker + compute pivotFlag for NEXT message.
+        const updatedTracker = updateTracker(
+          extractionTracker,
+          {
+            themes_extracted: aiExtractions?.themes_extracted,
+            has_actionable_pattern:
+              aiAssessment?.has_actionable_pattern === true &&
+              (aiAssessment?.depth_score ?? 0) >= 4,
+          },
+          currentSection,
+        );
+        const { shouldPivot } = shouldTriggerPivot(updatedTracker, DEFAULT_THRESHOLDS);
+        updateTrackerState({ ...updatedTracker, pivotFlag: shouldPivot });
 
         // Progress Calculation & Logic
         let unlockedAuditions = session?.auditionsUnlocked || false;
@@ -576,7 +667,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         setStreamingContent("");
       }
     },
-    [userPath, sessionId, session, firebaseAvailable]
+    [userPath, sessionId, session, firebaseAvailable, extractionTracker, updateTrackerState]
   );
 
   /**
@@ -588,9 +679,21 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
    */
   const changeSection = useCallback(async (newSection: string) => {
     if (!firebaseAvailable || !session) return;
-    
+
+    // Reset the extraction tracker for the new section. extractedThemes is
+    // seeded from the session's existing themes so the new tracker is aware
+    // of what the user has already covered there on prior visits.
+    const sessionThemes = session?.sectionThemes?.[newSection as DNASectionId] || [];
+    updateTrackerState({
+      currentSection: newSection,
+      extractedThemes: sessionThemes,
+      hqExtractionHistory: [],
+      questionCounter: 0,
+      pivotFlag: false,
+    });
+
     const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
-    await setDoc(sessionRef, { 
+    await setDoc(sessionRef, {
       currentSection: newSection,
       lastActiveAt: serverTimestamp()
     }, { merge: true });
@@ -612,7 +715,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         });
       }
     }
-  }, [userPath, sessionId, session, firebaseAvailable]);
+  }, [userPath, sessionId, session, firebaseAvailable, updateTrackerState]);
 
   return {
     messages,
@@ -624,5 +727,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
     streamingContent,
     isInitializing,
     firebaseAvailable,
+    extractionTracker,
   };
 }
