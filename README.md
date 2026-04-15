@@ -330,7 +330,9 @@ users/{userPath}/
   progress: number (0-100)
   status: "active" | "paused" | "completed"
   totalExtractions: number
+  sectionHqCounts: Record<string, number>    // Section -> HQ extraction count
   completedSections: string[]
+  sectionThemes: Partial<Record<DNASectionId, string[]>>  // Theme tracking
   auditionsUnlocked: boolean
   askedQuestions: string[]
 }
@@ -393,6 +395,40 @@ Stored in `users/{userPath}/profile/master`:
 | `conflict` | Conflict and Pressure |
 | `beliefs` | Beliefs and Life Patterns |
 
+### Arena Themes (Extraction Diversity)
+
+Each arena has a predefined set of psychological themes (`ARENA_THEMES` in `lib/chat-types.ts`) that the MemListener agent tags each extraction with. This ensures diverse psychological exploration within each arena.
+
+**Example themes for `shame` arena:**
+- `shame_origin` - Where shame first rooted
+- `shame_trigger` - Situations that provoke shame
+- `shame_coping` - How they manage shame
+- `shame_relationships` - How shame affects relationships
+- `shame_body` - Physical sensation of shame
+- `shame_identity` - How shame defines self-view
+
+See `lib/chat-types.ts` for complete theme taxonomy across all 12 arenas.
+
+### Extraction Diversity Tracking
+
+To ensure meaningful psychological exploration, section completion requires:
+
+1. **Minimum extractions:** 5 high-quality extractions
+2. **Theme diversity:** At least 4 unique themes covered
+
+**Progress formula** (`hooks/use-chat.ts`):
+- Completed sections: 100% / 12 = 8.33% each
+- Incomplete sections: 60% diversity score + 40% count score weighted
+
+**Section completion logic:**
+```typescript
+const meetsThemeRequirement = uniqueThemes.size >= 4;
+const meetsCountRequirement = hqCount >= 5;
+const isComplete = meetsCountRequirement && meetsThemeRequirement;
+```
+
+**UI:** Progress rings in `components/chat-sidebar.tsx` show extraction progress per section, with hover tooltips displaying explored vs. missing themes.
+
 ---
 
 ## AI/ML Architecture
@@ -450,6 +486,8 @@ The MemListener agent extracts via `update_master_profile` function:
 | `emotional_baseline` | object | Conflict/vulnerability patterns |
 | `archetype_signals` | string[] | e.g., "The Protector" |
 | `progress_assessment` | object | depth_score, actionable patterns |
+| `themes_extracted` | string[] | Theme tags from ARENA_THEMES taxonomy |
+| `diversity_note` | string | Note about thematic diversity of extraction |
 
 ### Pivot Engine
 
@@ -619,8 +657,12 @@ if (error.code === 'auth/account-exists-with-different-credential')
 
 ### Test Coverage
 
-Only **1 test file** exists:
-- `app/api/auth/callback/route.test.ts` (156 lines)
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `app/api/auth/callback/route.test.ts` | 1+ | Auth callback |
+| `lib/chat-types.test.ts` | 31 | ARENA_THEMES, THEME_DISPLAY_NAMES, deduplication logic, diversity-weighted progress, backward compatibility |
+| `app/api/profile/autofill/route.test.ts` | 21+ | IMDB autofill |
+| Other test files | Various | Auth context, loading text, etc. |
 
 ### Test Patterns
 
@@ -633,10 +675,19 @@ Only **1 test file** exists:
 | Mocking `jose` | JWT signing |
 | Mocking `global.fetch` | Kajabi API calls |
 
+### Test Coverage Areas
+
+| Area | Status |
+|------|--------|
+| Auth callback | Covered |
+| IMDB autofill | Covered |
+| Theme taxonomy & display names | Covered |
+| Progress calculation with diversity weighting | Covered |
+| Backward compatibility | Covered |
+
 ### Missing Testing
 
 - No e2e tests (Playwright/Cypress)
-- No integration tests beyond single API route
 - No component tests (React Testing Library)
 - No snapshot tests
 

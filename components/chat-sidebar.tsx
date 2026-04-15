@@ -12,8 +12,118 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DNA_SECTIONS } from "@/lib/chat-types";
-import type { DNASession } from "@/lib/chat-types";
+import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
+import type { DNASession, DNASectionId } from "@/lib/chat-types";
+import { useState } from "react";
+
+interface SectionProgressRingProps {
+  current: number;
+  total: number;
+  isCompleted: boolean;
+  sectionId: DNASectionId;
+  themesCovered?: string[];
+}
+
+function SectionProgressRing({ current, total, isCompleted, sectionId, themesCovered = [] }: SectionProgressRingProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const size = 16;
+  const strokeWidth = 2;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.min(current / total, 1);
+  const strokeDashoffset = circumference * (1 - progress);
+
+  const allThemes = ARENA_THEMES[sectionId] || [];
+  const themesCoveredSet = new Set(themesCovered);
+  const exploredThemes = allThemes.filter(t => themesCoveredSet.has(t));
+  const missingThemes = allThemes.filter(t => !themesCoveredSet.has(t));
+
+  const ring = isCompleted ? (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#E8721A"
+          strokeWidth={strokeWidth}
+        />
+      </svg>
+      <CheckCircle2 className="absolute h-3.5 w-3.5 text-[#E8721A]" />
+    </div>
+  ) : (
+    <div className="flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#2C3328"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#E8721A"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          className="transition-all duration-300"
+        />
+      </svg>
+    </div>
+  );
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {ring}
+      {showTooltip && (
+        <div className="absolute left-6 top-0 z-50 w-36 rounded-md bg-[#2C3328] p-2 text-[10px] text-[#F5F0E8] shadow-lg border border-[#3D4A3C]">
+          {exploredThemes.length > 0 && (
+            <div className="mb-1">
+              <p className="mb-0.5 font-medium text-[#E8721A]">Explored:</p>
+              <ul className="space-y-0">
+                {exploredThemes.map(theme => (
+                  <li key={theme} className="flex items-center gap-1">
+                    <span className="h-1 w-1 rounded-full bg-[#E8721A]" />
+                    {THEME_DISPLAY_NAMES[theme] || theme}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {missingThemes.length > 0 && (
+            <div>
+              <p className="mb-0.5 font-medium text-[#F5F0E8]/50">To explore:</p>
+              <ul className="space-y-0 text-[#F5F0E8]/40">
+                {missingThemes.map(theme => (
+                  <li key={theme} className="flex items-center gap-1">
+                    <span className="h-1 w-1 rounded-full bg-[#F5F0E8]/40" />
+                    {THEME_DISPLAY_NAMES[theme] || theme}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {exploredThemes.length === 0 && missingThemes.length === 0 && (
+            <p className="text-[#F5F0E8]/40">No themes explored yet</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const HQ_EXTRACTIONS_FOR_COMPLETION = 5;
 
 const menuItems = [
   { label: "Personal DNA", href: "/chat", icon: MessageCircle },
@@ -98,25 +208,28 @@ export function ChatSidebar({
         </div>
         <nav className="flex flex-col gap-0.5 pl-1">
           {DNA_SECTIONS.map((section) => {
-
             const isCompleted = session?.completedSections?.includes(section.id);
+            const extractionCount = session?.sectionHqCounts?.[section.id] ?? 0;
 
             return (
               <button
                 key={section.id}
                 onClick={() => onSectionClick(section.id)}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-left text-sm transition-colors",
+                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                   activeSection === section.id
                     ? "font-medium text-[#E8721A]"
                     : "text-[#F5F0E8]/70 hover:text-[#F5F0E8]"
                 )}
               >
-                {section.label}
-                
-                {isCompleted && (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[#E8721A]" />
-                )}
+                <SectionProgressRing
+                  current={extractionCount}
+                  total={HQ_EXTRACTIONS_FOR_COMPLETION}
+                  isCompleted={isCompleted ?? false}
+                  sectionId={section.id}
+                  themesCovered={session?.sectionThemes?.[section.id]}
+                />
+                <span className="flex-1">{section.label}</span>
               </button>
             )
           }

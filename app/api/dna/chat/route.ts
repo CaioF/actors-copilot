@@ -39,6 +39,8 @@ interface ExtractedPsychData {
         has_actionable_pattern: boolean;
         depth_score: number;
     };
+    themes_extracted?: string[];
+    diversity_note?: string;
 }
 
 /**
@@ -257,6 +259,15 @@ export async function POST(request: Request) {
                                     depth_score: { type: SchemaType.NUMBER, description: "Score from 0 to 10 evaluating the emotional depth and vulnerability of the latest answer." }
                                 },
                                 required: ["has_actionable_pattern", "depth_score"]
+                            },
+                            themes_extracted: {
+                                type: SchemaType.ARRAY,
+                                description: "Theme tags from the ARENA_THEMES taxonomy that categorize the psychological material discovered. E.g., ['shame_origin', 'shame_trigger'].",
+                                items: { type: SchemaType.STRING }
+                            },
+                            diversity_note: {
+                                type: SchemaType.STRING,
+                                description: "Optional note about whether this extraction adds new thematic diversity or repeats existing themes. E.g., 'New theme: different from shame_origin'."
                             }
                         },
                         required: ["progress_assessment"]
@@ -277,9 +288,29 @@ export async function POST(request: Request) {
         const promptForExtraction = `
             [SYSTEM INSTRUCTION FOR EXTRACTION]
             You are a silent psychological profiler. Analyze the conversation history and the actor's latest input.
-            Task: Extract ONLY NEW, actionable psychological data, their core identity and defense mechanisms, and provide a holistic analysis. Do NOT extract if the actor is being repetitive, superficial, or making small talk. Your goal is to identify deep, novel insights into their soul and heart. 
+            Task: Extract ONLY NEW, actionable psychological data, their core identity and defense mechanisms, and provide a holistic analysis. Do NOT extract if the actor is being repetitive, superficial, or making small talk. Your goal is to identify deep, novel insights into their soul and heart.
             If the actor is making small talk, repeating previous points, or being superficial, set 'has_actionable_pattern' to false and leave the data arrays empty.
             Look at the broader context of the history to make holistic inferences.
+
+            [THEME EXTRACTION]
+            For each extraction you identify, also tag it with theme(s) from this taxonomy that best categorize the psychological material:
+
+            identity: self_narrative, core_traits, values_anchor, public_vs_private, growth_narrative
+            childhood: family_dynamics, early_memory, upbringing_style, sibling_position, foundational_event, early_joy
+            school_authority: teacher_relationship, academic_self_image, peer_dynamic, achievement_pattern, rebellion_turning_point
+            belonging: group_identification, exclusion_memory, assimilation_pattern, belonging_longing, chosen_family
+            relationships: attachment_style, boundary_dynamic, intimacy_capacity, conflict_habitude, trust_pattern, relationship_role
+            power: power_dynamic, control_pattern, authority_relationship, empowerment_moment, disempowerment_story
+            shame: shame_origin, shame_trigger, shame_coping, shame_relationships, shame_body, shame_identity
+            loss: grief_event, grief_process, abandonment_fear, change_adaptation, mortality_perspective
+            desire: core_desire, aspiration_fuel, denied_desire, desire_fear, ambition_pattern
+            joy: joy_source, play_capacity, body_joy, creative_joy, connection_joy
+            conflict: conflict_style, pressure_response, fight_flight_freeze, conflict_aftermath, compromise_pattern
+            beliefs: life_belief, self_belief, worthiness_belief, control_belief, relationship_belief
+
+            Extract 1-2 theme tags per insight. If the extraction spans multiple themes, include both.
+            If this is a genuinely new theme not on the list, include it as 'novel_theme' but minimize these.
+            For diversity_note: indicate if this extraction adds new thematic diversity or repeats existing themes.
 
             [CONVERSATION HISTORY]
             ${recentHistoryText}

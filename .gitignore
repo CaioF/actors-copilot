@@ -37,3 +37,7 @@ docs/feature-plans/
 .claude/
 .coderlm/
 .agents/
+
+# local dev tools
+.serena/
+scripts/
