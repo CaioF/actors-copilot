@@ -471,16 +471,14 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                 ...(ARENA_THEMES[currentSection as DNASectionId] || []),
                 "novel_theme",
               ]);
-              const existingThemes = new Set(sectionThemes[currentSection as DNASectionId] || []);
+              const existingThemesArr: string[] = sectionThemes[currentSection as DNASectionId] || [];
+              const existingThemesSet = new Set(existingThemesArr);
               const incomingThemes: string[] = aiExtractions.themes_extracted
                 .map((t: string) => t.trim().toLowerCase())
-                .filter((t: string) => allowedThemes.has(t) && !existingThemes.has(t));
+                .filter((t: string) => allowedThemes.has(t) && !existingThemesSet.has(t));
               // De-duplicate within incoming array then merge
-              const deduped = [...new Set(incomingThemes)];
-              sectionThemes[currentSection as DNASectionId] = [
-                ...existingThemes,
-                ...deduped,
-              ];
+              const deduped = Array.from(new Set(incomingThemes));
+              sectionThemes[currentSection as DNASectionId] = [...existingThemesArr, ...deduped];
             }
 
             const uniqueThemes = new Set(sectionThemes[currentSection as DNASectionId] || []);
