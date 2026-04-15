@@ -25,9 +25,9 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={1}
           title="Personal DNA Upload"
-          description="Build the foundation of your craft. Through guided conversation, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns — creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing. It's about identifying what's usable. The more you invest here, the sharper your auditions become."
+          description="Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition analyses will become."
           link="/chat"
-          ctaLabel="Start building DNA"
+          ctaLabel="Start building your DNA with the identity section"
           ctaIcon={Dna}
           variant="orange"
           bodyVariant="dark"

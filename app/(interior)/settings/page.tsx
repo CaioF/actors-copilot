@@ -18,6 +18,19 @@ import { useAuth } from "@/lib/context/AuthContext"
 import { collection, getDocs, doc, writeBatch } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 
+interface FirebaseError {
+  code: string;
+  message: string;
+}
+function isFirebaseError(error: unknown): error is FirebaseError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as Record<string, unknown>).code === 'string'
+  );
+}
+
 /**
  * Renders a section header with icon, title, and subtitle.
  * Used to categorize settings into distinct sections.
@@ -305,14 +318,16 @@ export default function SettingsPage() {
         // Note: AuthContext handles the redirect automatically when currentUser becomes null.
       }
 
-    } catch (error: any) {
-      console.error("Error deleting account:", error);
-      // FIREBASE SECURITY PROTOCOL: Requires recent login for destructive actions
-      if (error.code === 'auth/requires-recent-login') {
-        alert("For security reasons, you need to verify your identity. Please log out, log back in, and try again.");
-      } else {
+    } catch (error: unknown) {
+        console.error("Error deleting account:", error);
+        if (isFirebaseError(error)) {
+          if (error.code === 'auth/requires-recent-login') {
+            alert("For security reasons, you need to verify your identity. Please log out, log back in, and try again.");
+            return; // Early return 
+          }
+        }
         alert("Failed to delete account. Please try again.");
-      }
+    
     } finally {
       setIsDeletingAccount(false);
     }

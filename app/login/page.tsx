@@ -6,6 +6,20 @@ import { useState, ReactNode } from 'react';
 import Link from "next/link";
 import Image from "next/image"
 
+interface FirebaseError {
+  code: string;
+  message: string;
+}
+
+function isFirebaseError(error: unknown): error is FirebaseError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as Record<string, unknown>).code === 'string'
+  );
+}
+
 /**
  * Main authentication page component.
  * Renders the login interface alongside app features and manages 
@@ -30,12 +44,17 @@ export default function LoginPage() {
         setErrorMsg('');
         try {
             await loginWithGoogle();
-        } catch (error: any) {
-            if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-                return; 
+        } catch (error: unknown) { // Use unknown aqui
+            if (isFirebaseError(error)) {
+                // Tratamento específico do Firebase
+                if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                    return; 
+                }
+                setErrorMsg(error.message);
+            } else {
+                // Erro genérico (ex: rede)
+                setErrorMsg('Access denied. Please try again later.');
             }
-            
-            setErrorMsg(error.message || 'Access denied. Please check your account.');
         }
     }
 
@@ -60,18 +79,21 @@ export default function LoginPage() {
             } else {
                 await loginWithEmail(email, password);
             }
-        } catch (error: any) {
-            // Traduzindo os erros feios do Firebase para o usuário final
-            if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-                setErrorMsg('Invalid email or password.');
-            } else if (error.code === 'auth/email-already-in-use') {
-                setErrorMsg('This email is already in use. Please log in.');
-            } else if (error.code === 'auth/weak-password') {
-                setErrorMsg('Password should be at least 6 characters.');
-            } else {
-                setErrorMsg(error.message || 'An error occurred. Please try again.');
-            }
+        } catch (error: unknown) {
+        if (isFirebaseError(error)) {
+            const ERROR_MESSAGES: Record<string, string> = {
+                'auth/invalid-credential': 'Invalid email or password.',
+                'auth/wrong-password': 'Invalid email or password.',
+                'auth/email-already-in-use': 'This email is already in use. Please log in.',
+                'auth/weak-password': 'Password should be at least 6 characters.',
+            };
+
+            setErrorMsg(ERROR_MESSAGES[error.code] || 'An error occurred. Please try again.');
+        } else {
+            const message = error instanceof Error ? error.message : 'Connection failed.';
+            setErrorMsg(message);
         }
+    }
     }
 
     return (

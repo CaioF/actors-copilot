@@ -48,9 +48,9 @@ export interface DNASession {
  * @constant
  */
 export const DNA_SECTIONS = [
+  { id: "identity", label: "Identity and Self-Story" },
   { id: "childhood", label: "Early Childhood and Home" },
   { id: "school_authority", label: "School, Authority and the Outside World" },
-  { id: "identity", label: "Identity and Self-Story" },
   { id: "belonging", label: "Belonging and Exclusion" },
   { id: "relationships", label: "Relationships and Attachment" },
   { id: "power", label: "Power and Authority" },

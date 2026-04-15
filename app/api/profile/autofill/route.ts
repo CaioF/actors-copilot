@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/firebase.admin';
 import { IMDB_AUTOFILL_PROMPT } from '@/lib/prompts';
-import type { ImdbExtractedData, Credit, Showreel } from '@/lib/imdb-types';
-import { logger, createChildLogger } from '@/lib/logger';
+import type { ImdbExtractedData, Credit, Showreel, KnownForEntry } from '@/lib/imdb-types';
+import { createChildLogger } from '@/lib/logger';
 import { generateSlug } from '@/lib/profile-types';
+
+interface FirecrawlMetadata {
+  title?: string;
+  ogImage?: string;
+  description?: string;
+}
+
 
 /**
  * Parses IMDB page markdown content to extract actor profile data including name,
@@ -12,7 +19,7 @@ import { generateSlug } from '@/lib/profile-types';
  * @param metadata - Additional metadata from the scraped page (title, ogImage, description)
  * @returns Structured ImdbExtractedData object with parsed actor information
  */
-export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtractedData {
+export function parseIMDBMarkdown(markdown: string, metadata: FirecrawlMetadata): ImdbExtractedData {
   const lines = markdown.split('\n');
   let fullName = metadata?.title?.replace(' - IMDb', '') || '';
   let bio = '';
@@ -20,7 +27,7 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
   let location = '';
   const credits: Credit[] = [];
   const showreels: Showreel[] = [];
-  const knownFor: any[] = [];
+  const knownFor: KnownForEntry[] = [];
 
   // Parse markdown lines
   for (let i = 0; i < lines.length; i++) {
@@ -78,6 +85,7 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
               title: knownForMatch[1].trim(),
               year: knownForMatch[2],
               role: knownForMatch[3] ? knownForMatch[3].trim() : '',
+              imageUrl: '',
             });
           }
         }
@@ -87,7 +95,6 @@ export function parseIMDBMarkdown(markdown: string, metadata: any): ImdbExtracte
 
     // Extract credits from "Credits" section
     if (line.includes('Actress') || line.includes('Actor') || line.includes('Credits')) {
-      let foundCredits = false;
       for (let j = i + 1; j < Math.min(i + 50, lines.length); j++) {
         const creditLine = lines[j].trim();
 
@@ -188,8 +195,9 @@ export async function POST(request: Request) {
     try {
       decodedToken = await auth.verifyIdToken(token);
       log.debug({ uid: decodedToken.uid, email: decodedToken.email, msg: 'Token verified successfully' });
-    } catch (error: any) {
-      log.error({ err: error, msg: 'Token verification failed' });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Invalid token';
+      log.error({ err: errorMessage, msg: 'Token verification failed' });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -326,7 +334,7 @@ export async function POST(request: Request) {
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.3,
-      } as any,
+      }
     });
 
     const synthesisPrompt = `
@@ -389,12 +397,9 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       data: finalData,
     }, { status: 200 });
 
-  } catch (error: any) {
-    log.error({ err: error, msg: 'Autofill request failed' });
-
-    return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+      log.error({ err: error, msg: 'Autofill request failed' });
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

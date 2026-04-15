@@ -20,6 +20,11 @@ import { useAuth } from "@/lib/context/AuthContext";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+interface FirestoreError {
+  code?: string;
+  message?: string;
+}
+
 /**
  * Main profile page component that renders the actor profile editor.
  * Handles loading, saving (auto-save and manual), publishing, and IMDB autofill.
@@ -125,14 +130,18 @@ export default function ProfilePage() {
         } else {
           methods.reset(defaults);
         }
-      } catch (error: any) {
-        if (cancelled) return;
-        if (error?.code === "unavailable" || error?.message?.includes("offline")) {
-          console.warn("Firestore offline, using defaults.");
-        } else {
-          console.error("Error loading profile:", error);
-        }
-        methods.reset(defaults);
+      } catch (error: unknown) {
+    if (cancelled) return;
+    const isFirestoreError = typeof error === 'object' && error !== null && 'code' in error;
+    const isGenericError = error instanceof Error;
+    const errorCode = isFirestoreError ? (error as FirestoreError).code : null;
+    const errorMessage = isGenericError ? error.message : "";
+    if (errorCode === "unavailable" || errorMessage.includes("offline")) {
+        console.warn("Firestore offline, using defaults.");
+    } else {
+        console.error("Error loading profile:", error);
+    }
+    methods.reset(defaults);
       } finally {
         if (!cancelled) {
           setIsLoading(false);

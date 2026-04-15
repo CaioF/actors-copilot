@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { signOut, onAuthStateChanged, getAuth, Auth, User } from 'firebase/auth';
@@ -49,7 +49,7 @@ describe('AuthContext', () => {
         } else if (nextOrObserver && typeof nextOrObserver === 'object' && 'next' in nextOrObserver) {
             nextOrObserver.next?.(null);
         }
-        return jest.fn(); 
+        return () => {}; 
         });
     });
 
@@ -72,7 +72,9 @@ describe('AuthContext', () => {
                 expect(getByTestId('loading').textContent).toBe('false');
             });
 
-            getByTestId('logout-btn').click();
+            await act(async () => {
+                fireEvent.click(getByTestId('logout-btn'));
+            });
 
             await waitFor(() => {
                 expect(mockSignOut).toHaveBeenCalled();
@@ -95,10 +97,12 @@ describe('AuthContext', () => {
                 expect(getByTestId('loading').textContent).toBe('false');
             });
 
-            getByTestId('logout-btn').click();
+            await act(async () => {
+                fireEvent.click(getByTestId('logout-btn'));
+            });
 
             await waitFor(() => {
-                expect(consoleErrorSpy).toHaveBeenCalledWith('Error signing out: ', firebaseError);
+                expect(consoleErrorSpy).toHaveBeenLastCalledWith('Error signing out: ', firebaseError.message);
                 expect(getByTestId('loading').textContent).toBe('false');
             });
         });

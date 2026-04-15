@@ -264,7 +264,7 @@ export async function POST(request: Request) {
         if (aiExtractions.core_values && aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...aiExtractions.core_values);
         if (aiExtractions.relational_dynamics && aiExtractions.relational_dynamics?.length > 0) updatePayload['psychology.relationalDynamics'] = FieldValue.arrayUnion(...aiExtractions.relational_dynamics);
         if (aiExtractions.milestones && aiExtractions.milestones?.length > 0) {
-            const milestonesWithContext = aiExtractions.milestones.map((milestone: any) => ({ ...milestone, discoveredAt: new Date().toISOString() }));
+            const milestonesWithContext = aiExtractions.milestones.map((milestone: Milestone) => ({ ...milestone, discoveredAt: new Date().toISOString() }));
             updatePayload['history.milestones'] = FieldValue.arrayUnion(...milestonesWithContext);
         }
         if (aiExtractions.core_wounds_and_fears && aiExtractions.core_wounds_and_fears?.length > 0) updatePayload['acting_fuel.coreWounds'] = FieldValue.arrayUnion(...aiExtractions.core_wounds_and_fears);

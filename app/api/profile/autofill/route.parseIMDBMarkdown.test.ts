@@ -47,8 +47,8 @@ Actress
 
             expect(result.fullName).toBe('Tracey Collis');
             expect(result.knownFor).toEqual([
-                { title: 'The Great Film', year: '2020', role: 'Actress' },
-                { title: 'Another Show', year: '2019', role: 'Lead Role' },
+                { title: 'The Great Film', year: '2020', role: 'Actress', imageUrl: '' },
+                { title: 'Another Show', year: '2019', role: 'Lead Role', imageUrl: '' },
             ]);
         });
 
