@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         const userPath = `${decodedToken.uid}_${firstName}`;
 
         const log = createChildLogger({ route: 'dna/chat', userPath, currentSection });
-        console.log('[TRACE] Request body received:', { bodyKeys: Object.keys(body) });
+        log.trace({ bodyKeys: Object.keys(body) }, 'Request body received');
 
         const profileRef = db.doc(`users/${userPath}/profile/master`);
         const profileSnap = await profileRef.get();
@@ -99,13 +99,13 @@ export async function POST(request: Request) {
         // const isMandatoryPivot = questionCount > 0 && questionCount % 15 === 0;
         const isMandatoryPivot = false;
 
-        console.log('[TRACE] Pivot decision variables:', {
+        log.trace({
             questionCount,
             isShort,
             isMandatoryPivot,
             pivotFlag: pivotFlag === true,
             contentLength: content.trim().length
-        });
+        }, 'Pivot decision variables');
 
         let dynamicCommand = "";
         if (isShort) {
@@ -346,14 +346,14 @@ export async function POST(request: Request) {
             extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
         }
 
-        console.log('[TRACE] MemListener extraction result:', {
-            extractionData: extractionsData,
-            themesExtracted: extractionsData?.themes_extracted,
-            diversityNote: extractionsData?.diversity_note,
-            hasActionablePattern: extractionsData?.progress_assessment?.has_actionable_pattern,
-            depthScore: extractionsData?.progress_assessment?.depth_score,
-            uniqueThemeCount: extractionsData?.themes_extracted?.length || 0
-        });
+        if (process.env.MEMLISTENER_DEBUG === 'true') {
+            log.trace({
+                hasExtractionData: extractionsData !== null,
+                functionCallCount: functionCalls?.length || 0,
+                uniqueThemeCount: extractionsData?.themes_extracted?.length || 0,
+                hasProgressAssessment: extractionsData?.progress_assessment != null,
+            }, 'MemListener extraction summary');
+        }
 
         // 7. FIRE-AND-FORGET LOGGING - TEMPORARIAMENTE DESABILITADO PARA DEBUG
         // saveRawMessageToFirestore(userId, {

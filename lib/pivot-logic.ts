@@ -51,10 +51,12 @@ function computeThemeFrequency(history: string[]): Map<string, number> {
  * Conditions (any one is sufficient):
  * - questionCounter > questionThreshold (strict greater-than)
  * - At least one theme repeats >= repetitionThreshold times in the window
- * - Unique themes in the window < requiredDiversity
+ * - Unique themes in the window < requiredDiversity (only evaluated when window is full)
  *
  * When hqExtractionHistory is empty, only the questionCounter check can fire
  * (diversity/repetition are undefined on empty history).
+ * The diversity check is only evaluated when hqExtractionHistory.length >= windowSize
+ * to avoid false pivots during the window warm-up period.
  */
 export function shouldTriggerPivot(
   tracker: ExtractionTracker,
@@ -78,12 +80,14 @@ export function shouldTriggerPivot(
       }
     }
 
-    const uniqueThemes = new Set(tracker.hqExtractionHistory).size;
-    if (uniqueThemes < thresholds.requiredDiversity) {
-      return {
-        shouldPivot: true,
-        reason: `low_diversity (${uniqueThemes} unique < ${thresholds.requiredDiversity} required)`,
-      };
+    if (tracker.hqExtractionHistory.length >= thresholds.windowSize) {
+      const uniqueThemes = new Set(tracker.hqExtractionHistory).size;
+      if (uniqueThemes < thresholds.requiredDiversity) {
+        return {
+          shouldPivot: true,
+          reason: `low_diversity (${uniqueThemes} unique < ${thresholds.requiredDiversity} required)`,
+        };
+      }
     }
   }
 

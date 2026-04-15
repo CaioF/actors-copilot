@@ -2,14 +2,14 @@ import pino from 'pino';
 import Pretty from 'pino-pretty';
 
 const createLogger = () => {
-  const LOG_LEVEL = process.env.LOG_LEVEL || 'trace';
+  const LOG_LEVEL = process.env.LOG_LEVEL || 'warn';
   
   if (process.env.NODE_ENV === 'development') {
     const stream = Pretty({
       colorize: true,
       translateTime: 'SYS:standard',
       ignore: 'pid,hostname',
-      minimumLevel: 'trace',
+      minimumLevel: LOG_LEVEL as pino.Level,
     });
     return pino({ level: LOG_LEVEL }, stream);
   }

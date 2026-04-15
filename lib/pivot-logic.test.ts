@@ -84,6 +84,21 @@ describe('shouldTriggerPivot', () => {
     expect(result.shouldPivot).toBe(false);
   });
 
+  it('does NOT trigger diversity pivot before the history reaches the full window size', () => {
+    const partialHistories = [['a'], ['a', 'b'], ['a', 'b', 'c'], ['a', 'b', 'c', 'd']];
+
+    partialHistories.forEach((hqExtractionHistory) => {
+      const tracker: ExtractionTracker = {
+        ...minimalTracker,
+        hqExtractionHistory,
+        questionCounter: hqExtractionHistory.length,
+      };
+
+      const result = shouldTriggerPivot(tracker, DEFAULT_THRESHOLDS);
+      expect(result.shouldPivot).toBe(false);
+    });
+  });
+
   it('is independent of the existing pivotFlag on the tracker', () => {
     const tracker: ExtractionTracker = {
       ...minimalTracker,
