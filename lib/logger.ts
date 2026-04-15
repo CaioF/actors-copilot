@@ -2,7 +2,7 @@ import pino from 'pino';
 import Pretty from 'pino-pretty';
 
 const createLogger = () => {
-  const LOG_LEVEL = process.env.LOG_LEVEL || 'warn';
+  const LOG_LEVEL = process.env.LOG_LEVEL || 'trace';
   
   if (process.env.NODE_ENV === 'development') {
     const stream = Pretty({

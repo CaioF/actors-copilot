@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { ARENA_THEMES } from '@/lib/chat-types';
+import { createChildLogger } from '@/lib/logger';
 
 interface ChatHistoryMessage {
   role: string;
@@ -88,12 +89,20 @@ export async function POST(request: Request) {
             }
         }
 
-        //PIVOT ENGINE 
+        //PIVOT ENGINE
+        const log = createChildLogger({ route: 'dna/chat', userPath, currentSection });
         const questionCount = previouslyAsked?.length || 0;
-        
+
         const isShort = content.trim().length < 15;
         // const isMandatoryPivot = questionCount > 0 && questionCount % 15 === 0;
         const isMandatoryPivot = false;
+
+        log.trace({
+            questionCount,
+            isShort,
+            isMandatoryPivot,
+            contentLength: content.trim().length
+        }, 'Pivot decision variables');
 
         let dynamicCommand = "";
         if (isShort) {
@@ -328,7 +337,15 @@ export async function POST(request: Request) {
         if (functionCalls && functionCalls.length > 0) {
             extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
         }
-        
+
+        log.trace({
+            extractionData: extractionsData,
+            themesExtracted: extractionsData?.themes_extracted,
+            diversityNote: extractionsData?.diversity_note,
+            hasActionablePattern: extractionsData?.progress_assessment?.has_actionable_pattern,
+            depthScore: extractionsData?.progress_assessment?.depth_score,
+            uniqueThemeCount: extractionsData?.themes_extracted?.length || 0
+        }, 'MemListener extraction result');
 
         // 7. FIRE-AND-FORGET LOGGING - TEMPORARIAMENTE DESABILITADO PARA DEBUG
         // saveRawMessageToFirestore(userId, {
