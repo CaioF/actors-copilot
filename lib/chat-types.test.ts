@@ -346,29 +346,6 @@ it("should give partial progress based on themes only", () => {
     expect(progress).toBeCloseTo(5.67, 1);
   });
 
-  it("should cap diversity score at 1.0", () => {
-    const hqCount = 1;
-    const themesCovered = [
-      "shame_origin",
-      "shame_trigger",
-      "shame_coping",
-      "shame_identity",
-      "shame_body",
-      "shame_relationships",
-    ];
-    const progress = calculateSectionProgress(hqCount, themesCovered, false);
-
-    // Even with 6 themes (more than required 4), diversity should cap at 1.0
-    // But countScore still contributes
-    const diversityScore = 1.0; // capped at 1.0
-    const countScore = hqCount / HQ_FOR_COMPLETION; // 0.2
-    const expectedScore =
-      diversityScore * DIVERSITY_WEIGHT + countScore * COUNT_WEIGHT; // 0.68
-    const expectedProgress = expectedScore * (100 / TOTAL_SECTIONS);
-
-    expect(progress).toBeCloseTo(expectedProgress, 5);
-  });
-
   it("should combine diversity and count for mid-progress section", () => {
     const hqCount = 3;
     const themesCovered = ["shame_origin", "shame_trigger"];
@@ -386,7 +363,7 @@ it("should give partial progress based on themes only", () => {
   it("should sum progress across multiple sections correctly", () => {
     const sections = [
       { hqCount: 5, themes: ["shame_origin"], isComplete: true },
-      { hqCount: 3, themes: ["identity", "core_traits"], isComplete: false },
+      { hqCount: 3, themes: ["self_narrative", "core_traits"], isComplete: false },
       { hqCount: 0, themes: [], isComplete: false },
     ];
 

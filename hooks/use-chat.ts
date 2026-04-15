@@ -18,7 +18,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SECTION_INTROS } from "@/lib/prompts";
-import {  DNASectionId } from "@/lib/chat-types";
+import { ARENA_THEMES, DNASectionId } from "@/lib/chat-types";
 
 
 const DEFAULT_SESSION_ID = "session-1";
@@ -467,11 +467,20 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             sectionCounts[currentSection] = currentSecCount;
 
             if (aiExtractions.themes_extracted && aiExtractions.themes_extracted.length > 0) {
-              const existingThemes = sectionThemes[currentSection as DNASectionId] || [];
-              const newThemes = aiExtractions.themes_extracted.filter(
-                (t: string) => !existingThemes.includes(t)
-              );
-              sectionThemes[currentSection as DNASectionId] = [...existingThemes, ...newThemes];
+              const allowedThemes = new Set([
+                ...(ARENA_THEMES[currentSection as DNASectionId] || []),
+                "novel_theme",
+              ]);
+              const existingThemes = new Set(sectionThemes[currentSection as DNASectionId] || []);
+              const incomingThemes: string[] = aiExtractions.themes_extracted
+                .map((t: string) => t.trim().toLowerCase())
+                .filter((t: string) => allowedThemes.has(t) && !existingThemes.has(t));
+              // De-duplicate within incoming array then merge
+              const deduped = [...new Set(incomingThemes)];
+              sectionThemes[currentSection as DNASectionId] = [
+                ...existingThemes,
+                ...deduped,
+              ];
             }
 
             const uniqueThemes = new Set(sectionThemes[currentSection as DNASectionId] || []);
@@ -554,6 +563,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           totalExtractions: totalCount,
           sectionHqCounts: sectionCounts,
           sectionThemes: sectionThemes,
+          completedSections: newCompletedSecs,
           progress: newProgress,
           auditionsUnlocked: unlockedAuditions,
           askedQuestions: newAskedQuestions

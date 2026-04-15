@@ -79,15 +79,28 @@ function SectionProgressRing({ current, total, isCompleted, sectionId, themesCov
     </div>
   );
 
+  const tooltipId = `theme-tooltip-${sectionId}`;
+
   return (
     <div
       className="relative"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      {ring}
+      <button
+        type="button"
+        className="flex items-center justify-center rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[#E8721A]"
+        aria-describedby={showTooltip ? tooltipId : undefined}
+        onFocus={() => setShowTooltip(true)}
+        onBlur={() => setShowTooltip(false)}
+      >
+        {ring}
+      </button>
       {showTooltip && (
-        <div className="absolute left-6 top-0 z-50 w-36 rounded-md bg-[#2C3328] p-2 text-[10px] text-[#F5F0E8] shadow-lg border border-[#3D4A3C]">
+        <div
+          id={tooltipId}
+          role="tooltip"
+          className="absolute left-6 top-0 z-50 w-36 rounded-md bg-[#2C3328] p-2 text-[10px] text-[#F5F0E8] shadow-lg border border-[#3D4A3C]">
           {exploredThemes.length > 0 && (
             <div className="mb-1">
               <p className="mb-0.5 font-medium text-[#E8721A]">Explored:</p>

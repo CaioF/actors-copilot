@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
+import { ARENA_THEMES } from '@/lib/chat-types';
 
 interface ChatHistoryMessage {
   role: string;
@@ -285,6 +286,10 @@ export async function POST(request: Request) {
         // Build the history context for the extraction model to read
         const recentHistoryText = history.slice(-7).map((msg: ChatHistoryMessage) => `${msg.role.toUpperCase()}: ${msg.parts[0].text}`).join('\n');
 
+        const themeTaxonomyText = Object.entries(ARENA_THEMES)
+            .map(([arena, themes]) => `${arena}: ${themes.join(', ')}`)
+            .join('\n            ');
+
         const promptForExtraction = `
             [SYSTEM INSTRUCTION FOR EXTRACTION]
             You are a silent psychological profiler. Analyze the conversation history and the actor's latest input.
@@ -295,18 +300,7 @@ export async function POST(request: Request) {
             [THEME EXTRACTION]
             For each extraction you identify, also tag it with theme(s) from this taxonomy that best categorize the psychological material:
 
-            identity: self_narrative, core_traits, values_anchor, public_vs_private, growth_narrative
-            childhood: family_dynamics, early_memory, upbringing_style, sibling_position, foundational_event, early_joy
-            school_authority: teacher_relationship, academic_self_image, peer_dynamic, achievement_pattern, rebellion_turning_point
-            belonging: group_identification, exclusion_memory, assimilation_pattern, belonging_longing, chosen_family
-            relationships: attachment_style, boundary_dynamic, intimacy_capacity, conflict_habitude, trust_pattern, relationship_role
-            power: power_dynamic, control_pattern, authority_relationship, empowerment_moment, disempowerment_story
-            shame: shame_origin, shame_trigger, shame_coping, shame_relationships, shame_body, shame_identity
-            loss: grief_event, grief_process, abandonment_fear, change_adaptation, mortality_perspective
-            desire: core_desire, aspiration_fuel, denied_desire, desire_fear, ambition_pattern
-            joy: joy_source, play_capacity, body_joy, creative_joy, connection_joy
-            conflict: conflict_style, pressure_response, fight_flight_freeze, conflict_aftermath, compromise_pattern
-            beliefs: life_belief, self_belief, worthiness_belief, control_belief, relationship_belief
+            ${themeTaxonomyText}
 
             Extract 1-2 theme tags per insight. If the extraction spans multiple themes, include both.
             If this is a genuinely new theme not on the list, include it as 'novel_theme' but minimize these.
