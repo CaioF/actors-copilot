@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
+import { ARENA_THEMES } from '@/lib/chat-types';
 
 interface ChatHistoryMessage {
   role: string;
@@ -39,6 +40,8 @@ interface ExtractedPsychData {
         has_actionable_pattern: boolean;
         depth_score: number;
     };
+    themes_extracted?: string[];
+    diversity_note?: string;
 }
 
 /**
@@ -257,6 +260,15 @@ export async function POST(request: Request) {
                                     depth_score: { type: SchemaType.NUMBER, description: "Score from 0 to 10 evaluating the emotional depth and vulnerability of the latest answer." }
                                 },
                                 required: ["has_actionable_pattern", "depth_score"]
+                            },
+                            themes_extracted: {
+                                type: SchemaType.ARRAY,
+                                description: "Theme tags from the ARENA_THEMES taxonomy that categorize the psychological material discovered. E.g., ['shame_origin', 'shame_trigger'].",
+                                items: { type: SchemaType.STRING }
+                            },
+                            diversity_note: {
+                                type: SchemaType.STRING,
+                                description: "Optional note about whether this extraction adds new thematic diversity or repeats existing themes. E.g., 'New theme: different from shame_origin'."
                             }
                         },
                         required: ["progress_assessment"]
@@ -274,12 +286,25 @@ export async function POST(request: Request) {
         // Build the history context for the extraction model to read
         const recentHistoryText = history.slice(-7).map((msg: ChatHistoryMessage) => `${msg.role.toUpperCase()}: ${msg.parts[0].text}`).join('\n');
 
+        const themeTaxonomyText = Object.entries(ARENA_THEMES)
+            .map(([arena, themes]) => `${arena}: ${themes.join(', ')}`)
+            .join('\n            ');
+
         const promptForExtraction = `
             [SYSTEM INSTRUCTION FOR EXTRACTION]
             You are a silent psychological profiler. Analyze the conversation history and the actor's latest input.
-            Task: Extract ONLY NEW, actionable psychological data, their core identity and defense mechanisms, and provide a holistic analysis. Do NOT extract if the actor is being repetitive, superficial, or making small talk. Your goal is to identify deep, novel insights into their soul and heart. 
+            Task: Extract ONLY NEW, actionable psychological data, their core identity and defense mechanisms, and provide a holistic analysis. Do NOT extract if the actor is being repetitive, superficial, or making small talk. Your goal is to identify deep, novel insights into their soul and heart.
             If the actor is making small talk, repeating previous points, or being superficial, set 'has_actionable_pattern' to false and leave the data arrays empty.
             Look at the broader context of the history to make holistic inferences.
+
+            [THEME EXTRACTION]
+            For each extraction you identify, also tag it with theme(s) from this taxonomy that best categorize the psychological material:
+
+            ${themeTaxonomyText}
+
+            Extract 1-2 theme tags per insight. If the extraction spans multiple themes, include both.
+            If this is a genuinely new theme not on the list, include it as 'novel_theme' but minimize these.
+            For diversity_note: indicate if this extraction adds new thematic diversity or repeats existing themes.
 
             [CONVERSATION HISTORY]
             ${recentHistoryText}
