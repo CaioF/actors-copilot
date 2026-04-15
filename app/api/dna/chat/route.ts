@@ -61,24 +61,43 @@ export async function POST(request: Request) {
 
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
-        const recentQuestions = previouslyAsked ? previouslyAsked.slice(-4) : [];
+        const recentQuestions = previouslyAsked ? previouslyAsked.slice(-6) : [];
         const blacklistText = recentQuestions.length > 0 
             ? recentQuestions.map((q: string, i: number) => `Prior AI Question: "${q}"`).join('\n') 
             : "No previous questions.";
 
+        const { auth, db } = await import('@/lib/firebase.admin');
+        const token = authHeader.split('Bearer ')[1];
+        const decodedToken = await auth.verifyIdToken(token);
+        
+        const userRecord = await auth.getUser(decodedToken.uid);
+        const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
+        const userPath = `${decodedToken.uid}_${firstName}`;
+
+        const profileRef = db.doc(`users/${userPath}/profile/master`);
+        const profileSnap = await profileRef.get();
+        
+        let baselineContext = "";
+        if (profileSnap.exists) {
+            const summary = profileSnap.data()?.baselineSummary;
+            if (summary) {
+                baselineContext = `\n\n# ACTOR'S KNOWN BASELINE STORY:\n${summary}\n(Use this background knowledge to inform your Socratic questioning, but do not recite it back to them unless it's in order to show a contradiction.)`;
+            }
+        }
+
         //PIVOT ENGINE 
         const questionCount = previouslyAsked?.length || 0;
         
-        // const isFrustrated = /|don'?t remember|no|stop|uncomfortable|not relevant/i.test(content) || content.trim().length < 10;
-        const isFrustrated = false;
-        const isMandatoryPivot = questionCount > 0 && questionCount % 10 === 0;
+        const isShort = content.trim().length < 15;
+        // const isMandatoryPivot = questionCount > 0 && questionCount % 15 === 0;
+        const isMandatoryPivot = false;
 
         let dynamicCommand = "";
-        if (isFrustrated) {
-            dynamicCommand = `[SYSTEM OVERRIDE: HARD PIVOT REQUIRED - change the subject]
-            The user's input indicates frustration, confusion, or a refusal to elaborate. 
-            COMMAND: YOU MUST IMMEDIATELY DROP THE CURRENT MEMORY. 
-            Select a COMPLETELY DIFFERENT "Follow-up Route" from your arsenal.`;
+        if (isShort) {
+            dynamicCommand = `[User is giving very short input]
+            Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate. 
+            Ask a follow-up question that encourages them to expand and provide more detail. Do not accept one-word answers. Push for depth and specificity. Explain your reasoning to the user to encourage them to open up.
+            `;
         } else if (isMandatoryPivot) {
             dynamicCommand = `[SYSTEM OVERRIDE: MANDATORY THEME SHIFT]
             You have spent enough time digging into this specific memory. To ensure a diverse range of data, PIVOT NOW. 
@@ -92,13 +111,16 @@ export async function POST(request: Request) {
         system instruction: ${SYSTEM_PROMPT}
             ${specificSectionDirective}
 
+            ${baselineContext}
+
             === YOUR PREVIOUS RECENT QUESTIONS ===
             You are STRICTLY FORBIDDEN from repeating the essence of these questions. Do not ask them again:
             ${blacklistText}
 
             === CONVERSATION STATE ===
             Actor's Name: ${actorName}
-            Actor's Latest Input: "${content.trim()}"
+            Actor's Latest Input:  "${content.trim()}"
+            DO NOT REPEAT THE USER'S WORDS BACK TO THEM. Do not paraphrase or summarize their input.
             
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}
@@ -112,7 +134,7 @@ export async function POST(request: Request) {
         
         // --- AGENT 1: YAN (Conversacional) ---
         const chatModel = getGenerativeModel(ai, { 
-            model: "gemini-3.1-pro-preview", 
+            model: "gemini-2.5-pro", 
             generationConfig: { temperature: 0.4 },
             
             // thinkingConfig: {
@@ -124,8 +146,8 @@ export async function POST(request: Request) {
         const extractionModel = getGenerativeModel(ai, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
-            // @ts-expect-error
-            thinkingConfig: { thinkingLevel: "MEDIUM" },
+            // // @ts-expect-error
+            // thinkingConfig: { thinkingLevel: "MEDIUM" },
             tools: [{
                 functionDeclarations: [{
                     name: "update_master_profile",

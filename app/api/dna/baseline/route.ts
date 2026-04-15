@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin'; 
 import { FieldValue, DocumentData } from 'firebase-admin/firestore';
 import PDFParser from 'pdf2json';
+import mammoth from 'mammoth';
 
 interface Milestone {
   event: string;
@@ -26,6 +27,7 @@ interface ActorProfileExtraction {
   unmet_needs?: string[];
   public_masks?: string[];
   emotional_baseline?: EmotionalBaseline;
+  baseline_summary?: string;
   archetype_signals?: string[];
   key_entities_and_arenas?: string[];
 }
@@ -91,15 +93,31 @@ export async function POST(request: Request) {
     let finalContent = "";
 
     if (file) {
+      // 1. Verificação se o arquivo é aceito
+      const allowedTypes = [
+        "application/pdf",
+        "text/plain",
+        "application/msword", 
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+      ];
+      const isWordExt = file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx');
+
+      if (!allowedTypes.includes(file.type) && !isWordExt) {
+        return NextResponse.json({ error: 'Unsupported file type. Please upload PDF, TXT, or DOCX.' }, { status: 400 });
+      }
+
       if (file.type === "application/pdf") {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         finalContent = await extractTextFromPDF(buffer);
+      } else if (file.name.toLowerCase().endsWith(".docx") || file.type.includes("wordprocessingml")) {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        finalContent = result.value;
       } else if (file.type.includes("text")) {
         finalContent = await file.text();
-      } else {
-        return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
-      }
+      } 
     } else if (text) {
       finalContent = text;
     }
@@ -234,6 +252,10 @@ export async function POST(request: Request) {
                               items: { type: SchemaType.STRING }
                           },
 
+                          baseline_summary: {
+                            type: SchemaType.STRING,
+                            description: "A cohesive, highly dense 2-to-3 paragraph psychological summary of the actor's entire uploaded life story. Distill the most important life events, their context, and the emotional baseline. This will serve as the AI Coach's core memory."
+                          },
 
                           progress_assessment: {
                               type: SchemaType.OBJECT,
@@ -250,8 +272,6 @@ export async function POST(request: Request) {
           }]
       } ); 
 
-
-    console.log("Iniciando extração profunda do Baseline Document...");
 
     const extractionResult = await extractionModel.generateContent(`
       ${BULK_SYSTEM_PROMPT}
@@ -284,6 +304,7 @@ export async function POST(request: Request) {
 
     if (aiExtractions) {
 
+      if (aiExtractions.baseline_summary) updatePayload['baselineSummary'] = aiExtractions.baseline_summary;
       if (aiExtractions.new_traits && aiExtractions.new_traits?.length > 0) updatePayload['psychology.traits'] = FieldValue.arrayUnion(...aiExtractions.new_traits);
       if (aiExtractions.defense_mechanisms && aiExtractions.defense_mechanisms?.length > 0) updatePayload['psychology.defenseMechanisms'] = FieldValue.arrayUnion(...aiExtractions.defense_mechanisms);
       if (aiExtractions.core_values && aiExtractions.core_values?.length > 0) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...aiExtractions.core_values);
