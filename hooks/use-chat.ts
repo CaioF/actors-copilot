@@ -18,7 +18,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SECTION_INTROS } from "@/lib/prompts";
-import {  DNASectionId } from "@/lib/chat-types";
+import { ARENA_THEMES, DNASectionId } from "@/lib/chat-types";
 
 
 const DEFAULT_SESSION_ID = "session-1";
@@ -58,7 +58,9 @@ interface AIExtractions {
   };
   archetype_signals?: string[];
   key_entities_and_arenas?: string[];
-  progress_assessment?: ProgressAssessment; // Campo crucial para o progresso
+  progress_assessment?: ProgressAssessment;
+  themes_extracted?: string[];
+  diversity_note?: string;
 }
 
 interface ChatApiResponse {
@@ -444,12 +446,16 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         // Progress Calculation & Logic
         let unlockedAuditions = session?.auditionsUnlocked || false;
         let totalCount = session?.totalExtractions || 0;
-        let newCompletedSecs = [...(session?.completedSections || [])]; 
-        let sectionCounts = { ...(session?.sectionHqCounts || {}) };    
+        let newCompletedSecs = [...(session?.completedSections || [])];
+        let sectionCounts = { ...(session?.sectionHqCounts || {}) };
         let currentSecCount = sectionCounts[currentSection] || 0;
+        let sectionThemes = { ...(session?.sectionThemes || {}) };
+
+        const REQUIRED_THEMES = 4;
+        const HQ_EXTRACTIONS_FOR_COMPLETION = 5;
 
         if (aiExtractions) {
-          totalCount += 1; 
+          totalCount += 1;
 
           const isHighQuality =
             aiAssessment != null &&
@@ -457,10 +463,29 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             aiAssessment.depth_score >= 4;
 
           if (isHighQuality) {
-            currentSecCount += 1; 
+            currentSecCount += 1;
             sectionCounts[currentSection] = currentSecCount;
 
-            if (currentSecCount >= 5 && !newCompletedSecs.includes(currentSection)) {
+            if (aiExtractions.themes_extracted && aiExtractions.themes_extracted.length > 0) {
+              const allowedThemes = new Set([
+                ...(ARENA_THEMES[currentSection as DNASectionId] || []),
+                "novel_theme",
+              ]);
+              const existingThemesArr: string[] = sectionThemes[currentSection as DNASectionId] || [];
+              const existingThemesSet = new Set(existingThemesArr);
+              const incomingThemes: string[] = aiExtractions.themes_extracted
+                .map((t: string) => t.trim().toLowerCase())
+                .filter((t: string) => allowedThemes.has(t) && !existingThemesSet.has(t));
+              // De-duplicate within incoming array then merge
+              const deduped = Array.from(new Set(incomingThemes));
+              sectionThemes[currentSection as DNASectionId] = [...existingThemesArr, ...deduped];
+            }
+
+            const uniqueThemes = new Set(sectionThemes[currentSection as DNASectionId] || []);
+            const meetsThemeRequirement = uniqueThemes.size >= REQUIRED_THEMES;
+            const meetsCountRequirement = currentSecCount >= HQ_EXTRACTIONS_FOR_COMPLETION;
+
+            if (meetsCountRequirement && meetsThemeRequirement && !newCompletedSecs.includes(currentSection)) {
               newCompletedSecs.push(currentSection);
             }
 
@@ -505,17 +530,24 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         
         if (newCompletedSecs.length >= 4) unlockedAuditions = true;
 
-        const TOTAL_SECTIONS = 12; 
-        const EXTRACTIONS_TO_COMPLETE_SECTION = 12; 
+        const TOTAL_SECTIONS = 12;
+        const DIVERSITY_WEIGHT = 0.6;
+        const COUNT_WEIGHT = 0.4;
 
         let totalProgressPercentage = 0;
 
-        Object.values(sectionCounts).forEach(count => {
-          const validExtractions = Math.min(count as number, EXTRACTIONS_TO_COMPLETE_SECTION);
-          
-          const sectionContribution = (validExtractions / EXTRACTIONS_TO_COMPLETE_SECTION) * (100 / TOTAL_SECTIONS);
-          
-          totalProgressPercentage += sectionContribution;
+        Object.entries(sectionCounts).forEach(([sectionId, count]) => {
+          const themesCovered = sectionThemes[sectionId as DNASectionId] || [];
+          const uniqueThemes = new Set(themesCovered);
+
+          if (newCompletedSecs.includes(sectionId)) {
+            totalProgressPercentage += 100 / TOTAL_SECTIONS;
+          } else {
+            const diversityScore = Math.min(uniqueThemes.size / REQUIRED_THEMES, 1);
+            const countScore = Math.min((count as number) / HQ_EXTRACTIONS_FOR_COMPLETION, 1);
+            const sectionScore = (diversityScore * DIVERSITY_WEIGHT) + (countScore * COUNT_WEIGHT);
+            totalProgressPercentage += sectionScore * (100 / TOTAL_SECTIONS);
+          }
         });
 
         const newProgress = Math.round(Math.min(totalProgressPercentage, 100));
@@ -524,13 +556,15 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
         
-        await setDoc(sessionRef, { 
+        await setDoc(sessionRef, {
           lastActiveAt: serverTimestamp(),
           totalExtractions: totalCount,
           sectionHqCounts: sectionCounts,
-          progress: newProgress,           
+          sectionThemes: sectionThemes,
+          completedSections: newCompletedSecs,
+          progress: newProgress,
           auditionsUnlocked: unlockedAuditions,
-          askedQuestions: newAskedQuestions 
+          askedQuestions: newAskedQuestions
         }, { merge: true });
         
       } catch (error: unknown) {
