@@ -120,7 +120,7 @@ export async function POST(request: Request) {
             === CONVERSATION STATE ===
             Actor's Name: ${actorName}
             Actor's Latest Input:  "${content.trim()}"
-            DO NOT REPEAT THE USER'S WORDS BACK TO THEM. Do not paraphrase or summarize their input.
+            Do not paraphrase or summarize their input.
             
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}

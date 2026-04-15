@@ -9,6 +9,30 @@ interface ChatInputProps {
 }
 
 /**
+ * Renders a pulsating voice waveform to provide visual feedback during audio capture.
+ * Uses staggered animation delays to simulate real-time audio input.
+ */
+function VoiceWaveform() {
+  return (
+    <div className="flex items-center justify-center gap-1.5 h-10 w-full bg-transparent">
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className="w-1 bg-[#E8721A] rounded-full animate-bounce"
+          style={{
+            height: "16px",
+            animationDuration: `${0.6 + i * 0.1}s`,
+          }}
+        />
+      ))}
+      <span className="ml-3 text-sm font-medium text-[#6B6B6B] animate-pulse">
+        Listening...
+      </span>
+    </div>
+  );
+}
+
+/**
  * Chat input component with text input, voice recording, and message submission.
  * @param props - The component props
  * @param props.onSend - Callback function to send a message
@@ -164,16 +188,25 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
           <Paperclip className="h-5 w-5" />
         </button>
 
-        <textarea
-          ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={1}
-          placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : "Ask me anything..."}
-          disabled={isLoading || isRecording || isTranscribing}
-          className="max-h-[150px] min-h-[24px] flex-1 resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50 scrollbar-thin"
-        />
+        {/* Conditional rendering: Switch between the text input and the voice waveform 
+          to provide immediate visual feedback when the user starts speaking.
+      */}
+      <div className="flex-1 overflow-hidden">
+        {isRecording ? (
+          <VoiceWaveform />
+        ) : (
+          <textarea
+            ref={inputRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            placeholder={isTranscribing ? "Transcribing..." : "Ask me anything..."}
+            disabled={isLoading || isTranscribing}
+            className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
+          />
+        )}
+      </div>
 
         <button
           onClick={handleMainAction}
