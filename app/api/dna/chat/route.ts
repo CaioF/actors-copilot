@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { ARENA_THEMES } from '@/lib/chat-types';
+import { createChildLogger } from '@/lib/logger';
 
 interface ChatHistoryMessage {
   role: string;
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { content, currentSection, actorName, history, previouslyAsked } = body;
+        const { content, currentSection, actorName, history, previouslyAsked, pivotFlag } = body;
 
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
@@ -77,6 +78,9 @@ export async function POST(request: Request) {
         const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
         const userPath = `${decodedToken.uid}_${firstName}`;
 
+        const log = createChildLogger({ route: 'dna/chat', userPath, currentSection });
+        log.trace({ bodyKeys: Object.keys(body) }, 'Request body received');
+
         const profileRef = db.doc(`users/${userPath}/profile/master`);
         const profileSnap = await profileRef.get();
         
@@ -88,23 +92,36 @@ export async function POST(request: Request) {
             }
         }
 
-        //PIVOT ENGINE 
+        //PIVOT ENGINE
         const questionCount = previouslyAsked?.length || 0;
-        
+
         const isShort = content.trim().length < 15;
         // const isMandatoryPivot = questionCount > 0 && questionCount % 15 === 0;
         const isMandatoryPivot = false;
 
+        log.trace({
+            questionCount,
+            isShort,
+            isMandatoryPivot,
+            pivotFlag: pivotFlag === true,
+            contentLength: content.trim().length
+        }, 'Pivot decision variables');
+
         let dynamicCommand = "";
         if (isShort) {
             dynamicCommand = `[User is giving very short input]
-            Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate. 
+            Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate.
             Ask a follow-up question that encourages them to expand and provide more detail. Do not accept one-word answers. Push for depth and specificity. Explain your reasoning to the user to encourage them to open up.
             `;
         } else if (isMandatoryPivot) {
             dynamicCommand = `[SYSTEM OVERRIDE: MANDATORY THEME SHIFT]
-            You have spent enough time digging into this specific memory. To ensure a diverse range of data, PIVOT NOW. 
+            You have spent enough time digging into this specific memory. To ensure a diverse range of data, PIVOT NOW.
             COMMAND: Look at the "Follow-up Routes" above. Select a NEW route that you haven't explored yet. Ask a question from that new route to open a completely different angle.`;
+        } else if (pivotFlag === true) {
+            dynamicCommand = `[THEME EXHAUSTION DETECTED]
+            Our monitoring has detected potential theme exhaustion in this conversation path.
+            Review the recent exchange carefully: if the last several exchanges show diminishing thematic diversity or repetitive patterns, the current conversation path may not be bearing fruit.
+            Deeply consider pivoting to a new Route that explores a different psychological dimension, rather than continuing to dig deeper into the same thematic territory.`;
         } else {
             dynamicCommand = `[MOMENTUM CHECK]
             Continue the Socratic extraction naturally. Ask ONE follow-up question. However, if you feel the current specific memory is fully explored, do not hesitate to pivot to a new Route.`;
@@ -328,7 +345,15 @@ export async function POST(request: Request) {
         if (functionCalls && functionCalls.length > 0) {
             extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
         }
-        
+
+        if (process.env.MEMLISTENER_DEBUG === 'true') {
+            log.trace({
+                hasExtractionData: extractionsData !== null,
+                functionCallCount: functionCalls?.length || 0,
+                uniqueThemeCount: extractionsData?.themes_extracted?.length || 0,
+                hasProgressAssessment: extractionsData?.progress_assessment != null,
+            }, 'MemListener extraction summary');
+        }
 
         // 7. FIRE-AND-FORGET LOGGING - TEMPORARIAMENTE DESABILITADO PARA DEBUG
         // saveRawMessageToFirestore(userId, {

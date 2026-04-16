@@ -41,3 +41,4 @@ docs/feature-plans/
 # local dev tools
 .serena/
 scripts/
+yarn.lock
