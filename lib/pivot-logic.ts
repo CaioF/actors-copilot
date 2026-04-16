@@ -102,9 +102,10 @@ export function shouldTriggerPivot(
  * - hqExtractionHistory: appended with stripped themes_extracted iff has_actionable_pattern === true
  * - extractedThemes: merged with stripped themes_extracted iff has_actionable_pattern === true (de-duped)
  * - pivotFlag: ALWAYS reset to false in the returned state. Callers (use-chat
- *   sendMessage) are expected to recompute pivotFlag via shouldTriggerPivot
- *   and overwrite it before persisting. The flag is evaluated turn-by-turn,
- *   not persisted across turns.
+ *   sendMessage) are expected to recompute pivotFlag via shouldTriggerPivot,
+ *   then overwrite and persist that recomputed value for the next outbound
+ *   request/turn. In other words, updateTracker zeroes the flag; callers
+ *   recompute and persist it afterward.
  * - currentSection: set to the `currentSection` argument (the section this
  *   update belongs to), even when no extraction happened.
  *
