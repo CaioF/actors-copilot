@@ -49,7 +49,8 @@ function computeThemeFrequency(history: string[]): Map<string, number> {
  * Determines if pivot conditions are met based on extraction tracker state.
  *
  * Conditions (any one is sufficient):
- * - questionCounter > questionThreshold (strict greater-than)
+ * - questionCounter >= questionThreshold (fires when reached; after N completed turns
+ *   the (N+1)th outbound request carries pivotFlag: true)
  * - At least one theme repeats >= repetitionThreshold times in the window
  * - Unique themes in the window < requiredDiversity (only evaluated when window is full)
  *
@@ -62,10 +63,10 @@ export function shouldTriggerPivot(
   tracker: ExtractionTracker,
   thresholds: PivotThresholds
 ): { shouldPivot: boolean; reason: string } {
-  if (tracker.questionCounter > thresholds.questionThreshold) {
+  if (tracker.questionCounter >= thresholds.questionThreshold) {
     return {
       shouldPivot: true,
-      reason: `question_threshold_exceeded (${tracker.questionCounter} > ${thresholds.questionThreshold})`,
+      reason: `question_threshold_reached (${tracker.questionCounter} >= ${thresholds.questionThreshold})`,
     };
   }
 

@@ -20,14 +20,20 @@ describe('shouldTriggerPivot', () => {
     expect(result.shouldPivot).toBe(false);
   });
 
-  it('triggers when question threshold exceeded (16 > 15)', () => {
+  it('triggers when question threshold is reached (15 >= 15)', () => {
+    const result = shouldTriggerPivot({ ...minimalTracker, questionCounter: 15 }, DEFAULT_THRESHOLDS);
+    expect(result.shouldPivot).toBe(true);
+    expect(result.reason).toContain('question');
+  });
+
+  it('triggers above the question threshold (16 >= 15)', () => {
     const result = shouldTriggerPivot({ ...minimalTracker, questionCounter: 16 }, DEFAULT_THRESHOLDS);
     expect(result.shouldPivot).toBe(true);
     expect(result.reason).toContain('question');
   });
 
-  it('does NOT trigger at exactly the question threshold (15)', () => {
-    const result = shouldTriggerPivot({ ...minimalTracker, questionCounter: 15 }, DEFAULT_THRESHOLDS);
+  it('does NOT trigger below the question threshold (14)', () => {
+    const result = shouldTriggerPivot({ ...minimalTracker, questionCounter: 14 }, DEFAULT_THRESHOLDS);
     expect(result.shouldPivot).toBe(false);
   });
 
