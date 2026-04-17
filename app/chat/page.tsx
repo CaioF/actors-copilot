@@ -122,6 +122,18 @@ export default function ChatPage() {
           >
             I don't understand the question
           </button>
+          {/* /**
+             * Triggers the safe termination protocol for the current session.
+             * Dispatches a system-level command to the AI backend to halt 
+             * Socratic extraction and initiate a psychological grounding text.
+             */  }
+          <button
+            onClick={() => sendMessage("[SYSTEM_COMMAND: END_SESSION]I need to stop now. Please help me ground myself and close the session.", activeSection)}
+            disabled={isLoading || isInitializing}
+            className="text-xs font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#ffa2a2] hover:text-[#2C3328] px-5 py-2 rounded-full transition-colors disabled:opacity-50"
+          >
+            END SESSION
+          </button>
         </div>
         
         {/* Input bar */}
