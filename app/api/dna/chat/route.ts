@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { content, currentSection, actorName, history, previouslyAsked, pivotFlag } = body;
+        const { content, currentSection, actorName, history, previouslyAsked, pivotFlag, document } = body;
 
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
@@ -106,10 +106,25 @@ export async function POST(request: Request) {
         }, 'Pivot decision variables');
 
         /**
+         * Flag to determine if a document payload is present in this exact turn.
+         */
+        const hasDocumentAttached = document && document.data ? true : false;
+
+        /**
          * System flag to determine if the user has requested a safe session termination.
          * We parse the incoming message for the specific command tag dispatched by the UI.
          */
         const isEndSession = content.includes("Please help me ground myself and close the session.");
+
+        /**
+         * System flag to detect if the actor is utilizing a UI shortcut to bypass 
+         * the current prompt. Used to prevent unnecessary extraction model execution.
+         */
+        const skipPhrases = [
+            "Pass", 
+            "Change the subject, next question", 
+        ];
+        const isSkipCommand = skipPhrases.includes(content.trim());
 
         let dynamicCommand = "";
         if (isEndSession) {
@@ -127,6 +142,13 @@ export async function POST(request: Request) {
             Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate.
             Ask a follow-up question that encourages them to expand and provide more detail. Do not accept one-word answers. Push for depth and specificity. Explain your reasoning to the user to encourage them to open up.
             `;
+        } else if (isSkipCommand) {
+            dynamicCommand = `[SYSTEM OVERRIDE: USER SKIPPED QUESTION]
+            The user has explicitly chosen to skip the previous question or requested a change of subject.
+            CRITICAL DIRECTIVES:
+            1. Do NOT ask why they skipped. Do NOT probe into their refusal.
+            2. Pivot immediately to a completely NEW Route from the instructions. 
+            3. Ask a fresh, unrelated Socratic question to regain momentum.`;
         } else if (isMandatoryPivot) {
             dynamicCommand = `[SYSTEM OVERRIDE: MANDATORY THEME SHIFT]
             You have spent enough time digging into this specific memory. To ensure a diverse range of data, PIVOT NOW.
@@ -158,6 +180,11 @@ export async function POST(request: Request) {
             
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}
+
+            ${hasDocumentAttached ? `
+            The user has attached a document alongside their message. You MUST read the contents of this document (provided as inlineData). 
+            Explicitly acknowledge that you have received and read the file, and deeply integrate its contents into your next Socratic response.
+            ` : ""}
             
             `;
 
@@ -325,20 +352,56 @@ export async function POST(request: Request) {
             "${content.trim()}"
         `;
 
-        const [chatResult, extractionResult] = await Promise.all([
-            chat.sendMessage(finalPromptForAI),
-            extractionModel.generateContent(promptForExtraction)
-        ]);
+        // Primary execution: Always generate the conversational response.
+        type PromptPart = { text: string } | { inlineData: { data: string; mimeType: string } };
+        
+        /**
+         * Initialize the prompt array with the mandatory system directives and user input.
+         */
+        const promptParts: PromptPart[] = [
+            { text: finalPromptForAI }
+        ];
+
+        /**
+         * If a valid document payload was provided in the request, append it as 
+         * inlineData. Vertex AI engine natively processes this alongside the text.
+         */
+        if (document && document.data && document.mimeType) {
+            promptParts.push({
+                inlineData: {
+                    data: document.data,
+                    mimeType: document.mimeType
+                }
+            });
+        }
+
+        const chatResult = await chat.sendMessage(promptParts);
 
         const aiResponseText = chatResult.response.text();
         
-
         let extractionsData: ExtractedPsychData | null = null;
         
-        const functionCalls = extractionResult.response.functionCalls(); 
+       /**
+         * Declare functionCalls in the outer scope so it can be accessed later by the debug logger. 
+         * Strictly typed to match the Firebase Vertex AI SDK FunctionCall signature to comply with no-any rules.
+         */
+        let functionCalls: { name: string; args: object }[] | undefined = undefined;
         
-        if (functionCalls && functionCalls.length > 0) {
-            extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
+        /**
+         * Secondary execution: Context Extraction
+         * We strictly bypass the extraction model if the user is ending the session
+         * or skipping the question, thereby saving token usage and preventing 
+         * superficial data pollution in the psychological profile.
+         */
+        if (!isEndSession && !isSkipCommand) {
+            const extractionResult = await extractionModel.generateContent(promptForExtraction);
+            
+            // Assign to the outer variable instead of using 'const'
+            functionCalls = extractionResult.response.functionCalls(); 
+            
+            if (functionCalls && functionCalls.length > 0) {
+                extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
+            }
         }
 
         if (process.env.MEMLISTENER_DEBUG === 'true') {

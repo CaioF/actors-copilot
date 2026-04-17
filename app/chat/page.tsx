@@ -128,9 +128,12 @@ export default function ChatPage() {
             END SESSION
           </button>
         </div>
-        
+
         {/* Input bar */}
-        <ChatInput onSend={(content) => sendMessage(content, activeSection)} isLoading={isLoading} />
+        <ChatInput 
+          onSend={(content, document) => sendMessage(content, activeSection, document)} 
+          isLoading={isLoading} 
+        />
 
         {/* Footer */}
         <DashboardFooter />
