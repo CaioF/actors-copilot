@@ -15,6 +15,7 @@ interface ExtractionMilestone {
 interface ExtractedPsychData {
     is_valuable_extraction?: boolean;
     new_traits?: string[];
+    themes_extracted?: string[];
     defense_mechanisms?: string[];
     leaf_snippets?: string[];
     holistic_analysis?: string;
@@ -104,8 +105,24 @@ export async function POST(request: Request) {
             contentLength: content.trim().length
         }, 'Pivot decision variables');
 
+        /**
+         * System flag to determine if the user has requested a safe session termination.
+         * We parse the incoming message for the specific command tag dispatched by the UI.
+         */
+        const isEndSession = content.includes("Please help me ground myself and close the session.");
+
         let dynamicCommand = "";
-        if (isShort) {
+        if (isEndSession) {
+            dynamicCommand = `[SYSTEM OVERRIDE: INITIATE GROUNDING PROTOCOL]
+            The user has explicitly requested to end the current extraction session safely.
+            
+            IMMEDIATE CRITICAL DIRECTIVES:
+            1. CEASE ALL EXTRACTION: Stop all Socratic questioning, probing, and psychological digging immediately. Do NOT ask any further questions about their memories or traits.
+            2. VALIDATION: Acknowledge the emotional work they have done today and validate their effort in exploring these depths.
+            3. GROUNDING EXERCISE: Guide the user through a brief, calming grounding technique to help them detach from the character/memory and return to their baseline reality. Provide a simple sensory exercise (e.g., the 5-4-3-2-1 technique or a guided deep breath).
+            4. CLOSURE: End with a warm, supportive closing statement indicating that the session is now complete and they are safe to step away from the screen. Keep the tone empathetic, grounded, and professional.`;
+        } else
+        if (isShort && !pivotFlag) {
             dynamicCommand = `[User is giving very short input]
             Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate.
             Ask a follow-up question that encourages them to expand and provide more detail. Do not accept one-word answers. Push for depth and specificity. Explain your reasoning to the user to encourage them to open up.
@@ -135,8 +152,8 @@ export async function POST(request: Request) {
             ${blacklistText}
 
             === CONVERSATION STATE ===
-            Actor's Name: ${actorName}
-            Actor's Latest Input:  "${content.trim()}"
+            User's Name: ${actorName}
+            User's Latest Input:  "${content.trim()}"
             DO NOT REPEAT THE USER'S WORDS BACK TO THEM. Do not paraphrase or summarize their input.
             
             === YOUR DIRECTIVE FOR THIS TURN ===
