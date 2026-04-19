@@ -297,13 +297,13 @@ export function AuditionWizard() {
 
       {/* STEP 5: LOADING OR RESULT */}
       {currentStep === 5 && (
-        <div className="flex-1 flex flex-col w-full h-full">
+        <div className={`flex-1 flex flex-col w-full h-full ${!isGenerating && resultData ? 'bg-[#F5EFE6] -mx-4 md:-mx-8 px-4 md:px-8 py-8 min-h-screen' : ''}`}>
           {isGenerating ? (
             <div className="flex flex-col flex-1 animate-in fade-in duration-500">
-              {/* O Card Verde Escuro de Loading idêntico ao seu print */}
+              {/* Dark loading card */}
               <div className="rounded-3xl bg-[#424842] shadow-xl text-center flex flex-col items-center justify-center w-full max-w-6xl mx-auto py-32 px-8">
                 
-                {/* Spinner Animado */}
+                {/* Animated Spinner */}
                 <svg className="animate-spin h-14 w-14 text-[#FF7316] mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -315,34 +315,40 @@ export function AuditionWizard() {
               </div>
             </div>
           ) : resultData ? (
-            <div className="flex flex-col animate-in fade-in duration-700">
+            <div className="flex flex-col animate-in fade-in duration-700 max-w-7xl mx-auto w-full">
 
-               <div className=" flex justify-between items-center mb-4">
-                 <h2 className="text-3xl font-title text-[#2C3328]">Your Performance Map</h2>
+               {/* --- FIGMA-ALIGNED HEADER --- */}
+               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-300 pb-6 mb-2 w-full">
+                 <div>
+                   <h1 className="text-3xl font-bold tracking-tight text-gray-900">{formData.role || "Character Role"}</h1>
+                   <p className="text-gray-600 mt-1">{formData.project || "Audition Project"} — AI Performance Map</p>
+                
+                 </div>
 
-                  <div className="flex items-center gap-3">
-                   {/* PRINT BUTTON */}
+                 <div className="flex gap-3 mt-4 sm:mt-0">
+                   {/* Print Action */}
                    <button 
                      onClick={handlePrintDocument}
-                     className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-5 py-2 rounded-full font-medium transition-colors text-sm"
+                     className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-700 text-sm hover:bg-white transition-colors"
                    >
                      <Printer className="w-4 h-4" />
                      Print
                    </button>
-
-                  <button 
-                      onClick={handleSaveAndFinish}
-                      className="bg-[#FF7316] hover:bg-[#E66814] text-white px-6 py-2 rounded-full font-medium transition-colors text-sm"
-                    >
-                      Save & Finish
-                    </button>
-                </div>
+                   
+                   {/* Save Action */}
+                   <button 
+                     onClick={handleSaveAndFinish}
+                     className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#FF7316] text-white text-sm font-medium hover:bg-[#E5630F] transition-colors shadow-sm"
+                   >
+                     Save Output
+                   </button>
+                 </div>
                </div>
 
-               {/* UI Display for the Web */}
+               {/* --- MAIN UI RENDERER --- */}
                <StepResult data={resultData} />
 
-               {/* HIDDEN PRINT TEMPLATE - This will be extracted by react-to-print */}
+               {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
                  <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
                    
@@ -394,7 +400,6 @@ export function AuditionWizard() {
                  </div>
                </div>
 
-               <StepResult data={resultData} />
             </div>
           ) : null}
         </div>

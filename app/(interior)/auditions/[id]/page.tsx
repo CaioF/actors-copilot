@@ -156,7 +156,7 @@ export default function AuditionDetailView() {
         <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
           
           {/* Cabeçalho do Documento */}
-          <div className="border-b-2 border-black pb-4 mb-8">
+          <div className="border-b-2  border-black pb-4 mb-8">
             <h1 className="text-4xl font-bold text-black">{auditionData?.project}</h1>
             <p className="text-xl text-gray-800 mt-2">{auditionData?.role}</p>
             <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
@@ -172,9 +172,9 @@ export default function AuditionDetailView() {
           )}
 
           {/* Sections Loop */}
-          <div className="space-y-10">
+          <div className="space-y-10 mt-10">
             {auditionData?.performanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
-              <div key={idx} className="break-inside-avoid">
+              <div key={idx} className="break-inside-avoid pt-8">
                 <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
                   {sec.title}
                 </h3>

@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         }
 
         // database search
-        const profileRef = db.doc(`users/${userPath}/masterProfile/current`);
+        const profileRef = db.doc(`users/${userPath}/masterProfile/master`);
         const profileSnap = await profileRef.get();
 
         let existingProfileTime = 0;

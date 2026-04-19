@@ -57,7 +57,7 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
     .slice(0, 2);
 
   return (
-    <header className="flex items-center justify-between px-8 py-10">
+    <header className="flex bg-[#8BA2A8] items-center justify-between px-8 mb-10 py-6">
       <h1 className="font-title text-3xl font-bold text-[#2C3328]">{title}</h1>
       <div className="flex items-center gap-3">
         <Link href={"/settings"}
