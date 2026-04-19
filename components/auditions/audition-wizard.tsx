@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Printer} from "lucide-react";
+import { Printer, Trash2, Save} from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import ReactMarkdown from "react-markdown";
 import { AuditionFormData, initialAuditionData, AuditionStep } from "@/lib/audition-types";
@@ -76,6 +76,13 @@ export function AuditionWizard() {
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
+  const handleDelete = () => {
+  if (window.confirm("Are you sure you want to delete this audition breakdown? This action cannot be undone.")) {
+    setResultData(null);
+    setCurrentStep(1); 
+  }
+};
+
   /**
    * Handles the generation of an audition breakdown.
    * Step 1: Smart-checks the DNA Vault and updates the Master Profile if needed.
@@ -102,7 +109,6 @@ export function AuditionWizard() {
 
       const token = await currentUser.getIdToken();
       // STAGE 1: SMART DNA SYNTHESIS (Uses the cache logic we just built)
-      console.log("Stage 1: Checking if Master Profile needs an update...");
       const dnaResponse = await fetch('/api/dna/synthesize', {
         method: 'POST',
         headers: { 
@@ -115,9 +121,7 @@ export function AuditionWizard() {
       // We wait for the backend to confirm the profile is ready (either cached or newly generated)
       await dnaResponse.json(); 
 
-
       // STAGE 2: GENERATE AUDITION BREAKDOWN
-      console.log("Stage 2: Generating Audition Breakdown...");
       const payload = new FormData();
       
       payload.append("projectType", formData.projectType || "cinematic"); // Defaults to cinematic if not set
@@ -194,8 +198,6 @@ export function AuditionWizard() {
         status: "completed"
       });
 
-      console.log(`✅ Audition successfully saved to users/${userPath}/auditions`);
-
       // Redirect back to the Dashboard
       router.push("/auditions");
 
@@ -209,12 +211,6 @@ export function AuditionWizard() {
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-2 h-full">
       
-      {/* Come back link */}
-      <Link href="/dashboard" className=" flex items-center gap-2 text-sm text-[#FF7316] mb-6 hover:opacity-80 transition-opacity">
-        <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
-      </Link>
-
       {/* Stepper  */}
       {currentStep < 5 && (
         <Stepper currentStep={currentStep} />
@@ -297,13 +293,13 @@ export function AuditionWizard() {
 
       {/* STEP 5: LOADING OR RESULT */}
       {currentStep === 5 && (
-        <div className="flex-1 flex flex-col w-full h-full">
+        <div className={`flex-1 flex flex-col w-full h-full ${!isGenerating && resultData ? 'bg-[#F5EFE6] -mx-4 md:-mx-8 px-4 md:px-8 py-8 min-h-screen' : ''}`}>
           {isGenerating ? (
             <div className="flex flex-col flex-1 animate-in fade-in duration-500">
-              {/* O Card Verde Escuro de Loading idêntico ao seu print */}
+              {/* Dark loading card */}
               <div className="rounded-3xl bg-[#424842] shadow-xl text-center flex flex-col items-center justify-center w-full max-w-6xl mx-auto py-32 px-8">
                 
-                {/* Spinner Animado */}
+                {/* Animated Spinner */}
                 <svg className="animate-spin h-14 w-14 text-[#FF7316] mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -315,34 +311,53 @@ export function AuditionWizard() {
               </div>
             </div>
           ) : resultData ? (
-            <div className="flex flex-col animate-in fade-in duration-700">
+            <div className="flex flex-col animate-in fade-in duration-700 max-w-7xl mx-auto w-full">
 
-               <div className=" flex justify-between items-center mb-4">
-                 <h2 className="text-3xl font-title text-[#2C3328]">Your Performance Map</h2>
+               {/* --- FIGMA-ALIGNED HEADER --- */}
+               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 w-full border-b border-[#D0D4D0]/50 pb-6">
+                 <div>
+                   <h1 className="text-[32px] font-title text-[#2C3328] leading-tight mb-1">
+                     {formData.role || "Audition Breakdown"}
+                   </h1>
+                   <p className="text-[#646A64] text-[15px] mb-3">
+                     Lead · {formData.project || "Audition Project"} 
+                   </p>
+                 </div>
 
-                  <div className="flex items-center gap-3">
-                   {/* PRINT BUTTON */}
+                 <div className="flex gap-3 mt-4 sm:mt-0">
+                  {/* Delete Action */}
+                   <button 
+                     type="button"
+                     onClick={handleDelete}
+                     className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#D0D4D0] text-[#646A64] text-sm font-medium hover:bg-[#FCFAF7] transition-colors"
+                   >
+                     <Trash2 className="w-4 h-4" />
+                     Delete
+                   </button>
+                   {/* Print Action */}
                    <button 
                      onClick={handlePrintDocument}
-                     className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-5 py-2 rounded-full font-medium transition-colors text-sm"
+                     className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-700 text-sm hover:bg-white transition-colors"
                    >
                      <Printer className="w-4 h-4" />
                      Print
                    </button>
-
-                  <button 
-                      onClick={handleSaveAndFinish}
-                      className="bg-[#FF7316] hover:bg-[#E66814] text-white px-6 py-2 rounded-full font-medium transition-colors text-sm"
-                    >
-                      Save & Finish
-                    </button>
-                </div>
+                   
+                   {/* Save Action */}
+                   <button 
+                     onClick={handleSaveAndFinish}
+                     className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#FF7316] text-white text-sm font-medium hover:bg-[#E5630F] transition-colors shadow-sm"
+                   >
+                    <Save className="w-4 h-4" />
+                     Save Output
+                   </button>
+                 </div>
                </div>
 
-               {/* UI Display for the Web */}
+               {/* --- MAIN UI RENDERER --- */}
                <StepResult data={resultData} />
 
-               {/* HIDDEN PRINT TEMPLATE - This will be extracted by react-to-print */}
+               {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
                  <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
                    
@@ -394,7 +409,6 @@ export function AuditionWizard() {
                  </div>
                </div>
 
-               <StepResult data={resultData} />
             </div>
           ) : null}
         </div>

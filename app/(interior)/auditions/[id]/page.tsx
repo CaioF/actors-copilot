@@ -172,9 +172,9 @@ export default function AuditionDetailView() {
           )}
 
           {/* Sections Loop */}
-          <div className="space-y-10">
+          <div className="space-y-10 mt-10">
             {auditionData?.performanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
-              <div key={idx} className="break-inside-avoid">
+              <div key={idx} className="break-inside-avoid pt-8">
                 <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
                   {sec.title}
                 </h3>

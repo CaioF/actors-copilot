@@ -37,7 +37,7 @@ jest.mock("react-markdown", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-import { AuditionWizard } from "./autition-wizard";
+import { AuditionWizard } from "./audition-wizard";
 import { StepUpload } from "./step/step-upload";
 import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
 

@@ -51,10 +51,10 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 };
 
 /**
- * Analyzes audition materials (sides, briefs, project context) using AI to generate
+ * Analyzes audition materials (sides, project context) using AI to generate
  * a personalized performance coaching breakdown for an actor.
  * @param request - HTTP request containing form data with project type, sides text/file,
- *                  brief text/file, actor name, and user path for DNA profile lookup
+ *                  actor name, and user path for DNA profile lookup
  * @returns JSON response with structured performance coaching data or error
  * @async
  */
@@ -85,10 +85,8 @@ export async function POST(request: Request) {
     const actorName = formData.get("actorName") as string || "Actor";
 
     let sidesText = (formData.get("sidesText") as string) || "";
-    let briefText = (formData.get("briefText") as string) || "";
 
     const sidesFile = formData.get("sidesFile") as File | null;
-    const briefFile = formData.get("briefFile") as File | null;
 
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
@@ -109,24 +107,7 @@ export async function POST(request: Request) {
       );
     }
   }
-
-  if (briefFile) {
-    if (briefFile.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "Brief file exceeds 20MB limit" },
-        { status: 413 }
-      );
-    }
-
-    const isDocx = briefFile.name.toLowerCase().endsWith('.docx');
-
-    if (!ALLOWED_MIME_TYPES.includes(briefFile.type) && !isDocx) {
-      return NextResponse.json(
-        { error: "Only PDFs and Word documents (.docx) are allowed for the brief" },
-        { status: 400 }
-      );
-    }
-  }
+  
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
@@ -147,20 +128,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (briefFile) {
-      const arrayBuffer = await briefFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      if (briefFile.type === "application/pdf") {
-        briefText = await extractTextFromPDF(buffer);
-      } else if (briefFile.name.toLowerCase().endsWith(".docx") || briefFile.type.includes("wordprocessingml")) {
-        const result = await mammoth.extractRawText({ buffer: buffer });
-        briefText = result.value;
-      }
-    }
-
     // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
-    console.log(`Fetching Master Profile for ${userPath}...`);
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
     
@@ -169,11 +137,8 @@ export async function POST(request: Request) {
     if (profileSnap.exists) {
       const profileData = profileSnap.data();
       // Stringify the profile so the AI can read it as context
-      actorDNAContext = JSON.stringify(profileData?.profile || {});
-      console.log("✅ Master Profile successfully loaded and injected.");
-    } else {
-      console.log("⚠️ No Master Profile found. Proceeding with generic coaching.");
-    }
+      actorDNAContext = JSON.stringify(profileData, null, 2);
+    } 
 
     //special instruction based on project type
     let categoryInstruction = "";
@@ -190,14 +155,13 @@ export async function POST(request: Request) {
     const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
+    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
 
     const model = getGenerativeModel(ai, { 
-      model: "gemini-2.5-pro", 
+      model: "gemini-3.1-pro-preview", 
       systemInstruction: { role: "user", parts: [{ text: AUDITION_COACH_PROMPT }] },
       generationConfig: { 
         responseMimeType: "application/json",
-        temperature: 0.3,
         responseSchema: {
           type: SchemaType.OBJECT,
           properties: {
@@ -226,23 +190,25 @@ export async function POST(request: Request) {
 
       ${categoryInstruction}
       
-      ACTOR'S DNA PROFILE (Use this psychological profile and physical tendencies to personalize the coaching):
+      === ACTOR'S DNA VAULT (MASTER PROFILE) ===
+      CRITICAL INSTRUCTION: You MUST use this profile as the psychological lens for your entire breakdown. 
+      Do not just tack it on at the end. Weave their specific emotional triggers, strengths, and past 
+      tendencies into the Coach Notes and Tactics.
+      
       ${actorDNAContext}
+      ==========================================
       
       Here are the audition materials for analysis:
 
       CONTEXT:
       - Project Category: ${projectType.toUpperCase()}
       - Project: ${project || "Not specified"}
-      
-      CHARACTER BRIEF / DIRECTOR NOTES:
-      ${briefText || "No brief provided. Infer context from the sides."}
 
       AUDITION SIDES (SCRIPT):
       ${sidesText || "No sides provided."}
-    `;
 
-    console.log("Initiating Vertex AI Synthesis Call for Audition...");
+      CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
+    `;
 
     // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE
     const result = await model.generateContent(prompt);
@@ -256,7 +222,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
     }
 
-    console.log("✅ BREAKDOWN GENERATED SUCCESSFULLY!");
 
     // 8. RETURN TO FRONTEND
     return NextResponse.json({
