@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatMessage } from "@/lib/chat-types";
 import { AiThinkingBlock } from "./ai-thinking-block";
+import { FileText } from "lucide-react";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -71,12 +72,12 @@ function CopilotAvatar() {
  * @param props.userInitials - The user's initials for their avatar
  * @returns The message bubble JSX element
  */
-function MessageBubble({ message, userInitials }: { message: ChatMessage, userInitials: string }) {
+function MessageBubble({ message, userInitials }: { message: ChatMessage & { attachmentName?: string }, userInitials: string }) {
   const isAssistant = message.role === "assistant";
 
   return (
     <div
-      className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"}`}
+      className={`flex gap-1 ${isAssistant ? "justify-start" : "justify-end"}`}
     >
       {isAssistant && (
         <div className="mt-auto mb-2">
@@ -92,6 +93,20 @@ function MessageBubble({ message, userInitials }: { message: ChatMessage, userIn
               : "bg-[#3D4A3C] text-[#F5F0E8]"
           }`}
         >
+          {/* =======================================================
+              DOCUMENT ATTACHMENT BADGE
+              Renders a visual indicator inside the user's message bubble 
+              if a file was attached during submission.
+              ======================================================= */}
+          {!isAssistant && message.attachmentName && (
+            <div className="flex items-center gap-1.5 rounded-md bg-[#2C3328]/40 px-2.5 py-1.5 mb-3 w-fit border border-[#F5F0E8]/10">
+              <FileText size={12} className="text-[#F5F0E8]/70" />
+              <span className="text-[11px] font-medium text-[#F5F0E8]/90 truncate max-w-[180px]">
+                {message.attachmentName}
+              </span>
+            </div>
+          )}
+
           <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
             {message.content.split("\n").map((line, i) => (
               <span key={i}>

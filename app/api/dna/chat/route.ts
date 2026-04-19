@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
-import { ARENA_THEMES } from '@/lib/chat-types';
 import { createChildLogger } from '@/lib/logger';
 
 interface ChatHistoryMessage {
@@ -16,6 +15,7 @@ interface ExtractionMilestone {
 interface ExtractedPsychData {
     is_valuable_extraction?: boolean;
     new_traits?: string[];
+    themes_extracted?: string[];
     defense_mechanisms?: string[];
     leaf_snippets?: string[];
     holistic_analysis?: string;
@@ -41,8 +41,6 @@ interface ExtractedPsychData {
         has_actionable_pattern: boolean;
         depth_score: number;
     };
-    themes_extracted?: string[];
-    diversity_note?: string;
 }
 
 /**
@@ -61,7 +59,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { content, currentSection, actorName, history, previouslyAsked, pivotFlag } = body;
+        const { content, currentSection, actorName, history, previouslyAsked, pivotFlag, document } = body;
 
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
@@ -107,12 +105,50 @@ export async function POST(request: Request) {
             contentLength: content.trim().length
         }, 'Pivot decision variables');
 
+        /**
+         * Flag to determine if a document payload is present in this exact turn.
+         */
+        const hasDocumentAttached = document && document.data ? true : false;
+
+        /**
+         * System flag to determine if the user has requested a safe session termination.
+         * We parse the incoming message for the specific command tag dispatched by the UI.
+         */
+        const isEndSession = content.includes("Please help me ground myself and close the session.");
+
+        /**
+         * System flag to detect if the actor is utilizing a UI shortcut to bypass 
+         * the current prompt. Used to prevent unnecessary extraction model execution.
+         */
+        const skipPhrases = [
+            "Pass", 
+            "Change the subject, next question", 
+        ];
+        const isSkipCommand = skipPhrases.includes(content.trim());
+
         let dynamicCommand = "";
-        if (isShort) {
+        if (isEndSession) {
+            dynamicCommand = `[SYSTEM OVERRIDE: INITIATE GROUNDING PROTOCOL]
+            The user has explicitly requested to end the current extraction session safely.
+            
+            IMMEDIATE CRITICAL DIRECTIVES:
+            1. CEASE ALL EXTRACTION: Stop all Socratic questioning, probing, and psychological digging immediately. Do NOT ask any further questions about their memories or traits.
+            2. VALIDATION: Acknowledge the emotional work they have done today and validate their effort in exploring these depths.
+            3. GROUNDING EXERCISE: Guide the user through a brief, calming grounding technique to help them detach from the character/memory and return to their baseline reality. Provide a simple sensory exercise (e.g., the 5-4-3-2-1 technique or a guided deep breath).
+            4. CLOSURE: End with a warm, supportive closing statement indicating that the session is now complete and they are safe to step away from the screen. Keep the tone empathetic, grounded, and professional.`;
+        } else
+        if (isShort && !pivotFlag) {
             dynamicCommand = `[User is giving very short input]
             Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate.
             Ask a follow-up question that encourages them to expand and provide more detail. Do not accept one-word answers. Push for depth and specificity. Explain your reasoning to the user to encourage them to open up.
             `;
+        } else if (isSkipCommand) {
+            dynamicCommand = `[SYSTEM OVERRIDE: USER SKIPPED QUESTION]
+            The user has explicitly chosen to skip the previous question or requested a change of subject.
+            CRITICAL DIRECTIVES:
+            1. Do NOT ask why they skipped. Do NOT probe into their refusal.
+            2. Pivot immediately to a completely NEW Route from the instructions. 
+            3. Ask a fresh, unrelated Socratic question to regain momentum.`;
         } else if (isMandatoryPivot) {
             dynamicCommand = `[SYSTEM OVERRIDE: MANDATORY THEME SHIFT]
             You have spent enough time digging into this specific memory. To ensure a diverse range of data, PIVOT NOW.
@@ -128,7 +164,7 @@ export async function POST(request: Request) {
         }
 
         const finalPromptForAI = `
-        system instruction: ${SYSTEM_PROMPT}
+        system instruction:
             ${specificSectionDirective}
 
             ${baselineContext}
@@ -138,32 +174,40 @@ export async function POST(request: Request) {
             ${blacklistText}
 
             === CONVERSATION STATE ===
-            Actor's Name: ${actorName}
-            Actor's Latest Input:  "${content.trim()}"
+            User's Name: ${actorName}
+            User's Latest Input:  "${content.trim()}"
             DO NOT REPEAT THE USER'S WORDS BACK TO THEM. Do not paraphrase or summarize their input.
             
             === YOUR DIRECTIVE FOR THIS TURN ===
             ${dynamicCommand}
+
+            ${hasDocumentAttached ? `
+            The user has attached a document alongside their message. You MUST read the contents of this document (provided as inlineData). 
+            Explicitly acknowledge that you have received and read the file, and deeply integrate its contents into your next Socratic response.
+            ` : ""}
             
             `;
 
         const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
-        const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
+        const aiGlobal = getAI(getFirebaseApp(), { 
+            backend: new VertexAIBackend('global') 
+        });
+        
+        // Mantemos o padrão (us-central1) para o modelo de extração não quebrar
+        const aiCentral = getAI(getFirebaseApp(), { 
+            backend: new VertexAIBackend() 
+        });
         
         // --- AGENT 1: YAN (Conversacional) ---
-        const chatModel = getGenerativeModel(ai, { 
-            model: "gemini-2.5-pro", 
-            generationConfig: { temperature: 0.4 },
+        const chatModel = getGenerativeModel(aiGlobal, { 
+            model: "gemini-3.1-pro-preview", 
             
-            // thinkingConfig: {
-            //     thinkingLevel: "HIGH" // Forces the model to use internal deliberation before answering
-            // }
-        } ); // Type assertion to bypass the current typing issue with getGenerativeModel);
+        } ); 
 
         // --- AGENT 2: MEMLISTENER (Context Extraction) ---
-        const extractionModel = getGenerativeModel(ai, {
+        const extractionModel = getGenerativeModel(aiCentral, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
             // // @ts-expect-error
@@ -277,15 +321,6 @@ export async function POST(request: Request) {
                                     depth_score: { type: SchemaType.NUMBER, description: "Score from 0 to 10 evaluating the emotional depth and vulnerability of the latest answer." }
                                 },
                                 required: ["has_actionable_pattern", "depth_score"]
-                            },
-                            themes_extracted: {
-                                type: SchemaType.ARRAY,
-                                description: "Theme tags from the ARENA_THEMES taxonomy that categorize the psychological material discovered. E.g., ['shame_origin', 'shame_trigger'].",
-                                items: { type: SchemaType.STRING }
-                            },
-                            diversity_note: {
-                                type: SchemaType.STRING,
-                                description: "Optional note about whether this extraction adds new thematic diversity or repeats existing themes. E.g., 'New theme: different from shame_origin'."
                             }
                         },
                         required: ["progress_assessment"]
@@ -296,32 +331,19 @@ export async function POST(request: Request) {
 
 
         const chat = chatModel.startChat({
-            systemInstruction: { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
+            systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
             history: history, 
         });
 
         // Build the history context for the extraction model to read
         const recentHistoryText = history.slice(-7).map((msg: ChatHistoryMessage) => `${msg.role.toUpperCase()}: ${msg.parts[0].text}`).join('\n');
 
-        const themeTaxonomyText = Object.entries(ARENA_THEMES)
-            .map(([arena, themes]) => `${arena}: ${themes.join(', ')}`)
-            .join('\n            ');
-
         const promptForExtraction = `
             [SYSTEM INSTRUCTION FOR EXTRACTION]
             You are a silent psychological profiler. Analyze the conversation history and the actor's latest input.
-            Task: Extract ONLY NEW, actionable psychological data, their core identity and defense mechanisms, and provide a holistic analysis. Do NOT extract if the actor is being repetitive, superficial, or making small talk. Your goal is to identify deep, novel insights into their soul and heart.
+            Task: Extract ONLY NEW, actionable psychological data, their core identity and defense mechanisms, and provide a holistic analysis. Do NOT extract if the actor is being repetitive, superficial, or making small talk. Your goal is to identify deep, novel insights into their soul and heart. 
             If the actor is making small talk, repeating previous points, or being superficial, set 'has_actionable_pattern' to false and leave the data arrays empty.
             Look at the broader context of the history to make holistic inferences.
-
-            [THEME EXTRACTION]
-            For each extraction you identify, also tag it with theme(s) from this taxonomy that best categorize the psychological material:
-
-            ${themeTaxonomyText}
-
-            Extract 1-2 theme tags per insight. If the extraction spans multiple themes, include both.
-            If this is a genuinely new theme not on the list, include it as 'novel_theme' but minimize these.
-            For diversity_note: indicate if this extraction adds new thematic diversity or repeats existing themes.
 
             [CONVERSATION HISTORY]
             ${recentHistoryText}
@@ -330,20 +352,56 @@ export async function POST(request: Request) {
             "${content.trim()}"
         `;
 
-        const [chatResult, extractionResult] = await Promise.all([
-            chat.sendMessage(finalPromptForAI),
-            extractionModel.generateContent(promptForExtraction)
-        ]);
+        // Primary execution: Always generate the conversational response.
+        type PromptPart = { text: string } | { inlineData: { data: string; mimeType: string } };
+        
+        /**
+         * Initialize the prompt array with the mandatory system directives and user input.
+         */
+        const promptParts: PromptPart[] = [
+            { text: finalPromptForAI }
+        ];
+
+        /**
+         * If a valid document payload was provided in the request, append it as 
+         * inlineData. Vertex AI engine natively processes this alongside the text.
+         */
+        if (document && document.data && document.mimeType) {
+            promptParts.push({
+                inlineData: {
+                    data: document.data,
+                    mimeType: document.mimeType
+                }
+            });
+        }
+
+        const chatResult = await chat.sendMessage(promptParts);
 
         const aiResponseText = chatResult.response.text();
         
-
         let extractionsData: ExtractedPsychData | null = null;
         
-        const functionCalls = extractionResult.response.functionCalls(); 
+       /**
+         * Declare functionCalls in the outer scope so it can be accessed later by the debug logger. 
+         * Strictly typed to match the Firebase Vertex AI SDK FunctionCall signature to comply with no-any rules.
+         */
+        let functionCalls: { name: string; args: object }[] | undefined = undefined;
         
-        if (functionCalls && functionCalls.length > 0) {
-            extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
+        /**
+         * Secondary execution: Context Extraction
+         * We strictly bypass the extraction model if the user is ending the session
+         * or skipping the question, thereby saving token usage and preventing 
+         * superficial data pollution in the psychological profile.
+         */
+        if (!isEndSession && !isSkipCommand) {
+            const extractionResult = await extractionModel.generateContent(promptForExtraction);
+            
+            // Assign to the outer variable instead of using 'const'
+            functionCalls = extractionResult.response.functionCalls(); 
+            
+            if (functionCalls && functionCalls.length > 0) {
+                extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
+            }
         }
 
         if (process.env.MEMLISTENER_DEBUG === 'true') {

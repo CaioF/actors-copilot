@@ -100,14 +100,7 @@ export default function ChatPage() {
             Help the actor navigate the conversation easily
             ========================================= */}
         <div className="flex justify-center items-center gap-3 w-full py-3 bg-[#F0E8DC]">
-          <button
-            onClick={() => sendMessage("PASS", activeSection)}
-            disabled={isLoading || isInitializing}
-            className="text-xs font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#E8DFD0] hover:text-[#2C3328] px-5 py-2 rounded-full transition-colors disabled:opacity-50"
-          >
-            PASS
-          </button>
-          
+         
           <button
             onClick={() => sendMessage("Change the subject, next question", activeSection)}
             disabled={isLoading || isInitializing}
@@ -122,10 +115,25 @@ export default function ChatPage() {
           >
             I don't understand the question
           </button>
+          {/* /**
+             * Triggers the safe termination protocol for the current session.
+             * Dispatches a system-level command to the AI backend to halt 
+             * Socratic extraction and initiate a psychological grounding text.
+             */  }
+          <button
+            onClick={() => sendMessage("I need to stop now. Please help me ground myself and close the session.", activeSection)}
+            disabled={isLoading || isInitializing}
+            className="text-xs font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#ffa2a2] hover:text-[#2C3328] px-5 py-2 rounded-full transition-colors disabled:opacity-50"
+          >
+            END SESSION
+          </button>
         </div>
-        
+
         {/* Input bar */}
-        <ChatInput onSend={(content) => sendMessage(content, activeSection)} isLoading={isLoading} />
+        <ChatInput 
+          onSend={(content, document) => sendMessage(content, activeSection, document)} 
+          isLoading={isLoading} 
+        />
 
         {/* Footer */}
         <DashboardFooter />

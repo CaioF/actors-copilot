@@ -107,6 +107,16 @@ interface ChatApiResponse {
 }
 
 /**
+ * Represents a document attached by the user, encoded in Base64 format 
+ * for secure transit to the AI processing backend.
+ */
+export interface AttachedDocument {
+  data: string;
+  mimeType: string;
+  name: string;
+}
+
+/**
  * Custom React hook to manage the AI Copilot DNA Extraction chat session.
  * Handles real-time synchronization with Firebase Firestore, interactions with
  * the Vertex AI Gemini model, and local state management for the chat UI.
@@ -345,7 +355,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
    * @returns {Promise<void>}
    */
   const sendMessage = useCallback(
-    async (content: string, activeSection?: string) => {
+    async (content: string, activeSection?: string, document?: AttachedDocument | null) => {
       if (!content.trim()) return;
 
       const currentSection = activeSection ?? session?.currentSection ?? "identity";
@@ -396,6 +406,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           content: content.trim(),
           timestamp: serverTimestamp(),
           section: currentSection,
+          ...(document && { attachmentName: document.name })
         });
         
         // 2. Prepare the history payload for the secure backend
@@ -467,6 +478,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                         history: chatHistory,
                         previouslyAsked,
                         pivotFlag: extractionTracker.pivotFlag,
+                        document: document || undefined,
                     })
                 });
 

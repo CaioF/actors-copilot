@@ -65,8 +65,8 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
           aria-label="Settings"
         >
           <Settings className="h-5 w-5" />
-        </Link>
-        <div className="flex items-center gap-2">
+        </Link >
+        <Link href={"/profile"} className="flex items-center gap-2">
           <Avatar className="h-9 w-9">
             {/* If the user has a Google/Firebase photo, it loads here */}
             <AvatarImage src={user?.photoURL || ""} alt={displayName} />
@@ -78,7 +78,7 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
           <span className="text-sm font-medium text-[#2C3328]">
             {user ? firstName : "Loading..."}
           </span>
-        </div>
+        </Link>
       </div>
     </header>
   )

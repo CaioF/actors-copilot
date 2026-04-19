@@ -87,15 +87,14 @@ function SectionProgressRing({ current, total, isCompleted, sectionId, themesCov
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      <button
-        type="button"
+      <div
         className="flex items-center justify-center rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[#E8721A]"
         aria-describedby={showTooltip ? tooltipId : undefined}
         onFocus={() => setShowTooltip(true)}
         onBlur={() => setShowTooltip(false)}
       >
         {ring}
-      </button>
+      </div>
       {showTooltip && (
         <div
           id={tooltipId}
