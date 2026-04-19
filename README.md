@@ -436,7 +436,7 @@ const isComplete = meetsCountRequirement && meetsThemeRequirement;
 ### AI Provider
 
 **Google Vertex AI via Firebase AI SDK**
-- Model: `gemini-2.5-pro` - Main conversational and analysis
+- Model: `gemini-3.1-pro` - Main conversational and analysis
 - Model: `gemini-2.5-flash` - Fast transcription
 
 ### Dual-Agent Pattern (`app/api/dna/chat/route.ts`)
@@ -452,8 +452,8 @@ const isComplete = meetsCountRequirement && meetsThemeRequirement;
 │  Agent 1: YAN     │   │  Agent 2: MEMLIST │
 │  (Conversational) │   │  (Extraction)     │
 │                   │   │                   │
-│  gemini-2.5-pro   │   │  gemini-2.5-pro   │
-│  temp: 0.4       │   │  temp: 0.1        │
+│  gemini-3.1-pro   │   │  gemini-2.5-pro   │
+│  temp: 1          │   │  temp: 0.1        │
 │                   │   │                   │
 │  Produces next    │   │  Function calling │
 │  Socratic question│   │  to update_master │
@@ -516,7 +516,7 @@ All prompts centralized in `lib/prompts.ts` (1203 lines).
 | `SECTION_PROMPTS` | 59-756 | 12 thematic arena directives |
 | `SECTION_INTROS` | 763-879 | Introduction messages per section |
 | `SYNTHESIZER_PROMPT` | 888 | Master Profile synthesis |
-| `AUDITION_COACH_PROMPT` | 993 | Character breakdown generation |
+| `AUDITION_COACH_PROMPT` | 993 | V2 Deep character breakdown (DNA Lens) |
 | `THEATHER_MODE_PROMPT` | 934 | Theater-specific coaching |
 | `COMMERCIAL_MODE_PROMPT` | 961 | Commercial audition coaching |
 | `BULK_SYSTEM_PROMPT` | (inline) | Document extraction |
@@ -530,7 +530,7 @@ All prompts centralized in `lib/prompts.ts` (1203 lines).
 
 ### Audition Modes
 
-**Cinematic** (default): Full character analysis with 12 sections
+**Cinematic** (default): Full character analysis with 12 sections. Powered by the V2 Prompt, which forces the LLM to use the actor's DNA Vault as the primary psychological lens (e.g., answering specific mandatory questions about how the actor's core wounds map to the character's tactics).
 
 **Theater** (`lib/prompts.ts:934-959`):
 - Physicality & Animal Work
