@@ -51,10 +51,10 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 };
 
 /**
- * Analyzes audition materials (sides, briefs, project context) using AI to generate
+ * Analyzes audition materials (sides, project context) using AI to generate
  * a personalized performance coaching breakdown for an actor.
  * @param request - HTTP request containing form data with project type, sides text/file,
- *                  brief text/file, actor name, and user path for DNA profile lookup
+ *                  actor name, and user path for DNA profile lookup
  * @returns JSON response with structured performance coaching data or error
  * @async
  */
@@ -85,10 +85,8 @@ export async function POST(request: Request) {
     const actorName = formData.get("actorName") as string || "Actor";
 
     let sidesText = (formData.get("sidesText") as string) || "";
-    let briefText = (formData.get("briefText") as string) || "";
 
     const sidesFile = formData.get("sidesFile") as File | null;
-    const briefFile = formData.get("briefFile") as File | null;
 
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
@@ -109,24 +107,7 @@ export async function POST(request: Request) {
       );
     }
   }
-
-  if (briefFile) {
-    if (briefFile.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "Brief file exceeds 20MB limit" },
-        { status: 413 }
-      );
-    }
-
-    const isDocx = briefFile.name.toLowerCase().endsWith('.docx');
-
-    if (!ALLOWED_MIME_TYPES.includes(briefFile.type) && !isDocx) {
-      return NextResponse.json(
-        { error: "Only PDFs and Word documents (.docx) are allowed for the brief" },
-        { status: 400 }
-      );
-    }
-  }
+  
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
@@ -144,18 +125,6 @@ export async function POST(request: Request) {
       } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
         const result = await mammoth.extractRawText({ buffer: buffer });
         sidesText = result.value;
-      }
-    }
-
-    if (briefFile) {
-      const arrayBuffer = await briefFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      if (briefFile.type === "application/pdf") {
-        briefText = await extractTextFromPDF(buffer);
-      } else if (briefFile.name.toLowerCase().endsWith(".docx") || briefFile.type.includes("wordprocessingml")) {
-        const result = await mammoth.extractRawText({ buffer: buffer });
-        briefText = result.value;
       }
     }
 
@@ -253,7 +222,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
     }
 
-    console.log("✅ BREAKDOWN GENERATED SUCCESSFULLY!");
 
     // 8. RETURN TO FRONTEND
     return NextResponse.json({

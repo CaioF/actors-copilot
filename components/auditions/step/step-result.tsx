@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna } from "lucide-react";
+import React from "react";
 
 interface Section {
   title: string;
@@ -97,7 +98,9 @@ export function StepResult({ data }: StepResultProps) {
            <div key={idx} className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50">
              <h3 className="text-xl font-bold text-gray-900 mb-4">{section.title}</h3>
              <div className="space-y-3">
-               {section.items.map((item, i) => <p key={i}>{renderMarkdown(item)}</p>)}
+               {section.items.map((item, i) => (
+                 <React.Fragment key={i}>{renderMarkdown(item)}</React.Fragment>
+               ))}
              </div>
            </div>
         ))}
@@ -159,7 +162,7 @@ export function StepResult({ data }: StepResultProps) {
               <div className="flex flex-wrap gap-2.5">
                 {s[5].items.map((item, i) => (
                   <span key={i} className="px-4 py-1.5 rounded-full border border-gray-300 text-gray-700 text-sm bg-transparent">
-                    {item.replace(/[-*•]/g, '').trim()}
+                    {item.replace(/^\s*[-*•]\s*/, '').trim()}
                   </span>
                 ))}
               </div>
@@ -233,16 +236,19 @@ export function StepResult({ data }: StepResultProps) {
                 <Video className="text-[#FF7316]" size={24} />
                 <h3 className="text-xl font-bold text-gray-900">Self-Tape Plan</h3>
               </div>
-              <div className="space-y-4">
+              <ul className="space-y-4">
                 {s[10].items.map((item, i) => (
-                  <label key={i} className="flex gap-3 items-start cursor-pointer group">
-                    <div className="w-4 h-4 mt-1 border border-gray-400 rounded-[3px] group-hover:border-[#FF7316] transition-colors shrink-0" />
-                    <div className="text-gray-700 text-[15px] select-none">
+                  <li key={i} className="flex gap-3 items-start">
+                    <div
+                      aria-hidden="true"
+                      className="w-4 h-4 mt-1 border border-gray-400 rounded-[3px] shrink-0"
+                    />
+                    <div className="text-gray-700 text-[15px]">
                       {renderMarkdown(item)}
                     </div>
-                  </label>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
 
             {/* 12. Personal DNA */}
@@ -259,7 +265,7 @@ export function StepResult({ data }: StepResultProps) {
                      if (isShortTag) {
                        return (
                          <span key={i} className="px-4 py-1.5 rounded-full bg-[#FDECE2] text-[#FF7316] text-xs font-semibold">
-                           {item.replace(/[-*•]/g, '').trim()}
+                           {item.replace(/^\s*[-*•]\s*/, '').trim()}
                          </span>
                        )
                      }
@@ -281,32 +287,34 @@ export function StepResult({ data }: StepResultProps) {
       </div>
 
       {/* RIGHT COLUMN: SIDEBAR NAVIGATION */}
-      <div className="hidden lg:block sticky top-10 rounded-2xl bg-[#FCFAF7] shadow-sm p-6 border border-gray-200/50">
-        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">On this page</h4>
-        <nav>
-          <ul className="space-y-2">
-            {sidebarLinks.map((link) => {
-              const isActive = activeSection === link.id;
-              
-              return (
-                <li key={link.id}>
-                  <button 
-                    onClick={() => scrollToSection(link.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border ${
-                      isActive 
-                        ? "bg-[#FDECE2] text-[#FF7316] border-transparent" 
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-transparent hover:border-gray-200"
-                    }`}
-                  >
-                    <link.icon className="text-[#FF7316]" size={18} />
-                    {link.label}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </div>
+       {hasFullSections && (
+        <div className="hidden lg:block sticky top-10 rounded-2xl bg-[#FCFAF7] shadow-sm p-6 border border-gray-200/50">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">On this page</h4>
+          <nav>
+            <ul className="space-y-2">
+              {sidebarLinks.map((link) => {
+                const isActive = activeSection === link.id;
+                
+                return (
+                  <li key={link.id}>
+                    <button 
+                      onClick={() => scrollToSection(link.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border ${
+                        isActive 
+                          ? "bg-[#FDECE2] text-[#FF7316] border-transparent" 
+                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-transparent hover:border-gray-200"
+                      }`}
+                    >
+                      <link.icon className="text-[#FF7316]" size={18} />
+                      {link.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </div>
+      )}
     </div>
   );
 }

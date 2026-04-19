@@ -156,7 +156,7 @@ export default function AuditionDetailView() {
         <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
           
           {/* Cabeçalho do Documento */}
-          <div className="border-b-2  border-black pb-4 mb-8">
+          <div className="border-b-2 border-black pb-4 mb-8">
             <h1 className="text-4xl font-bold text-black">{auditionData?.project}</h1>
             <p className="text-xl text-gray-800 mt-2">{auditionData?.role}</p>
             <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>

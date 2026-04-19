@@ -1,5 +1,5 @@
 import { DashboardHeader } from "@/components/dashboard-header";
-import { AuditionWizard } from "@/components/auditions/autition-wizard";
+import { AuditionWizard } from "@/components/auditions/audition-wizard";
 
 /**
  * Page for creating a new audition breakdown.

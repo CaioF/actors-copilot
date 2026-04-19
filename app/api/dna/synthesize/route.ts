@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         }
 
         // database search
-        const profileRef = db.doc(`users/${userPath}/masterProfile/master`);
+        const profileRef = db.doc(`users/${userPath}/profile/master`);
         const profileSnap = await profileRef.get();
 
         let existingProfileTime = 0;
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
         const latestExtractionTime = latestExtractionDoc.timestamp?.toDate()?.getTime() || 0;
 
         if (profileSnap.exists && latestExtractionTime <= existingProfileTime) {
-            console.log(`⚡ CACHE HIT: No new DNA found for ${userPath}. Returning existing Master Profile.`);
             return NextResponse.json({ 
                 success: true, 
                 message: 'Returned cached profile.',
@@ -66,8 +65,6 @@ export async function POST(request: Request) {
         }
 
         // AI generating (if new dna)
-        console.log(`🔄 NEW DNA DETECTED for ${userPath}. Initiating Vertex AI Synthesis...`);
-
         const compiledRawData = vaultSnapshot.docs.map((docSnap) => {
             const data = docSnap.data();
             return {
@@ -113,8 +110,6 @@ export async function POST(request: Request) {
 
         //  .set() insted of setDoc()
         await profileRef.set(profilePayload, { merge: true });
-
-        console.log(`✅ DATA SAVED SUCCESSFULLY IN FIRESTORE FOR ${userPath}!`);
 
         return NextResponse.json({ 
             success: true, 

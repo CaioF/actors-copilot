@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Printer, Trash2, Save} from "lucide-react";
+import { Printer, Trash2, Save} from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import ReactMarkdown from "react-markdown";
 import { AuditionFormData, initialAuditionData, AuditionStep } from "@/lib/audition-types";
@@ -109,7 +109,6 @@ export function AuditionWizard() {
 
       const token = await currentUser.getIdToken();
       // STAGE 1: SMART DNA SYNTHESIS (Uses the cache logic we just built)
-      console.log("Stage 1: Checking if Master Profile needs an update...");
       const dnaResponse = await fetch('/api/dna/synthesize', {
         method: 'POST',
         headers: { 
@@ -122,9 +121,7 @@ export function AuditionWizard() {
       // We wait for the backend to confirm the profile is ready (either cached or newly generated)
       await dnaResponse.json(); 
 
-
       // STAGE 2: GENERATE AUDITION BREAKDOWN
-      console.log("Stage 2: Generating Audition Breakdown...");
       const payload = new FormData();
       
       payload.append("projectType", formData.projectType || "cinematic"); // Defaults to cinematic if not set
@@ -200,8 +197,6 @@ export function AuditionWizard() {
         createdAt: serverTimestamp(),
         status: "completed"
       });
-
-      console.log(`✅ Audition successfully saved to users/${userPath}/auditions`);
 
       // Redirect back to the Dashboard
       router.push("/auditions");

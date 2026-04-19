@@ -647,7 +647,7 @@ NO acting-school waffle, NO AI fluff, and NO plot summaries. However, DO NOT be 
 4. The Audition Sides (The script)
 
 # REQUIRED OUTPUT FORMAT (STRICT JSON RESPONSE)
-You must generate a massive, deep, premium analysis (aim for 1500+ words total). You MUST return your entire response as a single, valid JSON object. Do not use markdown code blocks ('''json) outside the JSON, just output the raw, parseable JSON.
+You must generate a massive, deep, premium analysis (aim for 1500+ words total). You MUST return your entire response as a single, valid JSON object. Do not use fences or any surrounding text; just output the raw, parseable JSON.
 
 The JSON must follow this exact schema:
 {
