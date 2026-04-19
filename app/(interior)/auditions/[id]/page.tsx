@@ -9,7 +9,8 @@ import { Loader2, ArrowLeft, Printer } from "lucide-react"
 import { useReactToPrint } from "react-to-print"
 import ReactMarkdown from "react-markdown"
 
-import { StepResult } from "@/components/auditions/step/step-result"
+import { StepResultSides } from "@/components/auditions/step/step-result"
+import { StepResultBrief } from "@/components/auditions/step/step-result-brief"
 
 interface PerformanceSection {
   title: string;
@@ -26,6 +27,7 @@ interface AuditionData {
   project: string;
   role: string;
   performanceMap?: PerformanceMap;
+  analysisType?: "sides" | "brief";
 }
 
 /**
@@ -110,12 +112,13 @@ export default function AuditionDetailView() {
       </div>
     )
   }
+  const currentAnalysisType = auditionData.analysisType || "sides";
 
   return (
     <main className="flex-1 bg-[#F0E8DC] min-h-screen p-8">
       
       {/* HEADER CONTROLS  */}
-      <div className="max-w-5xl mx-auto ">
+      <div className="max-w-5xl mx-auto  flex justify-between  mb-8">
         <button 
           onClick={() => router.back()} 
           className="flex items-center gap-2 text-sm text-[#6B6B6B] hover:text-[#E8721A] transition-colors font-medium"
@@ -131,19 +134,30 @@ export default function AuditionDetailView() {
           <Printer className="w-4 h-4" />
           Print Breakdown
         </button>
+
+        {/* Visual indicator of the breakdown type */}
+            <span className="px-3 mt-2 py-1 rounded-full bg-[#E8721A] text-[11px] text-white uppercase tracking-wider font-semibold">
+              {currentAnalysisType} Breakdown
+            </span>
       </div>
 
       <div className=" max-w-5xl mx-auto">
-        {/* Title */}
-        <div className=" mb-10">
-          <h1 className="text-4xl font-title text-[#2C3328]">{auditionData.project}</h1>
-          <p className="text-xl text-[#E8721A] mt-2 font-medium">{auditionData.role}</p>
+        {/* Title & Tags */}
+        <div className="mb-2">
+          <div className="flex items-center">
+            <h1 className="text-4xl font-title text-[#2C3328]">{auditionData.project}</h1>
+          </div>
+          <p className="text-xl text-[#E8721A] font-medium">{auditionData.role}</p>
         </div>
 
-        {/* result component */}
-        <div className="">
+        {/* DYNAMIC RESULT COMPONENT */}
+        <div>
           {auditionData.performanceMap ? (
-             <StepResult data={auditionData.performanceMap} />
+             currentAnalysisType === "brief" ? (
+               <StepResultBrief data={auditionData.performanceMap} />
+             ) : (
+               <StepResultSides data={auditionData.performanceMap} />
+             )
           ) : (
              <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>
           )}
@@ -155,11 +169,20 @@ export default function AuditionDetailView() {
       <div className="hidden">
         <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
           
-          {/* Cabeçalho do Documento */}
-          <div className="border-b-2 border-black pb-4 mb-8">
-            <h1 className="text-4xl font-bold text-black">{auditionData?.project}</h1>
-            <p className="text-xl text-gray-800 mt-2">{auditionData?.role}</p>
-            <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
+          {/* Doc header */}
+          <div className="border-b-2 border-black pb-4 mb-8 flex justify-between items-end">
+            <div>
+              <h1 className="text-4xl font-bold text-black">{auditionData?.project}</h1>
+              <p className="text-xl text-gray-800 mt-2">{auditionData?.role}</p>
+              <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">
+                The Actors Copilot • AI Performance Map
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400 uppercase tracking-widest font-sans font-bold">
+                {currentAnalysisType}
+              </p>
+            </div>
           </div>
 
           {/* Intro Block */}

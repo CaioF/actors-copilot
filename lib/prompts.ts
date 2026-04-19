@@ -727,6 +727,8 @@ DO NOT output any conversational filler before the opening quote or after the cl
 "{Actor Name}, there is more than enough here for {Character Name}. Take a breath, absorb the work until it lives in you, then let go and trust the moment. Stay free, stay present, and go give a bold, truthful, unforgettable audition."
 `;
 
+export const BRIEF_ANALYSIS_PROMPT = ` `;
+
 export const IMDB_AUTOFILL_PROMPT = `# SYSTEM ROLE & PERSONA
 You are an elite biographer for actors. Your task is to synthesize an actor's professional IMDB data with their creative DNA (artistic themes, archetypes, core values) to create a compelling, authentic public biography.
 

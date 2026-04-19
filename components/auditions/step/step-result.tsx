@@ -18,12 +18,13 @@ interface StepResultProps {
   };
 }
 
-export function StepResult({ data }: StepResultProps) {
-  // Estado para controlar qual seção está ativa na sidebar
+export function StepResultSides({ data }: StepResultProps) {
+  
   const [activeSection, setActiveSection] = useState("section-objective");
-
-  // Configura o Intersection Observer para mudar a aba ativa conforme o scroll manual
+  const hasFullSections = data?.sections && data.sections.length >= 12;
+  
   useEffect(() => {
+    if (!hasFullSections) return;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -44,7 +45,6 @@ export function StepResult({ data }: StepResultProps) {
   if (!data || !data.sections) return null;
 
   const s = data.sections;
-  const hasFullSections = s.length >= 12;
 
   const renderMarkdown = (text: string) => (
     <div className="prose prose-slate max-w-none prose-p:m-0 prose-p:inline prose-strong:font-semibold prose-strong:text-gray-900">
@@ -52,21 +52,17 @@ export function StepResult({ data }: StepResultProps) {
     </div>
   );
 
-  // CORREÇÃO: Usando scrollIntoView para garantir que funciona em qualquer container
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      // scrollIntoView encontra automaticamente o container correto
       element.scrollIntoView({ 
         behavior: "smooth", 
         block: "start" 
       });
-      // Força a atualização do estado visual imediatamente no clique
       setActiveSection(id);
     }
   };
 
-  // Definição do menu da Sidebar
   const sidebarLinks = [
     { id: "section-objective", icon: Target, label: "Objective" },
     { id: "section-snapshot", icon: Eye, label: "Snapshot" },

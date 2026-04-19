@@ -30,6 +30,7 @@ interface Audition {
   date: string
   status: AuditionStatus
   projectType?: "cinematic" | "commercial" | "theater"
+  analysisType: "sides" | "brief"
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -131,7 +132,8 @@ export default function AuditionsPage() {
           role: data.role || "Unknown Role",
           date: formattedDate,
           status: statusStr as AuditionStatus,
-          projectType: data.projectType || "cinematic"
+          projectType: data.projectType || "cinematic",
+          analysisType: data.analysisType || "sides"
         };
       });
 
@@ -374,6 +376,9 @@ export default function AuditionsPage() {
                   <p className="text-xs text-[#E8721A] uppercase tracking-wide font-semibold">
                     {audition.projectType || "cinematic"}
                   </p>
+                  <span className="ml-2 px-2 py-0.5 rounded-sm bg-[#4A5548]/60 text-[#D4DDD6] border border-[#4A5548] text-[10px] uppercase tracking-wider font-medium">
+                    {audition.analysisType}
+                  </span>
                 </div>
                 <h3 className="font-title text-xl font-bold text-white truncate group-hover:text-[#E8721A] transition-colors">
                   {audition.project}

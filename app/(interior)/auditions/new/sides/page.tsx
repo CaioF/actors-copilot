@@ -13,7 +13,7 @@ export default function NewAuditionPage() {
       
       {/* Container rolável para o Wizard */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-8">
-        <AuditionWizard />
+        <AuditionWizard mode="sides" />
       </div>
     </main>
   );
