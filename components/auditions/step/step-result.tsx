@@ -298,7 +298,7 @@ export function StepResult({ data }: StepResultProps) {
                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-transparent hover:border-gray-200"
                     }`}
                   >
-                    <link.icon size={18} />
+                    <link.icon className="text-[#FF7316]" size={18} />
                     {link.label}
                   </button>
                 </li>

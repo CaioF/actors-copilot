@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Printer} from "lucide-react";
+import { ArrowLeft, Printer, Trash2, Save} from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import ReactMarkdown from "react-markdown";
 import { AuditionFormData, initialAuditionData, AuditionStep } from "@/lib/audition-types";
@@ -75,6 +75,13 @@ export function AuditionWizard() {
   const updateFormData = (data: Partial<AuditionFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
   };
+
+  const handleDelete = () => {
+  if (window.confirm("Are you sure you want to delete this audition breakdown? This action cannot be undone.")) {
+    setResultData(null);
+    setCurrentStep(1); 
+  }
+};
 
   /**
    * Handles the generation of an audition breakdown.
@@ -209,12 +216,6 @@ export function AuditionWizard() {
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-2 h-full">
       
-      {/* Come back link */}
-      <Link href="/dashboard" className=" flex items-center gap-2 text-sm text-[#FF7316] mb-6 hover:opacity-80 transition-opacity">
-        <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
-      </Link>
-
       {/* Stepper  */}
       {currentStep < 5 && (
         <Stepper currentStep={currentStep} />
@@ -318,14 +319,26 @@ export function AuditionWizard() {
             <div className="flex flex-col animate-in fade-in duration-700 max-w-7xl mx-auto w-full">
 
                {/* --- FIGMA-ALIGNED HEADER --- */}
-               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-300 pb-6 mb-2 w-full">
+               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 w-full border-b border-[#D0D4D0]/50 pb-6">
                  <div>
-                   <h1 className="text-3xl font-bold tracking-tight text-gray-900">{formData.role || "Character Role"}</h1>
-                   <p className="text-gray-600 mt-1">{formData.project || "Audition Project"} — AI Performance Map</p>
-                
+                   <h1 className="text-[32px] font-title text-[#2C3328] leading-tight mb-1">
+                     {formData.role || "Audition Breakdown"}
+                   </h1>
+                   <p className="text-[#646A64] text-[15px] mb-3">
+                     Lead · {formData.project || "Audition Project"} 
+                   </p>
                  </div>
 
                  <div className="flex gap-3 mt-4 sm:mt-0">
+                  {/* Delete Action */}
+                   <button 
+                     type="button"
+                     onClick={handleDelete}
+                     className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#D0D4D0] text-[#646A64] text-sm font-medium hover:bg-[#FCFAF7] transition-colors"
+                   >
+                     <Trash2 className="w-4 h-4" />
+                     Delete
+                   </button>
                    {/* Print Action */}
                    <button 
                      onClick={handlePrintDocument}
@@ -340,6 +353,7 @@ export function AuditionWizard() {
                      onClick={handleSaveAndFinish}
                      className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#FF7316] text-white text-sm font-medium hover:bg-[#E5630F] transition-colors shadow-sm"
                    >
+                    <Save className="w-4 h-4" />
                      Save Output
                    </button>
                  </div>

@@ -131,9 +131,14 @@ export function AppSidebar() {
           <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
             Upgrade to Premium Plan to unlock more features
           </p>
-          <button className="mt-3 w-full rounded-lg bg-[#E8721A] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90">
+          <a 
+            href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
+          >
             Upgrade
-          </button>
+          </a>
         </div>
       </div>
     </aside>
