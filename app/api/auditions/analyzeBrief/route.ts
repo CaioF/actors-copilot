@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
 import mammoth from "mammoth";
 // Note: You need to add BRIEF_ANALYSIS_PROMPT to your prompts file!
-import { BRIEF_ANALYSIS_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
+import { BRIEF_ANALYSIS_PROMPT, BRIEF_CINEMATIC_PROMPT, BRIEF_COMMERCIAL_PROMPT, BRIEF_THEATER_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
 
 const ALLOWED_MIME_TYPES = [
@@ -36,7 +36,13 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
     pdfParser.on("pdfParser_dataReady", () => {
       const rawText = pdfParser.getRawTextContent();
-      resolve(decodeURIComponent(rawText));
+      
+      try {
+        resolve(decodeURIComponent(rawText));
+      } catch (error) {
+        console.warn("Failed do decode pdf text with decodeURIComponent, returning raw text. Error:", error);
+        resolve(rawText);
+      }
     });
 
     pdfParser.parseBuffer(buffer);
@@ -159,9 +165,11 @@ export async function POST(request: Request) {
     // Special instruction based on project type
     let categoryInstruction = "";
     if (projectType === "commercial") {
-        categoryInstruction = COMMERCIAL_MODE_PROMPT;
+        categoryInstruction = BRIEF_COMMERCIAL_PROMPT;
     } else if (projectType === "theater") {
-        categoryInstruction = THEATHER_MODE_PROMPT;
+        categoryInstruction = BRIEF_THEATER_PROMPT;
+    } else if (projectType === "cinematic") {
+        categoryInstruction = BRIEF_CINEMATIC_PROMPT;
     }
 
     // 5. INITIALIZE VERTEX AI FOR FIREBASE
@@ -172,7 +180,7 @@ export async function POST(request: Request) {
 
     const model = getGenerativeModel(ai, { 
       model: "gemini-3.1-pro-preview", 
-      systemInstruction: { role: "user", parts: [{ text: BRIEF_ANALYSIS_PROMPT }] }, // Ensure you create this prompt
+      systemInstruction: { role: "user", parts: [{ text: BRIEF_ANALYSIS_PROMPT }] }, 
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: {
@@ -221,8 +229,6 @@ export async function POST(request: Request) {
 
       CHARACTER BRIEF / CASTING NOTES:
       ${briefText}
-
-      CRITICAL: Do not summarize. Break down the tone, archetype, physicality, and how the actor's DNA aligns with this specific casting call. Write expansive, multi-paragraph analyses for every section.
     `;
 
     // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE

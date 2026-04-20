@@ -150,8 +150,8 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
       payload.append("userPath", userPath);
 
       const endpoint = mode === "sides" 
-        ? "/api/auditions/analyze/sides" 
-        : "/api/auditions/analyze/brief";
+        ? "/api/auditions/analyzeSides" 
+        : "/api/auditions/analyzeBrief";
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -160,6 +160,12 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
         },
         body: payload, 
       });
+
+      if (!response.ok) {
+        const errorText = await response.text(); 
+        console.error("Erro na API:", response.status, errorText);
+        throw new Error(`Falha na requisição: ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -360,7 +366,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
                </div>
 
                {/* --- MAIN UI RENDERER --- */}
-               mode === "sides" ? <StepResultSides data={resultData} /> : <StepResultBrief data={resultData} />
+               {mode === "sides" ? <StepResultSides data={resultData} /> : <StepResultBrief data={resultData} />}
 
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
