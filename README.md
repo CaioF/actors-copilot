@@ -108,7 +108,9 @@ actors-copilot/
 │   │   ├── settings/page.tsx
 │   │   └── layout.tsx           # Authenticated layout
 │   ├── api/                     # Route Handlers
-│   │   ├── auditions/analyze/
+│   │    auditions/
+│   │   │   ├── analyzeSides/    # Extracts performance notes from script pages
+│   │   │   └── analyzeBrief/    # Extracts chronological workflows from casting notes
 │   │   ├── auth/callback/
 │   │   ├── auth/logout/
 │   │   └── dna/
@@ -122,8 +124,16 @@ actors-copilot/
 │   └── page.tsx
 ├── components/
 │   ├── ui/                      # 56 shadcn/ui components
-│   ├── auditions/              # Audition wizard components
-│   ├── profile/                # Profile page components
+│   ├── auditions/               # Audition wizard components
+│   ├── autition-wizard.tsx      # Multi-step wizard container
+│   └── step/                    # Wizard steps
+│       ├── step-upload.tsx      # File upload (PDF/DOCX)
+│       ├── step-basic.tsx       # Project/role info
+│       ├── step-review.tsx      # Review before submission
+│       ├── step-generating.tsx  # AI processing state
+│       ├── step-result.tsx      # V1 Results display (Sides)
+│       └── step-result-brief.tsx # Dynamic AI JSON renderer (Briefs)
+│   ├── profile/                  # Profile page components
 │   │   ├── profile-header.tsx
 │   │   ├── actor-profile-form.tsx
 │   │   ├── profile-live-preview.tsx
@@ -233,7 +243,8 @@ components/
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/auditions/analyze` | POST | Generate audition performance coaching |
+| `/api/auditions/analyzeSides` | POST | Synthesize script pages into psychological performance coaching |
+| `/api/auditions/analyzeBrief` | POST | Transform unstructured casting emails/PDFs into chronological checklists |
 
 ### Profile
 
@@ -519,6 +530,10 @@ All prompts centralized in `lib/prompts.ts` (1203 lines).
 | `AUDITION_COACH_PROMPT` | 993 | V2 Deep character breakdown (DNA Lens) |
 | `THEATHER_MODE_PROMPT` | 934 | Theater-specific coaching |
 | `COMMERCIAL_MODE_PROMPT` | 961 | Commercial audition coaching |
+| `BRIEF_ANALYSIS_PROMPT`| --- | Base orchestrator for Casting Brief JSON extraction |
+| `THEATHER_MODE_PROMPT` | 934 | Theatre-specific directives (Tour schedules, understudies) |
+| `COMMERCIAL_MODE_PROMPT` | 961 | Commercial directives (Buyout simplification, competitor checks) |
+| `CINEMATIC_MODE_PROMPT`| --- | TV/Film directives (NDAs, creative village, multi-part slates) |
 | `BULK_SYSTEM_PROMPT` | (inline) | Document extraction |
 
 ### System Prompt Rules
@@ -544,6 +559,20 @@ All prompts centralized in `lib/prompts.ts` (1203 lines).
 - Turnkey Moment (problem → relief shift)
 - Anti-Cliché Tilt ("Care Less" tactic)
 - Commercial Whisper (authenticity)
+
+### Brief Injection
+
+The system uses a dynamic injection architecture for Casting Briefs. `BRIEF_ANALYSIS_PROMPT` forces a strict JSON schema and delegates the extraction logic to injected sub-prompts based on the project type:
+
+**Cinematic** (`CINEMATIC_MODE_PROMPT`):
+- Focuses on NDA urgency, multi-part slate instructions, and mapping the "Creative Village" (Directors/Showrunners).
+- Sides analysis is powered by the V2 Prompt (DNA Lens).
+
+**Theater** (`THEATHER_MODE_PROMPT`):
+- Explicit mapping of rehearsal/tour schedules, home-base rules, and multi-character tracking for Understudies/Covers.
+
+**Commercial** (`COMMERCIAL_MODE_PROMPT`):
+- Strict extraction of competitor conflicts ("Conflict Checks"), simplified buyout/fee rules, and exact recording restrictions.
 
 ---
 
