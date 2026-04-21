@@ -25,7 +25,7 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={1}
           title="Personal DNA Upload"
-          description="Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition analyses will become."
+          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition\u00A0analyses\u00A0will\u00A0become."}
           link="/chat"
           ctaLabel="Start building your DNA with the identity section"
           ctaIcon={Dna}
@@ -45,7 +45,7 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={3}
           title="Casting Brief Upload"
-          description="Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost you trust."
+          description={"Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost\u00A0you\u00A0trust."}
           link="/auditions/new"
           ctaLabel="Upload Character Brief"
           ctaIcon={Sparkles}
@@ -65,10 +65,10 @@ export default function DashboardPage() {
           </div>
           <div>
             <h3 className="text-[#EADDCE] text-xl font-medium font-title">
-              Give The Coach a Head Start
+              Give the Coach a Head Start
             </h3>
             <p className="text-[#B7BCB6] text-sm max-w-4xl leading-relaxed">
-              Already have a journal, therapy notes, or a written biography? Upload your baseline history so the AI can skip the small talk, analyze your core patterns instantly, and jump straight into deep extraction.
+              Already have a journal, personal story, or written biography? Upload it here to give your coach deeper context for your Personal DNA extraction. It’s optional now, and you can always add it later.
             </p>
           </div>
         </div>

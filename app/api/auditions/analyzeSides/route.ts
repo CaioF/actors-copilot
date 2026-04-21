@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
 import mammoth from "mammoth";
 import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
-// IMPORT THE ADMIN SDK FOR SECURE BACKEND OPERATIONS
 import { auth, db } from "@/lib/firebase.admin";
+import { logger } from '@/lib/logger';
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -88,37 +88,49 @@ export async function POST(request: Request) {
 
     const sidesFile = formData.get("sidesFile") as File | null;
 
+  
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-  if (sidesFile) {
-    if (sidesFile.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File exceeds 20MB limit" },
-        { status: 413 }
-      );
+    if (sidesFile) {
+      if (sidesFile.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: "File exceeds 20MB limit" },
+          { status: 413 }
+        );
+      }
+
+      const isDocx = sidesFile.name.toLowerCase().endsWith('.docx');
+
+      if (!ALLOWED_MIME_TYPES.includes(sidesFile.type) && !isDocx) {
+        return NextResponse.json(
+          { error: "Only PDFs and Word documents (.docx) are allowed" },
+          { status: 400 }
+        );
+      }
     }
 
-    const isDocx = sidesFile.name.toLowerCase().endsWith('.docx');
+    if (sidesFile) {
+      const arrayBuffer = await sidesFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      if (sidesFile.type === "application/pdf") {
+        sidesText = await extractTextFromPDF(buffer);
+      } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        sidesText = result.value;
+      }
+    }
 
-    if (!ALLOWED_MIME_TYPES.includes(sidesFile.type) && !isDocx) {
+    if (!sidesText.trim()) {
       return NextResponse.json(
-        { error: "Only PDFs and Word documents (.docx) are allowed" },
+        { error: "No sides text or valid file provided for analysis." },
         { status: 400 }
       );
     }
-  }
-
-  if (!sidesText.trim()) {
-       return NextResponse.json(
-         { error: "No sides text or valid file provided for analysis." },
-         { status: 400 }
-       );
-    }
-  
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      console.error(` SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}`);
+      logger.error({ msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}` });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
@@ -225,7 +237,7 @@ export async function POST(request: Request) {
     try {
         performanceMap = JSON.parse(responseText) as PerformanceMap;
     } catch (parseError) {
-        console.error("Failed to parse AI JSON output:", responseText);
+        logger.error({ err: parseError, msg: 'Failed to parse AI JSON output' });
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
     }
 
@@ -238,7 +250,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error("Error during Audition synthesis: ", error);
+    logger.error({ err: error, msg: 'Error during Audition synthesis' });
     return NextResponse.json(
       { success: false, error: "Internal Server Error during synthesis." },
       { status: 500 }

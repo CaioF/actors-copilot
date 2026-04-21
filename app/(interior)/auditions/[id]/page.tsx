@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
 import { getDb } from "@/lib/firebase"
+import { logger } from '@/lib/logger';
 import { Loader2, ArrowLeft, Printer } from "lucide-react"
 import { useReactToPrint } from "react-to-print"
 import ReactMarkdown from "react-markdown"
@@ -86,7 +87,7 @@ export default function AuditionDetailView() {
         
       }
     } catch (err) {
-      console.error("Error fetching audition:", err)
+      logger.error({ err, msg: 'Error fetching audition' })
       setError(true)
     } finally {
       setIsLoading(false)

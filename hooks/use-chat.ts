@@ -25,6 +25,10 @@ import {
   shouldTriggerPivot,
   updateTracker,
 } from "@/lib/pivot-logic";
+import error from "next/error";
+import { createChildLogger, logger } from "@/lib/logger";
+
+const log = createChildLogger({ module: 'ExtractionTracker' });
 
 
 const DEFAULT_SESSION_ID = "session-1";
@@ -42,7 +46,7 @@ function loadTrackerFromStorage(userPath: string, sessionId: string): Extraction
     const stored = localStorage.getItem(trackerStorageKey(userPath, sessionId));
     if (stored) return JSON.parse(stored) as ExtractionTracker;
   } catch (e) {
-    console.warn("[ExtractionTracker] Failed to load from localStorage:", e);
+    log.error({ err: e, msg: 'Failed to load from localStorage' });
   }
   return null;
 }
@@ -53,7 +57,7 @@ function saveTrackerToStorage(userPath: string, sessionId: string, tracker: Extr
   try {
     localStorage.setItem(trackerStorageKey(userPath, sessionId), JSON.stringify(tracker));
   } catch (e) {
-    console.warn("[ExtractionTracker] Failed to save to localStorage:", e);
+    log.warn({ err: e, msg: 'Failed to save to localStorage' });
   }
 }
 
@@ -502,7 +506,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
             } catch (error) {
                 attempt++;
-                console.error(`Tentativa ${attempt} falhou silenciosamente:`, error);
+                log.error({ err: error, attempt, msg: 'Failed' });
                 
                 if (attempt < maxAttempts) {
                     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -671,7 +675,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unexpected session error";
-        console.error("Fatal error out of retry loop:", errorMessage);
+        log.error({ err: error, msg: 'Fatal error out of retry loop', errorMessage });
       } finally {
         setIsLoading(false);
         setIsReprocessing(false);

@@ -398,7 +398,7 @@ export const SECTION_PROMPTS: Record<string, string> = {
  */
 export const SECTION_INTROS: Record<string, string> = {
   
-  identity: `This process exists for one reason only: to make you a more truthful, dangerous, and compelling actor.
+  identity: `This process exists for one reason only: to make you a more truthful, bold, and compelling actor.
 
 Every great actor draws from a private, specific, lived archive. Not ideas. Not concepts. Events. Moments where something was at stake. Moments that left a mark.
 

@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Mic, Square, Loader2, CheckCircle2 } from "lucide-react";
 import { getAuth } from "firebase/auth";
+import { logger } from '@/lib/logger';
 
 type RecordStatus = "idle" | "recording" | "processing" | "success" | "error";
 
@@ -63,7 +64,7 @@ export function MemoryRecordingBanner() {
             setTimeout(() => setStatus("idle"), 3000); 
 
           } catch (error) {
-            console.error("Memory processing error:", error);
+            logger.error({ err: error, msg: 'Memory processing error' });
             setStatus("error");
             setTimeout(() => setStatus("idle"), 3000);
           }
@@ -73,7 +74,7 @@ export function MemoryRecordingBanner() {
       mediaRecorder.start();
       setStatus("recording");
     } catch (error) {
-      console.error("Mic access denied", error);
+      logger.error({ err: error, msg: 'Mic access denied' });
       alert("Please allow microphone access to record a memory.");
     }
   };
@@ -154,10 +155,10 @@ export function MemoryRecordingBanner() {
         </div>
         <div>
           <h3 className="text-[#EADDCE] text-xl font-medium font-title mb-1.5">
-            Quick Memory Recording
+            Memory Recording
           </h3>
           <p className="text-[#B7BCB6] text-sm max-w-2xl leading-relaxed">
-            Moments of truth don't wait. Tap the mic anytime to record personal thoughts or past experiences. The Copilot will analyze and add it to your DNA Vault.
+            When something surfaces, record it while it’s still fresh. Stay close to the details — what you saw, heard, smelt, touched, or tasted. The more vivid and specific the memory, the more truthfully it can live in your work.
           </p>
         </div>
       </div>

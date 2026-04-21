@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SYNTHESIZER_PROMPT } from '@/lib/prompts'; 
 import { auth, db } from "@/lib/firebase.admin"; 
+import { logger } from '@/lib/logger';
 
 /**
  * Synthesizes accumulated DNA vault data into a master actor profile using AI.
@@ -25,9 +26,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { userPath } = body;
 
-        // Regra de Ouro: O userPath SOLICITADO precisa começar com o UID de quem está LOGADO
         if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-            console.error(`🚨 ALERTA DE SEGURANÇA: Usuário ${authenticatedUserId} tentou acessar a pasta ${userPath}`);
             return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
         }
 
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
         try {
             masterProfile = JSON.parse(responseText);
         } catch (parseError) {
-            console.error("Failed to parse AI JSON output:", responseText);
+            logger.error({ err: parseError, msg: 'Failed to parse AI JSON output' });
             return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
         }
 
@@ -118,7 +117,7 @@ export async function POST(request: Request) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error("Error during DNA synthesis: ", error);
+        logger.error({ err: error, msg: 'Error during DNA synthesis' });
         return NextResponse.json({ error: 'Internal Server Error during synthesis.' }, { status: 500 });
     }
 }

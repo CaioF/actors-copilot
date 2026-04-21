@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
+import { logger } from '@/lib/logger';
 
 /**
  * Defines the shape of the authentication context state and its available methods.
@@ -111,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             const message = error instanceof Error ? error.message : "An unexpected error occurred";
-            console.error("Failed to log in: ", message);
+            logger.error({ err: message, msg: 'Failed to log in' });
             throw error;
            
         } finally {
@@ -150,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             const message = error instanceof Error ? error.message : "Failed to log in with email";
-            console.error("Login Error: ", message);
+            logger.error({ err: message, msg: 'Login Error' });
             throw error;
 
         } finally {
@@ -188,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             }
             const message = error instanceof Error ? error.message : "Failed to sign up with email";
-            console.error("Signup Error: ", message);
+            logger.error({ err: message, msg: 'Signup Error' });
             throw error;
         } finally {
             setLoading(false);
@@ -216,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             window.location.href = "/login"; 
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Unknown logout error";
-            console.error("Error signing out: ", message);
+            logger.error({ err: message, msg: 'Error signing out' });
         } finally {
             setLoading(false);
         }

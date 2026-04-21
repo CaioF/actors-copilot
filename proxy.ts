@@ -21,7 +21,6 @@ export async function proxy(request: NextRequest) {
 
     try {
         if (!process.env.JWT_SECRET) {
-            console.error("CRITICAL: JWT_SECRET is missing. Server misconfigured.");
             return NextResponse.redirect(loginUrl);
         }
 

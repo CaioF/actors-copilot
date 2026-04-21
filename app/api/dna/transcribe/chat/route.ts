@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/firebase.admin';
+import { logger } from '@/lib/logger';
 
 /**
  * Transcribes audio input (typically voice recordings for chat input) to text using AI.
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
 
   } catch (error: unknown) {
   const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
-  console.error("Transcription Error:", error);
+  logger.error({ err: error, msg: 'Transcription Error' });
   return NextResponse.json(    { error: errorMessage },     { status: 500 }  );
   }
 }

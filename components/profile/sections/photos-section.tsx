@@ -5,6 +5,7 @@ import { useFormContext } from "react-hook-form";
 import { Upload, X } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 import { useAuth } from "@/lib/context/AuthContext";
+import { logger } from '@/lib/logger';
 
 /**
  * Form section for managing actor photos including primary headshot and additional gallery images.
@@ -52,7 +53,7 @@ export function PhotosSection() {
       const url = await uploadImage(file, `profiles/${user.uid}/headshot.${ext}`);
       setValue("headshot", url, { shouldDirty: true });
     } catch (error) {
-      console.error("Error uploading headshot:", error);
+      logger.error({ err: error, msg: 'Error uploading headshot' });
       alert("Failed to upload headshot.");
     } finally {
       setUploading(null);
@@ -81,7 +82,7 @@ export function PhotosSection() {
       const url = await uploadImage(file, `profiles/${user.uid}/photos/${index}.${ext}`);
       setValue("additionalPhotos", [...additionalPhotos, url], { shouldDirty: true });
     } catch (error) {
-      console.error("Error uploading photo:", error);
+      logger.error({ err: error, msg: 'Error uploading photo' });
       alert("Failed to upload photo.");
     } finally {
       setUploading(null);

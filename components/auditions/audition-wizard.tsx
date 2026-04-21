@@ -16,6 +16,7 @@ import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { StepResultBrief } from "./step/step-result-brief";
+import { logger } from '@/lib/logger';
 
 interface PerformanceSection {
   title: string;
@@ -142,9 +143,6 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
         if (formData.briefFile) payload.append("briefFile", formData.briefFile);
       }
 
-      if (formData.sidesFile) payload.append("sidesFile", formData.sidesFile);
-      if (formData.briefFile) payload.append("briefFile", formData.briefFile);
-
       // Pass the actor's info so the backend knows who to coach and where to find the profile
       payload.append("actorName", actorName);
       payload.append("userPath", userPath);
@@ -163,7 +161,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
 
       if (!response.ok) {
         const errorText = await response.text(); 
-        console.error("Erro na API:", response.status, errorText);
+        logger.error({ err: errorText, msg: 'API Error' });
         throw new Error(`Falha na requisição: ${response.status}`);
       }
 
@@ -173,14 +171,14 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
         setResultData(data.data as AuditionAnalysisResult); 
         setIsGenerating(false);
       } else {
-        console.error("Server Error:", data.error);
+        logger.error({ err: data.error, msg: 'Server Error' });
         alert("Error processing files. Check console.");
         setCurrentStep(4);
         setIsGenerating(false);
       }
 
     } catch (error) {
-      console.error("Request Error:", error);
+      logger.error({ err: error, msg: 'Request Error' });
       alert("Connection error with the server.");
       setCurrentStep(4);
       setIsGenerating(false);
@@ -223,7 +221,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
       router.push("/auditions");
 
     } catch (error) {
-      console.error("Error saving audition to database:", error);
+      logger.error({ err: error, msg: 'Error saving audition to database' });
       alert("Failed to save the audition. Please try again.");
     }
   };
@@ -317,7 +315,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
                 </svg>
                 
                 <h2 className="text-2xl font-title text-[#EADDCE] mb-3">Generating your breakdown...</h2>
-                <p className="text-[#B7BCB6] text-base">This usually takes a few seconds</p>
+                <p className="text-[#B7BCB6] text-base">Time to put the kettle on - It takes a couple of minutes</p>
               
               </div>
             </div>

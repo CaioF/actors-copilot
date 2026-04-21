@@ -1,18 +1,8 @@
 import pino from 'pino';
-import Pretty from 'pino-pretty';
 
 const createLogger = () => {
-  const LOG_LEVEL = process.env.LOG_LEVEL || 'warn';
-  
-  if (process.env.NODE_ENV === 'development') {
-    const stream = Pretty({
-      colorize: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname',
-      minimumLevel: LOG_LEVEL as pino.Level,
-    });
-    return pino({ level: LOG_LEVEL }, stream);
-  }
+  const LOG_LEVEL = process.env.NEXT_PUBLIC_LOG_LEVEL || process.env.LOG_LEVEL || 'warn';
+  const isServer = typeof window === 'undefined';
   
   return pino({
     level: LOG_LEVEL,
@@ -20,6 +10,21 @@ const createLogger = () => {
       env: process.env.NODE_ENV || 'development',
     },
     timestamp: pino.stdTimeFunctions.isoTime,
+    
+    browser: {
+      asObject: true, 
+    },
+
+    ...(isServer && process.env.NODE_ENV === 'development' && {
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+        },
+      },
+    }),
   });
 };
 

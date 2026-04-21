@@ -3,6 +3,7 @@ import { auth, db } from '@/lib/firebase.admin';
 import { FieldValue, DocumentData } from 'firebase-admin/firestore';
 import PDFParser from 'pdf2json';
 import mammoth from 'mammoth';
+import { logger } from '@/lib/logger';
 
 interface Milestone {
   event: string;
@@ -136,7 +137,7 @@ export async function POST(request: Request) {
     // Prompt específico para dissecação de documentos completos
     const BULK_SYSTEM_PROMPT = `
       You are an elite Psychological Profiler and Dramaturg. 
-      You have been handed a raw, unfiltered baseline document (journal entries, therapy notes, or personal biography) belonging to an actor.
+      You have been handed a raw, unfiltered baseline document (journal entries, therapy notes, or Personal biography) belonging to an actor.
       Your objective is to read this entire document and extract maximum psychological value to populate their "Unique Actor Profile".
       
       CRITICAL INSTRUCTIONS:
@@ -338,7 +339,7 @@ export async function POST(request: Request) {
     }, { status: 200 });
 
   } catch (error: unknown) {
-    console.error("Baseline Upload Error:", error);
+    logger.error({ err: error, msg: 'Baseline Upload Error' });
     // Type narrowing 
     const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
     return NextResponse.json({ error: errorMessage }, { status: 500 });

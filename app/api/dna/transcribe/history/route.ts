@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { logger } from '@/lib/logger';
 
 interface TranscriptionRequest {
   audioBase64: string;
@@ -292,7 +293,7 @@ export async function POST(request: Request) {
 
   } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Internal Server Error";
-        console.error("Memory Processing Error:", message);
+        logger.error({ err: error, msg: 'Memory Processing Error' });
         return NextResponse.json({ error: message }, { status: 500 });
 }
 }

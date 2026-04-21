@@ -5,6 +5,7 @@ import { useFormContext } from "react-hook-form";
 import { Upload, X } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 import { useAuth } from "@/lib/context/AuthContext";
+import { logger } from '@/lib/logger';
 
 /**
  * Form section for uploading and managing actor CV/resume as a PDF file.
@@ -43,7 +44,7 @@ export function CvUploadSection() {
       setValue("cvUrl", url, { shouldDirty: true });
       setValue("cvFilename", file.name, { shouldDirty: true });
     } catch (error) {
-      console.error("Error uploading CV:", error);
+      logger.error({ err: error, msg: 'Error uploading CV' });
       alert("Failed to upload CV.");
     } finally {
       setUploading(false);

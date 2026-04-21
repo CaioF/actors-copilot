@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { StepUpload } from "@/components/auditions/step/step-upload"; // Ajuste o caminho conforme necessário
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { StepUpload } from "@/components/auditions/step/step-upload"; 
 import { CheckCircle2 } from "lucide-react";
-import { getDb } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
+import { logger } from '@/lib/logger';
 
 interface HistoryUploadModalProps {
   onClose: () => void;
@@ -66,7 +65,7 @@ export function HistoryUploadModal({ onClose, onSuccess }: HistoryUploadModalPro
       setIsSuccess(true);
 
     } catch (error) {
-      console.error("Error saving history:", error);
+      logger.error({ err: error, msg: 'Error saving history' });
       alert("Failed to save history. Make sure your PDF is not encrypted or corrupted.");
     } finally {
       setIsSubmitting(false);

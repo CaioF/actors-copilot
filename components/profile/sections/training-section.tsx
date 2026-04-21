@@ -67,7 +67,7 @@ export function TrainingSection() {
             <input
               {...register(`training.${index}.qualification`)}
               type="text"
-              placeholder="Qualification"
+              placeholder="Qualification/Course attended"
               className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-3 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
             />
             <input
