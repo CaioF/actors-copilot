@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
 import mammoth from "mammoth";
-// Note: You need to add BRIEF_ANALYSIS_PROMPT to your prompts file!
 import { BRIEF_ANALYSIS_PROMPT, BRIEF_CINEMATIC_PROMPT, BRIEF_COMMERCIAL_PROMPT, BRIEF_THEATER_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
 

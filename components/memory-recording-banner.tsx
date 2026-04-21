@@ -45,7 +45,6 @@ export function MemoryRecordingBanner() {
             const idToken = await auth.currentUser?.getIdToken();
             if (!idToken) throw new Error("Not authenticated");
 
-            // Envia para a nossa nova rota única
             const response = await fetch('/api/dna/transcribe/history', {
               method: 'POST',
               headers: {
@@ -61,7 +60,6 @@ export function MemoryRecordingBanner() {
             if (!response.ok) throw new Error("Failed to process memory");
 
             setStatus("success");
-            // Volta pro estado normal depois de 3 segundos
             setTimeout(() => setStatus("idle"), 3000); 
 
           } catch (error) {
@@ -90,7 +88,6 @@ export function MemoryRecordingBanner() {
     }
   };
 
-  // Renderização dinâmica do botão baseada no status
   /**
    * Renders the appropriate button based on the current recording status.
    * @returns React button element appropriate for the current status

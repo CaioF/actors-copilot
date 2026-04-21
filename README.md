@@ -125,7 +125,7 @@ actors-copilot/
 ├── components/
 │   ├── ui/                      # 56 shadcn/ui components
 │   ├── auditions/               # Audition wizard components
-│   ├── autition-wizard.tsx      # Multi-step wizard container
+│   |   ├── audition-wizard.tsx  # Multi-step wizard container
 │   └── step/                    # Wizard steps
 │       ├── step-upload.tsx      # File upload (PDF/DOCX)
 │       ├── step-basic.tsx       # Project/role info
@@ -531,9 +531,9 @@ All prompts centralized in `lib/prompts.ts` (1203 lines).
 | `THEATHER_MODE_PROMPT` | 934 | Theater-specific coaching |
 | `COMMERCIAL_MODE_PROMPT` | 961 | Commercial audition coaching |
 | `BRIEF_ANALYSIS_PROMPT`| --- | Base orchestrator for Casting Brief JSON extraction |
-| `THEATHER_MODE_PROMPT` | 934 | Theatre-specific directives (Tour schedules, understudies) |
-| `COMMERCIAL_MODE_PROMPT` | 961 | Commercial directives (Buyout simplification, competitor checks) |
-| `CINEMATIC_MODE_PROMPT`| --- | TV/Film directives (NDAs, creative village, multi-part slates) |
+| `BRIEF_THEATER_PROMPT` | 934 | Theatre-specific directives (Tour schedules, understudies) |
+| `BRIEF_COMMERCIAL_PROMPT` | 961 | Commercial directives (Buyout simplification, competitor checks) |
+| `BRIEF_CINEMATIC_PROMPT`| --- | TV/Film directives (NDAs, creative village, multi-part slates) |
 | `BULK_SYSTEM_PROMPT` | (inline) | Document extraction |
 
 ### System Prompt Rules

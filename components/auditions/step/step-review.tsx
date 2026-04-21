@@ -48,7 +48,7 @@ export function StepReview({ data, mode }: StepReviewProps) {
         </div>
 
         {/* Block 2: Sides & Brief  */}
-        <div className=" justify-center md:grid-cols-2 gap-6">
+        <div className=" justify-center gap-6">
           
           {/* Sides */}
           {mode === "sides" && (

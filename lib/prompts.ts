@@ -715,6 +715,10 @@ DO NOT output any conversational filler before the opening quote or after the cl
 * **Requirement:** 3-4 substantial, high-level directives.
 * **Focus:** Premium acting direction. Correct likely misplays, point out where the actor might fall into "indicating," and deepen their understanding of the scene's hidden traps. 
 
+## 11. Self-Tape Plan
+* **Requirement:** Highly practical, camera-ready notes.
+* **Focus:** Translate this deep analysis into self-tape reality (eye-line, stillness, silence, tempo, frame energy). Where is the power in doing less on camera?
+
 ## 12. The Bold Choice
 * **Requirement:** 1-2 highly specific, unexpected, yet entirely justifiable acting choices.
 * **Focus:** What is the wildcard, counter-intuitive choice that will make the casting group sit up and pay attention? Suggest a specific physical behavior, an opposing sensory anchor, or an immediate, truthful reaction to subtext that breaks the predictable rhythm of the scene. It must be a dangerous but grounded choice that sets this self-tape apart from the hundreds of others doing the "obvious" read.

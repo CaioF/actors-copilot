@@ -248,7 +248,6 @@ export function StepResultSides({ data }: StepResultProps) {
               </ul>
             </div>
 
-            {/* ADICIONE O BLOCO 12 AQUI */}
             <div id="section-bold-choice" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Flame className="text-[#FF7316]" size={24} />

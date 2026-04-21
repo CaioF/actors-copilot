@@ -68,7 +68,7 @@ describe("Markdown Generator: profileToMarkdown", () => {
       const profile = createMockProfile();
       const markdown = profileToMarkdown(profile, BASE_URL);
 
-      expect(markdown).toContain("");
+      expect(markdown).toContain("<!-- AI_AGENT_CONTEXT");
     });
   });
 

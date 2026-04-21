@@ -161,8 +161,8 @@ export function StepResultBrief({ data }: StepResultProps) {
                     
                     return (
                       <div key={i} className="flex flex-col gap-1.5 p-4 bg-white border border-gray-100 rounded-xl hover:border-[#FF7316]/30 transition-colors">
-                        <span className="font-bold text-gray-900 text-[14px] uppercase tracking-wide">{renderMarkdown(header)}</span>
-                        <span className="text-gray-600 text-[15px] leading-relaxed">{renderMarkdown(description)}</span>
+                          <div className="font-bold text-gray-900 text-[14px] uppercase tracking-wide">{renderMarkdown(header)}</div>
+                          <div className="text-gray-600 text-[15px] leading-relaxed">{renderMarkdown(description)}</div>
                       </div>
                     );
                   }
@@ -213,7 +213,7 @@ export function StepResultBrief({ data }: StepResultProps) {
                           : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-transparent hover:border-gray-200"
                       }`}
                     >
-                      <Icon className='shrink-0  text-[#FF7316] size={18} '/>
+                      <Icon  size={18} className='shrink-0  text-[#FF7316] '/>
                       <span className="truncate">{cleanTitle}</span>
                     </button>
                   </li>
