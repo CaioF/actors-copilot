@@ -8,9 +8,8 @@ interface StepperProps {
 
 const steps = [
   { num: 1, label: "Basics" },
-  { num: 2, label: "Sides" },
-  { num: 3, label: "Brief" },
-  { num: 4, label: "Review & Generate" },
+  { num: 2, label: "Upload" },
+  { num: 3, label: "Review & Generate" },
 ];
 
 /**

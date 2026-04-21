@@ -11,10 +11,11 @@ import { Stepper } from "./stepper";
 import { StepBasics } from "./step/step-basic";
 import { StepUpload } from "./step/step-upload";
 import { StepReview } from "./step/step-review";
-import { StepResult } from "./step/step-result";
+import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { StepResultBrief } from "./step/step-result-brief";
 
 interface PerformanceSection {
   title: string;
@@ -27,12 +28,15 @@ interface AuditionAnalysisResult {
   outro?: string;
 }
 
+interface AuditionWizardProps {
+  mode: "sides" | "brief";
+}
 /**
  * AuditionWizard Component
  * Multi-step wizard for creating audition breakdowns. Handles project info collection,
  * sides/brief upload, review, AI generation, and saving to Firestore.
  */
-export function AuditionWizard() {
+export function AuditionWizard({ mode }: AuditionWizardProps) {
   const router = useRouter(); // Used for redirecting after saving
   const [currentStep, setCurrentStep] = useState<AuditionStep>(1);
   const [formData, setFormData] = useState<AuditionFormData>(initialAuditionData);
@@ -60,7 +64,7 @@ export function AuditionWizard() {
   /**
    * Navigates to the next step in the audition wizard.
    */
-  const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 5) as AuditionStep);
+  const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 4) as AuditionStep);
 
   /**
    * Navigates to the previous step in the audition wizard.
@@ -89,7 +93,7 @@ export function AuditionWizard() {
    * Step 2: Generates the Audition Breakdown via API.
    */
   const handleGenerate = async () => {
-    setCurrentStep(5); 
+    setCurrentStep(4); 
     setIsGenerating(true); 
 
     try {
@@ -108,6 +112,7 @@ export function AuditionWizard() {
       const userPath = `${currentUser.uid}_${firstName}`;
 
       const token = await currentUser.getIdToken();
+
       // STAGE 1: SMART DNA SYNTHESIS (Uses the cache logic we just built)
       const dnaResponse = await fetch('/api/dna/synthesize', {
         method: 'POST',
@@ -129,8 +134,13 @@ export function AuditionWizard() {
       payload.append("role", formData.role);
       if (formData.deadline) payload.append("deadline", formData.deadline);
       
-      payload.append("sidesText", formData.sidesText);
-      payload.append("briefText", formData.briefText);
+      if (mode === "sides") {
+        payload.append("sidesText", formData.sidesText);
+        if (formData.sidesFile) payload.append("sidesFile", formData.sidesFile);
+      } else {
+        payload.append("briefText", formData.briefText);
+        if (formData.briefFile) payload.append("briefFile", formData.briefFile);
+      }
 
       if (formData.sidesFile) payload.append("sidesFile", formData.sidesFile);
       if (formData.briefFile) payload.append("briefFile", formData.briefFile);
@@ -139,13 +149,23 @@ export function AuditionWizard() {
       payload.append("actorName", actorName);
       payload.append("userPath", userPath);
 
-      const response = await fetch("/api/auditions/analyze", {
+      const endpoint = mode === "sides" 
+        ? "/api/auditions/analyzeSides" 
+        : "/api/auditions/analyzeBrief";
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${token}` 
         },
         body: payload, 
       });
+
+      if (!response.ok) {
+        const errorText = await response.text(); 
+        console.error("Erro na API:", response.status, errorText);
+        throw new Error(`Falha na requisição: ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -194,6 +214,7 @@ export function AuditionWizard() {
         role: formData.role,
         deadline: formData.deadline || null,
         performanceMap: resultData, // The fully structured AI JSON
+        analysisType: mode,
         createdAt: serverTimestamp(),
         status: "completed"
       });
@@ -212,7 +233,7 @@ export function AuditionWizard() {
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-2 h-full">
       
       {/* Stepper  */}
-      {currentStep < 5 && (
+      {currentStep < 4 && (
         <Stepper currentStep={currentStep} />
       )}
 
@@ -237,31 +258,21 @@ export function AuditionWizard() {
       {currentStep === 2 && (
         <div className="flex flex-col flex-1">
           <StepUpload 
-            title="Upload Sides"
-            description="Upload the script pages (Sides) for this audition."
-            file={formData.sidesFile}
-            text={formData.sidesText}
-            onFileChange={(file) => updateFormData({ sidesFile: file })}
-            onTextChange={(text) => updateFormData({ sidesText: text })}
-          />
-          <div className="flex justify-between mt-12 mb-8">
-            <button onClick={handleBack} className="text-[#FF7316] hover:text-[#E66814] font-medium transition-colors px-4 py-2">Back</button>
-            <button onClick={handleNext} className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors">Next</button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: BRIEF */}
-      {currentStep === 3 && (
-        <div className="flex flex-col flex-1">
-          <StepUpload 
-            title="Character Brief & Notes"
-            description="Upload the casting breakdown, character description, or any director's notes."
-            file={formData.briefFile}
-            text={formData.briefText}
-            onFileChange={(file) => updateFormData({ briefFile: file })}
-            onTextChange={(text) => updateFormData({ briefText: text })}
-          />
+            title={mode === "sides" ? "Upload Sides" : "Upload Character Brief"}
+            description={mode === "sides" 
+              ? "Upload the script pages (Sides) for this audition." 
+              : "Upload the casting breakdown, character description, or director's notes."}
+            file={mode === "sides" ? formData.sidesFile : formData.briefFile}
+            text={mode === "sides" ? formData.sidesText : formData.briefText}
+            onFileChange={(file) => mode === "sides" 
+              ? updateFormData({ sidesFile: file }) 
+              : updateFormData({ briefFile: file })
+            }
+            onTextChange={(text) => mode === "sides" 
+              ? updateFormData({ sidesText: text }) 
+              : updateFormData({ briefText: text })
+            }
+            />
           <div className="flex justify-between mt-12 mb-8">
             <button onClick={handleBack} className="text-[#FF7316] hover:text-[#E66814] font-medium transition-colors px-4 py-2">Back</button>
             <button onClick={handleNext} className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors">Next</button>
@@ -269,10 +280,10 @@ export function AuditionWizard() {
         </div>
       )}
       
-      {/* STEP 4: REVIEW */}
-      {currentStep === 4 && (
+      {/* STEP 3: REVIEW */}
+      {currentStep === 3 && (
         <div className="flex flex-col flex-1">
-          <StepReview data={formData} />
+          <StepReview data={formData} mode={mode} />
 
           <div className="flex justify-between items-center mt-12 mb-8">
             <button 
@@ -291,8 +302,8 @@ export function AuditionWizard() {
         </div>
       )}
 
-      {/* STEP 5: LOADING OR RESULT */}
-      {currentStep === 5 && (
+      {/* STEP 4: LOADING OR RESULT */}
+      {currentStep === 4 && (
         <div className={`flex-1 flex flex-col w-full h-full ${!isGenerating && resultData ? 'bg-[#F5EFE6] -mx-4 md:-mx-8 px-4 md:px-8 py-8 min-h-screen' : ''}`}>
           {isGenerating ? (
             <div className="flex flex-col flex-1 animate-in fade-in duration-500">
@@ -355,7 +366,7 @@ export function AuditionWizard() {
                </div>
 
                {/* --- MAIN UI RENDERER --- */}
-               <StepResult data={resultData} />
+               {mode === "sides" ? <StepResultSides data={resultData} /> : <StepResultBrief data={resultData} />}
 
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">

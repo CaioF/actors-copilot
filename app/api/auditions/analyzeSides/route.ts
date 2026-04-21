@@ -107,6 +107,13 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  if (!sidesText.trim()) {
+       return NextResponse.json(
+         { error: "No sides text or valid file provided for analysis." },
+         { status: 400 }
+       );
+    }
   
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user

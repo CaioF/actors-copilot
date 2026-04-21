@@ -489,7 +489,6 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                 // 4. Parse the secure response
                 const responseData = (await response.json()) as ChatApiResponse;
                 
-                // Validação de segurança para garantir que a IA não retornou um texto vazio
                 if (!responseData?.aiData?.coach_reply) {
                     throw new Error("Empty or invalid response from AI");
                 }

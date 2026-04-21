@@ -44,7 +44,7 @@ import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
 describe("AuditionWizard", () => {
   describe("handleNext", () => {
     it("increments step from 1 to 2", async () => {
-      render(<AuditionWizard />);
+      render(<AuditionWizard mode="sides" />);
       
       expect(screen.getByText("Basics")).toBeInTheDocument();
       
@@ -53,11 +53,11 @@ describe("AuditionWizard", () => {
         fireEvent.click(nextButton);
       });
       
-      expect(screen.getByText("Sides")).toBeInTheDocument();
+      expect(screen.getByText(/Upload Sides/i)).toBeInTheDocument();
     });
 
     it("caps step at 4 when already at maximum", async () => {
-      render(<AuditionWizard />);
+      render(<AuditionWizard mode="sides" />);
       
       const nextButtons = screen.getAllByRole("button", { name: "Next" });
       let stepButton = nextButtons[nextButtons.length - 1];
@@ -74,14 +74,14 @@ describe("AuditionWizard", () => {
 
   describe("handleBack", () => {
     it("decrements step from 2 to 1", async () => {
-      render(<AuditionWizard />);
+      render(<AuditionWizard mode="sides" />);
       
       const nextButton = screen.getByRole("button", { name: "Next" });
       await act(async () => {
         fireEvent.click(nextButton);
       });
       
-      expect(screen.getByText("Sides")).toBeInTheDocument();
+      expect(screen.getByText(/Upload Sides/i)).toBeInTheDocument();
       
       const backButton = screen.getByRole("button", { name: "Back" });
       await act(async () => {
@@ -92,7 +92,7 @@ describe("AuditionWizard", () => {
     });
 
     it("floors at step 1 when already at minimum", () => {
-      render(<AuditionWizard />);
+      render(<AuditionWizard mode="sides" />);
       
       expect(screen.getByText("Basics")).toBeInTheDocument();
       
@@ -103,7 +103,7 @@ describe("AuditionWizard", () => {
 
   describe("updateFormData", () => {
     it("merges partial data correctly and preserves existing keys", async () => {
-      render(<AuditionWizard />);
+      render(<AuditionWizard mode="sides" />);
       
       const projectInput = screen.getByPlaceholderText("e.g., The Morning Show Season 5");
       await act(async () => {

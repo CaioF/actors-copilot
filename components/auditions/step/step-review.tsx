@@ -5,6 +5,7 @@ import { CheckCircle2, FileText, AlignLeft, Calendar, User, Film } from "lucide-
 
 interface StepReviewProps {
   data: AuditionFormData;
+  mode: "sides" | "brief";
 }
 
 /**
@@ -13,7 +14,7 @@ interface StepReviewProps {
  * Displays project basics, sides info, and character brief status.
  * @param data - Current audition form data to review
  */
-export function StepReview({ data }: StepReviewProps) {
+export function StepReview({ data, mode }: StepReviewProps) {
   return (
     <div className="rounded-3xl bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto font-sans">
       
@@ -47,51 +48,57 @@ export function StepReview({ data }: StepReviewProps) {
         </div>
 
         {/* Block 2: Sides & Brief  */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className=" justify-center gap-6">
           
           {/* Sides */}
-          <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40">
-            <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" /> Sides
-            </h3>
-            {data.sidesFile ? (
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-[#B7BCB6]" />
-                <span className="font-medium truncate">{data.sidesFile.name}</span>
-              </div>
-            ) : data.sidesText ? (
-              <div className="flex items-center gap-3">
-                <AlignLeft className="w-5 h-5 text-[#B7BCB6]" />
-                <span className="font-medium text-sm truncate">Text pasted ({data.sidesText.split(' ').length} words)</span>
-              </div>
-            ) : (
-              <span className="text-[#B7BCB6]/50 italic">No sides provided</span>
-            )}
-          </div>
+          {mode === "sides" && (
+            <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40">
+              <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" /> Sides
+              </h3>
+              {data.sidesFile ? (
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-[#B7BCB6]" />
+                  <span className="font-medium truncate">{data.sidesFile.name}</span>
+                </div>
+              ) : data.sidesText ? (
+                <div className="flex items-center gap-3">
+                  <AlignLeft className="w-5 h-5 text-[#B7BCB6]" />
+                  <span className="font-medium text-sm truncate">Text pasted ({data.sidesText.split(' ').length} words)</span>
+                </div>
+              ) : (
+                <span className="text-[#B7BCB6]/50 italic">No sides provided</span>
+              )}
+            </div>
+          )}
 
           {/* Brief */}
-          <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40">
-            <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" /> Character Brief
-            </h3>
-            {data.briefFile ? (
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-[#B7BCB6]" />
-                <span className="font-medium truncate">{data.briefFile.name}</span>
-              </div>
-            ) : data.briefText ? (
-              <div className="flex items-center gap-3">
-                <AlignLeft className="w-5 h-5 text-[#B7BCB6]" />
-                <span className="font-medium text-sm truncate">Text pasted ({data.briefText.split(' ').length} words)</span>
-              </div>
-            ) : (
-              <span className="text-[#B7BCB6]/50 italic">No brief provided</span>
-            )}
+          {/* 4. Condicional para mostrar apenas BRIEF */}
+          {mode === "brief" && (
+            <div className="bg-[#2C3328] shadow-lg rounded-2xl p-6 border border-[#B7BCB6]/40 ">
+              <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" /> Character Brief
+              </h3>
+              {data.briefFile ? (
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-[#B7BCB6]" />
+                  <span className="font-medium truncate">{data.briefFile.name}</span>
+                </div>
+              ) : data.briefText ? (
+                <div className="flex items-center gap-3">
+                  <AlignLeft className="w-5 h-5 text-[#B7BCB6]" />
+                  <span className="font-medium text-sm truncate">Text pasted ({data.briefText.split(' ').length} words)</span>
+                </div>
+              ) : (
+                <span className="text-[#B7BCB6]/50 italic">No brief provided</span>
+              )}
+            </div>
+          )}
           </div>
 
         </div>
 
       </div>
-    </div>
+
   );
 }

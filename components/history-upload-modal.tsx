@@ -46,7 +46,6 @@ export function HistoryUploadModal({ onClose, onSuccess }: HistoryUploadModalPro
 
       const idToken = await user.getIdToken();
 
-      // Usando FormData para suportar o envio do arquivo binário real para a API
       const formData = new FormData();
       if (file) formData.append('file', file);
       if (text) formData.append('text', text);

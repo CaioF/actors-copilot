@@ -235,7 +235,6 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
   const handleMainAction = () => {
     if (isTranscribing) return; 
     if (isRecording) stopRecording();
-    // Atualize esta linha para considerar o pendingDocument
     else if (value.trim() || pendingDocument) handleSubmit();
     else startRecording();
   };

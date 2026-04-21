@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna } from "lucide-react";
+import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame } from "lucide-react";
 import React from "react";
 
 interface Section {
@@ -18,12 +18,13 @@ interface StepResultProps {
   };
 }
 
-export function StepResult({ data }: StepResultProps) {
-  // Estado para controlar qual seção está ativa na sidebar
+export function StepResultSides({ data }: StepResultProps) {
+  
   const [activeSection, setActiveSection] = useState("section-objective");
-
-  // Configura o Intersection Observer para mudar a aba ativa conforme o scroll manual
+  const hasFullSections = data?.sections && data.sections.length >= 13;
+  
   useEffect(() => {
+    if (!hasFullSections) return;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -44,7 +45,6 @@ export function StepResult({ data }: StepResultProps) {
   if (!data || !data.sections) return null;
 
   const s = data.sections;
-  const hasFullSections = s.length >= 12;
 
   const renderMarkdown = (text: string) => (
     <div className="prose prose-slate max-w-none prose-p:m-0 prose-p:inline prose-strong:font-semibold prose-strong:text-gray-900">
@@ -52,21 +52,17 @@ export function StepResult({ data }: StepResultProps) {
     </div>
   );
 
-  // CORREÇÃO: Usando scrollIntoView para garantir que funciona em qualquer container
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      // scrollIntoView encontra automaticamente o container correto
       element.scrollIntoView({ 
         behavior: "smooth", 
         block: "start" 
       });
-      // Força a atualização do estado visual imediatamente no clique
       setActiveSection(id);
     }
   };
 
-  // Definição do menu da Sidebar
   const sidebarLinks = [
     { id: "section-objective", icon: Target, label: "Objective" },
     { id: "section-snapshot", icon: Eye, label: "Snapshot" },
@@ -76,6 +72,7 @@ export function StepResult({ data }: StepResultProps) {
     { id: "section-tactics", icon: Shield, label: "Tactics & Obstacles" },
     { id: "section-notes", icon: MessageCircle, label: "Coach Notes" },
     { id: "section-tape", icon: Video, label: "Self-Tape Plan" },
+    { id: "section-bold-choice", icon: Flame, label: "The Bold Choice" },
     { id: "section-dna", icon: Dna, label: "Personal DNA" },
   ];
 
@@ -251,6 +248,20 @@ export function StepResult({ data }: StepResultProps) {
               </ul>
             </div>
 
+            <div id="section-bold-choice" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-6">
+                <Flame className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">The Bold Choice</h3>
+              </div>
+              <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
+                {s[11].items.map((item, i) => (
+                  <div key={i} className="p-5 bg-[#FDECE2]/50 border border-[#FDECE2] rounded-xl">
+                    {renderMarkdown(item)}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* 12. Personal DNA */}
             <div id="section-dna" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
@@ -260,7 +271,7 @@ export function StepResult({ data }: StepResultProps) {
               <div>
                 <h4 className="font-bold text-gray-900 mb-3 text-sm tracking-tight">Suggested reservoirs to access for this role</h4>
                 <div className="flex flex-wrap gap-2.5">
-                  {s[11].items.map((item, i) => {
+                  {s[12].items.map((item, i) => {
                      const isShortTag = item.length < 30 && !item.includes(':');
                      if (isShortTag) {
                        return (
