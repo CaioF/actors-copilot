@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { createChildLogger } from '@/lib/logger';
+import { logger } from '@/lib/logger';
 
 interface ChatHistoryMessage {
   role: string;
@@ -430,7 +431,7 @@ export async function POST(request: Request) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error("Secure Chat API Error:", error);
+        logger.error({ err: error, msg: 'Secure Chat API Error' });
         return NextResponse.json({ error: 'Failed to generate chat response' }, { status: 500 });
     }
 }

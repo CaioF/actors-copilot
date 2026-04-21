@@ -3,6 +3,7 @@ import PDFParser from "pdf2json";
 import mammoth from "mammoth";
 import { BRIEF_ANALYSIS_PROMPT, BRIEF_CINEMATIC_PROMPT, BRIEF_COMMERCIAL_PROMPT, BRIEF_THEATER_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
+import { logger } from '@/lib/logger';
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -39,7 +40,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
       try {
         resolve(decodeURIComponent(rawText));
       } catch (error) {
-        console.warn("Failed do decode pdf text with decodeURIComponent, returning raw text. Error:", error);
+        logger.warn({ err: error, msg: 'Failed to decode pdf text' });
         resolve(rawText);
       }
     });
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      console.error(`SECURITY ALERT: User ${authenticatedUserId} attempted to generate a brief for ${userPath}`);
+      logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate a brief for ${userPath}` });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
@@ -238,7 +239,7 @@ export async function POST(request: Request) {
     try {
         performanceMap = JSON.parse(responseText) as PerformanceMap;
     } catch (parseError) {
-        console.error("Failed to parse AI JSON output:", responseText);
+        logger.error({ err: parseError, msg: 'Failed to parse AI JSON output' });
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
     }
 
@@ -250,7 +251,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error("Error during Brief synthesis: ", error);
+    logger.error({ err: error, msg: 'Error during Brief synthesis' });
     return NextResponse.json(
       { success: false, error: "Internal Server Error during brief synthesis." },
       { status: 500 }

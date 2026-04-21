@@ -1,5 +1,6 @@
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getApp } from '@/lib/firebase';
+import { logger } from '@/lib/logger';
 
 /**
  * Saves a chat message pair (user message and AI response) to Firestore.
@@ -27,7 +28,7 @@ export async function saveRawMessageToFirestore(
             createdAt: serverTimestamp()
         });
     } catch (error) {
-        console.error('Error saving message to Firestore:', error);
+        logger.error({ err: error, msg: 'Error saving message to Firestore' });
         throw error;
     }
 }

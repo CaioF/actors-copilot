@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic, X } from "lucide-react"; 
 import { getAuth } from "firebase/auth";
+import { logger } from '@/lib/logger';
 
 interface ChatInputProps {
   onSend: (message: string, document?: AttachedDocument | null) => void;
@@ -201,7 +202,7 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
                }, 10);
             }
           } catch (error) {
-            console.error("Transcription error:", error);
+            logger.error({ err: error, msg: 'Transcription error' });
             alert("Failed to transcribe audio.");
           } finally {
             setIsTranscribing(false);
@@ -212,7 +213,7 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
-      console.error("Mic access denied", error);
+      logger.error({ err: error, msg: 'Mic access denied' });
       alert("Please allow microphone access.");
     }
   };

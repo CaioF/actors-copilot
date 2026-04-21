@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Search, Calendar, Trash2, Loader2, Edit2, Eye, Printer, Film, ShoppingBag, Drama } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { useRouter } from "next/navigation"
+import { logger } from '@/lib/logger';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -139,7 +140,7 @@ export default function AuditionsPage() {
 
       setAuditionList(fetchedData);
     } catch (error) {
-      console.error("Error fetching auditions:", error);
+      logger.error({ err: error, msg: 'Error fetching auditions' });
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +171,7 @@ export default function AuditionsPage() {
       // Close the modal
       setEditingAudition(null);
     } catch (error) {
-      console.error("Failed to update audition:", error);
+      logger.error({ err: error, msg: 'Failed to update audition' });
       alert("Error saving changes.");
     }
   }
@@ -213,7 +214,7 @@ export default function AuditionsPage() {
       setAuditionList((prev) => prev.filter((a) => a.id !== id));
       
     } catch (error) {
-      console.error("Error deleting audition:", error);
+      logger.error({ err: error, msg: 'Error deleting audition' });
       alert("Failed to delete audition. Please try again.");
     }
   }

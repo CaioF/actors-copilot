@@ -10,6 +10,7 @@ import { ActorProfileForm } from "@/components/profile/actor-profile-form";
 import { ProfileLivePreview } from "@/components/profile/profile-live-preview";
 import { ImdbAutofill } from "@/components/profile/imdb-autofill";
 import { useLoadingText } from "@/hooks/use-loading-text";
+import { logger } from '@/lib/logger';
 import {
   ActorProfile,
   actorProfileSchema,
@@ -75,7 +76,7 @@ export default function ProfilePage() {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
     } catch (error) {
-      console.error("Error saving profile:", error);
+      logger.error({ err: error, msg: 'Error saving profile' });
       setSaveStatus("error");
     }
   }, [user, methods]);
@@ -137,9 +138,9 @@ export default function ProfilePage() {
     const errorCode = isFirestoreError ? (error as FirestoreError).code : null;
     const errorMessage = isGenericError ? error.message : "";
     if (errorCode === "unavailable" || errorMessage.includes("offline")) {
-        console.warn("Firestore offline, using defaults.");
+        logger.warn({ msg: 'Firestore offline, using defaults.' });
     } else {
-        console.error("Error loading profile:", error);
+        logger.error({ err: error, msg: 'Error loading profile' });
     }
     methods.reset(defaults);
       } finally {
@@ -222,7 +223,7 @@ export default function ProfilePage() {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
     } catch (error) {
-      console.error("Error publishing profile:", error);
+      logger.error({ err: error, msg: 'Error publishing profile' });
       alert("Failed to publish profile. Please try again.");
       methods.setValue("status", "draft");
       setSaveStatus("error");

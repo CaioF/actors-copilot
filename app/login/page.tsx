@@ -127,7 +127,7 @@ export default function LoginPage() {
                         Your AI Partner<br />for Self-Taping
                     </h1>
                     <p className="text-lg text-muted-foreground leading-relaxed">
-                        Build your personal DNA, break down characters in minutes, and prepare with confidence.
+                        Build your Personal DNA, Breakdown Characters in minutes, and prepare with confidence.
                     </p>
                 </div>
 
@@ -136,7 +136,7 @@ export default function LoginPage() {
                     <FeatureItem 
                         icon={<Sparkles className="w-5 h-5 text-foreground" />} 
                         title="Personal DNA" 
-                        description="Build a living profile that personalizes every audition" 
+                        description="Build a living profile that personalises every audition" 
                     />
                     <FeatureItem 
                         icon={<FileText className="w-5 h-5 text-foreground" />} 

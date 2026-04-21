@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/lib/context/AuthContext"
 import { collection, getDocs, doc, writeBatch } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { logger } from '@/lib/logger';
 
 interface FirebaseError {
   code: string;
@@ -114,7 +115,7 @@ export default function SettingsPage() {
         // a secure re-authentication flow (sending a verification link).
       }
     } catch (error) {
-      console.error("Error updating profile:", error);
+      logger.error({ err: error, msg: 'Error updating profile' });
       alert("Failed to save profile. Please try again.");
     } finally {
       setIsSaving(false);
@@ -183,7 +184,7 @@ export default function SettingsPage() {
       }
 
     } catch (error) {
-      console.error("Error uploading image:", error);
+      logger.error({ err: error, msg: 'Error uploading image' });
       alert("Failed to upload image. Make sure Firebase Storage is enabled in your console.");
     } finally {
       setIsSaving(false);
@@ -214,7 +215,7 @@ export default function SettingsPage() {
 
       const sessionsRef = collection(db, `users/${userPath}/dnaSessions`);
       const sessionDocs = await getDocs(sessionsRef).catch((err) => {
-         console.error("🔥 ERRO FATAL AO LER O BANCO:", err);
+         logger.error({ err, msg: 'Failed to check sessions' });
          throw err;
       });
 
@@ -243,7 +244,7 @@ export default function SettingsPage() {
       window.location.reload(); 
 
     } catch (error) {
-      console.error("deletion eror: ", error);
+      logger.error({ err: error, msg: 'Failed to delete chat data' });
       alert("Failed to delete chat data. ");
       setIsDeletingChat(false);
     } 
@@ -305,7 +306,7 @@ export default function SettingsPage() {
           const avatarRef = ref(storage, user.photoURL);
           await deleteObject(avatarRef);
         } catch (storageError) {
-          console.warn("Avatar not found or already deleted, moving on.");
+          logger.warn({ msg: 'Avatar not found or already deleted, moving on.' });
         }
       }
 
@@ -319,7 +320,7 @@ export default function SettingsPage() {
       }
 
     } catch (error: unknown) {
-        console.error("Error deleting account:", error);
+        logger.error({ err: error, msg: 'Error deleting account' });
         if (isFirebaseError(error)) {
           if (error.code === 'auth/requires-recent-login') {
             alert("For security reasons, you need to verify your identity. Please log out, log back in, and try again.");
@@ -457,7 +458,7 @@ export default function SettingsPage() {
               <div className="mb-4">
                 <h4 className="text-sm font-semibold text-[#2C3328]">Private by default</h4>
                 <p className="mt-1 text-sm leading-relaxed text-[#6B6B6B]">
-                  {"Your data belongs to you. We don't sell your information, share it with third parties, or use it to train AI models. Your audition slides, personal DNA, and all content remain completely private."}
+                  {"Your data belongs to you. We don't sell your information, share it with third parties, or use it to train AI models. Your audition sides, Personal DNA, and all content remain completely private."}
                 </p>
               </div>
               <div>
@@ -479,7 +480,7 @@ export default function SettingsPage() {
                     <Trash2 className="h-4 w-4 text-[#C45A3C]" />
                     <div>
                       <p className="text-sm font-semibold text-[#C45A3C]">Delete chat data</p>
-                      <p className="text-xs text-[#6B6B6B]">Permanently delete your chat data</p>
+                      <p className="text-xs text-[#6B6B6B]">Permanently delete your chat data at any time</p>
                     </div>
                   </button>
                 </AlertDialogTrigger>

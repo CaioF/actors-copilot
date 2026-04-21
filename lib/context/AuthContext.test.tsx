@@ -3,6 +3,19 @@ import { render, waitFor, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { signOut, onAuthStateChanged, getAuth, Auth, User } from 'firebase/auth';
+import { logger } from '@/lib/logger';
+
+jest.mock('@/lib/logger', () => {
+  const mockLog = {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    logger: mockLog,
+    createChildLogger: jest.fn().mockReturnValue(mockLog),
+  };
+});
 
 jest.mock('@/lib/firebase', () => ({
     getApp: jest.fn(),
@@ -102,7 +115,11 @@ describe('AuthContext', () => {
             });
 
             await waitFor(() => {
-                expect(consoleErrorSpy).toHaveBeenLastCalledWith('Error signing out: ', firebaseError.message);
+                expect(logger.error).toHaveBeenCalledWith(
+                expect.objectContaining({ 
+                    msg: expect.stringContaining('Error signing out') 
+                })
+                );
                 expect(getByTestId('loading').textContent).toBe('false');
             });
         });
