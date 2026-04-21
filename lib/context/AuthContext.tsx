@@ -111,8 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             }
 
-            const message = error instanceof Error ? error.message : "An unexpected error occurred";
-            logger.error({ err: message, msg: 'Failed to log in' });
+            logger.error({ err: error, msg: 'Failed to log in' });
             throw error;
            
         } finally {
@@ -150,8 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             }
 
-            const message = error instanceof Error ? error.message : "Failed to log in with email";
-            logger.error({ err: message, msg: 'Login Error' });
+            logger.error({ err: error, msg: 'Login Error' });
             throw error;
 
         } finally {
@@ -188,8 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     throw new Error("This email is already registered. Try logging in with Google or your password instead.", { cause: error });
                 }
             }
-            const message = error instanceof Error ? error.message : "Failed to sign up with email";
-            logger.error({ err: message, msg: 'Signup Error' });
+            logger.error({ err: error, msg: 'Signup Error' });
             throw error;
         } finally {
             setLoading(false);
@@ -216,8 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             window.location.href = "/login"; 
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : "Unknown logout error";
-            logger.error({ err: message, msg: 'Error signing out' });
+            logger.error({ err: error, msg: 'Error signing out' });
         } finally {
             setLoading(false);
         }

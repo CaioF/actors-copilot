@@ -88,7 +88,13 @@ export async function POST(request: Request) {
 
     const sidesFile = formData.get("sidesFile") as File | null;
 
-  
+    // Security Check: Ensure the requested userPath belongs to the authenticated user
+    // Performed before any expensive file parsing to reject unauthorized requests early.
+    if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
+      logger.error({ msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}` });
+      return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
+    }
+
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     if (sidesFile) {
@@ -109,6 +115,7 @@ export async function POST(request: Request) {
       }
     }
 
+    // 3. PARSE FILES SAFELY (PDFs & DOCX)
     if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -126,25 +133,6 @@ export async function POST(request: Request) {
         { error: "No sides text or valid file provided for analysis." },
         { status: 400 }
       );
-    }
-
-    // Security Check: Ensure the requested userPath belongs to the authenticated user
-    if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      logger.error({ msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}` });
-      return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
-    }
-
-    // 3. PARSE FILES SAFELY (PDFs & DOCX)
-    if (sidesFile) {
-      const arrayBuffer = await sidesFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      
-      if (sidesFile.type === "application/pdf") {
-        sidesText = await extractTextFromPDF(buffer);
-      } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
-        const result = await mammoth.extractRawText({ buffer: buffer });
-        sidesText = result.value;
-      }
     }
 
     // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)

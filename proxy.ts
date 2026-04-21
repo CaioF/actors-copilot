@@ -21,6 +21,7 @@ export async function proxy(request: NextRequest) {
 
     try {
         if (!process.env.JWT_SECRET) {
+            console.error('[proxy] JWT_SECRET environment variable is not set. Redirecting to login.');
             return NextResponse.redirect(loginUrl);
         }
 
