@@ -44,7 +44,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
   // Security: Kill the process if the PDF is too complex or acting as a "Zip Bomb"
   const timeoutPromise = new Promise<string>((_, reject) =>
-    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (60s). The file might be corrupted or too complex.")), 60000)
+    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (80s). The file might be corrupted or too complex.")), 80000)
   );
 
   return Promise.race([parsePromise, timeoutPromise]);
@@ -88,13 +88,7 @@ export async function POST(request: Request) {
 
     const sidesFile = formData.get("sidesFile") as File | null;
 
-    // Security Check: Ensure the requested userPath belongs to the authenticated user
-    // Performed before any expensive file parsing to reject unauthorized requests early.
-    if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}` });
-      return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
-    }
-
+  
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     if (sidesFile) {
@@ -115,7 +109,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. PARSE FILES SAFELY (PDFs & DOCX)
     if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -133,6 +126,25 @@ export async function POST(request: Request) {
         { error: "No sides text or valid file provided for analysis." },
         { status: 400 }
       );
+    }
+
+    // Security Check: Ensure the requested userPath belongs to the authenticated user
+    if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
+      logger.warn({ msg: "SECURITY ALERT: Unauthorized access attempt" });
+      return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
+    }
+
+    // 3. PARSE FILES SAFELY (PDFs & DOCX)
+    if (sidesFile) {
+      const arrayBuffer = await sidesFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      if (sidesFile.type === "application/pdf") {
+        sidesText = await extractTextFromPDF(buffer);
+      } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        sidesText = result.value;
+      }
     }
 
     // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
@@ -217,7 +229,7 @@ export async function POST(request: Request) {
       CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
     `;
 
-    // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE
+    // EXECUTE AI INFERENCE AND PARSE RESPONSE
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
@@ -230,7 +242,7 @@ export async function POST(request: Request) {
     }
 
 
-    // 8. RETURN TO FRONTEND
+    // RETURN TO FRONTEND
     return NextResponse.json({
       success: true,
       message: "Performance Map generated successfully.",

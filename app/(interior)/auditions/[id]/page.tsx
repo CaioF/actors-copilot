@@ -32,7 +32,7 @@ interface AuditionData {
 }
 
 /**
- * Detailed view page for a single audition breakdown.
+ * Detailed view page for a single character breakdown.
  * Displays performance map data and provides print functionality.
  * @returns The rendered audition detail page
  */
