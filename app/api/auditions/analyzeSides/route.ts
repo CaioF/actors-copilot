@@ -44,7 +44,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
   // Security: Kill the process if the PDF is too complex or acting as a "Zip Bomb"
   const timeoutPromise = new Promise<string>((_, reject) =>
-    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (80s). The file might be corrupted or too complex.")), 80000)
+    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (60s). The file might be corrupted or too complex.")), 60000)
   );
 
   return Promise.race([parsePromise, timeoutPromise]);
@@ -217,7 +217,7 @@ export async function POST(request: Request) {
       CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
     `;
 
-    // EXECUTE AI INFERENCE AND PARSE RESPONSE
+    // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
     }
 
 
-    // RETURN TO FRONTEND
+    // 8. RETURN TO FRONTEND
     return NextResponse.json({
       success: true,
       message: "Performance Map generated successfully.",

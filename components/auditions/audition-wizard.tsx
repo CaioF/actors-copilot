@@ -17,7 +17,6 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { StepResultBrief } from "./step/step-result-brief";
 import { logger } from '@/lib/logger';
-import { calculateLocalDeadline } from "@/lib/time-utils";
 
 interface PerformanceSection {
   title: string;
@@ -35,7 +34,7 @@ interface AuditionWizardProps {
 }
 /**
  * AuditionWizard Component
- * Multi-step wizard for creating character breakdowns. Handles project info collection,
+ * Multi-step wizard for creating audition breakdowns. Handles project info collection,
  * sides/brief upload, review, AI generation, and saving to Firestore.
  */
 export function AuditionWizard({ mode }: AuditionWizardProps) {
@@ -45,7 +44,6 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [resultData, setResultData] = useState<AuditionAnalysisResult | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [localDeadlineStr, setLocalDeadlineStr] = useState<string | null>(null);
 
   // --- PRINTING SETUP ---
   const printRef = useRef<HTMLDivElement>(null);
@@ -67,10 +65,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
   /**
    * Navigates to the next step in the audition wizard.
    */
-  const handleNext = (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    setCurrentStep((prev) => Math.min(prev + 1, 4) as AuditionStep);
-  };
+  const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 4) as AuditionStep);
 
   /**
    * Navigates to the previous step in the audition wizard.
@@ -87,32 +82,20 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
   };
 
   const handleDelete = () => {
-  if (window.confirm("Are you sure you want to delete this character breakdown? This action cannot be undone.")) {
+  if (window.confirm("Are you sure you want to delete this audition breakdown? This action cannot be undone.")) {
     setResultData(null);
     setCurrentStep(1); 
   }
 };
 
   /**
-   * Handles the generation of an character breakdown.
+   * Handles the generation of an audition breakdown.
    * Step 1: Smart-checks the DNA Vault and updates the Master Profile if needed.
-   * Step 2: Generates the character breakdown via API.
+   * Step 2: Generates the Audition Breakdown via API.
    */
   const handleGenerate = async () => {
     setCurrentStep(4); 
     setIsGenerating(true); 
-
-    const actorTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  
-  // Calcula o prazo local antes de chamar a API
-  if (formData.deadline && formData.auditionTimezone) {
-    const converted = calculateLocalDeadline(
-      formData.deadline, 
-      formData.auditionTimezone, 
-      actorTimezone
-    );
-    setLocalDeadlineStr(converted);
-  }
 
     try {
       if (!currentUser) {
@@ -144,17 +127,13 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
       // We wait for the backend to confirm the profile is ready (either cached or newly generated)
       await dnaResponse.json(); 
 
-      // STAGE 2: GENERATE character breakdown
+      // STAGE 2: GENERATE AUDITION BREAKDOWN
       const payload = new FormData();
       
       payload.append("projectType", formData.projectType || "cinematic"); // Defaults to cinematic if not set
       payload.append("project", formData.project);
       payload.append("role", formData.role);
       if (formData.deadline) payload.append("deadline", formData.deadline);
-      if (formData.auditionTimezone) payload.append("auditionTimezone", formData.auditionTimezone);
-
-      const actorTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      payload.append("actorTimezone", actorTimezone);
       
       if (mode === "sides") {
         payload.append("sidesText", formData.sidesText);
@@ -207,7 +186,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
   };
 
   /**
-   * Saves the generated character breakdown to Firestore and redirects to the auditions page.
+   * Saves the generated audition breakdown to Firestore and redirects to the auditions page.
    */
   const handleSaveAndFinish = async () => {
     if (!currentUser) {
@@ -232,9 +211,6 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
         project: formData.project,
         role: formData.role,
         deadline: formData.deadline || null,
-        auditionTimezone: formData.auditionTimezone || null,
-        actorLocalDeadline: localDeadlineStr,
-        castingDirectorEmail: formData.castingDirectorEmail || null,
         performanceMap: resultData, // The fully structured AI JSON
         analysisType: mode,
         createdAt: serverTimestamp(),
@@ -253,7 +229,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-2 h-full">
-
+      
       {/* Stepper  */}
       {currentStep < 4 && (
         <Stepper currentStep={currentStep} />
@@ -262,12 +238,11 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
      
       {currentStep === 1 && (
         <div className="flex flex-col flex-1">
-          <StepBasics data={formData} updateData={updateFormData} mode={mode} />
+          <StepBasics data={formData} updateData={updateFormData} />
           
           {/*  Next button */}
           <div className="flex justify-end mt-12 mb-8">
             <button 
-              type="button"
               onClick={handleNext} 
               className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors"
             >
@@ -280,7 +255,6 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
       {/* STEP 2: SIDES */}
       {currentStep === 2 && (
         <div className="flex flex-col flex-1">
-          
           <StepUpload 
             title={mode === "sides" ? "Upload Sides" : "Upload Character Brief"}
             description={mode === "sides" 
@@ -298,8 +272,8 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
             }
             />
           <div className="flex justify-between mt-12 mb-8">
-            <button onClick={handleBack} type="button" className="text-[#FF7316] hover:text-[#E66814] font-medium transition-colors px-4 py-2">Back</button>
-            <button onClick={handleNext} type="button" className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors">Next</button>
+            <button onClick={handleBack} className="text-[#FF7316] hover:text-[#E66814] font-medium transition-colors px-4 py-2">Back</button>
+            <button onClick={handleNext} className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors">Next</button>
           </div>
         </div>
       )}
@@ -308,10 +282,9 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
       {currentStep === 3 && (
         <div className="flex flex-col flex-1">
           <StepReview data={formData} mode={mode} />
-          
+
           <div className="flex justify-between items-center mt-12 mb-8">
             <button 
-              type="button"
               onClick={handleBack} 
               className="text-[#FF7316] hover:text-[#E66814] font-medium transition-colors px-4 py-2"
             >
@@ -353,7 +326,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 w-full border-b border-[#D0D4D0]/50 pb-6">
                  <div>
                    <h1 className="text-[32px] font-title text-[#2C3328] leading-tight mb-1">
-                     {formData.role || "character breakdown"}
+                     {formData.role || "Audition Breakdown"}
                    </h1>
                    <p className="text-[#646A64] text-[15px] mb-3">
                      Lead · {formData.project || "Audition Project"} 
@@ -391,7 +364,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
                </div>
 
                {/* --- MAIN UI RENDERER --- */}
-               {mode === "sides" ? <StepResultSides data={resultData} /> : <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} />}
+               {mode === "sides" ? <StepResultSides data={resultData} /> : <StepResultBrief data={resultData} />}
 
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
