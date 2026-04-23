@@ -480,7 +480,7 @@ export default function SettingsPage() {
                     <Trash2 className="h-4 w-4 text-[#C45A3C]" />
                     <div>
                       <p className="text-sm font-semibold text-[#C45A3C]">Delete chat data</p>
-                      <p className="text-xs text-[#6B6B6B]">Permanently delete your chat data at anytime</p>
+                      <p className="text-xs text-[#6B6B6B]">Permanently delete your chat data at any time</p>
                     </div>
                   </button>
                 </AlertDialogTrigger>

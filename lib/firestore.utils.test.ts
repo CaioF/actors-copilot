@@ -4,7 +4,7 @@
 import { saveRawMessageToFirestore } from "./firestore.utils";
 import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getApp } from "@/lib/firebase";
-import { createChildLogger } from "./logger";
+import { logger } from "@/lib/logger";
 
 // --- MOCK SETUP ---
 // We mock the Firebase client SDK to ensure tests run instantly 
@@ -110,10 +110,8 @@ describe("Firestore Utilities - saveRawMessageToFirestore", () => {
       ).rejects.toThrow("Firebase: Permission Denied");
 
       // Verify that our internal logging caught the event before throwing
-      const mockLogger = createChildLogger({ module: 'test' }); // ou apenas logger, dependendo de como você importou no arquivo original
-
-      expect(mockLogger.error).toHaveBeenCalledTimes(1);
-      expect(mockLogger.error).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           err: networkError,
           msg: 'Error saving message to Firestore'

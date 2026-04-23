@@ -25,8 +25,7 @@ import {
   shouldTriggerPivot,
   updateTracker,
 } from "@/lib/pivot-logic";
-import error from "next/error";
-import { createChildLogger, logger } from "@/lib/logger";
+import { createChildLogger } from "@/lib/logger";
 
 const log = createChildLogger({ module: 'ExtractionTracker' });
 

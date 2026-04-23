@@ -3,7 +3,7 @@ import { render, waitFor, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { signOut, onAuthStateChanged, getAuth, Auth, User } from 'firebase/auth';
-import { createChildLogger } from '../logger';
+import { logger } from '@/lib/logger';
 
 jest.mock('@/lib/logger', () => {
   const mockLog = {
@@ -115,9 +115,7 @@ describe('AuthContext', () => {
             });
 
             await waitFor(() => {
-                const mockLogger = createChildLogger({ module: 'test' }); 
-
-                expect(mockLogger.error).toHaveBeenCalledWith(
+                expect(logger.error).toHaveBeenCalledWith(
                 expect.objectContaining({ 
                     msg: expect.stringContaining('Error signing out') 
                 })

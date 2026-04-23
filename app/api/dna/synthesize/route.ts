@@ -27,6 +27,7 @@ export async function POST(request: Request) {
         const { userPath } = body;
 
         if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
+            logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to access synthesize for ${userPath}` });
             return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
         }
 

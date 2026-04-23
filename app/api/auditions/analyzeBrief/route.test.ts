@@ -154,7 +154,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
       // Assert
       expect(response.status).toBe(403);
       expect(payload.error).toBe("Unauthorized access to this path.");
-      expect(logger.error).toHaveBeenCalledWith(
+      expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ msg: expect.stringContaining("SECURITY ALERT") })
       );
     });

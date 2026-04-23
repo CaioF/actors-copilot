@@ -125,7 +125,7 @@ export async function POST(request: Request) {
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      logger.error({ msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate a brief for ${userPath}` });
+      logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate a brief for ${userPath}` });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
