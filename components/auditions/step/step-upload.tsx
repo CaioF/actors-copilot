@@ -109,6 +109,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
               type="file"
               accept=".pdf,.docx"
               className="hidden"
+              onClick={(e) => e.stopPropagation()}
               ref={fileInputRef}
               onChange={handleFileSelect}
             />
@@ -155,7 +156,7 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
         {/* text area */}
         <div>
           <textarea
-            value={text}
+            value={text || ""}
             onChange={(e) => onTextChange(e.target.value)}
             placeholder="Paste your script or character details here..."
             className="w-full bg-[#EADDCE] rounded-xl px-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/50 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all min-h-[160px] resize-y"
