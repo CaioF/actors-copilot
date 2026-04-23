@@ -215,10 +215,10 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
                 <option value="Europe/Madrid">Madrid (CET/CEST)</option>
                 <option value="Europe/Athens">Athens / Eastern Europe (EET/EEST)</option>
                 <option value="Europe/Moscow">Moscow (MSK)</option>
+                <option value="Europe/Istanbul">Istanbul (TRT)</option>
               </optgroup>
 
               <optgroup label="Asia">
-                <option value="Asia/Istanbul">Istanbul (TRT)</option>
                 <option value="Asia/Jerusalem">Jerusalem (IST/IDT)</option>
                 <option value="Asia/Riyadh">Riyadh (AST)</option>
                 <option value="Asia/Dubai">Dubai (GST)</option>

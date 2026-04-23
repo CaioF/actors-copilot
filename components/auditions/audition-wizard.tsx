@@ -112,6 +112,8 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
       actorTimezone
     );
     setLocalDeadlineStr(converted);
+  } else {
+    setLocalDeadlineStr(null);
   }
 
     try {

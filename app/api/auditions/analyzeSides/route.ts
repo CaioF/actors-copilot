@@ -21,7 +21,7 @@ interface PerformanceMap {
 
 /**
  * Safely extracts raw text content from a PDF buffer using pdf2json.
- * Includes a 60-second timeout to prevent malformed or malicious PDFs from hanging the server.
+ * Includes a 80-second timeout to prevent malformed or malicious PDFs from hanging the server.
  * @param buffer - The PDF file content as a Node.js Buffer
  * @returns A promise resolving to the extracted text content
  * @async
@@ -88,6 +88,14 @@ export async function POST(request: Request) {
 
     const sidesFile = formData.get("sidesFile") as File | null;
 
+    if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
+      logger.warn({
+        msg: "SECURITY ALERT: Unauthorized access attempt",
+        authenticatedUserId,
+        userPath,
+      });
+      return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
+    }
   
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
@@ -128,26 +136,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Security Check: Ensure the requested userPath belongs to the authenticated user
-    if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      logger.warn({ msg: "SECURITY ALERT: Unauthorized access attempt" });
-      return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
-    }
-
-    // 3. PARSE FILES SAFELY (PDFs & DOCX)
-    if (sidesFile) {
-      const arrayBuffer = await sidesFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      
-      if (sidesFile.type === "application/pdf") {
-        sidesText = await extractTextFromPDF(buffer);
-      } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
-        const result = await mammoth.extractRawText({ buffer: buffer });
-        sidesText = result.value;
-      }
-    }
-
-    // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
+    // FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
     
