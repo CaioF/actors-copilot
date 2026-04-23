@@ -21,7 +21,7 @@ interface PerformanceMap {
 
 /**
  * Safely extracts raw text content from a PDF buffer using pdf2json.
- * Includes a 60-second timeout to prevent malformed or malicious PDFs from hanging the server.
+ * Includes a 80-second timeout to prevent malformed or malicious PDFs from hanging the server.
  * @param buffer - The PDF file content as a Node.js Buffer
  * @returns A promise resolving to the extracted text content
  * @async
@@ -44,7 +44,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
   // Security: Kill the process if the PDF is too complex or acting as a "Zip Bomb"
   const timeoutPromise = new Promise<string>((_, reject) =>
-    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (60s). The file might be corrupted or too complex.")), 60000)
+    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (80s). The file might be corrupted or too complex.")), 80000)
   );
 
   return Promise.race([parsePromise, timeoutPromise]);
@@ -88,13 +88,15 @@ export async function POST(request: Request) {
 
     const sidesFile = formData.get("sidesFile") as File | null;
 
-    // Security Check: Ensure the requested userPath belongs to the authenticated user
-    // Performed before any expensive file parsing to reject unauthorized requests early.
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate an audition for ${userPath}` });
+      logger.warn({
+        msg: "SECURITY ALERT: Unauthorized access attempt",
+        authenticatedUserId,
+        userPath,
+      });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
-
+  
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     if (sidesFile) {
@@ -115,7 +117,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. PARSE FILES SAFELY (PDFs & DOCX)
     if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -135,7 +136,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
+    // FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
     
@@ -217,7 +218,7 @@ export async function POST(request: Request) {
       CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
     `;
 
-    // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE
+    // EXECUTE AI INFERENCE AND PARSE RESPONSE
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
@@ -230,7 +231,7 @@ export async function POST(request: Request) {
     }
 
 
-    // 8. RETURN TO FRONTEND
+    // RETURN TO FRONTEND
     return NextResponse.json({
       success: true,
       message: "Performance Map generated successfully.",

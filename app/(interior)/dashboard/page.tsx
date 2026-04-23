@@ -36,7 +36,7 @@ export default function DashboardPage() {
           stepNumber={2}
           title="Audition Sides Upload"
           description="Upload your sides and generate a clear, playable breakdown in minutes. The Copilot maps the role to your Personal DNA — producing grounded objectives, stakes, beats, turns, and tactics tailored to you. No guesswork. No spiraling. Just direction you can act on."
-          link="/auditions/new"
+          link="/auditions/new/sides"
           ctaLabel="Start New Audition"
           ctaIcon={Monitor}
           variant="orange"
@@ -46,7 +46,7 @@ export default function DashboardPage() {
           stepNumber={3}
           title="Casting Brief Upload"
           description={"Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost\u00A0you\u00A0trust."}
-          link="/auditions/new"
+          link="/auditions/new/brief"
           ctaLabel="Upload Character Brief"
           ctaIcon={Sparkles}
           variant="orange"

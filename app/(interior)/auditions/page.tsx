@@ -32,6 +32,7 @@ interface Audition {
   status: AuditionStatus
   projectType?: "cinematic" | "commercial" | "theater"
   analysisType: "sides" | "brief"
+  castingDirectorEmail?: string
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -73,7 +74,8 @@ export default function AuditionsPage() {
   const [editForm, setEditForm] = useState({ 
     project: "", 
     role: "", 
-    projectType: "cinematic" as "cinematic" | "commercial" | "theater" 
+    projectType: "cinematic" as "cinematic" | "commercial" | "theater" ,
+    castingDirectorEmail: ""
   })
 
   /**
@@ -160,7 +162,8 @@ export default function AuditionsPage() {
       await updateDoc(docRef, {
         project: editForm.project,
         role: editForm.role,
-        projectType: editForm.projectType
+        projectType: editForm.projectType, 
+        castingDirectorEmail: editForm.castingDirectorEmail
       });
 
       // Update the local screen instantly
@@ -260,6 +263,17 @@ export default function AuditionsPage() {
               </div>
 
               <div>
+                <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Casting Director Email</label>
+                <input 
+                  type="email" 
+                  value={editForm.castingDirectorEmail}
+                  onChange={(e) => setEditForm({...editForm, castingDirectorEmail: e.target.value})}
+                  placeholder="casting@production.com"
+                  className="w-full mt-1 bg-white border border-[#C7C0B5] rounded-lg px-4 py-2 text-[#2C3328] focus:border-[#E8721A] outline-none"
+                />
+              </div>
+
+              <div>
                 <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Project Type</label>
                 <div className="grid grid-cols-3 gap-3 mt-2">
                   <button 
@@ -343,7 +357,7 @@ export default function AuditionsPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center px-8">
           <h3 className="text-xl font-title text-[#2C3328] mb-2">No auditions found</h3>
           <p className="text-[#6B6B6B] max-w-md">
-            You haven't generated any audition breakdowns yet, or none match your current filters.
+            You haven't generated any character breakdowns yet, or none match your current filters.
           </p>
         </div>
 
@@ -408,7 +422,7 @@ export default function AuditionsPage() {
                     onClick={(e) => { 
                       e.stopPropagation(); 
                       setEditingAudition(audition);
-                      setEditForm({ project: audition.project, role: audition.role, projectType: audition.projectType || "cinematic" });
+                      setEditForm({ project: audition.project, role: audition.role, projectType: audition.projectType || "cinematic", castingDirectorEmail: audition.castingDirectorEmail || "" });
                     }}
                     className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
                     title="Edit Details"
