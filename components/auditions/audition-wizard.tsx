@@ -271,7 +271,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
             <button 
               type="button"
               onClick={handleNext} 
-              className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors"
+              className="pointer-events-auto bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors"
             >
               Next
             </button>
@@ -301,7 +301,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
             />
           <div className="flex justify-between mt-12 mb-8">
             <button onClick={handleBack} type="button" className="text-[#FF7316] hover:text-[#E66814] font-medium transition-colors px-4 py-2">Back</button>
-            <button onClick={handleNext} type="button" className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors">Next</button>
+            <button onClick={handleNext} type="button" className="pointer-events-auto bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-3 rounded-full font-medium transition-colors">Next</button>
           </div>
         </div>
       )}
