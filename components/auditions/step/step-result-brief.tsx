@@ -25,6 +25,7 @@ interface StepResultProps {
     sections: Section[];
     outro?: string;
   };
+  localDeadlineStr?: string | null;
 }
 
 /**
@@ -44,7 +45,7 @@ const getSectionIcon = (title: string, index: number) => {
   return fallbacks[index % fallbacks.length];
 };
 
-export function StepResultBrief({ data }: StepResultProps) {
+export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
   const [activeSection, setActiveSection] = useState("section-0");
 
   useEffect(() => {
@@ -130,6 +131,22 @@ export function StepResultBrief({ data }: StepResultProps) {
                   );
                 });
               })()}
+            </div>
+          </div>
+        )}
+
+        {localDeadlineStr && (
+          <div className="rounded-2xl bg-[#FFF5F0] shadow-sm p-5 border border-[#FF7316]/30 flex items-center gap-4 animate-in fade-in duration-500">
+            <div className="bg-white p-3 rounded-full shadow-sm flex items-center justify-center shrink-0">
+              <CalendarDays className="text-[#FF7316]" size={24} />
+            </div>
+            <div>
+              <h4 className="text-[11px] font-bold text-[#FF7316] uppercase tracking-widest mb-0.5">
+                Your Local Deadline
+              </h4>
+              <p className="text-gray-900 font-bold text-lg">
+                {localDeadlineStr}
+              </p>
             </div>
           </div>
         )}

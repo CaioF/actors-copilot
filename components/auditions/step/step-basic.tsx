@@ -1,12 +1,13 @@
 "use client";
 
-import { Calendar, ShoppingBag, Film, Check, Drama } from "lucide-react";
+import { Calendar, ShoppingBag, Film, Check, Drama, Mail, Globe } from "lucide-react";
 import { AuditionFormData } from "@/lib/audition-types";
 import { cn } from "@/lib/utils"; // Using shadcn utility for cleaner class management
 
 interface StepBasicsProps {
   data: AuditionFormData;
   updateData: (data: Partial<AuditionFormData>) => void;
+  mode: "sides" | "brief";
 }
 
 // We define an array with the two project types
@@ -38,15 +39,22 @@ const projectTypes = [
  * @param data - Current audition form data
  * @param updateData - Callback to update form data
  */
-export function StepBasics({ data, updateData }: StepBasicsProps) {
+export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
   return (
     <div className="rounded-3xl font-sans bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
       
-      {/* Título do Card */}
       <div className="mb-12">
+        <div className="inline-flex items-center px-3 py-1 mb-4 rounded-full bg-[#FF7316]/10 border border-[#FF7316]/30 text-[#FF7316] text-xs font-bold tracking-wide uppercase">
+          {mode === "sides" ? "Sides Analysis" : "Casting Brief Checklist"}
+        </div>
         <h2 className="text-2xl font-title font-medium text-[#EADDCE]">
-          Tell us about the audition
+          Tell us about the {mode === "sides" ? "audition!" : "project!"}
         </h2>
+         <p className="text-[#a9a9a9] mt-2 text-sm">
+            {mode === "sides" 
+              ? "Analyze your script sides to map out your performance." 
+              : "Analyze the casting brief to build your character foundation."}
+          </p>
       </div>
 
       {/* --- NEW SECTION: Project Category Selection --- */}
@@ -62,6 +70,7 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
             return (
               <button
                 key={type.id}
+                type="button"
                 onClick={() => updateData({ projectType: type.id as "cinematic" | "commercial" | "theater" })}
                 className={cn(
                   "flex items-start gap-3 sm:gap-4 xl:gap-5 p-5 sm:p-6 xl:p-7 rounded-2xl border text-left transition-all duration-200",
@@ -94,6 +103,26 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
 
       {/* Formulário */}
       <div className="pt-6 space-y-10">
+
+          {/* Input: Casting Director Email */}
+        {mode === "brief" && (
+          <div>
+            <label htmlFor="castingEmail" className="block text-sm font-medium text-[#B7BCB6] mb-3">
+              Casting Director Email (optional)
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
+              <input
+                id="castingEmail"
+                type="email"
+                placeholder="e.g., casting@production.com"
+                value={data.castingDirectorEmail || ""}
+                onChange={(e) => updateData({ castingDirectorEmail: e.target.value })}
+                className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/40 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
+              />
+            </div>
+          </div>
+        )}
         
         {/* Input: Project/Production */}
         <div>
@@ -126,23 +155,107 @@ export function StepBasics({ data, updateData }: StepBasicsProps) {
         </div>
 
         {/* Input: Deadline */}
-        <div>
+        {mode === "brief" &&
+          <div>
           <label htmlFor="deadline" className="block text-sm font-medium text-[#B7BCB6] mb-3">
-            Deadline (optional)
+            Deadline (Date & Time)
           </label>
           <div className="relative">
             <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
             <input
               id="deadline"
-              type="date" // Usando texto para imitar a placeholder exata (dd/mm/aaaa)
-              placeholder="dd/mm/aaaa"
+              type="datetime-local" // <-- Mudança aqui
               value={data.deadline || ""}
               onChange={(e) => updateData({ deadline: e.target.value })}
-              className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/40 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
+              className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
             />
           </div>
         </div>
+        }
+        
+        {mode === "brief" && (
+          <div>
+            <label htmlFor="auditionTimezone" className="block text-sm font-medium text-[#B7BCB6] mb-3">
+              Audition Timezone
+            </label>
+            <div className="relative">
+            <Globe className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
+            <select
+              id="auditionTimezone"
+              value={data.auditionTimezone || ""}
+              onChange={(e) => updateData({ auditionTimezone: e.target.value })}
+              className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all appearance-none"
+            >
+              <option value="" disabled>Select the project's timezone...</option>
+  
+              <optgroup label="North America">
+                <option value="Pacific/Honolulu">Hawaii (HST)</option>
+                <option value="America/Anchorage">Alaska (AKST/AKDT)</option>
+                <option value="America/Los_Angeles">Pacific Time - Los Angeles (PST/PDT)</option>
+                <option value="America/Denver">Mountain Time - Denver (MST/MDT)</option>
+                <option value="America/Chicago">Central Time - Chicago (CST/CDT)</option>
+                <option value="America/New_York">Eastern Time - New York (EST/EDT)</option>
+                <option value="America/Halifax">Atlantic Time - Halifax (AST/ADT)</option>
+                <option value="America/Mexico_City">Mexico City (CST/CDT)</option>
+              </optgroup>
 
+              <optgroup label="South America">
+                <option value="America/Bogota">Bogota / Lima / Quito (COT/PET/ECT)</option>
+                <option value="America/Caracas">Caracas (VET)</option>
+                <option value="America/Santiago">Santiago (CLT/CLST)</option>
+                <option value="America/Sao_Paulo">São Paulo / Buenos Aires (BRT/ART)</option>
+              </optgroup>
+
+              <optgroup label="Europe">
+                <option value="Europe/London">London / Dublin (GMT/BST)</option>
+                <option value="Europe/Lisbon">Lisbon (WET/WEST)</option>
+                <option value="Europe/Paris">Paris / Central Europe (CET/CEST)</option>
+                <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+                <option value="Europe/Rome">Rome (CET/CEST)</option>
+                <option value="Europe/Madrid">Madrid (CET/CEST)</option>
+                <option value="Europe/Athens">Athens / Eastern Europe (EET/EEST)</option>
+                <option value="Europe/Moscow">Moscow (MSK)</option>
+              </optgroup>
+
+              <optgroup label="Asia">
+                <option value="Asia/Istanbul">Istanbul (TRT)</option>
+                <option value="Asia/Jerusalem">Jerusalem (IST/IDT)</option>
+                <option value="Asia/Riyadh">Riyadh (AST)</option>
+                <option value="Asia/Dubai">Dubai (GST)</option>
+                <option value="Asia/Karachi">Karachi (PKT)</option>
+                <option value="Asia/Kolkata">India Standard Time - Mumbai/New Delhi (IST)</option>
+                <option value="Asia/Bangkok">Bangkok / Jakarta (ICT/WIB)</option>
+                <option value="Asia/Singapore">Singapore / Manila (SGT/PHT)</option>
+                <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                <option value="Asia/Shanghai">Shanghai / Beijing (CST)</option>
+                <option value="Asia/Tokyo">Tokyo (JST)</option>
+                <option value="Asia/Seoul">Seoul (KST)</option>
+              </optgroup>
+
+              <optgroup label="Oceania">
+                <option value="Australia/Perth">Perth (AWST)</option>
+                <option value="Australia/Adelaide">Adelaide (ACST/ACDT)</option>
+                <option value="Australia/Sydney">Sydney / Melbourne (AEST/AEDT)</option>
+                <option value="Australia/Brisbane">Brisbane (AEST)</option>
+                <option value="Pacific/Auckland">Auckland / Wellington (NZST/NZDT)</option>
+                <option value="Pacific/Fiji">Fiji (FJT)</option>
+              </optgroup>
+
+              <optgroup label="Africa">
+                <option value="Africa/Casablanca">Casablanca (WEST)</option>
+                <option value="Africa/Lagos">West Africa Time - Lagos (WAT)</option>
+                <option value="Africa/Johannesburg">South Africa Standard Time - Johannesburg (SAST)</option>
+                <option value="Africa/Cairo">Cairo (EET/EEST)</option>
+                <option value="Africa/Nairobi">East Africa Time - Nairobi (EAT)</option>
+              </optgroup>
+
+              <optgroup label="Coordinated Universal Time">
+                <option value="UTC">UTC (Coordinated Universal Time)</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        )}
       </div>
     </div>
   );

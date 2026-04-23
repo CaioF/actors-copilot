@@ -64,7 +64,7 @@ export function StepReview({ data, mode }: StepReviewProps) {
               ) : data.sidesText ? (
                 <div className="flex items-center gap-3">
                   <AlignLeft className="w-5 h-5 text-[#B7BCB6]" />
-                  <span className="font-medium text-sm truncate">Text pasted ({data.sidesText.split(' ').length} words)</span>
+                  <span className="font-medium text-sm truncate">Text pasted ({data.sidesText ? data.sidesText.split(' ').length : 0} words)</span>
                 </div>
               ) : (
                 <span className="text-[#B7BCB6]/50 italic">No sides provided</span>
@@ -87,7 +87,7 @@ export function StepReview({ data, mode }: StepReviewProps) {
               ) : data.briefText ? (
                 <div className="flex items-center gap-3">
                   <AlignLeft className="w-5 h-5 text-[#B7BCB6]" />
-                  <span className="font-medium text-sm truncate">Text pasted ({data.briefText.split(' ').length} words)</span>
+                  <span className="font-medium text-sm truncate">Text pasted ({data.sidesText ? data.sidesText.split(' ').length : 0} words)</span>
                 </div>
               ) : (
                 <span className="text-[#B7BCB6]/50 italic">No brief provided</span>
