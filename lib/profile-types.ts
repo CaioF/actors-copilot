@@ -112,7 +112,6 @@ export const actorProfileSchema = z.object({
   playingAgeMin: z.number().nullable(),
   playingAgeMax: z.number().nullable(),
   location: z.string(),
-  timezone: z.string(),
   gender: z.string(),
 
   // Physical & Professional
@@ -167,7 +166,6 @@ export const defaultActorProfile: ActorProfile = {
   playingAgeMin: null,
   playingAgeMax: null,
   location: "",
-  timezone: "",
   gender: "",
   height: "",
   heightUnit: "imperial",

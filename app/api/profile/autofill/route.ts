@@ -11,6 +11,7 @@ interface FirecrawlMetadata {
   description?: string;
 }
 
+
 /**
  * Parses IMDB page markdown content to extract actor profile data including name,
  * bio, height, location, credits, showreels, and known-for works.
@@ -380,7 +381,6 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       height: synthesizedData.height || imdbExtracted.height,
       heightUnit: synthesizedData.heightUnit || 'imperial',
       location: synthesizedData.location || imdbExtracted.location,
-      timezone: synthesizedData.timezone || '',
       gender: synthesizedData.gender || '',
       nationalities: synthesizedData.nationalities?.length > 0 ? synthesizedData.nationalities : [],
       awardsCallout: synthesizedData.awardsCallout || '',

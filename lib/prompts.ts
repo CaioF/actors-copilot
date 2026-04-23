@@ -861,7 +861,6 @@ Return ONLY a valid JSON object. No markdown, no conversational filler.
   "height": "Height in format like \"5′ 9″\" or \"175cm\" - extract from 'Height' section in markdown like '5′ 9″ (1.75 m)'",
   "heightUnit": "Either 'imperial' for feet/inches (like 5′ 9″) or 'metric' for cm (like 175cm). Check which format is used.",
   "location": "Birthplace/location - extract from 'Born' section with country like 'United Kingdom' or 'Maidenhead, UK'",
-  "timezone": "IANA timezone string (e.g., 'America/New_York', 'Europe/London', 'America/Sao_Paulo') strictly inferred from the location. If location is unknown, leave empty.",
   "gender": "Gender if identifiable from IMDB profile title or pronouns in bio (e.g., 'Actress' = Female, 'Actor' = Male), otherwise omit",
   "nationalities": ["Array of nationalities inferred from birthplace links like '[United Kingdom](https://www.imdb.com/search/name/?birth_place=...)' in the markdown"],
   "awardsCallout": "Extract notable achievements from bio text - look for patterns like 'Winner of...', 'No1 Ranking in...', 'Best Actress award'. Example: 'No1 Ranking in World Monologue Games 2024'",

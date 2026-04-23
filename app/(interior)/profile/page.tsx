@@ -251,7 +251,6 @@ export default function ProfilePage() {
       height: currentValues.height || autofillData.height || '',
       heightUnit: currentValues.heightUnit || autofillData.heightUnit || 'imperial',
       location: currentValues.location || autofillData.location || '',
-      timezone: currentValues.timezone || autofillData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       gender: currentValues.gender || autofillData.gender || '',
       awardsCallout: currentValues.awardsCallout || autofillData.awardsCallout || '',
       // Array fields: keep current non-empty array, else use autofill; ensure defaults
