@@ -14,12 +14,14 @@ import {
   Sparkles,
   LogOut,
   User,
+  BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Personal DNA", href: "/chat", icon: MessageCircle },
+  { label: "Acting Coach", href: "/acting-coach", icon: BookOpen },
   { label: "Auditions", href: "/auditions", icon: Monitor },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
