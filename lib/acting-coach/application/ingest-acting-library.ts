@@ -47,6 +47,18 @@ export interface PineconeIndex {
   describeIndexStats(): Promise<{
     dimension?: number;
   }>;
+  query(params: {
+    vector: number[];
+    topK: number;
+    includeMetadata: boolean;
+    namespace?: string;
+  }): Promise<{
+    matches: Array<{
+      id: string;
+      score?: number;
+      metadata?: Record<string, unknown>;
+    }>;
+  }>;
 }
 
 export interface IngestDependencies {
@@ -182,6 +194,7 @@ export async function ingestActingLibrary(
           chunkIndex: chunk.metadata.chunkIndex,
           contentType: chunk.metadata.contentType,
           isTruncated: chunk.metadata.isTruncated ?? false,
+          content: chunk.content,
         },
       };
 

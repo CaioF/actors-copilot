@@ -128,6 +128,7 @@ describe("ingestActingLibrary", () => {
         chunkIndex: 0,
         contentType: "text/plain",
         isTruncated: false,
+        content: "First paragraph.",
       });
     });
   });
