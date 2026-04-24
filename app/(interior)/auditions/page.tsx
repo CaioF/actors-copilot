@@ -32,7 +32,7 @@ interface Audition {
   status: AuditionStatus
   projectType?: "cinematic" | "commercial" | "theater"
   analysisType: "sides" | "brief"
-  castingDirectorEmail?: string
+  castingDirectorName?: string
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -75,7 +75,7 @@ export default function AuditionsPage() {
     project: "", 
     role: "", 
     projectType: "cinematic" as "cinematic" | "commercial" | "theater" ,
-    castingDirectorEmail: ""
+    castingDirectorName: ""
   })
 
   /**
@@ -163,7 +163,7 @@ export default function AuditionsPage() {
         project: editForm.project,
         role: editForm.role,
         projectType: editForm.projectType, 
-        castingDirectorEmail: editForm.castingDirectorEmail
+        castingDirectorName: editForm.castingDirectorName
       });
 
       // Update the local screen instantly
@@ -266,8 +266,8 @@ export default function AuditionsPage() {
                 <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Casting Director Email</label>
                 <input 
                   type="email" 
-                  value={editForm.castingDirectorEmail}
-                  onChange={(e) => setEditForm({...editForm, castingDirectorEmail: e.target.value})}
+                  value={editForm.castingDirectorName}
+                  onChange={(e) => setEditForm({...editForm, castingDirectorName: e.target.value})}
                   placeholder="casting@production.com"
                   className="w-full mt-1 bg-white border border-[#C7C0B5] rounded-lg px-4 py-2 text-[#2C3328] focus:border-[#E8721A] outline-none"
                 />
@@ -422,7 +422,7 @@ export default function AuditionsPage() {
                     onClick={(e) => { 
                       e.stopPropagation(); 
                       setEditingAudition(audition);
-                      setEditForm({ project: audition.project, role: audition.role, projectType: audition.projectType || "cinematic", castingDirectorEmail: audition.castingDirectorEmail || "" });
+                      setEditForm({ project: audition.project, role: audition.role, projectType: audition.projectType || "cinematic", castingDirectorName: audition.castingDirectorName || "" });
                     }}
                     className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
                     title="Edit Details"

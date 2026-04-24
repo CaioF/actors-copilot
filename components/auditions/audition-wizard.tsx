@@ -236,7 +236,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
         deadline: formData.deadline || null,
         auditionTimezone: formData.auditionTimezone || null,
         actorLocalDeadline: localDeadlineStr,
-        castingDirectorEmail: formData.castingDirectorEmail || null,
+        castingDirectorName: formData.castingDirectorName || null,
         performanceMap: resultData, // The fully structured AI JSON
         analysisType: mode,
         createdAt: serverTimestamp(),
