@@ -12,6 +12,14 @@ import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-p
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
 import type { CoachCitation } from "@/lib/acting-coach/contracts";
 
+function createEmbeddingClientAdapter(
+  client: ReturnType<typeof createEmbeddingClient>
+): EmbeddingClient {
+  return {
+    embedContent: (params) => client.models.embedContent(params),
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("Authorization");
@@ -51,11 +59,10 @@ export async function POST(request: Request) {
     }
 
     const config = getActingCoachConfig();
-    const embeddingClient = createEmbeddingClient() as unknown as EmbeddingClient;
-    const pineconeClient = createPineconeClient();
-    const pineconeIndex = pineconeClient.index(
-      config.pineconeIndexName
-    ) as unknown as PineconeIndex;
+    const embeddingClient = createEmbeddingClientAdapter(createEmbeddingClient());
+    const pineconeIndex = createPineconeClient()
+      .index(config.pineconeIndexName)
+      .namespace(config.pineconeNamespace || undefined) as PineconeIndex;
 
     let excerpts;
     try {

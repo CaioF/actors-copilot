@@ -103,9 +103,17 @@ describe("Coach Chat Route", () => {
     };
     (createGenerationModel as jest.Mock).mockReturnValue(mockGenerationModel);
 
-    (createEmbeddingClient as jest.Mock).mockReturnValue({});
+    (createEmbeddingClient as jest.Mock).mockReturnValue({
+      models: {
+        embedContent: jest.fn(),
+      },
+    });
     (createPineconeClient as jest.Mock).mockReturnValue({
-      index: jest.fn().mockReturnValue({}),
+      index: jest.fn().mockReturnValue({
+        namespace: jest.fn().mockReturnValue({
+          query: jest.fn(),
+        }),
+      }),
     });
 
     (retrieveCoachContext as jest.Mock).mockResolvedValue([
