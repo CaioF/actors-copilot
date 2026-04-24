@@ -42,3 +42,9 @@ docs/feature-plans/
 .serena/
 scripts/
 yarn.lock
+
+# acting corpus (replaced with open materials before ingestion)
+book_sources/
+
+# implementation plans
+.plans/
