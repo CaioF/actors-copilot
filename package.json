@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest --forceExit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "ingest:acting-library": "npx ts-node scripts/ingest-acting-library.ts"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
