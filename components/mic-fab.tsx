@@ -40,7 +40,7 @@ export function MicFab() {
   }, [showMessage])
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       
       <div
         role="status"
@@ -67,7 +67,7 @@ export function MicFab() {
         }`}
         aria-label={isRecording ? "Stop recording" : "Start recording"}
       >
-        <Mic className="h-5 w-5" />
+        <Mic className="pointer-events-auto h-5 w-5" />
       </button>
       
     </div>
