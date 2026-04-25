@@ -1,3 +1,10 @@
+export interface AuditionSummary {
+  id: string;
+  project: string;
+  role: string;
+  createdAt: string;
+}
+
 export interface RetrievedExcerpt {
   citationNumber: number;
   sourceBook: string;
@@ -13,6 +20,7 @@ export interface CoachPromptInput {
     role: "user" | "assistant";
     content: string;
   }>;
+  auditions?: AuditionSummary[];
 }
 
 export interface CoachApiRequest {

@@ -5,12 +5,13 @@ import {
   type EmbeddingClient,
   type PineconeIndex,
 } from "@/lib/acting-coach/application/retrieve-coach-context";
+import { getUserAuditionsSummary } from "@/lib/acting-coach/application/get-audition-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
 import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-generation-model";
 import { createEmbeddingClient } from "@/lib/acting-coach/infrastructure/create-embedding-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
-import type { CoachCitation } from "@/lib/acting-coach/contracts";
+import type { CoachCitation, AuditionSummary } from "@/lib/acting-coach/contracts";
 
 function createEmbeddingClientAdapter(
   client: ReturnType<typeof createEmbeddingClient>
@@ -58,6 +59,13 @@ export async function POST(request: Request) {
       }
     }
 
+    let auditionSummaries: AuditionSummary[] = [];
+    try {
+      auditionSummaries = await getUserAuditionsSummary(userPath, db as any);
+    } catch (err) {
+      log.warn({ err }, "Failed to load audition summaries");
+    }
+
     const config = getActingCoachConfig();
     const embeddingClient = createEmbeddingClientAdapter(createEmbeddingClient());
     const pineconeIndex = createPineconeClient()
@@ -85,6 +93,7 @@ export async function POST(request: Request) {
       excerpts,
       question: content,
       history,
+      auditions: auditionSummaries,
     });
 
     let generationModel;

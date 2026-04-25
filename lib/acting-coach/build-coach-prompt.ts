@@ -2,7 +2,7 @@ import { ACTING_COACH_SYSTEM_PROMPT } from "../prompts";
 import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 
 export function buildCoachPrompt(input: CoachPromptInput): string {
-  const { actorBaseline, excerpts, question, history } = input;
+  const { actorBaseline, excerpts, question, history, auditions } = input;
 
   const sections: string[] = [];
 
@@ -11,6 +11,13 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
   if (actorBaseline) {
     sections.push(`# ACTOR CONTEXT
 ${actorBaseline}`);
+  }
+
+  if (auditions && auditions.length > 0) {
+    const auditionLines = auditions.map(
+      (a) => `- ${a.project} — ${a.role} (${a.id})`
+    );
+    sections.push(`# ACTOR'S AUDITIONS\n${auditionLines.join("\n")}`);
   }
 
   if (excerpts.length > 0) {

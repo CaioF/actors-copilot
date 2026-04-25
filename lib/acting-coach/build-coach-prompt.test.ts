@@ -106,6 +106,45 @@ describe("buildCoachPrompt", () => {
     });
   });
 
+  describe("with audition summaries", () => {
+    const auditions = [
+      { id: "aud-1", project: "FOUNDATION", role: "TECHNICIAN", createdAt: "2024-01-01" },
+      { id: "aud-2", project: "Night Watch", role: "Lead", createdAt: "2024-02-15" },
+    ];
+
+    it("includes # ACTOR'S AUDITIONS section when auditions are present", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Which audition should I work on?",
+        auditions,
+      });
+      expect(prompt).toContain("# ACTOR'S AUDITIONS");
+      expect(prompt).toContain("FOUNDATION — TECHNICIAN (aud-1)");
+      expect(prompt).toContain("Night Watch — Lead (aud-2)");
+    });
+
+    it("omits audition section when auditions is undefined", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "How do I prepare?",
+        auditions: undefined,
+      });
+      expect(prompt).not.toContain("ACTOR'S AUDITIONS");
+    });
+
+    it("omits audition section when auditions is empty", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "How do I prepare?",
+        auditions: [],
+      });
+      expect(prompt).not.toContain("ACTOR'S AUDITIONS");
+    });
+  });
+
   describe("with no actor baseline", () => {
     const excerpts: RetrievedExcerpt[] = [
       {

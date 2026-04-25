@@ -3,6 +3,7 @@ import { auth } from "@/lib/firebase.admin";
 import { createChildLogger, logger } from "@/lib/logger";
 import { retrieveCoachContext } from "@/lib/acting-coach/application/retrieve-coach-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
+import { getUserAuditionsSummary } from "@/lib/acting-coach/application/get-audition-context";
 import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-generation-model";
 import { createEmbeddingClient } from "@/lib/acting-coach/infrastructure/create-embedding-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
@@ -15,6 +16,7 @@ jest.mock("@/lib/firebase.admin", () => ({
   },
   db: {
     doc: jest.fn(),
+    collection: jest.fn(),
   },
 }));
 
@@ -30,6 +32,7 @@ jest.mock("@/lib/logger", () => ({
   createChildLogger: jest.fn().mockReturnValue({
     trace: jest.fn(),
     error: jest.fn(),
+    warn: jest.fn(),
   }),
 }));
 
@@ -39,6 +42,10 @@ jest.mock("@/lib/acting-coach/application/retrieve-coach-context", () => ({
 
 jest.mock("@/lib/acting-coach/build-coach-prompt", () => ({
   buildCoachPrompt: jest.fn(),
+}));
+
+jest.mock("@/lib/acting-coach/application/get-audition-context", () => ({
+  getUserAuditionsSummary: jest.fn(),
 }));
 
 jest.mock("@/lib/acting-coach/infrastructure/create-generation-model", () => ({
@@ -91,8 +98,17 @@ describe("Coach Chat Route", () => {
 
     const mockDb = {
       doc: jest.fn().mockReturnValue(mockProfileDoc),
+      collection: jest.fn().mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          collection: jest.fn().mockReturnValue({
+            get: jest.fn().mockResolvedValue({ docs: [] }),
+          }),
+        }),
+      }),
     };
     require("@/lib/firebase.admin").db = mockDb;
+
+    (getUserAuditionsSummary as jest.Mock).mockResolvedValue([]);
 
     mockGenerationModel = {
       generateContent: jest.fn().mockResolvedValue({
@@ -234,10 +250,68 @@ describe("Coach Chat Route", () => {
         },
       ],
       question: "Test question about acting",
+      history: undefined,
+      auditions: expect.any(Array),
     });
     expect(createGenerationModel).toHaveBeenCalled();
     expect(mockGenerationModel.generateContent).toHaveBeenCalledWith(
       "Test composed prompt"
+    );
+  });
+
+  it("calls getUserAuditionsSummary and passes audition summaries to buildCoachPrompt", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+
+    const mockAuditions = [
+      { id: "aud-1", project: "FOUNDATION", role: "TECHNICIAN", createdAt: "2024-01-01" },
+      { id: "aud-2", project: "Night Watch", role: "Lead", createdAt: "2024-02-15" },
+    ];
+    (getUserAuditionsSummary as jest.Mock).mockResolvedValue(mockAuditions);
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "Which audition should I work on?" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(getUserAuditionsSummary).toHaveBeenCalled();
+    expect(buildCoachPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auditions: mockAuditions,
+      })
+    );
+  });
+
+  it("degrades gracefully when audition loading fails", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+    (getUserAuditionsSummary as jest.Mock).mockRejectedValue(
+      new Error("Firestore error")
+    );
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "Test question" }),
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.aiData.coach_reply).toBe("Test coach reply");
+    expect(buildCoachPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auditions: [],
+      })
     );
   });
 
@@ -334,6 +408,8 @@ describe("Coach Chat Route", () => {
       actorBaseline: "Test actor baseline summary",
       excerpts: [],
       question: "Test question",
+      history: undefined,
+      auditions: expect.any(Array),
     });
   });
 
