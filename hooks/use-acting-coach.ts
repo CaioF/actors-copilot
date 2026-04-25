@@ -16,6 +16,7 @@ interface UseActingCoachReturn {
   isLoading: boolean;
   error: string | null;
   sendMessage: (content: string) => Promise<void>;
+  clearSession: () => void;
 }
 
 export function useActingCoach(): UseActingCoachReturn {
@@ -96,10 +97,16 @@ export function useActingCoach(): UseActingCoachReturn {
     }
   }, [messages]);
 
+  const clearSession = useCallback(() => {
+    setMessages([]);
+    setError(null);
+  }, []);
+
   return {
     messages,
     isLoading,
     error,
     sendMessage,
+    clearSession,
   };
 }

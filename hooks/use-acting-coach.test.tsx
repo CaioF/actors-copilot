@@ -188,4 +188,83 @@ describe("useActingCoach", () => {
       );
     });
   });
+
+  describe("clearSession", () => {
+    it("resets messages to [] and error to null after a conversation", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Hello, how can I help you?",
+            citations: [],
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("Hello coach");
+      });
+
+      await waitFor(() => {
+        expect(result.current.messages).toHaveLength(2);
+      });
+
+      act(() => {
+        result.current.clearSession();
+      });
+
+      expect(result.current.messages).toEqual([]);
+      expect(result.current.error).toBe(null);
+    });
+
+    it("is safely callable on a fresh hook with no messages", () => {
+      const { result } = renderHook(() => useActingCoach());
+
+      expect(result.current.messages).toEqual([]);
+      expect(result.current.error).toBe(null);
+
+      act(() => {
+        result.current.clearSession();
+      });
+
+      expect(result.current.messages).toEqual([]);
+      expect(result.current.error).toBe(null);
+    });
+
+    it("does not reset isLoading — in-flight request completes and resolves cleanly", async () => {
+      let resolveSlowResponse: (value: unknown) => void;
+      const slowResponsePromise = new Promise((resolve) => {
+        resolveSlowResponse = resolve;
+      });
+
+      mockFetch.mockImplementationOnce(
+        () => slowResponsePromise as Promise<unknown>
+      );
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        const sendPromise = result.current.sendMessage("Hello coach");
+        act(() => {
+          result.current.clearSession();
+        });
+        resolveSlowResponse!({
+          ok: true,
+          json: async () => ({
+            aiData: {
+              coach_reply: "Delayed response",
+              citations: [],
+            },
+          }),
+        });
+        await sendPromise;
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+    });
+  });
 });
