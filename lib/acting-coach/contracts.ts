@@ -9,6 +9,10 @@ export interface CoachPromptInput {
   actorBaseline?: string;
   excerpts: RetrievedExcerpt[];
   question: string;
+  history?: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
 }
 
 export interface CoachApiRequest {

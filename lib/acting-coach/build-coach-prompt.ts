@@ -2,7 +2,7 @@ import { ACTING_COACH_SYSTEM_PROMPT } from "../prompts";
 import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 
 export function buildCoachPrompt(input: CoachPromptInput): string {
-  const { actorBaseline, excerpts, question } = input;
+  const { actorBaseline, excerpts, question, history } = input;
 
   const sections: string[] = [];
 
@@ -23,6 +23,13 @@ Source: ${excerpt.sourceBook}`;
 
     sections.push(`# REFERENCE MATERIAL
 ${excerptSection}`);
+  }
+
+  if (history && history.length > 0) {
+    const historySection = history
+      .map((msg) => `${msg.role === "user" ? "Actor" : "Coach"}: ${msg.content}`)
+      .join("\n");
+    sections.push(`# CONVERSATION HISTORY\n${historySection}`);
   }
 
   sections.push(`# ACTOR'S QUESTION

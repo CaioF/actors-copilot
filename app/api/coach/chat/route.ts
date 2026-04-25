@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content } = body;
+    const { content, history } = body;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       actorBaseline,
       excerpts,
       question: content,
+      history,
     });
 
     let generationModel;
