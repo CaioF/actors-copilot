@@ -30,6 +30,10 @@ const createLogger = () => {
 
 export const logger = createLogger();
 
+// Emit at startup so we know what level the logger resolved to.
+// Visible in both server terminal and browser console.
+logger.info({ resolvedLevel: logger.level }, "logger initialized");
+
 /**
  * Creates a child logger with additional contextual fields.
  * All subsequent log entries from the child logger will include the provided context.

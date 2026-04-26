@@ -72,7 +72,7 @@ describe("createGenerationModel", () => {
       const { createGenerationModel } = require("./create-generation-model");
       createGenerationModel();
 
-      expect(VertexAIBackend).toHaveBeenCalledWith();
+      expect(VertexAIBackend).toHaveBeenCalledWith('global');
       expect(getAI).toHaveBeenCalled();
     });
   });
