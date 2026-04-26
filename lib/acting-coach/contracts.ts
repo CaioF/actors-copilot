@@ -52,6 +52,8 @@ export interface CoachApiResponse {
     step_index: number;
     mode: "guided" | "informational" | "transition" | null;
     phase: string | null;
+    action?: { type: string; payload?: Record<string, unknown> } | null;
+    extractions?: import("@/lib/chat-types").ExtractedPsychData | null;
   };
 }
 
@@ -61,4 +63,5 @@ export interface CoachReplyEnvelope {
   step_index: number;
   mode: "guided" | "informational" | "transition";
   phase: string | null;
+  action: { type: string; payload?: Record<string, unknown> } | null;
 }
