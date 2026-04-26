@@ -6,11 +6,34 @@ import { useActingCoach } from "./use-acting-coach";
 const mockGetIdToken = jest.fn();
 const mockFetch = jest.fn();
 
+jest.mock("firebase/firestore", () => ({
+  collection: jest.fn(),
+  doc: jest.fn(),
+  addDoc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+  serverTimestamp: jest.fn(() => new Date()),
+  setDoc: jest.fn(),
+  updateDoc: jest.fn(),
+  increment: jest.fn((n) => n),
+  query: jest.fn(),
+  orderBy: jest.fn(),
+  getDocs: jest.fn(),
+}));
+
+jest.mock("@/lib/firebase", () => ({
+  getDb: jest.fn(() => ({})),
+  isFirebaseConfigured: jest.fn(() => true),
+}));
+
 jest.mock("firebase/auth", () => ({
   getAuth: () => ({
     currentUser: {
       getIdToken: mockGetIdToken,
     },
+  }),
+  onAuthStateChanged: jest.fn((_auth, cb) => {
+    cb({ uid: "test-uid", displayName: "Test Actor" });
+    return jest.fn();
   }),
 }));
 
@@ -251,6 +274,28 @@ describe("useActingCoach", () => {
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
+      });
+    });
+  });
+
+  describe("Firestore listener infrastructure", () => {
+    it("returns session and sessionId from the hook", async () => {
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.sessionId).toBeDefined();
+        expect(typeof result.current.sessionId).toBe("string");
+      });
+      expect(result.current.session).toBeDefined();
+    });
+
+    it("calls onSnapshot for session when userPath is set", async () => {
+      const { onSnapshot } = require("firebase/firestore");
+
+      renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(onSnapshot).toHaveBeenCalled();
       });
     });
   });
