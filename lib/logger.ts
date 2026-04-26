@@ -30,6 +30,10 @@ const createLogger = () => {
 
 export const logger = createLogger();
 
+// Emit at startup so we know what level the logger resolved to.
+// Visible in both server terminal and browser console.
+logger.info({ resolvedLevel: logger.level }, "logger initialized");
+
 /**
  * Creates a child logger with additional contextual fields.
  * All subsequent log entries from the child logger will include the provided context.
@@ -38,5 +42,9 @@ export const logger = createLogger();
  * @returns A pino logger instance with the additional context baked in
  */
 export const createChildLogger = (context: Record<string, unknown>) => {
-  return logger.child(context);
+  const child = logger.child(context);
+  // Pino browser child() does not reliably inherit the parent level;
+  // force-set it so debug/trace logs are not silently dropped.
+  child.level = logger.level;
+  return child;
 };

@@ -8,6 +8,7 @@ import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-
 import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
+import { runCoachTriggeredExtraction } from "@/lib/dna/extraction/run-extraction";
 
 jest.mock("@/lib/firebase.admin", () => ({
   auth: {
@@ -26,6 +27,7 @@ jest.mock("@/lib/logger", () => ({
   },
   createChildLogger: jest.fn().mockReturnValue({
     trace: jest.fn(),
+    debug: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
     info: jest.fn(),
@@ -69,6 +71,10 @@ jest.mock("@/lib/acting-coach/infrastructure/config", () => ({
   }),
 }));
 
+jest.mock("@/lib/dna/extraction/run-extraction", () => ({
+  runCoachTriggeredExtraction: jest.fn(),
+}));
+
 describe("Coach Chat Route", () => {
   let mockProfileDoc: { get: jest.Mock };
   let mockGenerationModel: { generateContent: jest.Mock };
@@ -109,7 +115,15 @@ describe("Coach Chat Route", () => {
     mockGenerationModel = {
       generateContent: jest.fn().mockResolvedValue({
         response: {
-          text: jest.fn().mockReturnValue("Test coach reply"),
+          text: jest.fn().mockReturnValue(
+            JSON.stringify({
+              reply: "Test coach reply",
+              session_focus: null,
+              step_index: 0,
+              mode: "informational",
+              phase: null,
+            })
+          ),
         },
       }),
     };
@@ -224,6 +238,12 @@ describe("Coach Chat Route", () => {
 
     expect(res.status).toBe(200);
     expect(data.aiData.coach_reply).toBe("Test coach reply");
+    expect(data.aiData.session_focus).toBe(null);
+    expect(data.aiData.step_index).toBe(0);
+    expect(data.aiData.mode).toBe("informational");
+    expect(data.aiData.phase).toBe(null);
+    expect(data.aiData.action).toBe(null);
+    expect(data.aiData.extractions).toBeUndefined();
     expect(data.aiData.citations).toBeUndefined();
 
     expect(auth.verifyIdToken).toHaveBeenCalledWith("valid-token");
@@ -522,5 +542,149 @@ describe("Coach Chat Route", () => {
 
     expect(res.status).toBe(500);
     expect(data.error).toBe("Failed to generate chat response");
+  });
+
+  it("falls back to raw text when model returns malformed JSON", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+    mockGenerationModel.generateContent.mockResolvedValueOnce({
+      response: {
+        text: jest.fn().mockReturnValue("This is not JSON at all"),
+      },
+    });
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "Test question" }),
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.aiData.coach_reply).toBe("This is not JSON at all");
+    expect(data.aiData.session_focus).toBe(null);
+    expect(data.aiData.step_index).toBe(0);
+    expect(data.aiData.mode).toBe("informational");
+    expect(data.aiData.phase).toBe(null);
+    expect(data.aiData.action).toBe(null);
+  });
+
+  it("returns action and extractions when coach model returns trigger_dna_extraction action", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+    const mockExtractionData = {
+      new_traits: ["deep thinker"],
+      defense_mechanisms: ["intellectualization"],
+      progress_assessment: { has_actionable_pattern: true, depth_score: 7 },
+    };
+    (runCoachTriggeredExtraction as jest.Mock).mockResolvedValue(mockExtractionData);
+    mockGenerationModel.generateContent.mockResolvedValueOnce({
+      response: {
+        text: jest.fn().mockReturnValue(
+          JSON.stringify({
+            reply: "Deep insight detected",
+            session_focus: null,
+            step_index: 1,
+            mode: "guided",
+            phase: "exploration",
+            action: { type: "trigger_dna_extraction" },
+          })
+        ),
+      },
+    });
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "I'm feeling vulnerable about my father's expectations" }),
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.aiData.action).toEqual({ type: "trigger_dna_extraction" });
+    expect(data.aiData.extractions).toEqual(mockExtractionData);
+    expect(runCoachTriggeredExtraction).toHaveBeenCalledWith({
+      content: "I'm feeling vulnerable about my father's expectations",
+      history: expect.any(Array),
+    });
+  });
+
+  it("returns reply even when extraction throws", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+    (runCoachTriggeredExtraction as jest.Mock).mockRejectedValue(new Error("Extraction failed"));
+    mockGenerationModel.generateContent.mockResolvedValueOnce({
+      response: {
+        text: jest.fn().mockReturnValue(
+          JSON.stringify({
+            reply: "Reply during extraction failure",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: { type: "trigger_dna_extraction" },
+          })
+        ),
+      },
+    });
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "Test question" }),
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.aiData.coach_reply).toBe("Reply during extraction failure");
+    expect(data.aiData.action).toEqual({ type: "trigger_dna_extraction" });
+    expect(data.aiData.extractions).toBeUndefined();
+  });
+
+  it("returns action: null in response when coach model emits action: null", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+    mockGenerationModel.generateContent.mockResolvedValueOnce({
+      response: {
+        text: jest.fn().mockReturnValue(
+          JSON.stringify({
+            reply: "Reply with null action",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: null,
+          })
+        ),
+      },
+    });
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "Test question" }),
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.aiData.action).toBe(null);
+    expect(data.aiData.extractions).toBeUndefined();
+    expect(runCoachTriggeredExtraction).not.toHaveBeenCalled();
   });
 });

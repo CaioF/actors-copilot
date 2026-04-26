@@ -8,12 +8,13 @@ import { ChatInput } from "@/components/chat-input";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CoachSuggestionChips } from "@/components/coach-suggestion-chips";
 import { useActingCoach } from "@/hooks/use-acting-coach";
+import { renderMarkdown } from "@/lib/render-markdown";
 
 const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
 
 export default function ActingCoachPage() {
-  const { messages, isLoading, sendMessage, clearSession } = useActingCoach();
+  const { messages, isLoading, sendMessage, startNewSession, clearSessionFocus, session } = useActingCoach();
   const searchParams = useSearchParams();
 
   const auditionId = searchParams.get("auditionId");
@@ -23,15 +24,22 @@ export default function ActingCoachPage() {
   const hasFiredInitialMessage = useRef(false);
 
   useEffect(() => {
-    if (auditionId && project && role && !hasFiredInitialMessage.current) {
+    if (!auditionId || !project || !role) return;
+    if (!session) return;
+    if (hasFiredInitialMessage.current) return;
+    if (session.linkedAuditionId === auditionId) {
       hasFiredInitialMessage.current = true;
-      sendMessage(
+      return;
+    }
+    hasFiredInitialMessage.current = true;
+    void (async () => {
+      await startNewSession({ linkedAuditionId: auditionId });
+      await sendMessage(
         `I want to work on my ${project} audition as ${role}.`,
         auditionId
       );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    })();
+  }, [auditionId, project, role, session, startNewSession, sendMessage]);
 
   const handleSend = (content: string) => sendMessage(content);
   const isEmpty = messages.length === 0 && !isLoading;
@@ -45,11 +53,23 @@ export default function ActingCoachPage() {
           <div>
             <h2 className="font-title text-2xl font-bold text-[#2C3328]">Acting Coach</h2>
             <p className="mt-1 text-sm text-[#6B6B6B]">
-              Your coach is ready. What are we working on?
+              {session?.title ?? "Session 1"}
             </p>
+            {session?.sessionFocus && (
+              <p className="mt-1 text-xs italic text-[#8BA2A8]">
+                Currently working on: {session.sessionFocus}
+                <button
+                  onClick={clearSessionFocus}
+                  className="ml-2 underline hover:text-[#E8721A]"
+                  aria-label="Clear current focus"
+                >
+                  clear
+                </button>
+              </p>
+            )}
           </div>
           <button
-            onClick={clearSession}
+            onClick={() => startNewSession()}
             className="inline-flex items-center gap-2 rounded-full bg-[#E8721A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d66a18]"
           >
             <Plus className="h-4 w-4" />
@@ -93,7 +113,13 @@ export default function ActingCoachPage() {
                         : "bg-[#E8DFD0] text-[#2C3328]"
                     }`}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    {msg.role === "assistant" ? (
+                      <div className="text-sm">
+                        {renderMarkdown(msg.content)}
+                      </div>
+                    ) : (
+                      <p className="text-sm">{msg.content}</p>
+                    )}
                   </div>
                 </div>
               ))}

@@ -22,6 +22,12 @@ export interface CoachPromptInput {
   }>;
   auditions?: AuditionSummary[];
   auditionFullData?: Record<string, unknown>;
+  currentFocus?: {
+    sessionFocus: string | null;
+    stepIndex: number;
+    mode: "guided" | "informational" | "transition" | null;
+    phase: string | null;
+  } | null;
 }
 
 export interface CoachApiRequest {
@@ -42,5 +48,20 @@ export interface CoachCitation {
 export interface CoachApiResponse {
   aiData: {
     coach_reply: string;
+    session_focus: string | null;
+    step_index: number;
+    mode: "guided" | "informational" | "transition" | null;
+    phase: string | null;
+    action?: { type: string; payload?: Record<string, unknown> } | null;
+    extractions?: import("@/lib/chat-types").ExtractedPsychData | null;
   };
+}
+
+export interface CoachReplyEnvelope {
+  reply: string;
+  session_focus: string | null;
+  step_index: number;
+  mode: "guided" | "informational" | "transition";
+  phase: string | null;
+  action: { type: string; payload?: Record<string, unknown> } | null;
 }

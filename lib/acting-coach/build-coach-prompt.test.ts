@@ -22,7 +22,7 @@ describe("buildCoachPrompt", () => {
 
     it("includes the coach system prompt", () => {
       const prompt = buildCoachPrompt({ actorBaseline, excerpts, question });
-      expect(prompt).toContain("Acting Coach");
+      expect(prompt).toMatch(/acting coach/i);
     });
 
     it("includes the actor baseline summary", () => {
@@ -32,9 +32,7 @@ describe("buildCoachPrompt", () => {
 
     it("includes all retrieved excerpts in order", () => {
       const prompt = buildCoachPrompt({ actorBaseline, excerpts, question });
-      expect(prompt).toContain("Respect for Acting");
       expect(prompt).toContain("Authenticity is the foundation");
-      expect(prompt).toContain("Sanford Meisner on Acting");
       expect(prompt).toContain("Living truthfully under imaginary circumstances");
     });
 
@@ -63,14 +61,14 @@ describe("buildCoachPrompt", () => {
 
     it("still includes system prompt, baseline, and question", () => {
       const prompt = buildCoachPrompt({ actorBaseline, excerpts: [], question });
-      expect(prompt).toContain("Acting Coach");
+      expect(prompt).toMatch(/acting coach/i);
       expect(prompt).toContain(actorBaseline);
       expect(prompt).toContain(question);
     });
   });
 
-  describe("excerpt numbering stability", () => {
-    it("prefixes each excerpt with stable citation markers in 1..N order", () => {
+  describe("excerpt ordering stability", () => {
+    it("places excerpts in input order", () => {
       const excerpts: RetrievedExcerpt[] = [
         {
           citationNumber: 1,
@@ -97,12 +95,12 @@ describe("buildCoachPrompt", () => {
         question: "Test question?",
       });
 
-      const bookAIndex = prompt.indexOf("Book A");
-      const bookBIndex = prompt.indexOf("Book B");
-      const bookCIndex = prompt.indexOf("Book C");
+      const firstIndex = prompt.indexOf("First wisdom.");
+      const secondIndex = prompt.indexOf("Second insight.");
+      const thirdIndex = prompt.indexOf("Third revelation.");
 
-      expect(bookAIndex).toBeLessThan(bookBIndex);
-      expect(bookBIndex).toBeLessThan(bookCIndex);
+      expect(firstIndex).toBeLessThan(secondIndex);
+      expect(secondIndex).toBeLessThan(thirdIndex);
     });
   });
 
@@ -158,9 +156,174 @@ describe("buildCoachPrompt", () => {
 
     it("still produces a valid prompt without baseline section", () => {
       const prompt = buildCoachPrompt({ actorBaseline: undefined, excerpts, question });
-      expect(prompt).toContain("Acting Coach");
+      expect(prompt).toMatch(/acting coach/i);
       expect(prompt).toContain(question);
-      expect(prompt).toContain("Acting Books");
+      expect(prompt).toContain("Some acting wisdom.");
+    });
+  });
+
+  describe("system prompt section headers", () => {
+    it("contains ONE STEP AT A TIME section", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("ONE STEP AT A TIME");
+    });
+
+    it("contains MODES section", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("MODES");
+    });
+
+    it("contains EXAMPLES section", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("EXAMPLES");
+    });
+
+    it("contains guided mode example", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("## guided");
+    });
+
+    it("contains informational mode example", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("## informational");
+    });
+
+    it("contains transition mode example", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("## transition");
+    });
+  });
+
+  describe("with currentFocus", () => {
+    it("includes Session focus line when currentFocus.sessionFocus is truthy", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find Jane's objective in scene 2",
+          stepIndex: 2,
+          mode: "guided",
+          phase: "objective",
+        },
+      });
+      expect(prompt).toContain("Session focus: Find Jane's objective in scene 2");
+      expect(prompt).toContain("Step index: 2");
+      expect(prompt).toContain("Mode: guided");
+      expect(prompt).toContain("Phase: objective");
+    });
+
+    it("omits Session focus line when currentFocus is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: null,
+      });
+      expect(prompt).not.toContain("Session focus: Find");
+    });
+
+    it("omits Session focus line when currentFocus.sessionFocus is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: null,
+          stepIndex: 0,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      expect(prompt).not.toContain("Session focus: Find");
+    });
+
+    it("omits Session focus line when currentFocus.sessionFocus is empty string", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "",
+          stepIndex: 0,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      expect(prompt).not.toContain("Session focus: Find");
+    });
+
+    it("places Session focus line before # ACTOR'S QUESTION", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find objective",
+          stepIndex: 1,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      const focusLineIndex = prompt.indexOf("Session focus: Find objective");
+      const questionIndex = prompt.indexOf("# ACTOR'S QUESTION");
+      expect(focusLineIndex).toBeGreaterThan(0);
+      expect(questionIndex).toBeGreaterThan(0);
+      expect(focusLineIndex).toBeLessThan(questionIndex);
+    });
+
+    it("defaults mode to guided when mode is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find objective",
+          stepIndex: 0,
+          mode: null,
+          phase: null,
+        },
+      });
+      expect(prompt).toContain("Mode: guided");
+    });
+
+    it("defaults phase to (none) when phase is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find objective",
+          stepIndex: 0,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      expect(prompt).toContain("Phase: (none)");
     });
   });
 });

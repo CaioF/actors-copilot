@@ -72,7 +72,7 @@ describe("createGenerationModel", () => {
       const { createGenerationModel } = require("./create-generation-model");
       createGenerationModel();
 
-      expect(VertexAIBackend).toHaveBeenCalledWith();
+      expect(VertexAIBackend).toHaveBeenCalledWith('global');
       expect(getAI).toHaveBeenCalled();
     });
   });
@@ -116,6 +116,73 @@ describe("createGenerationModel", () => {
 
       const { createGenerationModel } = require("./create-generation-model");
       expect(() => createGenerationModel()).toThrow("ACTING_COACH_GENERATION_MODEL");
+    });
+  });
+
+  it("forwards generationConfig to getGenerativeModel when provided", () => {
+    const mockConfig = {
+      googleCloudProject: "test-project",
+      googleCloudLocation: "us-central1",
+      embeddingModel: "text-embedding-004",
+      embeddingDimension: 768,
+      generationModel: "gemini-2.0-flash",
+      corpusDir: "/corpus",
+      pineconeApiKey: "test-key",
+      pineconeIndexName: "test-index",
+      pineconeNamespace: "",
+    };
+
+    jest.isolateModules(() => {
+      jest.doMock("./config", () => ({
+        getActingCoachConfig: () => mockConfig,
+      }));
+
+      const mockAiInstance = {};
+      (getAI as jest.Mock).mockReturnValue(mockAiInstance);
+      (getGenerativeModel as jest.Mock).mockReturnValue({});
+
+      const { createGenerationModel } = require("./create-generation-model");
+      const generationConfig = {
+        responseMimeType: "application/json",
+        responseSchema: { type: "object", properties: {} },
+      };
+      createGenerationModel({ generationConfig });
+
+      expect(getGenerativeModel).toHaveBeenCalledWith(mockAiInstance, {
+        model: "gemini-2.0-flash",
+        generationConfig,
+      });
+    });
+  });
+
+  it("does not include generationConfig in getGenerativeModel when not provided", () => {
+    const mockConfig = {
+      googleCloudProject: "test-project",
+      googleCloudLocation: "us-central1",
+      embeddingModel: "text-embedding-004",
+      embeddingDimension: 768,
+      generationModel: "gemini-2.0-flash",
+      corpusDir: "/corpus",
+      pineconeApiKey: "test-key",
+      pineconeIndexName: "test-index",
+      pineconeNamespace: "",
+    };
+
+    jest.isolateModules(() => {
+      jest.doMock("./config", () => ({
+        getActingCoachConfig: () => mockConfig,
+      }));
+
+      const mockAiInstance = {};
+      (getAI as jest.Mock).mockReturnValue(mockAiInstance);
+      (getGenerativeModel as jest.Mock).mockReturnValue({});
+
+      const { createGenerationModel } = require("./create-generation-model");
+      createGenerationModel();
+
+      expect(getGenerativeModel).toHaveBeenCalledWith(mockAiInstance, {
+        model: "gemini-2.0-flash",
+      });
     });
   });
 });

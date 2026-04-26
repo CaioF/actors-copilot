@@ -2,7 +2,7 @@ import { ACTING_COACH_SYSTEM_PROMPT } from "../prompts";
 import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 
 export function buildCoachPrompt(input: CoachPromptInput): string {
-  const { actorBaseline, excerpts, question, history, auditions, auditionFullData } = input;
+  const { actorBaseline, excerpts, question, history, auditions, auditionFullData, currentFocus } = input;
 
   const sections: string[] = [];
 
@@ -43,8 +43,7 @@ ${actorBaseline}`);
   if (excerpts.length > 0) {
     const excerptSection = excerpts
       .map((excerpt: RetrievedExcerpt) => {
-        return `[${excerpt.citationNumber}] "${excerpt.excerptText}"
-Source: ${excerpt.sourceBook}`;
+        return `"${excerpt.excerptText}"`;
       })
       .join("\n\n");
 
@@ -57,6 +56,12 @@ ${excerptSection}`);
       .map((msg) => `${msg.role === "user" ? "Actor" : "Coach"}: ${msg.content}`)
       .join("\n");
     sections.push(`# CONVERSATION HISTORY\n${historySection}`);
+  }
+
+  if (currentFocus && currentFocus.sessionFocus) {
+    sections.push(
+      `# CURRENT FOCUS\nSession focus: ${currentFocus.sessionFocus}\nStep index: ${currentFocus.stepIndex}\nMode: ${currentFocus.mode ?? "guided"}\nPhase: ${currentFocus.phase ?? "(none)"}\n\nThe actor is mid-exercise. Continue from this focus unless their new message clearly signals a topic shift.`
+    );
   }
 
   sections.push(`# ACTOR'S QUESTION

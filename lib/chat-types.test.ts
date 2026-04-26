@@ -1,4 +1,4 @@
-import { ARENA_THEMES, THEME_DISPLAY_NAMES, DNA_SECTIONS, SectionProgress } from "./chat-types";
+import { ARENA_THEMES, THEME_DISPLAY_NAMES, DNA_SECTIONS, SectionProgress, CoachSession, CoachMessage, ExtractedPsychData, ChatHistoryMessage, ExtractionMilestone } from "./chat-types";
 
 describe("ARENA_THEMES", () => {
   it("should have themes defined for all DNA sections", () => {
@@ -376,6 +376,229 @@ it("should give partial progress based on themes only", () => {
   });
 });
 
+describe("CoachSession interface", () => {
+  it("should have exactly 11 fields: id, createdAt, lastActiveAt, status, title, linkedAuditionId, messageCount, sessionFocus, stepIndex, mode, phase", () => {
+    const session: CoachSession = {
+      id: "test-session-id",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
+    };
+
+    expect(Object.keys(session)).toHaveLength(11);
+    expect(Object.keys(session)).toEqual([
+      "id",
+      "createdAt",
+      "lastActiveAt",
+      "status",
+      "title",
+      "linkedAuditionId",
+      "messageCount",
+      "sessionFocus",
+      "stepIndex",
+      "mode",
+      "phase",
+    ]);
+  });
+
+  it("should not have any DNA-specific fields", () => {
+    const session: CoachSession = {
+      id: "test-session-id",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
+    };
+
+    expect(session).not.toHaveProperty("section");
+    expect(session).not.toHaveProperty("sessionNumber");
+    expect(session).not.toHaveProperty("currentSection");
+    expect(session).not.toHaveProperty("sectionHqCounts");
+    expect(session).not.toHaveProperty("askedQuestions");
+    expect(session).not.toHaveProperty("totalSessions");
+    expect(session).not.toHaveProperty("progress");
+    expect(session).not.toHaveProperty("durationMinutes");
+  });
+
+  it("should allow status to be active or completed", () => {
+    const activeSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
+    };
+
+    const completedSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "completed",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 5,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
+    };
+
+    expect(activeSession.status).toBe("active");
+    expect(completedSession.status).toBe("completed");
+  });
+
+  it("should allow title and linkedAuditionId to be nullable", () => {
+    const session: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: "Scene work prep",
+      linkedAuditionId: "audition-123",
+      messageCount: 3,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
+    };
+
+    expect(session.title).toBe("Scene work prep");
+    expect(session.linkedAuditionId).toBe("audition-123");
+  });
+
+  it("should allow sessionFocus, stepIndex, mode, and phase to be set", () => {
+    const session: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 3,
+      sessionFocus: "Find Jane's objective in scene 2",
+      stepIndex: 2,
+      mode: "guided",
+      phase: "objective",
+    };
+
+    expect(session.sessionFocus).toBe("Find Jane's objective in scene 2");
+    expect(session.stepIndex).toBe(2);
+    expect(session.mode).toBe("guided");
+    expect(session.phase).toBe("objective");
+  });
+
+  it("should allow mode to be guided, informational, or transition", () => {
+    const guidedSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: "guided",
+      phase: null,
+    };
+
+    const informationalSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: "informational",
+      phase: null,
+    };
+
+    const transitionSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: "transition",
+      phase: null,
+    };
+
+    expect(guidedSession.mode).toBe("guided");
+    expect(informationalSession.mode).toBe("informational");
+    expect(transitionSession.mode).toBe("transition");
+  });
+});
+
+describe("CoachMessage interface", () => {
+  it("should have exactly 4 fields: id, role, content, timestamp", () => {
+    const message: CoachMessage = {
+      id: "msg-1",
+      role: "user",
+      content: "Hello coach",
+      timestamp: null,
+    };
+
+    expect(Object.keys(message)).toHaveLength(4);
+    expect(Object.keys(message)).toEqual(["id", "role", "content", "timestamp"]);
+  });
+
+  it("should not have a section field", () => {
+    const message: CoachMessage = {
+      id: "msg-1",
+      role: "user",
+      content: "Hello",
+      timestamp: null,
+    };
+
+    expect(message).not.toHaveProperty("section");
+  });
+
+  it("should allow role to be user or assistant", () => {
+    const userMsg: CoachMessage = {
+      id: "msg-1",
+      role: "user",
+      content: "Hello",
+      timestamp: null,
+    };
+
+    const assistantMsg: CoachMessage = {
+      id: "msg-2",
+      role: "assistant",
+      content: "Hello! How can I help?",
+      timestamp: null,
+    };
+
+    expect(userMsg.role).toBe("user");
+    expect(assistantMsg.role).toBe("assistant");
+  });
+});
+
 describe("Backward compatibility for sessions without theme data", () => {
   const HQ_FOR_COMPLETION = 5;
 
@@ -418,5 +641,135 @@ describe("Backward compatibility for sessions without theme data", () => {
   it("should use diversity-weighted progress when themes exist", () => {
     const progress = calculateProgressFallback(3, ["shame_origin", "shame_trigger"], false);
     expect(progress).toBeLessThan((3 / HQ_FOR_COMPLETION) * (100 / 12));
+  });
+});
+
+describe("ExtractedPsychData interface", () => {
+  it("should have the exact 18-field shape with all optional fields plus progress_assessment", () => {
+    const data: ExtractedPsychData = {
+      is_valuable_extraction: true,
+      new_traits: ["trait1"],
+      themes_extracted: ["theme1"],
+      defense_mechanisms: ["defense1"],
+      leaf_snippets: ["snippet1"],
+      holistic_analysis: "analysis",
+      somatic_tells: ["tell1"],
+      core_values: ["value1"],
+      relational_dynamics: ["dynamic1"],
+      milestones: [{ event: "event1", emotional_cost: "cost1" }],
+      core_wounds_and_fears: ["wound1"],
+      unmet_needs: ["need1"],
+      public_masks: ["mask1"],
+      emotional_baseline: {
+        conflict_response: "response",
+        internal_friction: "friction",
+        vulnerability_management: "management",
+      },
+      intellectual_framework: {
+        cognitive_style: "style",
+        attention_to_detail: "detail",
+      },
+      archetype_signals: ["archetype1"],
+      key_entities_and_arenas: ["entity1"],
+      progress_assessment: {
+        has_actionable_pattern: true,
+        depth_score: 7,
+      },
+    };
+
+    expect(data.is_valuable_extraction).toBe(true);
+    expect(data.new_traits).toEqual(["trait1"]);
+    expect(data.themes_extracted).toEqual(["theme1"]);
+    expect(data.defense_mechanisms).toEqual(["defense1"]);
+    expect(data.leaf_snippets).toEqual(["snippet1"]);
+    expect(data.holistic_analysis).toBe("analysis");
+    expect(data.somatic_tells).toEqual(["tell1"]);
+    expect(data.core_values).toEqual(["value1"]);
+    expect(data.relational_dynamics).toEqual(["dynamic1"]);
+    expect(data.milestones).toEqual([{ event: "event1", emotional_cost: "cost1" }]);
+    expect(data.core_wounds_and_fears).toEqual(["wound1"]);
+    expect(data.unmet_needs).toEqual(["need1"]);
+    expect(data.public_masks).toEqual(["mask1"]);
+    expect(data.emotional_baseline?.conflict_response).toBe("response");
+    expect(data.emotional_baseline?.internal_friction).toBe("friction");
+    expect(data.emotional_baseline?.vulnerability_management).toBe("management");
+    expect(data.intellectual_framework?.cognitive_style).toBe("style");
+    expect(data.intellectual_framework?.attention_to_detail).toBe("detail");
+    expect(data.archetype_signals).toEqual(["archetype1"]);
+    expect(data.key_entities_and_arenas).toEqual(["entity1"]);
+    expect(data.progress_assessment?.has_actionable_pattern).toBe(true);
+    expect(data.progress_assessment?.depth_score).toBe(7);
+  });
+
+  it("should require has_actionable_pattern and depth_score in progress_assessment", () => {
+    const data: ExtractedPsychData = {
+      progress_assessment: {
+        has_actionable_pattern: true,
+        depth_score: 5,
+      },
+    };
+
+    expect(data.progress_assessment?.has_actionable_pattern).toBe(true);
+    expect(data.progress_assessment?.depth_score).toBe(5);
+  });
+
+  it("should allow all fields to be optional except progress_assessment sub-fields", () => {
+    const minimalData: ExtractedPsychData = {
+      progress_assessment: {
+        has_actionable_pattern: false,
+        depth_score: 0,
+      },
+    };
+
+    expect(minimalData.progress_assessment?.has_actionable_pattern).toBe(false);
+    expect(minimalData.progress_assessment?.depth_score).toBe(0);
+    expect(minimalData.is_valuable_extraction).toBeUndefined();
+    expect(minimalData.new_traits).toBeUndefined();
+  });
+});
+
+describe("ChatHistoryMessage interface", () => {
+  it("should have role string and parts array with text objects", () => {
+    const msg: ChatHistoryMessage = {
+      role: "user",
+      parts: [{ text: "Hello" }],
+    };
+
+    expect(msg.role).toBe("user");
+    expect(msg.parts).toHaveLength(1);
+    expect(msg.parts[0].text).toBe("Hello");
+  });
+
+  it("should allow model role for assistant messages", () => {
+    const msg: ChatHistoryMessage = {
+      role: "model",
+      parts: [{ text: "How can I help?" }],
+    };
+
+    expect(msg.role).toBe("model");
+    expect(msg.parts[0].text).toBe("How can I help?");
+  });
+
+  it("should allow multiple parts", () => {
+    const msg: ChatHistoryMessage = {
+      role: "user",
+      parts: [{ text: "Part 1" }, { text: "Part 2" }],
+    };
+
+    expect(msg.parts).toHaveLength(2);
+    expect(msg.parts[0].text).toBe("Part 1");
+    expect(msg.parts[1].text).toBe("Part 2");
+  });
+});
+
+describe("ExtractionMilestone interface", () => {
+  it("should have event and emotional_cost fields", () => {
+    const milestone: ExtractionMilestone = {
+      event: "Graduation day",
+      emotional_cost: "Loss of childhood innocence",
+    };
+
+    expect(milestone.event).toBe("Graduation day");
+    expect(milestone.emotional_cost).toBe("Loss of childhood innocence");
   });
 });
