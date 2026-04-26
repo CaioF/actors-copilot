@@ -52,7 +52,7 @@ export default function ActingCoachPage() {
           <div>
             <h2 className="font-title text-2xl font-bold text-[#2C3328]">Acting Coach</h2>
             <p className="mt-1 text-sm text-[#6B6B6B]">
-              Your coach is ready. What are we working on?
+              {session?.title ?? "Session 1"}
             </p>
           </div>
           <button

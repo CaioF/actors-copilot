@@ -60,7 +60,7 @@ describe("ActingCoachPage", () => {
       error: null,
       sendMessage: mockSendMessage,
       startNewSession: mockStartNewSession,
-      session: { linkedAuditionId: null, sessionFocus: null, stepIndex: 0, mode: null, phase: null },
+      session: { title: null, linkedAuditionId: null, sessionFocus: null, stepIndex: 0, mode: null, phase: null },
     });
   });
 
@@ -71,9 +71,7 @@ describe("ActingCoachPage", () => {
 
   it("renders the subtitle in heading section", () => {
     render(<ActingCoachPage />);
-    expect(
-      screen.getByText("Your coach is ready. What are we working on?")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Session 1")).toBeInTheDocument();
   });
 
   it("renders the Acting Coach page header", () => {
