@@ -234,7 +234,7 @@ export function useActingCoach(): UseActingCoachReturn {
               if (aiExtractions.defense_mechanisms?.length) updatePayload["psychology.defenseMechanisms"] = arrayUnion(...aiExtractions.defense_mechanisms);
               if (aiExtractions.leaf_snippets?.length) {
                 updatePayload["psychology.leafSnippets"] = arrayUnion(
-                  ...aiExtractions.leaf_snippets.map((quote: { quote: string }) => ({ quote: quote.quote, section: "identity", timestamp: new Date().toISOString() }))
+                  ...aiExtractions.leaf_snippets.map((quote: string) => ({ quote, section: "identity", timestamp: new Date().toISOString() }))
                 );
               }
               if (aiExtractions.holistic_analysis) {
@@ -247,7 +247,7 @@ export function useActingCoach(): UseActingCoachReturn {
               if (aiExtractions.relational_dynamics?.length) updatePayload["psychology.relationalDynamics"] = arrayUnion(...aiExtractions.relational_dynamics);
               if (aiExtractions.milestones?.length) {
                 updatePayload["history.milestones"] = arrayUnion(
-                  ...aiExtractions.milestones.map((m: { title: string; date: string }) => ({ ...m, section: "identity", discoveredAt: new Date().toISOString() }))
+                  ...aiExtractions.milestones.map((m: { event: string; emotional_cost: string }) => ({ ...m, section: "identity", discoveredAt: new Date().toISOString() }))
                 );
               }
               if (aiExtractions.core_wounds_and_fears?.length) updatePayload["acting_fuel.coreWounds"] = arrayUnion(...aiExtractions.core_wounds_and_fears);

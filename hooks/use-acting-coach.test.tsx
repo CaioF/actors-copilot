@@ -624,12 +624,12 @@ describe("useActingCoach", () => {
     const highQualityExtraction = {
       new_traits: ["introverted performer"],
       defense_mechanisms: [" intellectualization"],
-      leaf_snippets: [{ quote: "I hide behind characters" }],
+      leaf_snippets: ["I hide behind characters"],
       holistic_analysis: "Shows strong analytical approach to role preparation",
       somatic_tells: ["taps foot when thinking"],
       core_values: [" authenticity"],
       relational_dynamics: [" struggles with vulnerability"],
-      milestones: [{ title: "First breakthrough", date: "2024-01-01" }],
+      milestones: [{ event: "First breakthrough", emotional_cost: "vulnerability" }],
       core_wounds_and_fears: ["fear of judgment"],
       unmet_needs: ["validation"],
       public_masks: ["confident exterior"],
@@ -723,8 +723,8 @@ describe("useActingCoach", () => {
       const milestones = payload["history.milestones"];
       expect(milestones).toBeDefined();
       expect(milestones[0]).toMatchObject({
-        title: "First breakthrough",
-        date: "2024-01-01",
+        event: "First breakthrough",
+        emotional_cost: "vulnerability",
         section: "identity",
         discoveredAt: expect.any(String),
       });
