@@ -323,6 +323,9 @@ users/{userPath}/
 ├── masterProfile/current        # Synthesized profile (cached)
 ├── dnaSessions/{sessionId}/    # DNA session metadata
 │   └── messages/              # Chat messages subcollection
+├── coachSessions/{sessionId}/  # Acting Coach session metadata
+│   └── messages/              # Coach chat messages subcollection
+├── auditions/                 # Audition breakdowns
 └── dnaVault/                  # Raw DNA extractions (for synthesis)
 ```
 
@@ -354,6 +357,33 @@ users/{userPath}/
   sectionThemes: Partial<Record<DNASectionId, string[]>>  // Theme tracking
   auditionsUnlocked: boolean
   askedQuestions: string[]
+}
+```
+
+**CoachSession** (`lib/chat-types.ts:47`)
+```typescript
+{
+  id: string
+  createdAt: Timestamp | null
+  lastActiveAt: Timestamp | null
+  status: "active" | "completed"
+  title: string | null
+  linkedAuditionId: string | null
+  messageCount: number
+  sessionFocus: string | null       // Floating focus — in-flight exercise description
+  stepIndex: number                 // Model-incremented exercise step
+  mode: "guided" | "informational" | "transition" | null
+  phase: string | null              // Model-tracked sub-state within the focus
+}
+```
+
+**CoachMessage** (`lib/chat-types.ts:61`)
+```typescript
+{
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: Timestamp | null
 }
 ```
 
@@ -800,7 +830,10 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 | `components/app-sidebar.tsx` | ~130 | Sidebar navigation |
 | `lib/prompts.ts` | 1203 | All AI prompts |
 | `lib/questions.ts` | 386 | Question bank |
-| `hooks/use-chat.ts` | 545 | Chat state management |
+| `hooks/use-chat.ts` | 545 | DNA chat state management |
+| `hooks/use-acting-coach.ts` | 363 | Acting Coach hook — Firestore persistence, floating focus |
+| `lib/acting-coach/contracts.ts` | 64 | Coach request/response interfaces |
+| `lib/acting-coach/build-coach-prompt.ts` | 72 | Prompt composition with focus injection |
 | `lib/context/AuthContext.tsx` | 227 | Auth context |
 
 ---
@@ -1191,7 +1224,8 @@ The Acting Coach (`/acting-coach`) is a free-form conversational AI assistant gr
 ┌─────────────────────────────────────────────────────────────┐
 │                    Browser Client                           │
 │  useActingCoach() hook                                     │
-│  ├── POST /api/coach/chat { content, history, auditionId } │
+│  ├── POST /api/coach/chat { content, history, auditionId, currentFocus } │
+│  ├── Firestore persistence (addDoc + onSnapshot)          │
 │  └── Renders coach_reply in chat UI                       │
 └─────────────────────────────────────────────────────────────┘
                              │
@@ -1203,9 +1237,9 @@ The Acting Coach (`/acting-coach`) is a free-form conversational AI assistant gr
 │  3. Load audition summaries (project, role, date)          │
 │  4. Embed question via Pinecone Inference API              │
 │  5. Query Pinecone for top-K similar chunks              │
-│  6. Compose prompt with baseline + excerpts + history     │
-│  7. Generate reply via Vertex AI Gemini                   │
-│  8. Return { aiData: { coach_reply } }                  │
+│  6. Compose prompt with baseline + excerpts + history + currentFocus │
+│  7. Generate structured JSON reply via Vertex AI Gemini   │
+│  8. Parse JSON envelope → return { aiData: { coach_reply, session_focus, step_index, mode, phase } } │
 └─────────────────────────────────────────────────────────────┘
                              │
                ┌─────────────┼─────────────┐
@@ -1231,8 +1265,8 @@ The Acting Coach (`/acting-coach`) is a free-form conversational AI assistant gr
 | `lib/acting-coach/build-coach-prompt.ts` | Composes prompt from baseline, excerpts, history, audition context |
 | `lib/acting-coach/application/get-audition-context.ts` | Reads audition summaries from Firestore |
 | `lib/prompts.ts` | `ACTING_COACH_SYSTEM_PROMPT` — coach persona and methodology |
-| `hooks/use-acting-coach.ts` | Client hook — message state, sendMessage, clearSession |
-| `app/(interior)/acting-coach/page.tsx` | Coach UI — welcome bubble, suggestion chips, chat messages |
+| `hooks/use-acting-coach.ts` | Client hook — message state, sendMessage, startNewSession, clearSessionFocus, Firestore persistence |
+| `app/(interior)/acting-coach/page.tsx` | Coach UI — welcome bubble, suggestion chips, chat messages, session indicator, focus indicator |
 | `components/coach-suggestion-chips.tsx` | Clickable prompt suggestions |
 | `scripts/python/ingest_acting_library.py` | Corpus ingestion script |
 
@@ -1243,6 +1277,9 @@ The coach prompt (`buildCoachPrompt`) assembles these sections in order:
 ```
 # SYSTEM ROLE & PERSONA
 (ACTING_COACH_SYSTEM_PROMPT from lib/prompts.ts)
+  Modes: guided (≤60 words, one step per turn), informational (factual),
+  transition (topic pivot). Explicit boundaries prohibit naming specific
+  practitioners and emitting citation markers.
 
 # ACTOR CONTEXT
 {actorBaselineSummary from Firestore}
@@ -1255,14 +1292,20 @@ The coach prompt (`buildCoachPrompt`) assembles these sections in order:
 {project} — {role} ({id}) per audition
 
 # REFERENCE MATERIAL
-[1] "excerpt text"
-Source: sources_open.txt#chunkIndex
-... (up to 5 excerpts)
+"excerpt text"
+... (up to 5 excerpts, extracted verbatim — no citation markers or source labels)
 
 # CONVERSATION HISTORY
 Actor: message
 Coach: message
 ... (last 20 messages)
+
+# CURRENT FOCUS
+Session focus: {sessionFocus}
+Step index: {stepIndex}
+Mode: {mode}
+Phase: {phase}
+(only if sessionFocus is set — anchors the model to the in-flight exercise)
 
 # ACTOR'S QUESTION
 {current question}
@@ -1315,9 +1358,13 @@ cd scripts/python
 | **History** | Last 20 messages passed to prompt to maintain context |
 | **Audition context** | Summary list of all auditions injected into every prompt |
 | **Full audition breakdown** | Loaded on demand when `auditionId` provided |
-| **New Session** | `clearSession()` resets messages to `[]` |
+| **New Session** | `startNewSession()` creates a new Firestore session doc with a fresh UUID |
 | **Suggestion chips** | 4 preset prompts: deepen objective, redirect help, spiraling, apply to DNA |
 | **Welcome bubble** | Shown when `messages.length === 0` |
+| **Session persistence** | Messages and session metadata survive page refresh via Firestore `onSnapshot` |
+| **Floating focus** | Model tracks exercise state across turns (`sessionFocus`/`stepIndex`/`mode`/`phase`) |
+| **Focus indicator** | Page header shows "Currently working on: {sessionFocus}" with tap-to-clear |
+| **Delete Chat Data** | Settings page deletes all `coachSessions` and messages atomically with DNA data |
 
 ### Data Flow
 
@@ -1326,7 +1373,7 @@ User types message
     ↓
 useActingCoach.sendMessage()
     ↓
-POST /api/coach/chat { content, history, auditionId }
+POST /api/coach/chat { content, history, auditionId, currentFocus }
     ↓
 1. verifyIdToken → userPath
 2. getActingCoachConfig()
@@ -1334,15 +1381,16 @@ POST /api/coach/chat { content, history, auditionId }
    (gracefully degrades if Firestore unavailable)
 4. createPineconeInferenceClient → embed([question])
 5. pineconeIndex.query({ vector, topK: 5 })
-6. buildCoachPrompt({ actorBaseline, excerpts, history, auditionSummaries })
-7. createGenerationModel() → generateContent(prompt)
-8. return { aiData: { coach_reply } }
+6. buildCoachPrompt({ actorBaseline, excerpts, history, auditionSummaries, currentFocus })
+7. createGenerationModel({ responseMimeType: "application/json", responseSchema }) → generateContent(prompt)
+8. Parse JSON envelope → defensive fallback on malformed JSON
+9. return { aiData: { coach_reply, session_focus, step_index, mode, phase } }
     ↓
-useActingCoach appends assistant message to state
+useActingCoach writes assistant message + updates session doc (lastActiveAt, messageCount, focus fields)
     ↓
-UI renders new message bubble
+onSnapshot fires → UI renders new message bubble from Firestore
 ```
 
 ### Privacy
 
-The Acting Coach does not persist conversation history — each request is stateless. The `history` array is held in client memory only and sent with each request (capped at 20 messages). Audition data is read from Firestore but never written by the Coach.
+Conversation history is persisted to Firestore (see [Firestore Persistence](#firestore-persistence) above). Message history sent with each request is capped at 20 messages. Audition data is read from Firestore but never written by the Coach. Citation markers and practitioner attributions are suppressed in model output via prompt constraints. Previously stateless (v1); session persistence was added in the acting-coach-session-persistence plan.

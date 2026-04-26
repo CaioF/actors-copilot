@@ -302,31 +302,51 @@ export default function SettingsPage() {
       const userPath = `${user.uid}_${firstName}`;
 
       // --- 2. DELETE ALL FIRESTORE DATA ---
-      const { getFirestore, collection, getDocs, deleteDoc, doc } = await import("firebase/firestore");
+      const { getFirestore, collection, getDocs, doc, writeBatch } = await import("firebase/firestore");
       const { getApp } = await import("@/lib/firebase");
       const db = getFirestore(getApp());
 
-      // Fetch all subcollections
-      const sessionsRef = collection(db, `users/${userPath}/dnaSessions`);
-      const vaultRef = collection(db, `users/${userPath}/dnaVault`);
-      const auditionsRef = collection(db, `users/${userPath}/auditions`);
+      const batch = writeBatch(db);
 
-      const [sessionDocs, vaultDocs, auditionDocs] = await Promise.all([
-        getDocs(sessionsRef),
-        getDocs(vaultRef),
-        getDocs(auditionsRef)
-      ]);
+      // DNA sessions — delete message subcollections first, then session docs
+      const dnaSessionsRef = collection(db, `users/${userPath}/dnaSessions`);
+      const dnaSessionDocs = await getDocs(dnaSessionsRef);
+      for (const sessionDoc of dnaSessionDocs.docs) {
+        const messagesRef = collection(db, `users/${userPath}/dnaSessions/${sessionDoc.id}/messages`);
+        const messagesSnap = await getDocs(messagesRef);
+        messagesSnap.docs.forEach((msgDoc) => {
+          batch.delete(doc(db, `users/${userPath}/dnaSessions/${sessionDoc.id}/messages`, msgDoc.id));
+        });
+        batch.delete(doc(db, `users/${userPath}/dnaSessions`, sessionDoc.id));
+      }
 
-      // Map all documents to delete promises
-      const deletePromises = [
-        ...sessionDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/dnaSessions`, d.id))),
-        ...vaultDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/dnaVault`, d.id))),
-        ...auditionDocs.docs.map(d => deleteDoc(doc(db, `users/${userPath}/auditions`, d.id))),
-        deleteDoc(doc(db, `users/${userPath}`)) // Delete the parent user document itself
-      ];
+      // Coach sessions — delete message subcollections first, then session docs
+      const coachSessionsRef = collection(db, `users/${userPath}/coachSessions`);
+      const coachSessionDocs = await getDocs(coachSessionsRef);
+      for (const sessionDoc of coachSessionDocs.docs) {
+        const messagesRef = collection(db, `users/${userPath}/coachSessions/${sessionDoc.id}/messages`);
+        const messagesSnap = await getDocs(messagesRef);
+        messagesSnap.docs.forEach((msgDoc) => {
+          batch.delete(doc(db, `users/${userPath}/coachSessions/${sessionDoc.id}/messages`, msgDoc.id));
+        });
+        batch.delete(doc(db, `users/${userPath}/coachSessions`, sessionDoc.id));
+      }
 
-      // Execute all database deletions simultaneously
-      await Promise.all(deletePromises);
+      // DNA vault docs
+      const vaultDocs = await getDocs(collection(db, `users/${userPath}/dnaVault`));
+      vaultDocs.docs.forEach(d => batch.delete(doc(db, `users/${userPath}/dnaVault`, d.id)));
+
+      // Audition docs
+      const auditionDocs = await getDocs(collection(db, `users/${userPath}/auditions`));
+      auditionDocs.docs.forEach(d => batch.delete(doc(db, `users/${userPath}/auditions`, d.id)));
+
+      // Profile doc
+      batch.delete(doc(db, `users/${userPath}/profile/master`));
+
+      // Parent user document
+      batch.delete(doc(db, `users/${userPath}`));
+
+      await batch.commit();
 
       // --- 3. DELETE AVATAR FROM STORAGE (If it exists) ---
       if (user.photoURL && user.photoURL.includes('firebasestorage')) {
