@@ -66,6 +66,10 @@ jest.mock("firebase/firestore", () => {
               title: "New Session",
               linkedAuditionId: null,
               messageCount: 0,
+              sessionFocus: null,
+              stepIndex: 0,
+              mode: null,
+              phase: null,
             }),
           });
         });
@@ -114,6 +118,10 @@ describe("useActingCoach", () => {
         json: async () => ({
           aiData: {
             coach_reply: "Hello, how can I help you?",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
           },
         }),
       });
@@ -133,6 +141,7 @@ describe("useActingCoach", () => {
         body: JSON.stringify({
           content: "Hello coach",
           history: [],
+          currentFocus: null,
         }),
       });
 
@@ -184,6 +193,10 @@ describe("useActingCoach", () => {
         json: async () => ({
           aiData: {
             coach_reply: "",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
           },
         }),
       });
@@ -214,6 +227,10 @@ describe("useActingCoach", () => {
         json: async () => ({
           aiData: {
             coach_reply: "Hello, how can I help you?",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
           },
         }),
       });
@@ -241,6 +258,10 @@ describe("useActingCoach", () => {
         json: async () => ({
           aiData: {
             coach_reply: "Here is some guidance.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
           },
         }),
       });
@@ -265,7 +286,10 @@ describe("useActingCoach", () => {
           json: async () => ({
             aiData: {
               coach_reply: "First response",
-
+              session_focus: null,
+              step_index: 0,
+              mode: null,
+              phase: null,
             },
           }),
         })
@@ -274,7 +298,10 @@ describe("useActingCoach", () => {
           json: async () => ({
             aiData: {
               coach_reply: "Second response",
-
+              session_focus: null,
+              step_index: 0,
+              mode: null,
+              phase: null,
             },
           }),
         });
@@ -307,9 +334,84 @@ describe("useActingCoach", () => {
               { role: "user", content: "First message" },
               { role: "assistant", content: "First response" },
             ],
+            currentFocus: {
+              sessionFocus: null,
+              stepIndex: 0,
+              mode: null,
+              phase: null,
+            },
           }),
         })
       );
+    });
+
+    it("calls updateDoc with sessionFocus, stepIndex, mode, and phase from aiData after successful response", async () => {
+      const { updateDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Here is some guidance.",
+            session_focus: "Find the objective",
+            step_index: 3,
+            mode: "guided",
+            phase: "objective",
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("What should I work on?");
+      });
+
+      await waitFor(() => {
+        expect(updateDoc).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            sessionFocus: "Find the objective",
+            stepIndex: 3,
+            mode: "guided",
+            phase: "objective",
+          })
+        );
+      });
+    });
+
+    it("sends currentFocus from session snapshot in fetch body", async () => {
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Response with focus",
+            session_focus: "Work on objective",
+            step_index: 2,
+            mode: "guided",
+            phase: "objective",
+          },
+        }),
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Continue working");
+      });
+
+      const fetchCall = mockFetch.mock.calls[0];
+      const body = JSON.parse(fetchCall[1].body);
+      expect(body.currentFocus).toEqual({
+        sessionFocus: null,
+        stepIndex: 0,
+        mode: null,
+        phase: null,
+      });
     });
   });
 
@@ -382,7 +484,10 @@ describe("useActingCoach", () => {
           json: async () => ({
             aiData: {
               coach_reply: "Delayed response",
-
+              session_focus: null,
+              step_index: 0,
+              mode: null,
+              phase: null,
             },
           }),
         });
@@ -420,6 +525,10 @@ describe("useActingCoach", () => {
           title: "New Session",
           linkedAuditionId: null,
           messageCount: 0,
+          sessionFocus: null,
+          stepIndex: 0,
+          mode: null,
+          phase: null,
         })
       );
     });

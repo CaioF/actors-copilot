@@ -219,4 +219,113 @@ describe("buildCoachPrompt", () => {
       expect(prompt).toContain("## transition");
     });
   });
+
+  describe("with currentFocus", () => {
+    it("includes Session focus line when currentFocus.sessionFocus is truthy", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find Jane's objective in scene 2",
+          stepIndex: 2,
+          mode: "guided",
+          phase: "objective",
+        },
+      });
+      expect(prompt).toContain("Session focus: Find Jane's objective in scene 2");
+      expect(prompt).toContain("Step index: 2");
+      expect(prompt).toContain("Mode: guided");
+      expect(prompt).toContain("Phase: objective");
+    });
+
+    it("omits Session focus line when currentFocus is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: null,
+      });
+      expect(prompt).not.toContain("Session focus: Find");
+    });
+
+    it("omits Session focus line when currentFocus.sessionFocus is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: null,
+          stepIndex: 0,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      expect(prompt).not.toContain("Session focus: Find");
+    });
+
+    it("omits Session focus line when currentFocus.sessionFocus is empty string", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "",
+          stepIndex: 0,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      expect(prompt).not.toContain("Session focus: Find");
+    });
+
+    it("places Session focus line before # ACTOR'S QUESTION", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find objective",
+          stepIndex: 1,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      const focusLineIndex = prompt.indexOf("Session focus: Find objective");
+      const questionIndex = prompt.indexOf("# ACTOR'S QUESTION");
+      expect(focusLineIndex).toBeGreaterThan(0);
+      expect(questionIndex).toBeGreaterThan(0);
+      expect(focusLineIndex).toBeLessThan(questionIndex);
+    });
+
+    it("defaults mode to guided when mode is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find objective",
+          stepIndex: 0,
+          mode: null,
+          phase: null,
+        },
+      });
+      expect(prompt).toContain("Mode: guided");
+    });
+
+    it("defaults phase to (none) when phase is null", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+        currentFocus: {
+          sessionFocus: "Find objective",
+          stepIndex: 0,
+          mode: "guided",
+          phase: null,
+        },
+      });
+      expect(prompt).toContain("Phase: (none)");
+    });
+  });
 });

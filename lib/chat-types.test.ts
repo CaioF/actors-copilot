@@ -377,7 +377,7 @@ it("should give partial progress based on themes only", () => {
 });
 
 describe("CoachSession interface", () => {
-  it("should have exactly 7 fields: id, createdAt, lastActiveAt, status, title, linkedAuditionId, messageCount", () => {
+  it("should have exactly 11 fields: id, createdAt, lastActiveAt, status, title, linkedAuditionId, messageCount, sessionFocus, stepIndex, mode, phase", () => {
     const session: CoachSession = {
       id: "test-session-id",
       createdAt: null,
@@ -386,9 +386,13 @@ describe("CoachSession interface", () => {
       title: null,
       linkedAuditionId: null,
       messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
     };
 
-    expect(Object.keys(session)).toHaveLength(7);
+    expect(Object.keys(session)).toHaveLength(11);
     expect(Object.keys(session)).toEqual([
       "id",
       "createdAt",
@@ -397,6 +401,10 @@ describe("CoachSession interface", () => {
       "title",
       "linkedAuditionId",
       "messageCount",
+      "sessionFocus",
+      "stepIndex",
+      "mode",
+      "phase",
     ]);
   });
 
@@ -409,6 +417,10 @@ describe("CoachSession interface", () => {
       title: null,
       linkedAuditionId: null,
       messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
     };
 
     expect(session).not.toHaveProperty("section");
@@ -430,6 +442,10 @@ describe("CoachSession interface", () => {
       title: null,
       linkedAuditionId: null,
       messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
     };
 
     const completedSession: CoachSession = {
@@ -440,6 +456,10 @@ describe("CoachSession interface", () => {
       title: null,
       linkedAuditionId: null,
       messageCount: 5,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
     };
 
     expect(activeSession.status).toBe("active");
@@ -455,10 +475,83 @@ describe("CoachSession interface", () => {
       title: "Scene work prep",
       linkedAuditionId: "audition-123",
       messageCount: 3,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: null,
+      phase: null,
     };
 
     expect(session.title).toBe("Scene work prep");
     expect(session.linkedAuditionId).toBe("audition-123");
+  });
+
+  it("should allow sessionFocus, stepIndex, mode, and phase to be set", () => {
+    const session: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 3,
+      sessionFocus: "Find Jane's objective in scene 2",
+      stepIndex: 2,
+      mode: "guided",
+      phase: "objective",
+    };
+
+    expect(session.sessionFocus).toBe("Find Jane's objective in scene 2");
+    expect(session.stepIndex).toBe(2);
+    expect(session.mode).toBe("guided");
+    expect(session.phase).toBe("objective");
+  });
+
+  it("should allow mode to be guided, informational, or transition", () => {
+    const guidedSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: "guided",
+      phase: null,
+    };
+
+    const informationalSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: "informational",
+      phase: null,
+    };
+
+    const transitionSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+      sessionFocus: null,
+      stepIndex: 0,
+      mode: "transition",
+      phase: null,
+    };
+
+    expect(guidedSession.mode).toBe("guided");
+    expect(informationalSession.mode).toBe("informational");
+    expect(transitionSession.mode).toBe("transition");
   });
 });
 

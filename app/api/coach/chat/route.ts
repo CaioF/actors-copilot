@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content, history, auditionId } = body;
+    const { content, history, auditionId, currentFocus } = body;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -109,6 +109,7 @@ export async function POST(request: Request) {
       history: historyToInclude,
       auditions: auditionSummaries,
       auditionFullData,
+      currentFocus: currentFocus ?? null,
     });
 
     let generationModel;

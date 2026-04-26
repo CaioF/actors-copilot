@@ -22,6 +22,12 @@ export interface CoachPromptInput {
   }>;
   auditions?: AuditionSummary[];
   auditionFullData?: Record<string, unknown>;
+  currentFocus?: {
+    sessionFocus: string | null;
+    stepIndex: number;
+    mode: "guided" | "informational" | "transition" | null;
+    phase: string | null;
+  } | null;
 }
 
 export interface CoachApiRequest {

@@ -52,6 +52,10 @@ export interface CoachSession {
   title: string | null;
   linkedAuditionId: string | null;
   messageCount: number;
+  sessionFocus: string | null;
+  stepIndex: number;
+  mode: "guided" | "informational" | "transition" | null;
+  phase: string | null;
 }
 
 export interface CoachMessage {

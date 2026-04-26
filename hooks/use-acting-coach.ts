@@ -89,6 +89,10 @@ export function useActingCoach(): UseActingCoachReturn {
             title: "New Session",
             linkedAuditionId: null,
             messageCount: 0,
+            sessionFocus: null,
+            stepIndex: 0,
+            mode: null,
+            phase: null,
           });
         }
       },
@@ -144,6 +148,15 @@ export function useActingCoach(): UseActingCoachReturn {
           `users/${userPath}/coachSessions/${sessionId}/messages`
         );
 
+        const currentFocus = session
+          ? {
+              sessionFocus: session.sessionFocus ?? null,
+              stepIndex: session.stepIndex ?? 0,
+              mode: session.mode ?? null,
+              phase: session.phase ?? null,
+            }
+          : null;
+
         const history = messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
@@ -173,6 +186,7 @@ export function useActingCoach(): UseActingCoachReturn {
               content: trimmedContent,
               history,
               auditionId,
+              currentFocus,
             }),
           });
 
@@ -197,6 +211,10 @@ export function useActingCoach(): UseActingCoachReturn {
             {
               lastActiveAt: serverTimestamp(),
               messageCount: increment(1),
+              sessionFocus: data.aiData.session_focus,
+              stepIndex: data.aiData.step_index,
+              mode: data.aiData.mode,
+              phase: data.aiData.phase,
             }
           );
         } catch (err) {
@@ -305,6 +323,10 @@ export function useActingCoach(): UseActingCoachReturn {
           title: "New Session",
           linkedAuditionId: opts?.linkedAuditionId ?? null,
           messageCount: 0,
+          sessionFocus: null,
+          stepIndex: 0,
+          mode: null,
+          phase: null,
         }
       );
       setMessages([]);
