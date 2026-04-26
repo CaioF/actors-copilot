@@ -313,7 +313,7 @@ describe("useActingCoach", () => {
     });
   });
 
-  describe("clearSession", () => {
+  describe("startNewSession", () => {
     it("resets messages to [] and error to null after a conversation", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -335,22 +335,27 @@ describe("useActingCoach", () => {
         expect(result.current.messages).toHaveLength(2);
       });
 
-      act(() => {
-        result.current.clearSession();
+      // Clear mock messages state so the new session listener sees an empty collection
+      writtenMessages.length = 0;
+
+      await act(async () => {
+        await result.current.startNewSession();
       });
 
-      expect(result.current.messages).toEqual([]);
+      await waitFor(() => {
+        expect(result.current.messages).toEqual([]);
+      });
       expect(result.current.error).toBe(null);
     });
 
-    it("is safely callable on a fresh hook with no messages", () => {
+    it("is safely callable on a fresh hook with no messages", async () => {
       const { result } = renderHook(() => useActingCoach());
 
       expect(result.current.messages).toEqual([]);
       expect(result.current.error).toBe(null);
 
-      act(() => {
-        result.current.clearSession();
+      await act(async () => {
+        await result.current.startNewSession();
       });
 
       expect(result.current.messages).toEqual([]);
@@ -371,9 +376,7 @@ describe("useActingCoach", () => {
 
       await act(async () => {
         const sendPromise = result.current.sendMessage("Hello coach");
-        act(() => {
-          result.current.clearSession();
-        });
+        await result.current.startNewSession();
         resolveSlowResponse!({
           ok: true,
           json: async () => ({
@@ -389,6 +392,57 @@ describe("useActingCoach", () => {
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
+    });
+
+    it("creates a new Firestore session doc and updates sessionId state", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      const oldSessionId = result.current.sessionId;
+
+      await act(async () => {
+        await result.current.startNewSession();
+      });
+
+      expect(result.current.sessionId).not.toBe(oldSessionId);
+      expect(result.current.sessionId).toMatch(
+        /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
+      );
+      expect(setDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          status: "active",
+          title: "New Session",
+          linkedAuditionId: null,
+          messageCount: 0,
+        })
+      );
+    });
+
+    it("passes linkedAuditionId to setDoc when provided", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.startNewSession({ linkedAuditionId: "audition-123" });
+      });
+
+      expect(setDoc).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          linkedAuditionId: "audition-123",
+        })
+      );
     });
   });
 

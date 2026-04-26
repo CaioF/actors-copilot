@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 jest.mock("@/lib/firebase", () => ({
@@ -35,7 +35,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockSendMessage = jest.fn();
-const mockClearSession = jest.fn();
+const mockStartNewSession = jest.fn().mockResolvedValue(undefined);
 
 jest.mock("@/hooks/use-acting-coach", () => ({
   useActingCoach: jest.fn(),
@@ -51,13 +51,16 @@ describe("ActingCoachPage", () => {
     mockSearchParams.delete("project");
     mockSearchParams.delete("role");
     mockSendMessage.mockImplementation(() => Promise.resolve());
-    mockClearSession.mockImplementation(() => {});
+    mockStartNewSession.mockClear();
+    mockSendMessage.mockImplementation(() => Promise.resolve());
+    mockStartNewSession.mockResolvedValue(undefined);
     (useActingCoach as jest.Mock).mockReturnValue({
       messages: [],
       isLoading: false,
       error: null,
       sendMessage: mockSendMessage,
-      clearSession: mockClearSession,
+      startNewSession: mockStartNewSession,
+      session: { linkedAuditionId: null, sessionFocus: null, stepIndex: 0, mode: null, phase: null },
     });
   });
 
@@ -111,7 +114,8 @@ describe("ActingCoachPage", () => {
       isLoading: false,
       error: null,
       sendMessage: jest.fn(),
-      clearSession: jest.fn(),
+      startNewSession: jest.fn(),
+      session: null,
     });
     render(<ActingCoachPage />);
     expect(screen.queryByAltText("The Actors Copilot")).not.toBeInTheDocument();
@@ -131,7 +135,8 @@ describe("ActingCoachPage", () => {
       isLoading: false,
       error: null,
       sendMessage: jest.fn(),
-      clearSession: jest.fn(),
+      startNewSession: jest.fn(),
+      session: null,
     });
     render(<ActingCoachPage />);
     expect(screen.queryByText("Help me deepen my objective")).not.toBeInTheDocument();
@@ -142,10 +147,10 @@ describe("ActingCoachPage", () => {
     expect(screen.getByText("New Session")).toBeInTheDocument();
   });
 
-  it("clicking New Session calls clearSession", () => {
+  it("clicking New Session calls startNewSession", () => {
     render(<ActingCoachPage />);
     fireEvent.click(screen.getByText("New Session"));
-    expect(mockClearSession).toHaveBeenCalledTimes(1);
+    expect(mockStartNewSession).toHaveBeenCalledTimes(1);
   });
 
   it("clicking a suggestion chip triggers sendMessage with the chip prompt", () => {
@@ -154,17 +159,19 @@ describe("ActingCoachPage", () => {
     expect(mockSendMessage).toHaveBeenCalledWith("Help me deepen my objective");
   });
 
-  it("auto-triggers sendMessage with audition context when auditionId URL param is present", () => {
+  it("auto-triggers sendMessage with audition context when auditionId URL param is present", async () => {
     mockSearchParams.set("auditionId", "aud-123");
     mockSearchParams.set("project", "FOUNDATION");
     mockSearchParams.set("role", "TECHNICIAN");
 
     render(<ActingCoachPage />);
 
-    expect(mockSendMessage).toHaveBeenCalledWith(
-      "I want to work on my FOUNDATION audition as TECHNICIAN.",
-      "aud-123"
-    );
+    await waitFor(() => {
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "I want to work on my FOUNDATION audition as TECHNICIAN.",
+        "aud-123"
+      );
+    });
   });
 
   it("does not auto-trigger when auditionId URL param is absent", () => {

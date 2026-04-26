@@ -25,7 +25,7 @@ interface UseActingCoachReturn {
   isLoading: boolean;
   error: string | null;
   sendMessage: (content: string, auditionId?: string) => Promise<void>;
-  clearSession: () => void;
+  startNewSession: (opts?: { linkedAuditionId?: string | null }) => Promise<void>;
   session: CoachSession | null;
   sessionId: string;
 }
@@ -292,17 +292,34 @@ export function useActingCoach(): UseActingCoachReturn {
     [messages, sessionId, userPath]
   );
 
-  const clearSession = useCallback(() => {
-    setMessages([]);
-    setError(null);
-  }, []);
+  const startNewSession = useCallback(
+    async (opts?: { linkedAuditionId?: string | null }) => {
+      if (!userPath) return;
+      const newSessionId = crypto.randomUUID();
+      await setDoc(
+        doc(getDb(), `users/${userPath}/coachSessions/${newSessionId}`),
+        {
+          createdAt: serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
+          status: "active",
+          title: "New Session",
+          linkedAuditionId: opts?.linkedAuditionId ?? null,
+          messageCount: 0,
+        }
+      );
+      setMessages([]);
+      setError(null);
+      setSessionId(newSessionId);
+    },
+    [userPath]
+  );
 
   return {
     messages,
     isLoading,
     error,
     sendMessage,
-    clearSession,
+    startNewSession,
     session,
     sessionId,
   };
