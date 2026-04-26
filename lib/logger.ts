@@ -38,5 +38,9 @@ export const logger = createLogger();
  * @returns A pino logger instance with the additional context baked in
  */
 export const createChildLogger = (context: Record<string, unknown>) => {
-  return logger.child(context);
+  const child = logger.child(context);
+  // Pino browser child() does not reliably inherit the parent level;
+  // force-set it so debug/trace logs are not silently dropped.
+  child.level = logger.level;
+  return child;
 };
