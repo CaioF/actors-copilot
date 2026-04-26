@@ -232,6 +232,37 @@ export default function SettingsPage() {
         operationsCount++;
       }
 
+      // Coach sessions — same writeBatch pattern as DNA sessions above
+      const coachSessionsRef = collection(db, `users/${userPath}/coachSessions`);
+      const coachSessionDocs = await getDocs(coachSessionsRef).catch((err) => {
+        logger.error({ err, msg: 'Failed to check coach sessions' });
+        throw err;
+      });
+
+      for (const coachSessionDoc of coachSessionDocs.docs) {
+        const coachMessagesRef = collection(
+          db,
+          `users/${userPath}/coachSessions/${coachSessionDoc.id}/messages`
+        );
+        const coachMessagesSnap = await getDocs(coachMessagesRef);
+
+        coachMessagesSnap.docs.forEach((msgDoc) => {
+          batch.delete(
+            doc(
+              db,
+              `users/${userPath}/coachSessions/${coachSessionDoc.id}/messages`,
+              msgDoc.id
+            )
+          );
+          operationsCount++;
+        });
+
+        batch.delete(
+          doc(db, `users/${userPath}/coachSessions`, coachSessionDoc.id)
+        );
+        operationsCount++;
+      }
+
       const profileRef = doc(db, `users/${userPath}/profile/master`);
       batch.delete(profileRef);
       operationsCount++;
