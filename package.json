@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
-    "@pinecone-database/pinecone": "^3.0.0",
     "@hookform/resolvers": "^3.9.1",
+    "@pinecone-database/pinecone": "^3.0.0",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
@@ -69,6 +69,7 @@
     "react": "19.2.4",
     "react-day-picker": "9.13.2",
     "react-dom": "19.2.4",
+    "react-dropzone": "^15.0.0",
     "react-hook-form": "^7.54.1",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",

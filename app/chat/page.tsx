@@ -82,7 +82,7 @@ export default function ChatPage() {
       {/* Main content area */}
       {/* TODO: Implement an Error Boundary or empty state fallback in case the useChat hook fails to initialize properly. */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader title="AI Copilot DNA Extraction" />
+        <DashboardHeader title="Personal DNA Extraction" />
 
         {/* Chat message display area */}
         <ChatMessages
