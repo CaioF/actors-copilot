@@ -133,76 +133,163 @@ export function useActingCoach(): UseActingCoachReturn {
     async (content: string, auditionId?: string) => {
       if (!content.trim()) return;
 
-      const userMsg: CoachMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: content.trim(),
-      };
+      const trimmedContent = content.trim();
 
-      setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
       setError(null);
 
-      try {
-        const auth = getAuth();
-        const idToken = await auth.currentUser?.getIdToken();
-
-        if (!idToken) {
-          throw new Error("Authentication required");
-        }
+      if (userPath) {
+        const messagesRef = collection(
+          getDb(),
+          `users/${userPath}/coachSessions/${sessionId}/messages`
+        );
 
         const history = messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
 
-        const response = await fetch("/api/coach/chat", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            content: content.trim(),
-            history,
-            auditionId,
-          }),
-        });
+        try {
+          await addDoc(messagesRef, {
+            role: "user",
+            content: trimmedContent,
+            timestamp: serverTimestamp(),
+          });
 
-        if (!response.ok) {
-          throw new Error(`Request failed: ${response.status}`);
+          const auth = getAuth();
+          const idToken = await auth.currentUser?.getIdToken();
+
+          if (!idToken) {
+            throw new Error("Authentication required");
+          }
+
+          const response = await fetch("/api/coach/chat", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: trimmedContent,
+              history,
+              auditionId,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Request failed: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (!data?.aiData?.coach_reply) {
+            throw new Error("Invalid response from coach");
+          }
+
+          await addDoc(messagesRef, {
+            role: "assistant",
+            content: data.aiData.coach_reply,
+            timestamp: serverTimestamp(),
+          });
+
+          await updateDoc(
+            doc(getDb(), `users/${userPath}/coachSessions/${sessionId}`),
+            {
+              lastActiveAt: serverTimestamp(),
+              messageCount: increment(1),
+            }
+          );
+        } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : "Failed to get coach response";
+          setError(errorMessage);
+
+          try {
+            await addDoc(messagesRef, {
+              role: "assistant",
+              content:
+                "I apologize, but I'm having trouble responding right now. Please try again.",
+              timestamp: serverTimestamp(),
+            });
+          } catch {
+            // Silently accept — the error message is already in local state via setMessages.
+          }
+        } finally {
+          setIsLoading(false);
         }
-
-        const data = await response.json();
-
-        if (!data?.aiData?.coach_reply) {
-          throw new Error("Invalid response from coach");
-        }
-
-        const assistantMsg: CoachMessage = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: data.aiData.coach_reply,
+      } else {
+        const userMsg: CoachMessage = {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: trimmedContent,
+          timestamp: null,
         };
 
-        setMessages((prev) => [...prev, assistantMsg]);
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to get coach response";
-        setError(errorMessage);
+        setMessages((prev) => [...prev, userMsg]);
 
-        const errorMsg: CoachMessage = {
-          id: `error-${Date.now()}`,
-          role: "assistant",
-          content:
-            "I apologize, but I'm having trouble responding right now. Please try again.",
-        };
-        setMessages((prev) => [...prev, errorMsg]);
-      } finally {
-        setIsLoading(false);
+        try {
+          const auth = getAuth();
+          const idToken = await auth.currentUser?.getIdToken();
+
+          if (!idToken) {
+            throw new Error("Authentication required");
+          }
+
+          const history = messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
+
+          const response = await fetch("/api/coach/chat", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: trimmedContent,
+              history,
+              auditionId,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Request failed: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (!data?.aiData?.coach_reply) {
+            throw new Error("Invalid response from coach");
+          }
+
+          const assistantMsg: CoachMessage = {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: data.aiData.coach_reply,
+            timestamp: null,
+          };
+
+          setMessages((prev) => [...prev, assistantMsg]);
+        } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : "Failed to get coach response";
+          setError(errorMessage);
+
+          const errorMsg: CoachMessage = {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content:
+              "I apologize, but I'm having trouble responding right now. Please try again.",
+            timestamp: null,
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        } finally {
+          setIsLoading(false);
+        }
       }
     },
-    [messages]
+    [messages, sessionId, userPath]
   );
 
   const clearSession = useCallback(() => {
