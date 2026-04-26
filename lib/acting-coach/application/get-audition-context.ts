@@ -1,8 +1,9 @@
+import type { Firestore } from "firebase-admin/firestore";
 import { AuditionSummary } from "../contracts";
 
 export async function getUserAuditionsSummary(
   userPath: string,
-  db: FirebaseFirestore.Firestore
+  db: Firestore
 ): Promise<AuditionSummary[]> {
   const snapshot = await db
     .collection("users")
@@ -25,7 +26,7 @@ export async function getUserAuditionsSummary(
 export async function getAuditionFullData(
   userPath: string,
   auditionId: string,
-  db: FirebaseFirestore.Firestore
+  db: Firestore
 ): Promise<Record<string, unknown> | null> {
   const doc = await db.doc(`users/${userPath}/auditions/${auditionId}`).get();
   if (!doc.exists) {
