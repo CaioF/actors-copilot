@@ -18,6 +18,9 @@ import {
 } from "firebase/firestore";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { CoachMessage, CoachSession } from "@/lib/chat-types";
+import { createChildLogger } from "@/lib/logger";
+
+const log = createChildLogger({ module: "CoachExtraction" });
 
 const DEFAULT_SESSION_ID = "coach-session-1";
 
@@ -170,6 +173,7 @@ export function useActingCoach(): UseActingCoachReturn {
             content: trimmedContent,
             timestamp: serverTimestamp(),
           });
+          log.debug({ content: trimmedContent }, "User message sent to coach");
 
           const auth = getAuth();
           const idToken = await auth.currentUser?.getIdToken();
@@ -202,6 +206,12 @@ export function useActingCoach(): UseActingCoachReturn {
             throw new Error("Invalid response from coach");
           }
 
+          log.debug({
+            reply: data.aiData.coach_reply,
+            actionType: data.aiData.action?.type,
+            hasExtractions: data.aiData.extractions != null,
+          }, "Coach reply received");
+
           await addDoc(messagesRef, {
             role: "assistant",
             content: data.aiData.coach_reply,
@@ -222,11 +232,17 @@ export function useActingCoach(): UseActingCoachReturn {
 
           if (data.aiData.action?.type === "trigger_dna_extraction" && data.aiData.extractions) {
             const aiExtractions = data.aiData.extractions;
+            log.debug({
+              depthScore: aiExtractions.progress_assessment?.depth_score,
+              hasActionablePattern: aiExtractions.progress_assessment?.has_actionable_pattern,
+              newTraitsCount: aiExtractions.new_traits?.length ?? 0,
+            }, "Coach extraction data received from API");
             const isHighQuality =
               aiExtractions.progress_assessment?.has_actionable_pattern === true &&
               (aiExtractions.progress_assessment?.depth_score ?? 0) >= 4;
 
             if (isHighQuality) {
+              log.debug("Coach extraction passed quality gate, writing to profile/master");
               const profileRef = doc(getDb(), `users/${userPath}/profile/master`);
               const updatePayload: Record<string, unknown> = { lastUpdated: serverTimestamp() };
 
@@ -263,9 +279,15 @@ export function useActingCoach(): UseActingCoachReturn {
 
               try {
                 await setDoc(profileRef, updatePayload, { merge: true });
+                log.debug({ fieldCount: Object.keys(updatePayload).length - 1 }, "Coach extraction written to profile/master");
               } catch (writeErr) {
                 console.error("Coach extraction profile write failed", writeErr);
               }
+            } else {
+              log.debug({
+                depthScore: aiExtractions.progress_assessment?.depth_score,
+                hasActionablePattern: aiExtractions.progress_assessment?.has_actionable_pattern,
+              }, "Coach extraction failed quality gate");
             }
           }
         } catch (err) {

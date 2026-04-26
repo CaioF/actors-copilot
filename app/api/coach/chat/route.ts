@@ -174,6 +174,7 @@ export async function POST(request: Request) {
 
       let extractions: ExtractedPsychData | null = null;
       if (envelope.action?.type === "trigger_dna_extraction") {
+        log.debug({ historyCount: (body.history ?? []).length }, "Coach emitted trigger_dna_extraction, running extraction");
         try {
           const historyMessages: ChatHistoryMessage[] = (body.history ?? []).map(
             (msg: { role: string; content: string }) => ({
@@ -185,7 +186,14 @@ export async function POST(request: Request) {
             content: body.content.trim(),
             history: historyMessages.slice(-20),
           });
-          log.info({ hasExtraction: extractions !== null }, "Coach extraction completed");
+          log.info({
+            hasExtraction: extractions !== null,
+            depthScore: extractions?.progress_assessment?.depth_score,
+            hasActionablePattern: extractions?.progress_assessment?.has_actionable_pattern,
+            newTraitsCount: extractions?.new_traits?.length ?? 0,
+            defenseMechCount: extractions?.defense_mechanisms?.length ?? 0,
+            snippetCount: extractions?.leaf_snippets?.length ?? 0,
+          }, "Coach extraction completed");
         } catch (extractErr) {
           log.error({ err: extractErr }, "Coach extraction failed");
           extractions = null;
