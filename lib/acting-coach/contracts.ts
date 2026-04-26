@@ -21,6 +21,7 @@ export interface CoachPromptInput {
     content: string;
   }>;
   auditions?: AuditionSummary[];
+  auditionFullData?: Record<string, unknown>;
 }
 
 export interface CoachApiRequest {
@@ -29,6 +30,7 @@ export interface CoachApiRequest {
     role: "user" | "assistant";
     content: string;
   }>;
+  auditionId?: string;
 }
 
 export interface CoachCitation {
@@ -40,6 +42,5 @@ export interface CoachCitation {
 export interface CoachApiResponse {
   aiData: {
     coach_reply: string;
-    citations: CoachCitation[];
   };
 }

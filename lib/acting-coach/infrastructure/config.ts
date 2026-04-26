@@ -3,8 +3,6 @@ export interface ActingCoachConfig {
   embeddingDimension: number;
   generationModel: string;
   corpusDir: string;
-  googleCloudProject: string;
-  googleCloudLocation: string;
   pineconeApiKey: string;
   pineconeIndexName: string;
   pineconeNamespace: string;
@@ -42,8 +40,6 @@ export function getActingCoachConfig(): ActingCoachConfig {
   const embeddingDimension = getEnvAsInt("ACTING_COACH_EMBEDDING_DIMENSION");
   const generationModel = getEnv("ACTING_COACH_GENERATION_MODEL");
   const corpusDir = getEnv("ACTING_COACH_CORPUS_DIR");
-  const googleCloudProject = getEnv("GOOGLE_CLOUD_PROJECT");
-  const googleCloudLocation = getEnv("GOOGLE_CLOUD_LOCATION");
   const pineconeApiKey = getEnv("PINECONE_API_KEY");
   const pineconeIndexName = getEnv("PINECONE_INDEX_NAME");
   const pineconeNamespace = getOptionalEnv("PINECONE_NAMESPACE", "");
@@ -53,8 +49,6 @@ export function getActingCoachConfig(): ActingCoachConfig {
     embeddingDimension,
     generationModel,
     corpusDir,
-    googleCloudProject,
-    googleCloudLocation,
     pineconeApiKey,
     pineconeIndexName,
     pineconeNamespace,
@@ -63,4 +57,3 @@ export function getActingCoachConfig(): ActingCoachConfig {
   return cachedConfig;
 }
 
-export const actingCoachConfig = getActingCoachConfig();

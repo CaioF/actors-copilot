@@ -15,6 +15,7 @@ describe("ingestActingLibrary", () => {
   const mockPineconeIndex = {
     upsert: mockUpsert,
     describeIndexStats: mockDescribeIndexStats,
+    query: jest.fn(),
   };
 
   const defaultOptions = {

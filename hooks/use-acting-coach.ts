@@ -2,20 +2,18 @@
 
 import { useState, useCallback } from "react";
 import { getAuth } from "firebase/auth";
-import type { CoachCitation } from "@/lib/acting-coach/contracts";
 
 export interface CoachMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  citations?: CoachCitation[];
 }
 
 interface UseActingCoachReturn {
   messages: CoachMessage[];
   isLoading: boolean;
   error: string | null;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, auditionId?: string) => Promise<void>;
   clearSession: () => void;
 }
 
@@ -24,7 +22,7 @@ export function useActingCoach(): UseActingCoachReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, auditionId?: string) => {
     if (!content.trim()) return;
 
     const userMsg: CoachMessage = {
@@ -59,6 +57,7 @@ export function useActingCoach(): UseActingCoachReturn {
         body: JSON.stringify({
           content: content.trim(),
           history,
+          auditionId,
         }),
       });
 
@@ -76,7 +75,6 @@ export function useActingCoach(): UseActingCoachReturn {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: data.aiData.coach_reply,
-        citations: data.aiData.citations || [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);

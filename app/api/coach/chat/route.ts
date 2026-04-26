@@ -2,24 +2,17 @@ import { NextResponse } from "next/server";
 import { createChildLogger, logger } from "@/lib/logger";
 import {
   retrieveCoachContext,
-  type EmbeddingClient,
   type PineconeIndex,
 } from "@/lib/acting-coach/application/retrieve-coach-context";
-import { getUserAuditionsSummary } from "@/lib/acting-coach/application/get-audition-context";
+import { getUserAuditionsSummary, getAuditionFullData } from "@/lib/acting-coach/application/get-audition-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
 import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-generation-model";
-import { createEmbeddingClient } from "@/lib/acting-coach/infrastructure/create-embedding-client";
+import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
-import type { CoachCitation, AuditionSummary } from "@/lib/acting-coach/contracts";
+import type { AuditionSummary } from "@/lib/acting-coach/contracts";
 
-function createEmbeddingClientAdapter(
-  client: ReturnType<typeof createEmbeddingClient>
-): EmbeddingClient {
-  return {
-    embedContent: (params) => client.models.embedContent(params),
-  };
-}
+const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(request: Request) {
   try {
@@ -29,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content, history } = body;
+    const { content, history, auditionId } = body;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -66,19 +59,32 @@ export async function POST(request: Request) {
       log.warn({ err }, "Failed to load audition summaries");
     }
 
+    let auditionFullData: Record<string, unknown> | undefined;
+    if (auditionId && typeof auditionId === "string") {
+      try {
+        const data = await getAuditionFullData(userPath, auditionId, db as any);
+        if (data) auditionFullData = data;
+      } catch (err) {
+        log.warn({ err, auditionId }, "Failed to load audition full data");
+      }
+    }
+
     const config = getActingCoachConfig();
-    const embeddingClient = createEmbeddingClientAdapter(createEmbeddingClient());
-    const pineconeIndex = createPineconeClient()
-      .index(config.pineconeIndexName)
-      .namespace(config.pineconeNamespace || undefined) as PineconeIndex;
+    const pineconeInferenceClient = createPineconeInferenceClient({
+      apiKey: config.pineconeApiKey,
+    });
+    const pineconeRawIndex = createPineconeClient().index(config.pineconeIndexName);
+    const pineconeIndex = (config.pineconeNamespace
+      ? pineconeRawIndex.namespace(config.pineconeNamespace)
+      : pineconeRawIndex) as unknown as PineconeIndex;
 
     let excerpts;
     try {
       excerpts = await retrieveCoachContext(
         content,
         config.embeddingModel,
-        { topK: 5, namespace: config.pineconeNamespace || undefined },
-        { embeddingClient, pineconeIndex }
+        { topK: 5 },
+        { pineconeInferenceClient, pineconeIndex }
       );
     } catch (err) {
       log.error({ err }, "Retrieval failed");
@@ -88,12 +94,20 @@ export async function POST(request: Request) {
       );
     }
 
+    log.info(
+      { excerptCount: excerpts.length, excerpts },
+      "Retrieved context from Pinecone"
+    );
+
+    const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
+
     const prompt = buildCoachPrompt({
       actorBaseline,
       excerpts,
       question: content,
-      history,
+      history: historyToInclude,
       auditions: auditionSummaries,
+      auditionFullData,
     });
 
     let generationModel;
@@ -119,17 +133,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const citations: CoachCitation[] = excerpts.map((excerpt) => ({
-      citationNumber: excerpt.citationNumber,
-      sourceBook: excerpt.sourceBook,
-      excerptText: excerpt.excerptText,
-    }));
-
     return NextResponse.json(
       {
         aiData: {
           coach_reply: replyText,
-          citations,
         },
       },
       { status: 200 }

@@ -29,13 +29,6 @@ describe("useActingCoach", () => {
         json: async () => ({
           aiData: {
             coach_reply: "Hello, how can I help you?",
-            citations: [
-              {
-                citationNumber: 1,
-                sourceBook: "Acting Techniques",
-                excerptText: "Some excerpt text",
-              },
-            ],
           },
         }),
       });
@@ -69,12 +62,6 @@ describe("useActingCoach", () => {
       expect(result.current.messages[1]).toMatchObject({
         role: "assistant",
         content: "Hello, how can I help you?",
-      });
-      expect(result.current.messages[1].citations).toHaveLength(1);
-      expect(result.current.messages[1].citations?.[0]).toMatchObject({
-        citationNumber: 1,
-        sourceBook: "Acting Techniques",
-        excerptText: "Some excerpt text",
       });
     });
 
@@ -141,7 +128,7 @@ describe("useActingCoach", () => {
           json: async () => ({
             aiData: {
               coach_reply: "First response",
-              citations: [],
+
             },
           }),
         })
@@ -150,7 +137,7 @@ describe("useActingCoach", () => {
           json: async () => ({
             aiData: {
               coach_reply: "Second response",
-              citations: [],
+
             },
           }),
         });
@@ -255,7 +242,7 @@ describe("useActingCoach", () => {
           json: async () => ({
             aiData: {
               coach_reply: "Delayed response",
-              citations: [],
+
             },
           }),
         });

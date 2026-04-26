@@ -1,23 +1,11 @@
 import type { RetrievedExcerpt } from "../contracts";
+import type { PineconeInferenceClient } from "../infrastructure/pinecone-inference-client";
+
+export type { PineconeInferenceClient };
 
 export interface RetrievalOptions {
   topK?: number;
   namespace?: string;
-}
-
-export interface EmbeddingClient {
-  embedContent(params: {
-    model: string;
-    contents: Array<{ parts: Array<{ text: string }> }>;
-    config?: {
-      outputDimensionality?: number;
-      taskType?: string;
-    };
-  }): Promise<{
-    embeddings?: Array<{
-      values?: number[];
-    }>;
-  }>;
 }
 
 export interface PineconeIndex {
@@ -25,7 +13,6 @@ export interface PineconeIndex {
     vector: number[];
     topK: number;
     includeMetadata: boolean;
-    namespace?: string;
   }): Promise<{
     matches: Array<{
       id: string;
@@ -36,7 +23,7 @@ export interface PineconeIndex {
 }
 
 export interface RetrievalDependencies {
-  embeddingClient: EmbeddingClient;
+  pineconeInferenceClient: PineconeInferenceClient;
   pineconeIndex: PineconeIndex;
 }
 
@@ -53,17 +40,15 @@ export async function retrieveCoachContext(
   options: RetrievalOptions,
   deps: RetrievalDependencies
 ): Promise<RetrievedExcerpt[]> {
-  const { embeddingClient, pineconeIndex } = deps;
+  const { pineconeInferenceClient, pineconeIndex } = deps;
   const topK = options.topK ?? 5;
 
-  let embeddingResponse;
+  let embeddingResult: number[][];
   try {
-    embeddingResponse = await embeddingClient.embedContent({
+    embeddingResult = await pineconeInferenceClient.embed({
       model: embeddingModel,
-      contents: [{ parts: [{ text: question }] }],
-      config: {
-        taskType: "RETRIEVAL_QUERY",
-      },
+      inputs: [question],
+      taskType: "RETRIEVAL_QUERY",
     });
   } catch (err) {
     throw new RetrievalError(
@@ -71,8 +56,8 @@ export async function retrieveCoachContext(
     );
   }
 
-  const vector = embeddingResponse.embeddings?.[0]?.values;
-  if (!vector) {
+  const vector = embeddingResult[0];
+  if (!vector || vector.length === 0) {
     throw new RetrievalError("Failed to embed question: no embedding returned");
   }
 
@@ -82,7 +67,6 @@ export async function retrieveCoachContext(
       vector,
       topK,
       includeMetadata: true,
-      namespace: options.namespace,
     });
   } catch (err) {
     throw new RetrievalError(
@@ -97,7 +81,7 @@ export async function retrieveCoachContext(
     return {
       citationNumber: index + 1,
       sourceBook: typeof metadata.sourceBook === "string" ? metadata.sourceBook : match.id,
-      excerptText: typeof metadata.content === "string" ? metadata.content : "",
+      excerptText: typeof metadata.text === "string" ? metadata.text : "",
       score: match.score ?? 0,
     };
   });

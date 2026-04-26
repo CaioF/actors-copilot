@@ -1,11 +1,11 @@
 import { retrieveCoachContext, RetrievalError } from "./retrieve-coach-context";
 
 describe("retrieveCoachContext", () => {
-  const mockEmbedContent = jest.fn();
+  const mockEmbed = jest.fn();
   const mockQuery = jest.fn();
 
-  const mockEmbeddingClient = {
-    embedContent: mockEmbedContent,
+  const mockPineconeInferenceClient = {
+    embed: mockEmbed,
   };
 
   const mockPineconeIndex = {
@@ -13,7 +13,7 @@ describe("retrieveCoachContext", () => {
   };
 
   const defaultDeps = {
-    embeddingClient: mockEmbeddingClient,
+    pineconeInferenceClient: mockPineconeInferenceClient,
     pineconeIndex: mockPineconeIndex,
   };
 
@@ -26,36 +26,32 @@ describe("retrieveCoachContext", () => {
   });
 
   describe("embedding and query orchestration", () => {
-    it("calls embedding client with retrieval-query task type", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+    it("calls Pinecone inference client with retrieval-query task type", async () => {
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({ matches: [] });
 
       await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
 
-      expect(mockEmbedContent).toHaveBeenCalledWith({
-        model: "text-embedding-004",
-        contents: [{ parts: [{ text: "How do I prepare for an audition?" }] }],
-        config: { taskType: "RETRIEVAL_QUERY" },
+      expect(mockEmbed).toHaveBeenCalledWith({
+        model: "llama-text-embed-v2",
+        inputs: ["How do I prepare for an audition?"],
+        taskType: "RETRIEVAL_QUERY",
       });
     });
 
     it("forwards the resulting embedding vector to Pinecone query", async () => {
       const embeddingVector = new Array(768).fill(0.1);
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: embeddingVector }],
-      });
+      mockEmbed.mockResolvedValue([embeddingVector]);
       mockQuery.mockResolvedValue({ matches: [] });
 
       await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -64,20 +60,17 @@ describe("retrieveCoachContext", () => {
         vector: embeddingVector,
         topK: 5,
         includeMetadata: true,
-        namespace: undefined,
       });
     });
 
-    it("uses custom topK and namespace when provided", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+    it("uses custom topK when provided", async () => {
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({ matches: [] });
 
       await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
-        { topK: 10, namespace: "test-namespace" },
+        "llama-text-embed-v2",
+        { topK: 10 },
         defaultDeps
       );
 
@@ -85,16 +78,13 @@ describe("retrieveCoachContext", () => {
         vector: expect.any(Array),
         topK: 10,
         includeMetadata: true,
-        namespace: "test-namespace",
       });
     });
   });
 
   describe("result mapping", () => {
     it("maps Pinecone matches to RetrievedExcerpt with citation numbers, sourceBook, excerptText, and score", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({
         matches: [
           {
@@ -102,7 +92,7 @@ describe("retrieveCoachContext", () => {
             score: 0.95,
             metadata: {
               sourceBook: "acting-guide.txt",
-              content: "First paragraph about acting.",
+              text: "First paragraph about acting.",
               chunkIndex: 0,
               contentType: "text/plain",
             },
@@ -112,7 +102,7 @@ describe("retrieveCoachContext", () => {
             score: 0.87,
             metadata: {
               sourceBook: "acting-guide.txt",
-              content: "Second paragraph about auditioning.",
+              text: "Second paragraph about auditioning.",
               chunkIndex: 1,
               contentType: "text/plain",
             },
@@ -122,7 +112,7 @@ describe("retrieveCoachContext", () => {
 
       const result = await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -145,9 +135,7 @@ describe("retrieveCoachContext", () => {
     });
 
     it("uses id as sourceBook fallback when metadata.sourceBook is missing", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({
         matches: [
           {
@@ -162,7 +150,7 @@ describe("retrieveCoachContext", () => {
 
       const result = await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -171,9 +159,7 @@ describe("retrieveCoachContext", () => {
     });
 
     it("defaults score to 0 when not provided", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({
         matches: [
           {
@@ -188,7 +174,7 @@ describe("retrieveCoachContext", () => {
 
       const result = await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -196,10 +182,8 @@ describe("retrieveCoachContext", () => {
       expect(result[0].score).toBe(0);
     });
 
-    it("defaults excerptText to empty string when content is missing from metadata", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+    it("defaults excerptText to empty string when text is missing from metadata", async () => {
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({
         matches: [
           {
@@ -214,7 +198,7 @@ describe("retrieveCoachContext", () => {
 
       const result = await retrieveCoachContext(
         "How do I prepare for an audition?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -225,14 +209,12 @@ describe("retrieveCoachContext", () => {
 
   describe("empty result handling", () => {
     it("returns empty array when Pinecone returns no matches", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({ matches: [] });
 
       const result = await retrieveCoachContext(
         "Unanswerable question?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -241,14 +223,12 @@ describe("retrieveCoachContext", () => {
     });
 
     it("returns empty array when matches is undefined", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockResolvedValue({});
 
       const result = await retrieveCoachContext(
         "Unanswerable question?",
-        "text-embedding-004",
+        "llama-text-embed-v2",
         defaultOptions,
         defaultDeps
       );
@@ -259,12 +239,12 @@ describe("retrieveCoachContext", () => {
 
   describe("error handling", () => {
     it("throws RetrievalError when embedding fails to return a vector", async () => {
-      mockEmbedContent.mockResolvedValue({ embeddings: [] });
+      mockEmbed.mockResolvedValue([]);
 
       await expect(
         retrieveCoachContext(
           "How do I prepare for an audition?",
-          "text-embedding-004",
+          "llama-text-embed-v2",
           defaultOptions,
           defaultDeps
         )
@@ -272,7 +252,7 @@ describe("retrieveCoachContext", () => {
       await expect(
         retrieveCoachContext(
           "How do I prepare for an audition?",
-          "text-embedding-004",
+          "llama-text-embed-v2",
           defaultOptions,
           defaultDeps
         )
@@ -280,12 +260,12 @@ describe("retrieveCoachContext", () => {
     });
 
     it("throws RetrievalError when embedding client throws", async () => {
-      mockEmbedContent.mockRejectedValue(new Error("Embedding API quota exceeded"));
+      mockEmbed.mockRejectedValue(new Error("Embedding API quota exceeded"));
 
       await expect(
         retrieveCoachContext(
           "How do I prepare for an audition?",
-          "text-embedding-004",
+          "llama-text-embed-v2",
           defaultOptions,
           defaultDeps
         )
@@ -293,7 +273,7 @@ describe("retrieveCoachContext", () => {
       await expect(
         retrieveCoachContext(
           "How do I prepare for an audition?",
-          "text-embedding-004",
+          "llama-text-embed-v2",
           defaultOptions,
           defaultDeps
         )
@@ -301,15 +281,13 @@ describe("retrieveCoachContext", () => {
     });
 
     it("throws RetrievalError when Pinecone query fails", async () => {
-      mockEmbedContent.mockResolvedValue({
-        embeddings: [{ values: new Array(768).fill(0.1) }],
-      });
+      mockEmbed.mockResolvedValue([new Array(768).fill(0.1)]);
       mockQuery.mockRejectedValue(new Error("Pinecone connection refused"));
 
       await expect(
         retrieveCoachContext(
           "How do I prepare for an audition?",
-          "text-embedding-004",
+          "llama-text-embed-v2",
           defaultOptions,
           defaultDeps
         )
@@ -317,7 +295,7 @@ describe("retrieveCoachContext", () => {
       await expect(
         retrieveCoachContext(
           "How do I prepare for an audition?",
-          "text-embedding-004",
+          "llama-text-embed-v2",
           defaultOptions,
           defaultDeps
         )
