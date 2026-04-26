@@ -43,8 +43,7 @@ ${actorBaseline}`);
   if (excerpts.length > 0) {
     const excerptSection = excerpts
       .map((excerpt: RetrievedExcerpt) => {
-        return `[${excerpt.citationNumber}] "${excerpt.excerptText}"
-Source: ${excerpt.sourceBook}`;
+        return `"${excerpt.excerptText}"`;
       })
       .join("\n\n");
 

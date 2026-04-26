@@ -32,9 +32,7 @@ describe("buildCoachPrompt", () => {
 
     it("includes all retrieved excerpts in order", () => {
       const prompt = buildCoachPrompt({ actorBaseline, excerpts, question });
-      expect(prompt).toContain("Respect for Acting");
       expect(prompt).toContain("Authenticity is the foundation");
-      expect(prompt).toContain("Sanford Meisner on Acting");
       expect(prompt).toContain("Living truthfully under imaginary circumstances");
     });
 
@@ -69,8 +67,8 @@ describe("buildCoachPrompt", () => {
     });
   });
 
-  describe("excerpt numbering stability", () => {
-    it("prefixes each excerpt with stable citation markers in 1..N order", () => {
+  describe("excerpt ordering stability", () => {
+    it("places excerpts in input order", () => {
       const excerpts: RetrievedExcerpt[] = [
         {
           citationNumber: 1,
@@ -97,12 +95,12 @@ describe("buildCoachPrompt", () => {
         question: "Test question?",
       });
 
-      const bookAIndex = prompt.indexOf("Book A");
-      const bookBIndex = prompt.indexOf("Book B");
-      const bookCIndex = prompt.indexOf("Book C");
+      const firstIndex = prompt.indexOf("First wisdom.");
+      const secondIndex = prompt.indexOf("Second insight.");
+      const thirdIndex = prompt.indexOf("Third revelation.");
 
-      expect(bookAIndex).toBeLessThan(bookBIndex);
-      expect(bookBIndex).toBeLessThan(bookCIndex);
+      expect(firstIndex).toBeLessThan(secondIndex);
+      expect(secondIndex).toBeLessThan(thirdIndex);
     });
   });
 
@@ -160,7 +158,7 @@ describe("buildCoachPrompt", () => {
       const prompt = buildCoachPrompt({ actorBaseline: undefined, excerpts, question });
       expect(prompt).toMatch(/acting coach/i);
       expect(prompt).toContain(question);
-      expect(prompt).toContain("Acting Books");
+      expect(prompt).toContain("Some acting wisdom.");
     });
   });
 
