@@ -12,6 +12,8 @@ import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-p
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
 import { COACH_REPLY_SCHEMA } from "@/lib/acting-coach/infrastructure/coach-reply-schema";
 import type { AuditionSummary, CoachReplyEnvelope } from "@/lib/acting-coach/contracts";
+import { runCoachTriggeredExtraction } from "@/lib/dna/extraction/run-extraction";
+import type { ExtractedPsychData, ChatHistoryMessage } from "@/lib/chat-types";
 
 const MAX_HISTORY_MESSAGES = 20;
 
@@ -141,12 +143,22 @@ export async function POST(request: Request) {
         ) {
           throw new Error("envelope shape invalid");
         }
+        if (parsed.action !== undefined && parsed.action !== null) {
+          if (
+            typeof parsed.action !== "object" ||
+            Array.isArray(parsed.action) ||
+            typeof parsed.action.type !== "string"
+          ) {
+            throw new Error("envelope shape invalid");
+          }
+        }
         envelope = {
           reply: parsed.reply,
           session_focus: typeof parsed.session_focus === "string" ? parsed.session_focus : null,
           step_index: parsed.step_index,
           mode: parsed.mode,
           phase: typeof parsed.phase === "string" ? parsed.phase : null,
+          action: parsed.action != null ? parsed.action : null,
         };
       } catch (parseErr) {
         log.warn({ err: parseErr, rawText }, "Coach envelope parse failed; using raw text fallback");
@@ -156,8 +168,44 @@ export async function POST(request: Request) {
           step_index: 0,
           mode: "informational",
           phase: null,
+          action: null,
         };
       }
+
+      let extractions: ExtractedPsychData | null = null;
+      if (envelope.action?.type === "trigger_dna_extraction") {
+        try {
+          const historyMessages: ChatHistoryMessage[] = (body.history ?? []).map(
+            (msg: { role: string; content: string }) => ({
+              role: msg.role === "assistant" ? "model" : msg.role,
+              parts: [{ text: msg.content }],
+            })
+          );
+          extractions = await runCoachTriggeredExtraction({
+            content: body.content.trim(),
+            history: historyMessages.slice(-20),
+          });
+          log.info({ hasExtraction: extractions !== null }, "Coach extraction completed");
+        } catch (extractErr) {
+          log.error({ err: extractErr }, "Coach extraction failed");
+          extractions = null;
+        }
+      }
+
+      return NextResponse.json(
+        {
+          aiData: {
+            coach_reply: envelope.reply,
+            session_focus: envelope.session_focus,
+            step_index: envelope.step_index,
+            mode: envelope.mode,
+            phase: envelope.phase,
+            action: envelope.action,
+            extractions: extractions ?? undefined,
+          },
+        },
+        { status: 200 }
+      );
     } catch (err) {
       log.error({ err }, "Generation failed");
       return NextResponse.json(
@@ -165,19 +213,6 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
-    return NextResponse.json(
-      {
-        aiData: {
-          coach_reply: envelope.reply,
-          session_focus: envelope.session_focus,
-          step_index: envelope.step_index,
-          mode: envelope.mode,
-          phase: envelope.phase,
-        },
-      },
-      { status: 200 }
-    );
   } catch (error) {
     logger.error({ err: error, msg: "Coach Chat API Error" });
     return NextResponse.json(
