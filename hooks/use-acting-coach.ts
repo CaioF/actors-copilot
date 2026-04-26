@@ -2,12 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { getAuth } from "firebase/auth";
-
-export interface CoachMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
+import type { CoachMessage } from "@/lib/chat-types";
 
 interface UseActingCoachReturn {
   messages: CoachMessage[];

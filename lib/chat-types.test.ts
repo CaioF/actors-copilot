@@ -1,4 +1,4 @@
-import { ARENA_THEMES, THEME_DISPLAY_NAMES, DNA_SECTIONS, SectionProgress } from "./chat-types";
+import { ARENA_THEMES, THEME_DISPLAY_NAMES, DNA_SECTIONS, SectionProgress, CoachSession, CoachMessage } from "./chat-types";
 
 describe("ARENA_THEMES", () => {
   it("should have themes defined for all DNA sections", () => {
@@ -373,6 +373,136 @@ it("should give partial progress based on themes only", () => {
 
     expect(totalProgress).toBeLessThan(100);
     expect(totalProgress).toBeGreaterThan(0);
+  });
+});
+
+describe("CoachSession interface", () => {
+  it("should have exactly 7 fields: id, createdAt, lastActiveAt, status, title, linkedAuditionId, messageCount", () => {
+    const session: CoachSession = {
+      id: "test-session-id",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+    };
+
+    expect(Object.keys(session)).toHaveLength(7);
+    expect(Object.keys(session)).toEqual([
+      "id",
+      "createdAt",
+      "lastActiveAt",
+      "status",
+      "title",
+      "linkedAuditionId",
+      "messageCount",
+    ]);
+  });
+
+  it("should not have any DNA-specific fields", () => {
+    const session: CoachSession = {
+      id: "test-session-id",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+    };
+
+    expect(session).not.toHaveProperty("section");
+    expect(session).not.toHaveProperty("sessionNumber");
+    expect(session).not.toHaveProperty("currentSection");
+    expect(session).not.toHaveProperty("sectionHqCounts");
+    expect(session).not.toHaveProperty("askedQuestions");
+    expect(session).not.toHaveProperty("totalSessions");
+    expect(session).not.toHaveProperty("progress");
+    expect(session).not.toHaveProperty("durationMinutes");
+  });
+
+  it("should allow status to be active or completed", () => {
+    const activeSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 0,
+    };
+
+    const completedSession: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "completed",
+      title: null,
+      linkedAuditionId: null,
+      messageCount: 5,
+    };
+
+    expect(activeSession.status).toBe("active");
+    expect(completedSession.status).toBe("completed");
+  });
+
+  it("should allow title and linkedAuditionId to be nullable", () => {
+    const session: CoachSession = {
+      id: "test",
+      createdAt: null,
+      lastActiveAt: null,
+      status: "active",
+      title: "Scene work prep",
+      linkedAuditionId: "audition-123",
+      messageCount: 3,
+    };
+
+    expect(session.title).toBe("Scene work prep");
+    expect(session.linkedAuditionId).toBe("audition-123");
+  });
+});
+
+describe("CoachMessage interface", () => {
+  it("should have exactly 4 fields: id, role, content, timestamp", () => {
+    const message: CoachMessage = {
+      id: "msg-1",
+      role: "user",
+      content: "Hello coach",
+      timestamp: null,
+    };
+
+    expect(Object.keys(message)).toHaveLength(4);
+    expect(Object.keys(message)).toEqual(["id", "role", "content", "timestamp"]);
+  });
+
+  it("should not have a section field", () => {
+    const message: CoachMessage = {
+      id: "msg-1",
+      role: "user",
+      content: "Hello",
+      timestamp: null,
+    };
+
+    expect(message).not.toHaveProperty("section");
+  });
+
+  it("should allow role to be user or assistant", () => {
+    const userMsg: CoachMessage = {
+      id: "msg-1",
+      role: "user",
+      content: "Hello",
+      timestamp: null,
+    };
+
+    const assistantMsg: CoachMessage = {
+      id: "msg-2",
+      role: "assistant",
+      content: "Hello! How can I help?",
+      timestamp: null,
+    };
+
+    expect(userMsg.role).toBe("user");
+    expect(assistantMsg.role).toBe("assistant");
   });
 });
 

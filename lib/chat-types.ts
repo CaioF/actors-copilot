@@ -44,6 +44,23 @@ export interface DNASession {
   sectionProgress?: Record<DNASectionId, SectionProgress>;
 }
 
+export interface CoachSession {
+  id: string;
+  createdAt: Timestamp | null;
+  lastActiveAt: Timestamp | null;
+  status: "active" | "completed";
+  title: string | null;
+  linkedAuditionId: string | null;
+  messageCount: number;
+}
+
+export interface CoachMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Timestamp | null;
+}
+
 /**
  * Defines the core exploration arenas (sections) for the DNA extraction process.
  * NOTE: The 'id' fields must perfectly align with the keys used in the QUESTIONS reservoir.
