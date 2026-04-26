@@ -13,7 +13,7 @@ const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
 
 export default function ActingCoachPage() {
-  const { messages, isLoading, sendMessage, startNewSession, session } = useActingCoach();
+  const { messages, isLoading, sendMessage, startNewSession, clearSessionFocus, session } = useActingCoach();
   const searchParams = useSearchParams();
 
   const auditionId = searchParams.get("auditionId");
@@ -54,6 +54,18 @@ export default function ActingCoachPage() {
             <p className="mt-1 text-sm text-[#6B6B6B]">
               {session?.title ?? "Session 1"}
             </p>
+            {session?.sessionFocus && (
+              <p className="mt-1 text-xs italic text-[#8BA2A8]">
+                Currently working on: {session.sessionFocus}
+                <button
+                  onClick={clearSessionFocus}
+                  className="ml-2 underline hover:text-[#E8721A]"
+                  aria-label="Clear current focus"
+                >
+                  clear
+                </button>
+              </p>
+            )}
           </div>
           <button
             onClick={() => startNewSession()}

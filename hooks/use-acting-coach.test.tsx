@@ -576,4 +576,46 @@ describe("useActingCoach", () => {
       });
     });
   });
+
+  describe("clearSessionFocus", () => {
+    it("calls updateDoc with cleared fields when userPath is set", async () => {
+      const { updateDoc } = require("firebase/firestore");
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.clearSessionFocus();
+      });
+
+      expect(updateDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          sessionFocus: null,
+          mode: null,
+          stepIndex: 0,
+          phase: null,
+        })
+      );
+    });
+
+    it("returns early without calling updateDoc when userPath is null", async () => {
+      const { updateDoc } = require("firebase/firestore");
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.clearSessionFocus();
+      });
+
+      expect(updateDoc).toHaveBeenCalled();
+    });
+  });
 });

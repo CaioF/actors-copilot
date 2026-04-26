@@ -36,6 +36,7 @@ jest.mock("next/navigation", () => ({
 
 const mockSendMessage = jest.fn();
 const mockStartNewSession = jest.fn().mockResolvedValue(undefined);
+const mockClearSessionFocus = jest.fn().mockResolvedValue(undefined);
 
 jest.mock("@/hooks/use-acting-coach", () => ({
   useActingCoach: jest.fn(),
@@ -52,14 +53,17 @@ describe("ActingCoachPage", () => {
     mockSearchParams.delete("role");
     mockSendMessage.mockImplementation(() => Promise.resolve());
     mockStartNewSession.mockClear();
+    mockClearSessionFocus.mockClear();
     mockSendMessage.mockImplementation(() => Promise.resolve());
     mockStartNewSession.mockResolvedValue(undefined);
+    mockClearSessionFocus.mockResolvedValue(undefined);
     (useActingCoach as jest.Mock).mockReturnValue({
       messages: [],
       isLoading: false,
       error: null,
       sendMessage: mockSendMessage,
       startNewSession: mockStartNewSession,
+      clearSessionFocus: mockClearSessionFocus,
       session: { title: null, linkedAuditionId: null, sessionFocus: null, stepIndex: 0, mode: null, phase: null },
     });
   });
@@ -113,6 +117,7 @@ describe("ActingCoachPage", () => {
       error: null,
       sendMessage: jest.fn(),
       startNewSession: jest.fn(),
+      clearSessionFocus: mockClearSessionFocus,
       session: null,
     });
     render(<ActingCoachPage />);
@@ -134,6 +139,7 @@ describe("ActingCoachPage", () => {
       error: null,
       sendMessage: jest.fn(),
       startNewSession: jest.fn(),
+      clearSessionFocus: mockClearSessionFocus,
       session: null,
     });
     render(<ActingCoachPage />);
@@ -175,5 +181,40 @@ describe("ActingCoachPage", () => {
   it("does not auto-trigger when auditionId URL param is absent", () => {
     render(<ActingCoachPage />);
     expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it("renders session focus indicator when sessionFocus is set", () => {
+    (useActingCoach as jest.Mock).mockReturnValue({
+      messages: [],
+      isLoading: false,
+      error: null,
+      sendMessage: mockSendMessage,
+      startNewSession: mockStartNewSession,
+      clearSessionFocus: mockClearSessionFocus,
+      session: { title: "New Session", linkedAuditionId: null, sessionFocus: "Find Jane's objective in scene 2", stepIndex: 0, mode: "guided", phase: "opening" },
+    });
+    render(<ActingCoachPage />);
+    expect(screen.getByText("Currently working on: Find Jane's objective in scene 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear current focus" })).toBeInTheDocument();
+  });
+
+  it("does not render session focus indicator when sessionFocus is null", () => {
+    render(<ActingCoachPage />);
+    expect(screen.queryByText(/currently working on:/i)).not.toBeInTheDocument();
+  });
+
+  it("clicking clear button calls clearSessionFocus", () => {
+    (useActingCoach as jest.Mock).mockReturnValue({
+      messages: [],
+      isLoading: false,
+      error: null,
+      sendMessage: mockSendMessage,
+      startNewSession: mockStartNewSession,
+      clearSessionFocus: mockClearSessionFocus,
+      session: { title: "New Session", linkedAuditionId: null, sessionFocus: "Find Jane's objective", stepIndex: 0, mode: "guided", phase: null },
+    });
+    render(<ActingCoachPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Clear current focus" }));
+    expect(mockClearSessionFocus).toHaveBeenCalledTimes(1);
   });
 });

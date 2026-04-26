@@ -26,6 +26,7 @@ interface UseActingCoachReturn {
   error: string | null;
   sendMessage: (content: string, auditionId?: string) => Promise<void>;
   startNewSession: (opts?: { linkedAuditionId?: string | null }) => Promise<void>;
+  clearSessionFocus: () => Promise<void>;
   session: CoachSession | null;
   sessionId: string;
 }
@@ -336,12 +337,26 @@ export function useActingCoach(): UseActingCoachReturn {
     [userPath]
   );
 
+  const clearSessionFocus = useCallback(async () => {
+    if (!userPath) return;
+    await updateDoc(
+      doc(getDb(), `users/${userPath}/coachSessions/${sessionId}`),
+      {
+        sessionFocus: null,
+        mode: null,
+        stepIndex: 0,
+        phase: null,
+      }
+    );
+  }, [userPath, sessionId]);
+
   return {
     messages,
     isLoading,
     error,
     sendMessage,
     startNewSession,
+    clearSessionFocus,
     session,
     sessionId,
   };
