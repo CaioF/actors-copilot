@@ -42,6 +42,8 @@ jest.mock("@/hooks/use-acting-coach", () => ({
   useActingCoach: jest.fn(),
 }));
 
+jest.mock("@/lib/render-markdown", () => ({ renderMarkdown: (s: string) => s }));
+
 import ActingCoachPage from "./page";
 import { useActingCoach } from "@/hooks/use-acting-coach";
 

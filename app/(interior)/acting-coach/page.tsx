@@ -8,6 +8,7 @@ import { ChatInput } from "@/components/chat-input";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CoachSuggestionChips } from "@/components/coach-suggestion-chips";
 import { useActingCoach } from "@/hooks/use-acting-coach";
+import { renderMarkdown } from "@/lib/render-markdown";
 
 const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
@@ -112,7 +113,13 @@ export default function ActingCoachPage() {
                         : "bg-[#E8DFD0] text-[#2C3328]"
                     }`}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    {msg.role === "assistant" ? (
+                      <div className="text-sm">
+                        {renderMarkdown(msg.content)}
+                      </div>
+                    ) : (
+                      <p className="text-sm">{msg.content}</p>
+                    )}
                   </div>
                 </div>
               ))}
