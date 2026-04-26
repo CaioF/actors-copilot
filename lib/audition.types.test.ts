@@ -15,7 +15,7 @@ describe("Audition Flow Types and Constants", () => {
         "role",
         "deadline",
         "auditionTimezone",
-        "castingDirectorName",
+        "castingDirectorEmail",
         "sidesFile",
         "sidesText",
         "briefFile",

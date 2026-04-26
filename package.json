@@ -9,10 +9,12 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest --forceExit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "ingest:acting-library": "npx ts-node scripts/ingest-acting-library.ts"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
+    "@pinecone-database/pinecone": "^3.0.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",

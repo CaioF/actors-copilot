@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 interface ChatInputProps {
   onSend: (message: string, document?: AttachedDocument | null) => void;
   isLoading: boolean;
+  placeholder?: string;
 }
 
 /**
@@ -51,7 +52,7 @@ function VoiceWaveform() {
  * @param props.isLoading - Whether the AI is currently processing a request
  * @returns The chat input JSX element
  */
-export function ChatInput({ onSend, isLoading }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything..." }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
 
@@ -293,7 +294,7 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            placeholder={isTranscribing ? "Transcribing..." : "Ask me anything..."}
+            placeholder={isTranscribing ? "Transcribing..." : placeholder ?? "Ask me anything..."}
             disabled={isLoading || isTranscribing}
             className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
           />

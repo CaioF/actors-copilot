@@ -157,7 +157,14 @@ export default function AuditionDetailView() {
              currentAnalysisType === "brief" ? (
                <StepResultBrief data={auditionData.performanceMap} />
              ) : (
-               <StepResultSides data={auditionData.performanceMap} />
+               <StepResultSides
+                 data={auditionData.performanceMap}
+                 onCoachClick={() =>
+                   router.push(
+                     `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}`
+                   )
+                 }
+               />
              )
           ) : (
              <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>

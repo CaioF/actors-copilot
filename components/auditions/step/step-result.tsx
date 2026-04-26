@@ -16,9 +16,10 @@ interface StepResultProps {
     sections: Section[];
     outro?: string;
   };
+  onCoachClick?: () => void;
 }
 
-export function StepResultSides({ data }: StepResultProps) {
+export function StepResultSides({ data, onCoachClick }: StepResultProps) {
   
   const [activeSection, setActiveSection] = useState("section-objective");
   const hasFullSections = data?.sections && data.sections.length >= 13;
@@ -293,6 +294,20 @@ export function StepResultSides({ data }: StepResultProps) {
             <div className="prose prose-slate max-w-none prose-p:italic prose-p:m-0 text-sm">
               <ReactMarkdown>{data.outro}</ReactMarkdown>
             </div>
+          </div>
+        )}
+
+        {onCoachClick && (
+          <div className="mt-2">
+            <button
+              onClick={onCoachClick}
+              className="w-full rounded-full bg-[#E8721A] py-4 text-base font-semibold text-white transition-colors hover:bg-[#d66a18]"
+            >
+              Take this to my Coach →
+            </button>
+            <p className="mt-2 text-center text-sm text-[#6B6B6B]">
+              Open a coaching session with this breakdown pre-loaded
+            </p>
           </div>
         )}
       </div>

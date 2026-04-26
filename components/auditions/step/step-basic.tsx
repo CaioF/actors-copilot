@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ShoppingBag, Film, Check, Drama, Globe, Video } from "lucide-react";
+import { Calendar, ShoppingBag, Film, Check, Drama, Mail, Globe } from "lucide-react";
 import { AuditionFormData } from "@/lib/audition-types";
 import { cn } from "@/lib/utils"; // Using shadcn utility for cleaner class management
 
@@ -108,16 +108,16 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
         {mode === "brief" && (
           <div>
             <label htmlFor="castingEmail" className="block text-sm font-medium text-[#B7BCB6] mb-3">
-              Casting Director Name (optional)
+              Casting Director Email (optional)
             </label>
             <div className="relative">
-              <Video className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
+              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
               <input
                 id="castingEmail"
-                type="text"
-                placeholder="Director's Name"
-                value={data.castingDirectorName || ""}
-                onChange={(e) => updateData({ castingDirectorName: e.target.value })}
+                type="email"
+                placeholder="e.g., casting@production.com"
+                value={data.castingDirectorEmail || ""}
+                onChange={(e) => updateData({ castingDirectorEmail: e.target.value })}
                 className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/40 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
               />
             </div>

@@ -40,5 +40,18 @@ docs/feature-plans/
 
 # local dev tools
 .serena/
-scripts/
+scripts/get-all-asked-questions.js
+scripts/migrate-section-themes.js
+scripts/query-dna-sessions.js
+scripts/query-sessions.js
+scripts/__fixtures__/
 yarn.lock
+
+# acting corpus (replaced with open materials before ingestion)
+book_sources/
+
+# python venv
+scripts/python/venv/
+
+# implementation plans
+.plans/
