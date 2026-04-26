@@ -25,7 +25,7 @@ export default function InteriorLayout({
           <DashboardFooter />
         </div>
         {}
-        <MicFab />
+        
       </ProtectedRoute>
       
     </div>
