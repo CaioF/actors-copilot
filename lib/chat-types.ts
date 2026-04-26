@@ -289,9 +289,50 @@ export type DNASectionId = (typeof DNA_SECTIONS)[number]["id"];
  */
 export interface DNAQuestion {
   qid: string;
-  section: DNASectionId; 
+  section: DNASectionId;
   intensity: number;
   tags: string[];
   question: string;
+}
+
+export interface ChatHistoryMessage {
+  role: string;
+  parts: { text: string }[];
+}
+
+export interface ExtractionMilestone {
+  event: string;
+  emotional_cost: string;
+}
+
+export interface ExtractedPsychData {
+  is_valuable_extraction?: boolean;
+  new_traits?: string[];
+  themes_extracted?: string[];
+  defense_mechanisms?: string[];
+  leaf_snippets?: string[];
+  holistic_analysis?: string;
+  somatic_tells?: string[];
+  core_values?: string[];
+  relational_dynamics?: string[];
+  milestones?: ExtractionMilestone[];
+  core_wounds_and_fears?: string[];
+  unmet_needs?: string[];
+  public_masks?: string[];
+  emotional_baseline?: {
+    conflict_response?: string;
+    internal_friction?: string;
+    vulnerability_management?: string;
+  };
+  intellectual_framework?: {
+    cognitive_style?: string;
+    attention_to_detail?: string;
+  };
+  archetype_signals?: string[];
+  key_entities_and_arenas?: string[];
+  progress_assessment?: {
+    has_actionable_pattern: boolean;
+    depth_score: number;
+  };
 }
 

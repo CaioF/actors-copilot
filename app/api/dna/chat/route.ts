@@ -2,47 +2,7 @@ import { NextResponse } from 'next/server';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { createChildLogger } from '@/lib/logger';
 import { logger } from '@/lib/logger';
-
-interface ChatHistoryMessage {
-  role: string;
-  parts: { text: string }[];
-}
-
-interface ExtractionMilestone {
-    event: string;
-    emotional_cost: string;
-}
-
-interface ExtractedPsychData {
-    is_valuable_extraction?: boolean;
-    new_traits?: string[];
-    themes_extracted?: string[];
-    defense_mechanisms?: string[];
-    leaf_snippets?: string[];
-    holistic_analysis?: string;
-    somatic_tells?: string[];
-    core_values?: string[];
-    relational_dynamics?: string[];
-    milestones?: ExtractionMilestone[];
-    core_wounds_and_fears?: string[];
-    unmet_needs?: string[];
-    public_masks?: string[];
-    emotional_baseline?: {
-        conflict_response?: string;
-        internal_friction?: string;
-        vulnerability_management?: string;
-    };
-    intellectual_framework?: {
-        cognitive_style?: string;
-        attention_to_detail?: string;
-    };
-    archetype_signals?: string[];
-    key_entities_and_arenas?: string[];
-    progress_assessment?: {
-        has_actionable_pattern: boolean;
-        depth_score: number;
-    };
-}
+import type { ChatHistoryMessage, ExtractedPsychData } from '@/lib/chat-types';
 
 /**
  * Handles conversational DNA extraction chat, running dual AI models: one for Socratic
