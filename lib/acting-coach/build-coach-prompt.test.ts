@@ -22,7 +22,7 @@ describe("buildCoachPrompt", () => {
 
     it("includes the coach system prompt", () => {
       const prompt = buildCoachPrompt({ actorBaseline, excerpts, question });
-      expect(prompt).toContain("Acting Coach");
+      expect(prompt).toMatch(/acting coach/i);
     });
 
     it("includes the actor baseline summary", () => {
@@ -63,7 +63,7 @@ describe("buildCoachPrompt", () => {
 
     it("still includes system prompt, baseline, and question", () => {
       const prompt = buildCoachPrompt({ actorBaseline, excerpts: [], question });
-      expect(prompt).toContain("Acting Coach");
+      expect(prompt).toMatch(/acting coach/i);
       expect(prompt).toContain(actorBaseline);
       expect(prompt).toContain(question);
     });
@@ -158,9 +158,65 @@ describe("buildCoachPrompt", () => {
 
     it("still produces a valid prompt without baseline section", () => {
       const prompt = buildCoachPrompt({ actorBaseline: undefined, excerpts, question });
-      expect(prompt).toContain("Acting Coach");
+      expect(prompt).toMatch(/acting coach/i);
       expect(prompt).toContain(question);
       expect(prompt).toContain("Acting Books");
+    });
+  });
+
+  describe("system prompt section headers", () => {
+    it("contains ONE STEP AT A TIME section", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("ONE STEP AT A TIME");
+    });
+
+    it("contains MODES section", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("MODES");
+    });
+
+    it("contains EXAMPLES section", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("EXAMPLES");
+    });
+
+    it("contains guided mode example", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("## guided");
+    });
+
+    it("contains informational mode example", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("## informational");
+    });
+
+    it("contains transition mode example", () => {
+      const prompt = buildCoachPrompt({
+        actorBaseline: "Test baseline",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("## transition");
     });
   });
 });
