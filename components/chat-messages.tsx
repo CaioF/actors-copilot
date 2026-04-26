@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatMessage } from "@/lib/chat-types";
 import { AiThinkingBlock } from "./ai-thinking-block";
 import { FileText } from "lucide-react";
+import { renderMarkdown } from "@/lib/render-markdown";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -108,12 +109,16 @@ function MessageBubble({ message, userInitials }: { message: ChatMessage & { att
           )}
 
           <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
-            {message.content.split("\n").map((line, i) => (
-              <span key={i}>
-                {i > 0 && <br />}
-                {line}
-              </span>
-            ))}
+            {isAssistant ? (
+              renderMarkdown(message.content)
+            ) : (
+              message.content.split("\n").map((line, i) => (
+                <span key={i}>
+                  {i > 0 && <br />}
+                  {line}
+                </span>
+              ))
+            )}
           </div>
         </div>
         <span className="mt-1.5 text-xs text-[#6B6B6B]">

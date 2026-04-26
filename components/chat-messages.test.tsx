@@ -1,3 +1,5 @@
+jest.mock('@/lib/render-markdown', () => ({ renderMarkdown: (s: string) => s }));
+
 import { getInitials, formatTime } from './chat-messages';
 
 describe('getInitials', () => {
