@@ -10,7 +10,8 @@ import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-
 import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
-import type { AuditionSummary } from "@/lib/acting-coach/contracts";
+import { COACH_REPLY_SCHEMA } from "@/lib/acting-coach/infrastructure/coach-reply-schema";
+import type { AuditionSummary, CoachReplyEnvelope } from "@/lib/acting-coach/contracts";
 
 const MAX_HISTORY_MESSAGES = 20;
 
@@ -112,7 +113,12 @@ export async function POST(request: Request) {
 
     let generationModel;
     try {
-      generationModel = createGenerationModel();
+      generationModel = createGenerationModel({
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: COACH_REPLY_SCHEMA,
+        },
+      });
     } catch (err) {
       log.error({ err }, "Failed to create generation model");
       return NextResponse.json(
@@ -121,10 +127,36 @@ export async function POST(request: Request) {
       );
     }
 
-    let replyText: string;
+    let envelope: CoachReplyEnvelope;
     try {
       const result = await generationModel.generateContent(prompt);
-      replyText = result.response.text();
+      const rawText = result.response.text();
+      try {
+        const parsed = JSON.parse(rawText);
+        if (
+          typeof parsed.reply !== "string" ||
+          typeof parsed.step_index !== "number" ||
+          !["guided", "informational", "transition"].includes(parsed.mode)
+        ) {
+          throw new Error("envelope shape invalid");
+        }
+        envelope = {
+          reply: parsed.reply,
+          session_focus: typeof parsed.session_focus === "string" ? parsed.session_focus : null,
+          step_index: parsed.step_index,
+          mode: parsed.mode,
+          phase: typeof parsed.phase === "string" ? parsed.phase : null,
+        };
+      } catch (parseErr) {
+        log.warn({ err: parseErr, rawText }, "Coach envelope parse failed; using raw text fallback");
+        envelope = {
+          reply: rawText,
+          session_focus: null,
+          step_index: 0,
+          mode: "informational",
+          phase: null,
+        };
+      }
     } catch (err) {
       log.error({ err }, "Generation failed");
       return NextResponse.json(
@@ -136,7 +168,11 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         aiData: {
-          coach_reply: replyText,
+          coach_reply: envelope.reply,
+          session_focus: envelope.session_focus,
+          step_index: envelope.step_index,
+          mode: envelope.mode,
+          phase: envelope.phase,
         },
       },
       { status: 200 }

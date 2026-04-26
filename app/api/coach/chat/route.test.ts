@@ -109,7 +109,15 @@ describe("Coach Chat Route", () => {
     mockGenerationModel = {
       generateContent: jest.fn().mockResolvedValue({
         response: {
-          text: jest.fn().mockReturnValue("Test coach reply"),
+          text: jest.fn().mockReturnValue(
+            JSON.stringify({
+              reply: "Test coach reply",
+              session_focus: null,
+              step_index: 0,
+              mode: "informational",
+              phase: null,
+            })
+          ),
         },
       }),
     };
@@ -224,6 +232,10 @@ describe("Coach Chat Route", () => {
 
     expect(res.status).toBe(200);
     expect(data.aiData.coach_reply).toBe("Test coach reply");
+    expect(data.aiData.session_focus).toBe(null);
+    expect(data.aiData.step_index).toBe(0);
+    expect(data.aiData.mode).toBe("informational");
+    expect(data.aiData.phase).toBe(null);
     expect(data.aiData.citations).toBeUndefined();
 
     expect(auth.verifyIdToken).toHaveBeenCalledWith("valid-token");
@@ -522,5 +534,33 @@ describe("Coach Chat Route", () => {
 
     expect(res.status).toBe(500);
     expect(data.error).toBe("Failed to generate chat response");
+  });
+
+  it("falls back to raw text when model returns malformed JSON", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+    mockGenerationModel.generateContent.mockResolvedValueOnce({
+      response: {
+        text: jest.fn().mockReturnValue("This is not JSON at all"),
+      },
+    });
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({ content: "Test question" }),
+    });
+
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.aiData.coach_reply).toBe("This is not JSON at all");
+    expect(data.aiData.session_focus).toBe(null);
+    expect(data.aiData.step_index).toBe(0);
+    expect(data.aiData.mode).toBe("informational");
+    expect(data.aiData.phase).toBe(null);
   });
 });

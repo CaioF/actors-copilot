@@ -42,5 +42,17 @@ export interface CoachCitation {
 export interface CoachApiResponse {
   aiData: {
     coach_reply: string;
+    session_focus: string | null;
+    step_index: number;
+    mode: "guided" | "informational" | "transition" | null;
+    phase: string | null;
   };
+}
+
+export interface CoachReplyEnvelope {
+  reply: string;
+  session_focus: string | null;
+  step_index: number;
+  mode: "guided" | "informational" | "transition";
+  phase: string | null;
 }
