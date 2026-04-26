@@ -209,4 +209,81 @@ describe("runCoachTriggeredExtraction", () => {
       );
     });
   });
+
+  it("handles empty history", async () => {
+    let result: ExtractedPsychData | null | undefined = undefined;
+    await jest.isolateModulesAsync(async () => {
+      const { runCoachTriggeredExtraction } = require("./run-extraction");
+
+      const history: ChatHistoryMessage[] = [];
+      const content = "I just started talking to you";
+
+      mockGenerateContent.mockResolvedValue({
+        response: {
+          functionCalls: () => [],
+        },
+      });
+
+      result = await runCoachTriggeredExtraction({ content, history });
+    });
+
+    expect(mockGenerateContent).toHaveBeenCalled();
+    const [promptArg] = mockGenerateContent.mock.calls[0];
+    expect(promptArg).toContain("[CONVERSATION HISTORY]");
+    expect(promptArg).not.toContain("USER:");
+    expect(result).toBeNull();
+  });
+
+  it("handles single message history", async () => {
+    let result: ExtractedPsychData | null | undefined = undefined;
+    await jest.isolateModulesAsync(async () => {
+      const { runCoachTriggeredExtraction } = require("./run-extraction");
+
+      const history: ChatHistoryMessage[] = [
+        { role: "user", parts: [{ text: "My first message" }] },
+      ];
+      const content = "This is my second message";
+
+      mockGenerateContent.mockResolvedValue({
+        response: {
+          functionCalls: () => [],
+        },
+      });
+
+      result = await runCoachTriggeredExtraction({ content, history });
+    });
+
+    expect(mockGenerateContent).toHaveBeenCalled();
+    const [promptArg] = mockGenerateContent.mock.calls[0];
+    expect(promptArg).toContain("USER: My first message");
+    expect(promptArg).toContain("[LATEST ACTOR INPUT]");
+    expect(result).toBeNull();
+  });
+
+  it("slices history with 20+ messages to last 7", async () => {
+    await jest.isolateModulesAsync(async () => {
+      const { runCoachTriggeredExtraction } = require("./run-extraction");
+
+      const history: ChatHistoryMessage[] = Array.from({ length: 25 }, (_, i) => ({
+        role: i % 2 === 0 ? "user" : "model",
+        parts: [{ text: `Message ${i}` }],
+      }));
+      const content = "Recent thought at index 24";
+
+      mockGenerateContent.mockResolvedValue({
+        response: {
+          functionCalls: () => [],
+        },
+      });
+
+      runCoachTriggeredExtraction({ content, history });
+
+      expect(mockGenerateContent).toHaveBeenCalled();
+      const [promptArg] = mockGenerateContent.mock.calls[0];
+      expect(promptArg).toContain("Message 18");
+      expect(promptArg).toContain("Message 24");
+      expect(promptArg).not.toContain("Message 0");
+      expect(promptArg).not.toContain("Message 12");
+    });
+  });
 });
