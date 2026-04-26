@@ -3,6 +3,7 @@
 import { useFormContext, useFieldArray } from "react-hook-form";
 import { Trash2 } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
+import { VideoDropzone } from "./VideoDropzone";
 
 /**
  * Form section for managing actor showreels with title and URL for each entry.
@@ -14,6 +15,10 @@ export function ShowreelsSection() {
     control,
     name: "showreels",
   });
+
+  const handleUploadSuccess = (url: string, fileName: string) => {
+    append({ title: fileName, url: url });
+  };
 
   return (
     <div className="space-y-5">
@@ -52,6 +57,8 @@ export function ShowreelsSection() {
       >
         + Add Showreel
       </button>
+
+      <VideoDropzone onUploadSuccess={handleUploadSuccess} />
     </div>
   );
 }

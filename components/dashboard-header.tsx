@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { HelpCircle, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import Link from "next/link";
-// We import the initialized app to ensure Auth knows which project to look at
-import { getApp } from "firebase/app";
 
 interface DashboardHeaderProps {
   title?: string
