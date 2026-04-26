@@ -20,6 +20,7 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 - [Sidebar Navigation](#sidebar-navigation)
 - [Profile Components](#profile-components)
 - [ActorProfile Schema](#actorprofile-schema)
+- [Acting Coach](#acting-coach)
 
 ---
 
@@ -88,6 +89,7 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 | `/auditions/new` | Multi-step audition wizard |
 | `/auditions/[id]` | Audition detail view |
 | `/settings` | User settings & account management |
+| `/acting-coach` | AI Acting Coach with RAG-powered responses |
 
 ---
 
@@ -251,6 +253,12 @@ components/
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/profile/autofill` | POST | IMDB AI Autofill - scrape IMDB profile and synthesize with DNA |
+
+### Acting Coach
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/coach/chat` | POST | RAG-powered acting coach with conversation history, audition context, and library grounding |
 
 ### IMDB AI Autofill Feature
 
@@ -1168,3 +1176,173 @@ export const defaultActorProfile: ActorProfile = {
 | Headshot | `profiles/{user.uid}/headshot.{ext}` |
 | Additional photos | `profiles/{user.uid}/photos/{index}.{ext}` |
 | CV | `profiles/{user.uid}/cv.pdf` |
+
+---
+
+## Acting Coach
+
+### Overview
+
+The Acting Coach (`/acting-coach`) is a free-form conversational AI assistant grounded in a curated acting library. Unlike the Socratic Personal DNA extraction, the Coach answers questions about acting technique, character development, audition prep, and career guidance using retrieval-augmented generation (RAG) over a vector database of acting texts.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Browser Client                           │
+│  useActingCoach() hook                                     │
+│  ├── POST /api/coach/chat { content, history, auditionId } │
+│  └── Renders coach_reply in chat UI                       │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│              /api/coach/chat Route                           │
+│  1. Verify Firebase ID token → userPath                    │
+│  2. Load actor baseline from Firestore                    │
+│  3. Load audition summaries (project, role, date)          │
+│  4. Embed question via Pinecone Inference API              │
+│  5. Query Pinecone for top-K similar chunks              │
+│  6. Compose prompt with baseline + excerpts + history     │
+│  7. Generate reply via Vertex AI Gemini                   │
+│  8. Return { aiData: { coach_reply } }                  │
+└─────────────────────────────────────────────────────────────┘
+                             │
+               ┌─────────────┼─────────────┐
+               ▼             ▼             ▼
+┌─────────────────────┐  ┌──────────────┐  ┌──────────────────────┐
+│  Pinecone           │  │ Google Gemini │  │ Firebase Firestore  │
+│  (Vector Store)    │  │ (Generation)  │  │ (Profile + Auditions)│
+│                     │  │              │  │                      │
+│  • llama-text-embed│  │ gemini-2.0-  │  │ users/{userPath}/   │
+│    -v2 (1024 dims)  │  │ flash        │  │   profile/master   │
+│  • field_map:      │  │              │  │   /auditions/{id}   │
+│    {"text": "text"} │  │              │  │                      │
+└─────────────────────┘  └──────────────┘  └──────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `app/api/coach/chat/route.ts` | HTTP endpoint — auth, orchestration, logging |
+| `lib/acting-coach/application/retrieve-coach-context.ts` | Embed question, query Pinecone, map results |
+| `lib/acting-coach/infrastructure/pinecone-inference-client.ts` | Wraps `pinecone.inference.embed()` |
+| `lib/acting-coach/build-coach-prompt.ts` | Composes prompt from baseline, excerpts, history, audition context |
+| `lib/acting-coach/application/get-audition-context.ts` | Reads audition summaries from Firestore |
+| `lib/prompts.ts` | `ACTING_COACH_SYSTEM_PROMPT` — coach persona and methodology |
+| `hooks/use-acting-coach.ts` | Client hook — message state, sendMessage, clearSession |
+| `app/(interior)/acting-coach/page.tsx` | Coach UI — welcome bubble, suggestion chips, chat messages |
+| `components/coach-suggestion-chips.tsx` | Clickable prompt suggestions |
+| `scripts/python/ingest_acting_library.py` | Corpus ingestion script |
+
+### Prompt Composition
+
+The coach prompt (`buildCoachPrompt`) assembles these sections in order:
+
+```
+# SYSTEM ROLE & PERSONA
+(ACTING_COACH_SYSTEM_PROMPT from lib/prompts.ts)
+
+# ACTOR CONTEXT
+{actorBaselineSummary from Firestore}
+
+# AUDITION BREAKDOWN
+{project, role, performanceMap from selected audition}
+(only if auditionId provided)
+
+# ACTOR'S AUDITIONS
+{project} — {role} ({id}) per audition
+
+# REFERENCE MATERIAL
+[1] "excerpt text"
+Source: sources_open.txt#chunkIndex
+... (up to 5 excerpts)
+
+# CONVERSATION HISTORY
+Actor: message
+Coach: message
+... (last 20 messages)
+
+# ACTOR'S QUESTION
+{current question}
+```
+
+### Configuration
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `ACTING_COACH_EMBEDDING_MODEL` | Pinecone embedding model (e.g., `llama-text-embed-v2`) |
+| `ACTING_COACH_EMBEDDING_DIMENSION` | Vector dimension (1024 for `llama-text-embed-v2`) |
+| `ACTING_COACH_GENERATION_MODEL` | Gemini model (e.g., `gemini-2.0-flash`) |
+| `PINECONE_API_KEY` | Pinecone API key |
+| `PINECONE_INDEX_NAME` | Pinecone index name |
+| `PINECONE_NAMESPACE` | Optional namespace (defaults to `__default__`) |
+| `GOOGLE_CLOUD_PROJECT` | GCP project (required for Vertex AI Gemini — not used for embeddings) |
+| `GOOGLE_CLOUD_LOCATION` | GCP location (e.g., `us-central1`) |
+
+### Corpus Ingestion
+
+The acting library corpus is ingested using the Python script at `scripts/python/ingest_acting_library.py`.
+
+**Prerequisites:**
+1. Create a Pinecone index with:
+   - Model: `llama-text-embed-v2`
+   - `field_map: {"text": "text"}`
+   - Dimension: 1024
+2. Place corpus files in `./book_sources/` (or set `ACTING_COACH_CORPUS_DIR`)
+
+**Run ingestion:**
+```bash
+cd scripts/python
+./venv/bin/pip install pinecone python-dotenv
+./venv/bin/python ingest_acting_library.py
+```
+
+**Ingestion flow:**
+1. Load `book_sources/sources_open.txt`
+2. Chunk text (~800 chars, 100 char overlap)
+3. Upsert records with `_id`, `text`, `source`, `chunk_index`
+4. Pinecone server-side embeds using `llama-text-embed-v2`
+5. Smoke-test with a search query
+
+### Conversation Features
+
+| Feature | Implementation |
+|---------|----------------|
+| **History** | Last 20 messages passed to prompt to maintain context |
+| **Audition context** | Summary list of all auditions injected into every prompt |
+| **Full audition breakdown** | Loaded on demand when `auditionId` provided |
+| **New Session** | `clearSession()` resets messages to `[]` |
+| **Suggestion chips** | 4 preset prompts: deepen objective, redirect help, spiraling, apply to DNA |
+| **Welcome bubble** | Shown when `messages.length === 0` |
+
+### Data Flow
+
+```
+User types message
+    ↓
+useActingCoach.sendMessage()
+    ↓
+POST /api/coach/chat { content, history, auditionId }
+    ↓
+1. verifyIdToken → userPath
+2. getActingCoachConfig()
+3. getUserAuditionsSummary(userPath, db)
+   (gracefully degrades if Firestore unavailable)
+4. createPineconeInferenceClient → embed([question])
+5. pineconeIndex.query({ vector, topK: 5 })
+6. buildCoachPrompt({ actorBaseline, excerpts, history, auditionSummaries })
+7. createGenerationModel() → generateContent(prompt)
+8. return { aiData: { coach_reply } }
+    ↓
+useActingCoach appends assistant message to state
+    ↓
+UI renders new message bubble
+```
+
+### Privacy
+
+The Acting Coach does not persist conversation history — each request is stateless. The `history` array is held in client memory only and sent with each request (capped at 20 messages). Audition data is read from Firestore but never written by the Coach.
