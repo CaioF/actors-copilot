@@ -308,7 +308,7 @@ export function useActingCoach(): UseActingCoachReturn {
         }
       }
     },
-    [messages, sessionId, userPath]
+    [messages, session, sessionId, userPath]
   );
 
   const startNewSession = useCallback(

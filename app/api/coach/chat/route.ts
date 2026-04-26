@@ -136,7 +136,7 @@ export async function POST(request: Request) {
         const parsed = JSON.parse(rawText);
         if (
           typeof parsed.reply !== "string" ||
-          typeof parsed.step_index !== "number" ||
+          !Number.isInteger(parsed.step_index) ||
           !["guided", "informational", "transition"].includes(parsed.mode)
         ) {
           throw new Error("envelope shape invalid");
