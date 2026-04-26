@@ -81,6 +81,7 @@ jest.mock("firebase/firestore", () => {
     updateDoc: jest.fn(),
     increment: jest.fn((n) => n),
     getDocs: jest.fn(),
+    arrayUnion: jest.fn((...args) => args),
   };
 });
 
@@ -616,6 +617,296 @@ describe("useActingCoach", () => {
       });
 
       expect(updateDoc).toHaveBeenCalled();
+    });
+  });
+
+  describe("DNA extraction trigger", () => {
+    const highQualityExtraction = {
+      new_traits: ["introverted performer"],
+      defense_mechanisms: [" intellectualization"],
+      leaf_snippets: [{ quote: "I hide behind characters" }],
+      holistic_analysis: "Shows strong analytical approach to role preparation",
+      somatic_tells: ["taps foot when thinking"],
+      core_values: [" authenticity"],
+      relational_dynamics: [" struggles with vulnerability"],
+      milestones: [{ title: "First breakthrough", date: "2024-01-01" }],
+      core_wounds_and_fears: ["fear of judgment"],
+      unmet_needs: ["validation"],
+      public_masks: ["confident exterior"],
+      emotional_baseline: {
+        conflict_response: "withdraws",
+        internal_friction: "high",
+        vulnerability_management: "avoidant",
+      },
+      intellectual_framework: {
+        cognitive_style: "analytical",
+        attention_to_detail: "high",
+      },
+      archetype_signals: ["the scholar"],
+      key_entities_and_arenas: ["the stage"],
+      themes_extracted: [],
+      progress_assessment: {
+        has_actionable_pattern: true,
+        depth_score: 7,
+      },
+    };
+
+    it("calls setDoc on profile/master with arrayUnion payloads when action is trigger_dna_extraction and quality gate passes", async () => {
+      const { setDoc, arrayUnion, doc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "You did great work today.",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: { type: "trigger_dna_extraction", payload: {} },
+            extractions: highQualityExtraction,
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("I discovered something about myself today");
+      });
+
+      await waitFor(() => {
+        expect(setDoc).toHaveBeenCalled();
+      });
+
+      const profileMasterCall = setDoc.mock.calls.find((call: unknown[]) => {
+        const docCall = (doc.mock.calls as unknown[][]).find((c: unknown[]) => (c[1] as string | undefined)?.includes?.("profile/master"));
+        return docCall !== undefined;
+      });
+      expect(profileMasterCall).toBeDefined();
+      expect(profileMasterCall[2]).toEqual({ merge: true });
+
+      const payload = profileMasterCall[1];
+      expect(payload.lastUpdated).toBeDefined();
+      expect(payload["psychology.traits"]).toEqual(arrayUnion("introverted performer"));
+      expect(payload["psychology.defenseMechanisms"]).toEqual(arrayUnion(" intellectualization"));
+      expect(payload["physicality.somaticTells"]).toEqual(arrayUnion("taps foot when thinking"));
+      expect(payload["psychology.coreValues"]).toEqual(arrayUnion(" authenticity"));
+      expect(payload["psychology.relationalDynamics"]).toEqual(arrayUnion(" struggles with vulnerability"));
+      expect(payload["acting_fuel.coreWounds"]).toEqual(arrayUnion("fear of judgment"));
+      expect(payload["acting_fuel.unmetNeeds"]).toEqual(arrayUnion("validation"));
+      expect(payload["acting_fuel.publicMasks"]).toEqual(arrayUnion("confident exterior"));
+      expect(payload["acting_fuel.archetypes"]).toEqual(arrayUnion("the scholar"));
+      expect(payload["history.keyEntities"]).toEqual(arrayUnion("the stage"));
+      expect(payload["psychology.emotionalBaseline.conflictResponse"]).toBe("withdraws");
+      expect(payload["psychology.emotionalBaseline.internalFriction"]).toBe("high");
+      expect(payload["psychology.emotionalBaseline.vulnerabilityManagement"]).toBe("avoidant");
+      expect(payload["psychology.intellectualFramework.cognitiveStyle"]).toBe("analytical");
+      expect(payload["psychology.intellectualFramework.attentionToDetail"]).toBe("high");
+
+      const leafSnippets = payload["psychology.leafSnippets"];
+      expect(leafSnippets).toBeDefined();
+      expect(leafSnippets[0]).toMatchObject({
+        quote: "I hide behind characters",
+        section: "identity",
+        timestamp: expect.any(String),
+      });
+
+      const analysisTimeline = payload["psychology.analysisTimeline"];
+      expect(analysisTimeline).toBeDefined();
+      expect(analysisTimeline[0]).toMatchObject({
+        inference: "Shows strong analytical approach to role preparation",
+        section: "identity",
+        timestamp: expect.any(String),
+      });
+
+      const milestones = payload["history.milestones"];
+      expect(milestones).toBeDefined();
+      expect(milestones[0]).toMatchObject({
+        title: "First breakthrough",
+        date: "2024-01-01",
+        section: "identity",
+        discoveredAt: expect.any(String),
+      });
+    });
+
+    it("does NOT call setDoc on profile/master when extractions is null", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "You did great work today.",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: { type: "trigger_dna_extraction", payload: {} },
+            extractions: null,
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("I discovered something about myself today");
+      });
+
+      await waitFor(() => {
+        expect(setDoc).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: expect.stringContaining("profile/master") }),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+    });
+
+    it("does NOT call setDoc on profile/master when action is absent", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Regular coaching response.",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("How do I improve?");
+      });
+
+      await waitFor(() => {
+        expect(setDoc).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: expect.stringContaining("profile/master") }),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+    });
+
+    it("does NOT call setDoc when depth_score is below 4", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Surface-level observation.",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: { type: "trigger_dna_extraction", payload: {} },
+            extractions: {
+              ...highQualityExtraction,
+              progress_assessment: {
+                has_actionable_pattern: true,
+                depth_score: 2,
+              },
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("Small talk about the weather");
+      });
+
+      await waitFor(() => {
+        expect(setDoc).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: expect.stringContaining("profile/master") }),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+    });
+
+    it("does NOT call setDoc when has_actionable_pattern is false", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Surface-level observation.",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: { type: "trigger_dna_extraction", payload: {} },
+            extractions: {
+              ...highQualityExtraction,
+              progress_assessment: {
+                has_actionable_pattern: false,
+                depth_score: 7,
+              },
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("Small talk about the weather");
+      });
+
+      await waitFor(() => {
+        expect(setDoc).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: expect.stringContaining("profile/master") }),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+    });
+
+    it("does NOT write themes_extracted to profile", async () => {
+      const { setDoc, doc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "You did great work today.",
+            session_focus: null,
+            step_index: 0,
+            mode: "informational",
+            phase: null,
+            action: { type: "trigger_dna_extraction", payload: {} },
+            extractions: highQualityExtraction,
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await act(async () => {
+        await result.current.sendMessage("I discovered something about myself today");
+      });
+
+      await waitFor(() => {
+        expect(setDoc).toHaveBeenCalled();
+      });
+
+      const profileMasterCall = setDoc.mock.calls.find((call: unknown[]) => {
+        const docCall = (doc.mock.calls as unknown[][]).find((c: unknown[]) => (c[1] as string | undefined)?.includes?.("profile/master"));
+        return docCall !== undefined;
+      });
+      expect(profileMasterCall).toBeDefined();
+      const payload = profileMasterCall[1];
+      expect(payload).not.toHaveProperty("themes_extracted");
     });
   });
 });
