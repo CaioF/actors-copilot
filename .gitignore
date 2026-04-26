@@ -50,5 +50,8 @@ yarn.lock
 # acting corpus (replaced with open materials before ingestion)
 book_sources/
 
+# python venv
+scripts/python/venv/
+
 # implementation plans
 .plans/
