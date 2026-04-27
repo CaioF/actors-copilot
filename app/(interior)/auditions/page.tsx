@@ -127,17 +127,21 @@ export default function AuditionsPage() {
           formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         }
 
-        // Standardize status text
-        const statusStr = data.status === "completed" ? "Completed" : "Draft";
+        // Standardize status text (Firestore may store lowercase or title-case)
+        const rawStatus = (data.status || "").toLowerCase();
+        let statusStr: AuditionStatus = "Draft";
+        if (rawStatus === "completed") statusStr = "Completed";
+        else if (rawStatus === "processing") statusStr = "Processing";
 
         return {
           id: docSnap.id,
           project: data.project || "Untitled Project",
           role: data.role || "Unknown Role",
           date: formattedDate,
-          status: statusStr as AuditionStatus,
+          status: statusStr,
           projectType: data.projectType || "cinematic",
-          analysisType: data.analysisType || "sides"
+          analysisType: data.analysisType || "sides",
+          castingDirectorName: data.castingDirectorName || ""
         };
       });
 
@@ -165,7 +169,7 @@ export default function AuditionsPage() {
         role: editForm.role,
         projectType: editForm.projectType, 
         castingDirectorName: editForm.castingDirectorName,
-        status: editForm.status
+        status: editForm.status.toLowerCase()
       });
 
       // Update the local screen instantly
