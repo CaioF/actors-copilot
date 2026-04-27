@@ -32,7 +32,7 @@ interface Audition {
   status: AuditionStatus
   projectType?: "cinematic" | "commercial" | "theater"
   analysisType: "sides" | "brief"
-  castingDirectorEmail?: string
+  castingDirectorName?: string
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -75,7 +75,8 @@ export default function AuditionsPage() {
     project: "", 
     role: "", 
     projectType: "cinematic" as "cinematic" | "commercial" | "theater" ,
-    castingDirectorEmail: ""
+    castingDirectorName: "",
+    status: "Draft" as AuditionStatus
   })
 
   /**
@@ -163,7 +164,8 @@ export default function AuditionsPage() {
         project: editForm.project,
         role: editForm.role,
         projectType: editForm.projectType, 
-        castingDirectorEmail: editForm.castingDirectorEmail
+        castingDirectorName: editForm.castingDirectorName,
+        status: editForm.status
       });
 
       // Update the local screen instantly
@@ -263,14 +265,28 @@ export default function AuditionsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Casting Director Email</label>
+                <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Casting Director Name</label>
                 <input 
-                  type="email" 
-                  value={editForm.castingDirectorEmail}
-                  onChange={(e) => setEditForm({...editForm, castingDirectorEmail: e.target.value})}
-                  placeholder="casting@production.com"
+                  type="text" 
+                  value={editForm.castingDirectorName}
+                  onChange={(e) => setEditForm({...editForm, castingDirectorName: e.target.value})}
+                  placeholder="e.g., John Doe"
                   className="w-full mt-1 bg-white border border-[#C7C0B5] rounded-lg px-4 py-2 text-[#2C3328] focus:border-[#E8721A] outline-none"
                 />
+              </div>
+
+              {/* status badge*/}
+              <div>
+                <label className="text-xs font-medium text-[#FF7316] uppercase tracking-wider">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({...editForm, status: e.target.value as AuditionStatus})}
+                  className="w-full mt-1 bg-white border border-[#C7C0B5] rounded-lg px-4 py-2 text-[#2C3328] focus:border-[#E8721A] outline-none appearance-none cursor-pointer"
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Processing">Processing</option>
+                  <option value="Completed">Completed</option>
+                </select>
               </div>
 
               <div>
@@ -422,7 +438,13 @@ export default function AuditionsPage() {
                     onClick={(e) => { 
                       e.stopPropagation(); 
                       setEditingAudition(audition);
-                      setEditForm({ project: audition.project, role: audition.role, projectType: audition.projectType || "cinematic", castingDirectorEmail: audition.castingDirectorEmail || "" });
+                      setEditForm({ 
+                        project: audition.project, 
+                        role: audition.role, 
+                        projectType: audition.projectType || "cinematic", 
+                        castingDirectorName: audition.castingDirectorName || "",
+                        status: audition.status 
+                      });
                     }}
                     className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
                     title="Edit Details"

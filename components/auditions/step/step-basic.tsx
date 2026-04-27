@@ -116,8 +116,8 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
                 id="castingEmail"
                 type="email"
                 placeholder="e.g., casting@production.com"
-                value={data.castingDirectorEmail || ""}
-                onChange={(e) => updateData({ castingDirectorEmail: e.target.value })}
+                value={data.castingDirectorName || ""}
+                onChange={(e) => updateData({ castingDirectorName: e.target.value })}
                 className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/40 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
               />
             </div>

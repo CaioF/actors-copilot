@@ -127,6 +127,10 @@ export async function POST(request: Request) {
         ];
         const isSkipCommand = skipPhrases.includes(content.trim());
 
+        const isResumeSessionContinue = content.includes("Pick up where I left off");
+        
+        const isResumeSessionNew = content.includes("Start something new");
+
         let dynamicCommand = "";
         if (isEndSession) {
             dynamicCommand = `[SYSTEM OVERRIDE: INITIATE GROUNDING PROTOCOL]
@@ -159,7 +163,26 @@ export async function POST(request: Request) {
             Our monitoring has detected potential theme exhaustion in this conversation path.
             Review the recent exchange carefully: if the last several exchanges show diminishing thematic diversity or repetitive patterns, the current conversation path may not be bearing fruit.
             Deeply consider pivoting to a new Route that explores a different psychological dimension, rather than continuing to dig deeper into the same thematic territory.`;
-        } else {
+        } else if (isResumeSessionContinue) {
+            dynamicCommand = `[SYSTEM OVERRIDE: WELCOME BACK & CONTINUE]
+            The user has returned to the session after taking a break and wants to continue their previous train of thought.
+            
+            CRITICAL DIRECTIVES:
+            1. WARM WELCOME: Start with a brief, grounding, and gentle welcome back message to make them feel safe.
+            2. CONTEXTUALIZE: Review the conversation history prior to the break.
+            3. RESUME SONDAGE: Ask ONE follow-up Socratic question that picks up exactly where the previous deep conversation left off. Maintain the momentum of the prior topic.`;
+            
+        } else if (isResumeSessionNew) {
+            dynamicCommand = `[SYSTEM OVERRIDE: WELCOME BACK & PIVOT]
+            The user has returned to the session after taking a break and specifically requested to start fresh.
+            
+            CRITICAL DIRECTIVES:
+            1. WARM WELCOME: Start with a brief, grounding, and gentle welcome back message to make them feel safe.
+            2. DROP THE PAST: Completely abandon whatever specific memory or theme was being discussed before the break. Do not reference it.
+            3. FRESH START: Look at your provided "Follow-up Routes" in the system instructions. Pick a completely NEW, unexplored route and ask a fresh Socratic question to open a new angle of psychological exploration.`;
+        }
+        
+        else {
             dynamicCommand = `[MOMENTUM CHECK]
             Continue the Socratic extraction naturally. Ask ONE follow-up question. However, if you feel the current specific memory is fully explored, do not hesitate to pivot to a new Route.`;
         }
@@ -394,7 +417,7 @@ export async function POST(request: Request) {
          * or skipping the question, thereby saving token usage and preventing 
          * superficial data pollution in the psychological profile.
          */
-        if (!isEndSession && !isSkipCommand) {
+        if (!isEndSession && !isSkipCommand && !isResumeSessionContinue && !isResumeSessionNew) {
             const extractionResult = await extractionModel.generateContent(promptForExtraction);
             
             // Assign to the outer variable instead of using 'const'
