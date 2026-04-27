@@ -14,7 +14,7 @@ export interface AuditionFormData {
   deadline?: string;
 
   auditionTimezone?: string;
-  castingDirectorEmail?: string;
+  castingDirectorName?: string;
 
   // Step 2: Sides
   sidesFile: File | null;
@@ -31,7 +31,7 @@ export const initialAuditionData: AuditionFormData = {
   role: "",
   deadline: "",
   auditionTimezone: "",
-  castingDirectorEmail: "",
+  castingDirectorName: "",
   sidesFile: null,
   sidesText: "",
   briefFile: null,

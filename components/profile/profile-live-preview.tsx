@@ -2,7 +2,7 @@
 
 import { useFormContext, useWatch } from "react-hook-form";
 import { Play, Download, ArrowRight, Award } from "lucide-react";
-import { ActorProfile } from "@/lib/profile-types";
+import { ActorProfile, generateSlug } from "@/lib/profile-types";
 
 /**
  * A live preview component that displays how the actor profile will appear publicly.
@@ -12,6 +12,7 @@ export function ProfileLivePreview() {
   const { control } = useFormContext<ActorProfile>();
 
   const fullName = useWatch({ control, name: "fullName" });
+  const slug = useWatch({ control, name: "slug" });
   const playingAgeMin = useWatch({ control, name: "playingAgeMin" });
   const playingAgeMax = useWatch({ control, name: "playingAgeMax" });
   const location = useWatch({ control, name: "location" });
@@ -35,6 +36,10 @@ export function ProfileLivePreview() {
   const featuredCredits = credits?.filter((c) => c.title).slice(0, 3) || [];
   const hasShowreels = showreels?.some((s) => s.url);
   const firstShowreelUrl = showreels?.find((s) => s.url)?.url;
+
+  const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://theactorscopilot.com';
+  const profilePath = `actors/${slug || generateSlug(fullName || "")}`;
+  const profileFullUrl = `${siteOrigin}/${profilePath}`;
 
   return (
     <div className="sticky top-8">
@@ -184,6 +189,7 @@ export function ProfileLivePreview() {
       {/* View Full Profile Link */}
       <button
         type="button"
+        onClick={() => window.open(profileFullUrl, "_blank", "noopener,noreferrer")}
         className="mt-3 flex items-center gap-1.5 text-sm font-medium text-[#E8721A] transition-colors hover:text-[#E8721A]/80"
       >
         <ArrowRight className="h-4 w-4" />

@@ -53,6 +53,28 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
     onSave();
   };
 
+  /**
+   * Opens the native device sharing dialog if supported, otherwise falls back to copying the link.
+   */
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${fullName || 'Actor'} - Profile`,
+          text: 'Check out my actor profile on The Actors Copilot!',
+          url: profileFullUrl,
+        });
+      } catch (err) {
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          await copyLink();
+        }
+      }
+    } else {
+      // Fallback for desktop browsers that don't support native sharing
+      copyLink();
+    }
+  };
+
   return (
     <div className="mb-6 space-y-4">
       {/* Title Row */}
@@ -118,6 +140,7 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
         {/* Share */}
         <button
           type="button"
+          onClick={handleShare}
           className="flex items-center gap-1.5 rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#E8DFD0]"
         >
           <Share2 className="h-3.5 w-3.5" />
