@@ -6,7 +6,6 @@ import {
 } from "@/lib/acting-coach/application/retrieve-coach-context";
 import { getUserAuditionsSummary, getAuditionFullData } from "@/lib/acting-coach/application/get-audition-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
-import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-generation-model";
 import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
@@ -16,6 +15,14 @@ import type { AttachedDocument } from "@/components/chat-input";
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
+/**
+ * Handles conversational Acting Coach chat.
+ * Integrates Pinecone vector retrieval for acting methodologies and utilizes
+ * Firebase Vertex AI with the global backend to support preview models.
+ *
+ * @param request - HTTP request containing content, history, auditionId, and optional document payload
+ * @returns JSON response with AI coach reply
+ */
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("Authorization");
@@ -35,21 +42,21 @@ export async function POST(request: Request) {
       if (!document || typeof document !== "object") {
         return NextResponse.json({ error: "Invalid document format" }, { status: 400 });
       }
-      
+
       const doc = document as AttachedDocument;
-      
+
       if (!doc.data || typeof doc.data !== "string") {
         return NextResponse.json({ error: "Document data is required" }, { status: 400 });
       }
       if (!doc.mimeType || typeof doc.mimeType !== "string") {
         return NextResponse.json({ error: "Document mimeType is required" }, { status: 400 });
       }
-      
+
       const supportedMimes = ["text/plain", "application/pdf", "image/jpeg", "image/png", "image/webp"];
       if (!supportedMimes.includes(doc.mimeType)) {
         return NextResponse.json({ error: `Unsupported document type: ${doc.mimeType}` }, { status: 400 });
       }
-      
+
       const decodedSize = (doc.data.length * 3) / 4;
       if (decodedSize > MAX_DOCUMENT_SIZE_BYTES) {
         return NextResponse.json({ error: "Document exceeds 20MB limit" }, { status: 400 });
@@ -127,42 +134,49 @@ export async function POST(request: Request) {
       "Retrieved context from Pinecone"
     );
 
-    // --- Inject Document text if text/plain ---
-    let effectiveContent = content;
-    if (document && document.mimeType === "text/plain") {
-      try {
-        const decodedText = Buffer.from(document.data, "base64").toString("utf-8");
-        effectiveContent = `[Attached: ${document.name}]\n${decodedText}\n\n${content}`;
-      } catch (err) {
-        log.warn({ err }, "Failed to decode base64 document");
-      }
-    }
-
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
 
-    const prompt = buildCoachPrompt({
+    // Context preparation without inline base64 string manipulation
+    const promptText = buildCoachPrompt({
       actorBaseline,
       excerpts,
-      question: effectiveContent, // The prompt includes the document
+      question: content,
       history: historyToInclude,
       auditions: auditionSummaries,
       auditionFullData,
     });
 
-    let generationModel;
-    try {
-      generationModel = createGenerationModel();
-    } catch (err) {
-      log.error({ err }, "Failed to create generation model");
-      return NextResponse.json(
-        { error: "Failed to initialize generation model" },
-        { status: 500 }
-      );
+    // --- Firebase Vertex AI Initialization (Aligned with DNA route architecture) ---
+    const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
+    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+
+    const aiGlobal = getAI(getFirebaseApp(), {
+      backend: new VertexAIBackend('global')
+    });
+
+    const coachModel = getGenerativeModel(aiGlobal, {
+      model: "gemini-3.1-pro-preview",
+    });
+
+    type PromptPart = { text: string } | { inlineData: { data: string; mimeType: string } };
+
+    const promptParts: PromptPart[] = [
+      { text: promptText }
+    ];
+
+    // Native attachment handling via Vertex AI SDK
+    if (document && document.data && document.mimeType) {
+      promptParts.push({
+        inlineData: {
+          data: document.data,
+          mimeType: document.mimeType,
+        },
+      });
     }
 
     let replyText: string;
     try {
-      const result = await generationModel.generateContent(prompt);
+      const result = await coachModel.generateContent(promptParts);
       replyText = result.response.text();
     } catch (err) {
       log.error({ err }, "Generation failed");

@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { QuickPromptsDropdown } from "@/components/quick-prompts-dropdown";
 import { useActingCoach } from "@/hooks/use-acting-coach";
 import type { AttachedDocument } from "@/components/chat-input";
+import { renderMarkdown } from "@/lib/acting-coach/render-markdown"; 
 
 const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
@@ -89,13 +90,19 @@ export default function ActingCoachPage() {
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    className={`max-w-[80%] rounded-2xl px-5 py-4 ${
                       msg.role === "user"
                         ? "bg-[#E8721A] text-white"
-                        : "bg-[#E8DFD0] text-[#2C3328]"
+                        : "bg-[#E8DFD0] text-[#2C3328] shadow-sm"
                     }`}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    {msg.role === "user" ? (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    ) : (
+                      <div className="text-sm">
+                        {renderMarkdown(msg.content)}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
