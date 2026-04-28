@@ -1,7 +1,16 @@
 /** @jest-environment jsdom */
 
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
+
+// Mocks para o JSDOM não reclamar dos componentes do Radix UI/cmdk do QuickPromptsDropdown
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+window.HTMLElement.prototype.scrollIntoView = jest.fn();
 
 jest.mock("@/lib/firebase", () => ({
   getDb: jest.fn(),
@@ -75,7 +84,6 @@ describe("ActingCoachPage", () => {
 
   it("renders the Acting Coach page header", () => {
     render(<ActingCoachPage />);
-    // Both the DashboardHeader and the heading section render "Acting Coach"
     const matches = screen.getAllByText("Acting Coach");
     expect(matches.length).toBeGreaterThan(0);
   });
@@ -93,7 +101,7 @@ describe("ActingCoachPage", () => {
       fireEvent.click(sendButton);
     }
 
-    expect(mockSendMessage).toHaveBeenCalledWith("How do I cold read?");
+    expect(mockSendMessage).toHaveBeenCalledWith("How do I cold read?", undefined, null);
   });
 
   it("renders empty-state center block with logo, heading, and description", () => {
@@ -117,15 +125,12 @@ describe("ActingCoachPage", () => {
     expect(screen.queryByAltText("The Actors Copilot")).not.toBeInTheDocument();
   });
 
-  it("renders suggestion chips when messages is empty", () => {
+  it("renders QuickPromptsDropdown when messages is empty", () => {
     render(<ActingCoachPage />);
-    expect(screen.getByText("Help me deepen my objective")).toBeInTheDocument();
-    expect(screen.getByText("I just got a redirect - what do I do?")).toBeInTheDocument();
-    expect(screen.getByText("I'm spiraling before an audition")).toBeInTheDocument();
-    expect(screen.getByText("Apply this to my DNA")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quick Prompts" })).toBeInTheDocument();
   });
 
-  it("does not render suggestion chips when messages.length > 0", () => {
+  it("does not render QuickPromptsDropdown when messages.length > 0", () => {
     (useActingCoach as jest.Mock).mockReturnValue({
       messages: [{ id: "1", role: "user", content: "Hello" }],
       isLoading: false,
@@ -134,7 +139,7 @@ describe("ActingCoachPage", () => {
       clearSession: jest.fn(),
     });
     render(<ActingCoachPage />);
-    expect(screen.queryByText("Help me deepen my objective")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quick Prompts" })).not.toBeInTheDocument();
   });
 
   it("renders New Session button in the heading row at all times", () => {
@@ -148,10 +153,21 @@ describe("ActingCoachPage", () => {
     expect(mockClearSession).toHaveBeenCalledTimes(1);
   });
 
-  it("clicking a suggestion chip triggers sendMessage with the chip prompt", () => {
+  it("selecting a prompt from QuickPromptsDropdown triggers sendMessage", async () => {
+    const user = userEvent.setup();
     render(<ActingCoachPage />);
-    fireEvent.click(screen.getByText("Help me deepen my objective"));
-    expect(mockSendMessage).toHaveBeenCalledWith("Help me deepen my objective");
+    
+    // Abre o dropdown
+    await user.click(screen.getByRole("button", { name: "Quick Prompts" }));
+    
+    // Clica no primeiro prompt da lista
+    const firstPrompt = screen.getByText(/I'm working on a scene/i);
+    await user.click(firstPrompt);
+    
+    // Verifica se a página enviou o texto correto preenchido
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      "I'm working on a scene. Help me define my character's Overall Objective and then walk me through a 'Destination' exercise to make that goal physical."
+    );
   });
 
   it("auto-triggers sendMessage with audition context when auditionId URL param is present", () => {

@@ -11,8 +11,10 @@ import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
 import type { AuditionSummary } from "@/lib/acting-coach/contracts";
+import type { AttachedDocument } from "@/components/chat-input";
 
 const MAX_HISTORY_MESSAGES = 20;
+const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
 export async function POST(request: Request) {
   try {
@@ -22,10 +24,36 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content, history, auditionId } = body;
+    const { content, history, auditionId, document } = body;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    }
+
+    // --- Document Validation Block ---
+    if (document !== undefined) {
+      if (!document || typeof document !== "object") {
+        return NextResponse.json({ error: "Invalid document format" }, { status: 400 });
+      }
+      
+      const doc = document as AttachedDocument;
+      
+      if (!doc.data || typeof doc.data !== "string") {
+        return NextResponse.json({ error: "Document data is required" }, { status: 400 });
+      }
+      if (!doc.mimeType || typeof doc.mimeType !== "string") {
+        return NextResponse.json({ error: "Document mimeType is required" }, { status: 400 });
+      }
+      
+      const supportedMimes = ["text/plain", "application/pdf", "image/jpeg", "image/png", "image/webp"];
+      if (!supportedMimes.includes(doc.mimeType)) {
+        return NextResponse.json({ error: `Unsupported document type: ${doc.mimeType}` }, { status: 400 });
+      }
+      
+      const decodedSize = (doc.data.length * 3) / 4;
+      if (decodedSize > MAX_DOCUMENT_SIZE_BYTES) {
+        return NextResponse.json({ error: "Document exceeds 20MB limit" }, { status: 400 });
+      }
     }
 
     const { auth, db } = await import("@/lib/firebase.admin");
@@ -81,7 +109,7 @@ export async function POST(request: Request) {
     let excerpts;
     try {
       excerpts = await retrieveCoachContext(
-        content,
+        content, // We keep searching Vector DB using only the prompt content
         config.embeddingModel,
         { topK: 5 },
         { pineconeInferenceClient, pineconeIndex }
@@ -99,12 +127,23 @@ export async function POST(request: Request) {
       "Retrieved context from Pinecone"
     );
 
+    // --- Inject Document text if text/plain ---
+    let effectiveContent = content;
+    if (document && document.mimeType === "text/plain") {
+      try {
+        const decodedText = Buffer.from(document.data, "base64").toString("utf-8");
+        effectiveContent = `[Attached: ${document.name}]\n${decodedText}\n\n${content}`;
+      } catch (err) {
+        log.warn({ err }, "Failed to decode base64 document");
+      }
+    }
+
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
 
     const prompt = buildCoachPrompt({
       actorBaseline,
       excerpts,
-      question: content,
+      question: effectiveContent, // The prompt includes the document
       history: historyToInclude,
       auditions: auditionSummaries,
       auditionFullData,

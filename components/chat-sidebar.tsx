@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
 import type { DNASession, DNASectionId } from "@/lib/chat-types";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 interface SectionProgressRingProps {
   current: number;
@@ -23,6 +23,47 @@ interface SectionProgressRingProps {
   sectionId: DNASectionId;
   themesCovered?: string[];
 }
+
+/**
+ * Standard Firebase Timestamp interface representation.
+ */
+interface FirebaseTimestamp {
+  seconds: number;
+  nanoseconds?: number;
+}
+
+/**
+ * Type guard to safely identify a Firebase Timestamp object at runtime.
+ * Eliminates the need for 'any' or forced assertions.
+ */
+const isFirebaseTimestamp = (value: unknown): value is FirebaseTimestamp => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "seconds" in value &&
+    typeof (value as Record<string, unknown>).seconds === "number"
+  );
+};
+
+/**
+ * Normalizes mixed date payloads (Firebase Timestamps, ISO strings, JS Dates) 
+ * into a safe, native JavaScript Date object.
+ */
+const normalizeDate = (dateValue: unknown): Date | null => {
+  if (!dateValue) return null;
+  if (dateValue instanceof Date) return dateValue;
+  
+  if (isFirebaseTimestamp(dateValue)) {
+    return new Date(dateValue.seconds * 1000);
+  }
+  
+  if (typeof dateValue === "string" || typeof dateValue === "number") {
+    const parsed = new Date(dateValue);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  
+  return null;
+};
 
 function SectionProgressRing({ current, total, isCompleted, sectionId, themesCovered = [] }: SectionProgressRingProps) {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -80,6 +121,8 @@ function SectionProgressRing({ current, total, isCompleted, sectionId, themesCov
   );
 
   const tooltipId = `theme-tooltip-${sectionId}`;
+
+  
 
   return (
     <div
@@ -150,6 +193,7 @@ interface ChatSidebarProps {
   onSectionClick: (sectionId: string) => void;
 }
 
+
 /**
  * ChatSidebar Component
  * Renders the chat interface sidebar with session info, DNA sections navigation,
@@ -165,15 +209,33 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
   const pathname = usePathname();
 
-  const lastActive = session?.lastActiveAt
-    ? new Date(
-        (session.lastActiveAt as unknown as { seconds: number }).seconds * 1000
-      ).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "February 18, 2026";
+  const { formattedLastActive, sessionDuration } = useMemo(() => {
+    const lastDate = normalizeDate(session?.lastActiveAt);
+    
+    const formattedDate = lastDate
+      ? lastDate.toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "No recent activity";
+
+    let duration = session?.durationMinutes ?? 0;
+    
+    if (!duration) {
+      const startDate = normalizeDate((session as any)?.createdAt); 
+      if (startDate && lastDate) {
+        const diffMs = Math.abs(lastDate.getTime() - startDate.getTime());
+        duration = Math.floor(diffMs / (1000 * 60));
+      }
+    }
+
+    return {
+      formattedLastActive: formattedDate,
+      sessionDuration: duration > 0 ? duration : 1,
+    };
+  }, [session?.lastActiveAt, session?.durationMinutes, session]);
+
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col bg-[#3D4A3C] text-[#F5F0E8]">
@@ -197,16 +259,12 @@ export function ChatSidebar({
 
       {/* Session Info */}
       <div className="px-5 pb-2">
-        <span className="inline-flex items-center rounded-full bg-[#E8721A] px-3 py-1 text-xs font-semibold text-[#ffffff]">
-          Session {session?.sessionNumber ?? 2} of{" "}
-          {session?.totalSessions ?? 7}
-        </span>
         <h3 className="mt-3 font-title text-base italic leading-snug text-[#E8721A]">
           Continue your discovery
         </h3>
         <p className="mt-1 text-[11px] leading-relaxed text-[#F5F0E8]/60">
-          Last session: {lastActive} &middot;{" "}
-          {session?.durationMinutes ?? 18} minutes
+          Last session: {formattedLastActive} &middot;{" "}
+          {sessionDuration} {sessionDuration === 1 ? 'minute' : 'minutes'}
         </p>
       </div>
 

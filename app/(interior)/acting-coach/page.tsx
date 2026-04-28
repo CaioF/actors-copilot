@@ -6,8 +6,9 @@ import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { ChatInput } from "@/components/chat-input";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { CoachSuggestionChips } from "@/components/coach-suggestion-chips";
+import { QuickPromptsDropdown } from "@/components/quick-prompts-dropdown";
 import { useActingCoach } from "@/hooks/use-acting-coach";
+import type { AttachedDocument } from "@/components/chat-input";
 
 const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
@@ -33,7 +34,8 @@ export default function ActingCoachPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSend = (content: string) => sendMessage(content);
+  const handleSend = (content: string, document?: AttachedDocument | null) => 
+    sendMessage(content, undefined, document); 
   const isEmpty = messages.length === 0 && !isLoading;
 
   return (
@@ -120,7 +122,7 @@ export default function ActingCoachPage() {
 
         {isEmpty && (
           <div className="flex justify-center pb-4">
-            <CoachSuggestionChips onSelect={sendMessage} />
+            <QuickPromptsDropdown onSelect={(text) => sendMessage(text)} />
           </div>
         )}
       </div>
