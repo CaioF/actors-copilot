@@ -15,14 +15,6 @@ import type { AttachedDocument } from "@/components/chat-input";
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
-/**
- * Handles conversational Acting Coach chat.
- * Integrates Pinecone vector retrieval for acting methodologies and utilizes
- * Firebase Vertex AI with the global backend to support preview models.
- *
- * @param request - HTTP request containing content, history, auditionId, and optional document payload
- * @returns JSON response with AI coach reply
- */
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("Authorization");
@@ -31,7 +23,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content, history, auditionId, document } = body;
+    // CORREÇÃO 1: Adicionei o currentFocus aqui
+    const { content, history, auditionId, document, currentFocus } = body;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -42,21 +35,17 @@ export async function POST(request: Request) {
       if (!document || typeof document !== "object") {
         return NextResponse.json({ error: "Invalid document format" }, { status: 400 });
       }
-
       const doc = document as AttachedDocument;
-
       if (!doc.data || typeof doc.data !== "string") {
         return NextResponse.json({ error: "Document data is required" }, { status: 400 });
       }
       if (!doc.mimeType || typeof doc.mimeType !== "string") {
         return NextResponse.json({ error: "Document mimeType is required" }, { status: 400 });
       }
-
       const supportedMimes = ["text/plain", "application/pdf", "image/jpeg", "image/png", "image/webp"];
       if (!supportedMimes.includes(doc.mimeType)) {
         return NextResponse.json({ error: `Unsupported document type: ${doc.mimeType}` }, { status: 400 });
       }
-
       const decodedSize = (doc.data.length * 3) / 4;
       if (decodedSize > MAX_DOCUMENT_SIZE_BYTES) {
         return NextResponse.json({ error: "Document exceeds 20MB limit" }, { status: 400 });
@@ -68,13 +57,10 @@ export async function POST(request: Request) {
     const decodedToken = await auth.verifyIdToken(token);
 
     const userRecord = await auth.getUser(decodedToken.uid);
-    const firstName =
-      userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") ||
-      "Actor";
+    const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
     const userPath = `${decodedToken.uid}_${firstName}`;
 
     const log = createChildLogger({ route: "coach/chat", userPath });
-    log.trace({ contentLength: content.trim().length }, "Request received");
 
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
@@ -82,9 +68,7 @@ export async function POST(request: Request) {
     let actorBaseline = "";
     if (profileSnap.exists) {
       const profileData = profileSnap.data();
-      if (profileData) {
-        actorBaseline = JSON.stringify(profileData, null, 2);
-      }
+      if (profileData) actorBaseline = JSON.stringify(profileData, null, 2);
     }
 
     let auditionSummaries: AuditionSummary[] = [];
@@ -105,38 +89,20 @@ export async function POST(request: Request) {
     }
 
     const config = getActingCoachConfig();
-    const pineconeInferenceClient = createPineconeInferenceClient({
-      apiKey: config.pineconeApiKey,
-    });
+    const pineconeInferenceClient = createPineconeInferenceClient({ apiKey: config.pineconeApiKey });
     const pineconeRawIndex = createPineconeClient().index(config.pineconeIndexName);
-    const pineconeIndex = (config.pineconeNamespace
-      ? pineconeRawIndex.namespace(config.pineconeNamespace)
-      : pineconeRawIndex) as unknown as PineconeIndex;
+    const pineconeIndex = (config.pineconeNamespace ? pineconeRawIndex.namespace(config.pineconeNamespace) : pineconeRawIndex) as unknown as PineconeIndex;
 
     let excerpts;
     try {
-      excerpts = await retrieveCoachContext(
-        content, // We keep searching Vector DB using only the prompt content
-        config.embeddingModel,
-        { topK: 5 },
-        { pineconeInferenceClient, pineconeIndex }
-      );
+      excerpts = await retrieveCoachContext(content, config.embeddingModel, { topK: 5 }, { pineconeInferenceClient, pineconeIndex });
     } catch (err) {
       log.error({ err }, "Retrieval failed");
-      return NextResponse.json(
-        { error: "Failed to retrieve context" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to retrieve context" }, { status: 500 });
     }
-
-    log.info(
-      { excerptCount: excerpts.length, excerpts },
-      "Retrieved context from Pinecone"
-    );
 
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
 
-    // Context preparation without inline base64 string manipulation
     const promptText = buildCoachPrompt({
       actorName: firstName,
       actorBaseline,
@@ -145,61 +111,51 @@ export async function POST(request: Request) {
       history: historyToInclude,
       auditions: auditionSummaries,
       auditionFullData,
+      currentFocus: currentFocus ?? null,
     });
 
-    // --- Firebase Vertex AI Initialization (Aligned with DNA route architecture) ---
     const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
-    const aiGlobal = getAI(getFirebaseApp(), {
-      backend: new VertexAIBackend('global')
-    });
+    const aiGlobal = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
+    const coachModel = getGenerativeModel(aiGlobal, { model: "gemini-3.1-pro-preview" });
 
-    const coachModel = getGenerativeModel(aiGlobal, {
-      model: "gemini-3.1-pro-preview",
-    });
-
-    type PromptPart = { text: string } | { inlineData: { data: string; mimeType: string } };
-
-    const promptParts: PromptPart[] = [
-      { text: promptText }
-    ];
-
-    // Native attachment handling via Vertex AI SDK
-    if (document && document.data && document.mimeType) {
-      promptParts.push({
-        inlineData: {
-          data: document.data,
-          mimeType: document.mimeType,
-        },
-      });
+    const promptParts: any[] = [{ text: promptText }];
+    if (document?.data && document?.mimeType) {
+      promptParts.push({ inlineData: { data: document.data, mimeType: document.mimeType } });
     }
 
-    let replyText: string;
+    let replyText = "";
     try {
       const result = await coachModel.generateContent(promptParts);
-      replyText = result.response.text();
+      const rawText = result.response.text();
+
+      let parsedResponse;
+      try {
+        const cleanJson = rawText.replace(/```json|```/g, "").trim();
+        parsedResponse = JSON.parse(cleanJson);
+      } catch (e) {
+        parsedResponse = { reply: rawText };
+      }
+
+      return NextResponse.json({
+        aiData: {
+          coach_reply: parsedResponse.reply || parsedResponse.coach_reply || rawText,
+          session_focus: parsedResponse.session_focus || currentFocus?.sessionFocus || null,
+          step_index: parsedResponse.step_index ?? currentFocus?.stepIndex ?? 0,
+          mode: parsedResponse.mode ?? currentFocus?.mode ?? "informational",
+          phase: parsedResponse.phase ?? currentFocus?.phase ?? null,
+          action: parsedResponse.action || null,
+          extractions: parsedResponse.extractions || null
+        }
+      });
+
     } catch (err) {
       log.error({ err }, "Generation failed");
-      return NextResponse.json(
-        { error: "Failed to generate response" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to generate response" }, { status: 500 });
     }
-
-    return NextResponse.json(
-      {
-        aiData: {
-          coach_reply: replyText,
-        },
-      },
-      { status: 200 }
-    );
   } catch (error) {
     logger.error({ err: error, msg: "Coach Chat API Error" });
-    return NextResponse.json(
-      { error: "Failed to generate chat response" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to generate chat response" }, { status: 500 });
   }
 }

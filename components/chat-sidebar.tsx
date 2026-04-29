@@ -352,10 +352,10 @@ export function ChatSidebar({
       <div className="p-2 pt-1">
         <div className="rounded-xl bg-[#2C3328] p-3">
           <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
-            Bussiness Class
+            Business Class
           </h4>
           <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
-            Upgrade to Bussiness Class to unlock more features
+            Upgrade to Business Class to unlock more features
           </p>
           <a 
             href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout" 

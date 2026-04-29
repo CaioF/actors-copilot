@@ -65,7 +65,9 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
           url: profileFullUrl,
         });
       } catch (err) {
-        // User cancelled the share dialog or it failed silently
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          await copyLink();
+        }
       }
     } else {
       // Fallback for desktop browsers that don't support native sharing

@@ -4,6 +4,8 @@ import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 /**
  * Constructs the final prompt string for the Acting Coach AI by aggregating system instructions,
  * the actor's specific identity and context, relevant vector database excerpts, and conversation history.
+ * * This version includes session focus and audition-specific performance maps to ensure
+ * high-context coaching responses.
  *
  * @param {CoachPromptInput} input - The aggregated context data required to build the prompt.
  * @returns {string} The fully assembled prompt string ready to be sent to the generation model.
@@ -16,25 +18,34 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     question, 
     history, 
     auditions, 
-    auditionFullData 
+    auditionFullData,
+    currentFocus // Added to maintain session continuity
   } = input;
 
   const sections: string[] = [];
 
-  // Core System Persona & Instructions
+  // 1. Core System Persona & Instructions
   sections.push(ACTING_COACH_SYSTEM_PROMPT);
 
-  // Dynamic Actor Identity Injection
+  // 2. Dynamic Actor Identity Injection
   if (actorName) {
-    sections.push(`# CURRENT ACTOR\nYou are coaching: ${actorName}. Always address them by this name and use their specific DNA context below.`);
+    sections.push(`# CURRENT ACTOR\nYou are coaching: ${actorName}. Always address them by this name and utilize their specific DNA context provided below.`);
   }
 
-  // Actor DNA / Baseline Context
+  // 3. Actor DNA / Baseline Context
   if (actorBaseline) {
-    sections.push(`# ACTOR CONTEXT\n${actorBaseline}`);
+    sections.push(`# ACTOR DNA & PSYCHOLOGY\n${actorBaseline}`);
   }
 
-  // Current Audition Focus (if applicable)
+  // 4. Current Session Focus
+  if (currentFocus?.sessionFocus) {
+    sections.push(`Session focus: ${currentFocus.sessionFocus}`);
+    sections.push(`Step index: ${currentFocus.stepIndex ?? 0}`);
+    sections.push(`Mode: ${currentFocus.mode ?? "guided"}`);
+    sections.push(`Phase: ${currentFocus.phase ?? "(none)"}`);
+  }
+
+  // 5. Current Audition Focus (Performance Map Integration)
   if (auditionFullData) {
     const pm = auditionFullData.performanceMap as {
       intro?: string;
@@ -55,38 +66,38 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     }
     if (pm?.outro) lines.push(`\n${pm.outro}`);
     
-    sections.push(`# AUDITION BREAKDOWN\n${lines.join("\n")}`);
+    sections.push(`# ACTIVE AUDITION BREAKDOWN\n${lines.join("\n")}`);
   }
 
-  //  Historical Auditions Summary
+  // 6. Historical Auditions Summary
   if (auditions && auditions.length > 0) {
     const auditionLines = auditions.map(
-      (a) => `- ${a.project} — ${a.role} (${a.id})`
+      (a) => `- ${a.project} — ${a.role} (${a.id})` 
     );
     sections.push(`# ACTOR'S AUDITIONS\n${auditionLines.join("\n")}`);
   }
 
-  //  Vector Database Retrieval (RAG)
+  // 7. Vector Database Retrieval (RAG)
   if (excerpts.length > 0) {
     const excerptSection = excerpts
       .map((excerpt: RetrievedExcerpt) => {
-        return `[${excerpt.citationNumber}] "${excerpt.excerptText}"\nSource: ${excerpt.sourceBook}`;
+        return `[Source: ${excerpt.sourceBook}] [Citation: ${excerpt.citationNumber}]\n"${excerpt.excerptText}"`;
       })
       .join("\n\n");
 
-    sections.push(`# REFERENCE MATERIAL\n${excerptSection}`);
+    sections.push(`# METHODOLOGY REFERENCE MATERIAL\nUse the following acting methodology excerpts to ground your coaching advice:\n\n${excerptSection}`);
   }
 
-  // Conversation History
+  // 8. Conversation History
   if (history && history.length > 0) {
     const historySection = history
       .map((msg) => `${msg.role === "user" ? "Actor" : "Coach"}: ${msg.content}`)
       .join("\n");
-    sections.push(`# CONVERSATION HISTORY\n${historySection}`);
+    sections.push(`# CONVERSATION LOG\n${historySection}`);
   }
 
-  // The Current Query
-  sections.push(`# ACTOR'S QUESTION\n${question}`);
+  // 9. The Current Query
+  sections.push(`# ACTOR'S CURRENT REQUEST\n${question}`);
 
   return sections.join("\n\n");
 }

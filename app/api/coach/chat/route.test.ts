@@ -24,6 +24,7 @@ jest.mock("@/lib/logger", () => ({
   },
   createChildLogger: jest.fn().mockReturnValue({
     trace: jest.fn(),
+    debug: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
     info: jest.fn(),
