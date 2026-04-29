@@ -39,7 +39,11 @@ jest.mock("firebase/firestore", () => {
     orderBy: jest.fn(),
     addDoc: jest.fn(async () => ({ id: "msg-123" })),
     onSnapshot: jest.fn((ref, observer) => {
-      Promise.resolve().then(() => {
+      // Importamos o act dinamicamente para evitar problemas de escopo no jest.mock
+      const { act } = require("@testing-library/react");
+      
+      // Envolvemos a chamada do observer no act() e rodamos de forma síncrona
+      act(() => {
         if (ref._query) {
           observer({
             docs: [],
