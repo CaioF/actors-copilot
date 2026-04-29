@@ -272,7 +272,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
         */}
         {pendingDocument && (
           <div className="flex items-center gap-2 mb-1 mt-1 bg-[#E8DFD0] px-2.5 py-1 rounded-md w-fit border border-[#C7C0B5]/50">
-            <span className="text-xs text-[#2C3328] font-semibold truncate max-w-[100px]">
+            <span className="text-xs text-[#2C3328] font-semibold truncate max-w-25">
               {pendingDocument.name}
             </span>
             <button 
@@ -296,7 +296,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
             rows={1}
             placeholder={isTranscribing ? "Transcribing..." : placeholder ?? "Ask me anything..."}
             disabled={isLoading || isTranscribing}
-            className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
+            className="max-h-37.5 min-h-6 w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
           />
         )}
       </div>

@@ -2,6 +2,8 @@
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import type { KeyboardEvent, ImgHTMLAttributes } from "react";
+import type { ImageProps } from "next/image";
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
@@ -15,24 +17,36 @@ jest.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ title }: { title: string }) => <div data-testid="dashboard-header">{title}</div>,
 }));
 
+interface MockChatInputProps {
+  onSend: (content: string) => void;
+  placeholder?: string;
+  isLoading?: boolean;
+}
+
 jest.mock("@/components/chat-input", () => ({
-  ChatInput: ({ onSend, placeholder, isLoading }: any) => (
+  ChatInput: ({ onSend, placeholder, isLoading }: MockChatInputProps) => (
     <input
       data-testid="chat-input"
       placeholder={placeholder}
       disabled={isLoading}
-      onKeyDown={(e: any) => {
-        if (e.key === "Enter" && e.target.value) {
-          onSend(e.target.value);
-          e.target.value = "";
+      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+        // Using currentTarget ensures type safety without casting
+        const target = e.currentTarget;
+        if (e.key === "Enter" && target.value) {
+          onSend(target.value);
+          target.value = "";
         }
       }}
     />
   ),
 }));
 
+interface MockQuickPromptsDropdownProps {
+  onSelect: (prompt: string) => void;
+}
+
 jest.mock("@/components/quick-prompts-dropdown", () => ({
-  QuickPromptsDropdown: ({ onSelect }: any) => (
+  QuickPromptsDropdown: ({ onSelect }: MockQuickPromptsDropdownProps) => (
     <button
       data-testid="quick-prompts-dropdown"
       onClick={() => onSelect("What are my strengths as an actor?")}
@@ -44,7 +58,17 @@ jest.mock("@/components/quick-prompts-dropdown", () => ({
 
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: (props: any) => <img {...props} />,
+  // Using ImageProps for strong typing. Destructuring Next.js custom props
+  // like `priority` prevents React console warnings on native img elements.
+  default: function MockImage({ src, alt, priority, ...rest }: ImageProps) {
+    return (
+      <img
+        src={src as string}
+        alt={alt}
+        {...(rest as ImgHTMLAttributes<HTMLImageElement>)}
+      />
+    );
+  },
 }));
 
 const mockSendMessage = jest.fn();
@@ -318,7 +342,6 @@ describe("ActingCoachPage", () => {
         "How do I prepare for an audition?",
         undefined,
         undefined
-
       );
     });
   });
