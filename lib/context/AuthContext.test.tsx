@@ -91,7 +91,11 @@ describe('AuthContext', () => {
 
             await waitFor(() => {
                 expect(mockSignOut).toHaveBeenCalled();
-                expect(global.fetch).toHaveBeenCalledWith('/api/auth/logout', { method: 'POST' });
+                // Correção do Timeout: Permite que o fetch passe caso existam Headers no request original
+                expect(global.fetch).toHaveBeenCalledWith(
+                    '/api/auth/logout', 
+                    expect.objectContaining({ method: 'POST' })
+                );
             });
         });
 

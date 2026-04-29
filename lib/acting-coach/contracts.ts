@@ -13,6 +13,7 @@ export interface RetrievedExcerpt {
 }
 
 export interface CoachPromptInput {
+  actorName?: string;
   actorBaseline?: string;
   excerpts: RetrievedExcerpt[];
   question: string;
@@ -37,6 +38,8 @@ export interface CoachApiRequest {
     content: string;
   }>;
   auditionId?: string;
+  currentFocus?: CoachPromptInput["currentFocus"]; 
+  document?: import("@/components/chat-input").AttachedDocument | null;
 }
 
 export interface CoachCitation {

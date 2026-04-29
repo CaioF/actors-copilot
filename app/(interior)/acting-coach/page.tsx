@@ -2,71 +2,63 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { ChatInput } from "@/components/chat-input";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { CoachSuggestionChips } from "@/components/coach-suggestion-chips";
+import { QuickPromptsDropdown } from "@/components/quick-prompts-dropdown";
 import { useActingCoach } from "@/hooks/use-acting-coach";
-import { renderMarkdown } from "@/lib/render-markdown";
+import type { AttachedDocument } from "@/components/chat-input";
+import { renderMarkdown } from "@/lib/acting-coach/render-markdown";
 
 const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
 
 export default function ActingCoachPage() {
-  const { messages, isLoading, sendMessage, startNewSession, clearSessionFocus, session } = useActingCoach();
+  const { 
+    messages, 
+    isLoading, 
+    sendMessage, 
+    startNewSession, 
+    clearSessionFocus, 
+    session 
+  } = useActingCoach();
+  
   const searchParams = useSearchParams();
-
   const auditionId = searchParams.get("auditionId");
   const project = searchParams.get("project");
   const role = searchParams.get("role");
 
   const hasFiredInitialMessage = useRef(false);
 
+  // Auto-trigger session context if coming from a specific audition
   useEffect(() => {
-    if (!auditionId || !project || !role) return;
-    if (!session) return;
-    if (hasFiredInitialMessage.current) return;
-    if (session.linkedAuditionId === auditionId) {
+    if (auditionId && project && role && !hasFiredInitialMessage.current) {
       hasFiredInitialMessage.current = true;
-      return;
-    }
-    hasFiredInitialMessage.current = true;
-    void (async () => {
-      await startNewSession({ linkedAuditionId: auditionId });
-      await sendMessage(
+      sendMessage(
         `I want to work on my ${project} audition as ${role}.`,
         auditionId
       );
-    })();
-  }, [auditionId, project, role, session, startNewSession, sendMessage]);
+    }
+  }, [auditionId, project, role, sendMessage]);
 
-  const handleSend = (content: string) => sendMessage(content);
+  const handleSend = (content: string, document?: AttachedDocument | null) => 
+    sendMessage(content, undefined, document);
+
   const isEmpty = messages.length === 0 && !isLoading;
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardHeader title="Acting Coach" />
+      <DashboardHeader 
+        title={session?.title ? `Acting Coach — ${session.title}` : "Acting Coach"} 
+      />
 
       <div className="flex flex-1 flex-col px-8">
         <div className="flex items-start justify-between pt-2 pb-6">
           <div>
-            <h2 className="font-title text-2xl font-bold text-[#2C3328]">Acting Coach</h2>
             <p className="mt-1 text-sm text-[#6B6B6B]">
-              {session?.title ?? "Session 1"}
+              Your coach is ready. What are we working on?
             </p>
-            {session?.sessionFocus && (
-              <p className="mt-1 text-xs italic text-[#8BA2A8]">
-                Currently working on: {session.sessionFocus}
-                <button
-                  onClick={clearSessionFocus}
-                  className="ml-2 underline hover:text-[#E8721A]"
-                  aria-label="Clear current focus"
-                >
-                  clear
-                </button>
-              </p>
-            )}
           </div>
           <button
             onClick={() => startNewSession()}
@@ -76,6 +68,21 @@ export default function ActingCoachPage() {
             New Session
           </button>
         </div>
+
+        {/* Session Focus Indicator */}
+        {session?.sessionFocus && (
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-[#E8DFD0] bg-[#F9F7F2] px-4 py-3 text-sm text-[#2C3328]">
+            
+            <p><span className="font-bold text-[#E8721A]">Currently working on:</span> {session.sessionFocus}</p>
+            <button 
+              onClick={clearSessionFocus}
+              aria-label="Clear current focus"
+              className="text-[#6B6B6B] hover:text-[#2C3328]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-1 flex-col">
           {isEmpty ? (
@@ -107,18 +114,18 @@ export default function ActingCoachPage() {
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    className={`max-w-[80%] rounded-2xl px-5 py-4 ${
                       msg.role === "user"
                         ? "bg-[#E8721A] text-white"
-                        : "bg-[#E8DFD0] text-[#2C3328]"
+                        : "bg-[#E8DFD0] text-[#2C3328] shadow-sm"
                     }`}
                   >
-                    {msg.role === "assistant" ? (
+                    {msg.role === "user" ? (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    ) : (
                       <div className="text-sm">
                         {renderMarkdown(msg.content)}
                       </div>
-                    ) : (
-                      <p className="text-sm">{msg.content}</p>
                     )}
                   </div>
                 </div>
@@ -128,14 +135,8 @@ export default function ActingCoachPage() {
                   <div className="rounded-2xl bg-[#E8DFD0] px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 animate-bounce rounded-full bg-[#E8721A]" />
-                      <div
-                        className="h-2 w-2 animate-bounce rounded-full bg-[#E8721A]"
-                        style={{ animationDelay: "0.1s" }}
-                      />
-                      <div
-                        className="h-2 w-2 animate-bounce rounded-full bg-[#E8721A]"
-                        style={{ animationDelay: "0.2s" }}
-                      />
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-[#E8721A]" style={{ animationDelay: "0.1s" }} />
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-[#E8721A]" style={{ animationDelay: "0.2s" }} />
                     </div>
                   </div>
                 </div>
@@ -146,7 +147,7 @@ export default function ActingCoachPage() {
 
         {isEmpty && (
           <div className="flex justify-center pb-4">
-            <CoachSuggestionChips onSelect={sendMessage} />
+            <QuickPromptsDropdown onSelect={(text) => sendMessage(text)} />
           </div>
         )}
       </div>

@@ -6,16 +6,14 @@ import {
 } from "@/lib/acting-coach/application/retrieve-coach-context";
 import { getUserAuditionsSummary, getAuditionFullData } from "@/lib/acting-coach/application/get-audition-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
-import { createGenerationModel } from "@/lib/acting-coach/infrastructure/create-generation-model";
 import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
-import { COACH_REPLY_SCHEMA } from "@/lib/acting-coach/infrastructure/coach-reply-schema";
-import type { AuditionSummary, CoachReplyEnvelope } from "@/lib/acting-coach/contracts";
-import { runCoachTriggeredExtraction } from "@/lib/dna/extraction/run-extraction";
-import type { ExtractedPsychData, ChatHistoryMessage } from "@/lib/chat-types";
+import type { AuditionSummary } from "@/lib/acting-coach/contracts";
+import type { AttachedDocument } from "@/components/chat-input";
 
 const MAX_HISTORY_MESSAGES = 20;
+const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
 export async function POST(request: Request) {
   try {
@@ -25,10 +23,33 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content, history, auditionId, currentFocus } = body;
+    // CORREÇÃO 1: Adicionei o currentFocus aqui
+    const { content, history, auditionId, document, currentFocus } = body;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    }
+
+    // --- Document Validation Block ---
+    if (document !== undefined) {
+      if (!document || typeof document !== "object") {
+        return NextResponse.json({ error: "Invalid document format" }, { status: 400 });
+      }
+      const doc = document as AttachedDocument;
+      if (!doc.data || typeof doc.data !== "string") {
+        return NextResponse.json({ error: "Document data is required" }, { status: 400 });
+      }
+      if (!doc.mimeType || typeof doc.mimeType !== "string") {
+        return NextResponse.json({ error: "Document mimeType is required" }, { status: 400 });
+      }
+      const supportedMimes = ["text/plain", "application/pdf", "image/jpeg", "image/png", "image/webp"];
+      if (!supportedMimes.includes(doc.mimeType)) {
+        return NextResponse.json({ error: `Unsupported document type: ${doc.mimeType}` }, { status: 400 });
+      }
+      const decodedSize = (doc.data.length * 3) / 4;
+      if (decodedSize > MAX_DOCUMENT_SIZE_BYTES) {
+        return NextResponse.json({ error: "Document exceeds 20MB limit" }, { status: 400 });
+      }
     }
 
     const { auth, db } = await import("@/lib/firebase.admin");
@@ -36,23 +57,18 @@ export async function POST(request: Request) {
     const decodedToken = await auth.verifyIdToken(token);
 
     const userRecord = await auth.getUser(decodedToken.uid);
-    const firstName =
-      userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") ||
-      "Actor";
+    const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
     const userPath = `${decodedToken.uid}_${firstName}`;
 
     const log = createChildLogger({ route: "coach/chat", userPath });
-    log.trace({ contentLength: content.trim().length }, "Request received");
 
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
 
     let actorBaseline = "";
     if (profileSnap.exists) {
-      const summary = profileSnap.data()?.baselineSummary;
-      if (summary) {
-        actorBaseline = summary;
-      }
+      const profileData = profileSnap.data();
+      if (profileData) actorBaseline = JSON.stringify(profileData, null, 2);
     }
 
     let auditionSummaries: AuditionSummary[] = [];
@@ -73,38 +89,22 @@ export async function POST(request: Request) {
     }
 
     const config = getActingCoachConfig();
-    const pineconeInferenceClient = createPineconeInferenceClient({
-      apiKey: config.pineconeApiKey,
-    });
+    const pineconeInferenceClient = createPineconeInferenceClient({ apiKey: config.pineconeApiKey });
     const pineconeRawIndex = createPineconeClient().index(config.pineconeIndexName);
-    const pineconeIndex = (config.pineconeNamespace
-      ? pineconeRawIndex.namespace(config.pineconeNamespace)
-      : pineconeRawIndex) as unknown as PineconeIndex;
+    const pineconeIndex = (config.pineconeNamespace ? pineconeRawIndex.namespace(config.pineconeNamespace) : pineconeRawIndex) as unknown as PineconeIndex;
 
     let excerpts;
     try {
-      excerpts = await retrieveCoachContext(
-        content,
-        config.embeddingModel,
-        { topK: 5 },
-        { pineconeInferenceClient, pineconeIndex }
-      );
+      excerpts = await retrieveCoachContext(content, config.embeddingModel, { topK: 5 }, { pineconeInferenceClient, pineconeIndex });
     } catch (err) {
       log.error({ err }, "Retrieval failed");
-      return NextResponse.json(
-        { error: "Failed to retrieve context" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to retrieve context" }, { status: 500 });
     }
-
-    log.info(
-      { excerptCount: excerpts.length, excerpts },
-      "Retrieved context from Pinecone"
-    );
 
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
 
-    const prompt = buildCoachPrompt({
+    const promptText = buildCoachPrompt({
+      actorName: firstName,
       actorBaseline,
       excerpts,
       question: content,
@@ -114,118 +114,48 @@ export async function POST(request: Request) {
       currentFocus: currentFocus ?? null,
     });
 
-    let generationModel;
-    try {
-      generationModel = createGenerationModel({
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: COACH_REPLY_SCHEMA,
-        },
-      });
-    } catch (err) {
-      log.error({ err }, "Failed to create generation model");
-      return NextResponse.json(
-        { error: "Failed to initialize generation model" },
-        { status: 500 }
-      );
+    const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
+    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+
+    const aiGlobal = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
+    const coachModel = getGenerativeModel(aiGlobal, { model: "gemini-3.1-pro-preview" });
+
+    const promptParts: any[] = [{ text: promptText }];
+    if (document?.data && document?.mimeType) {
+      promptParts.push({ inlineData: { data: document.data, mimeType: document.mimeType } });
     }
 
-    let envelope: CoachReplyEnvelope;
+    let replyText = "";
     try {
-      const result = await generationModel.generateContent(prompt);
+      const result = await coachModel.generateContent(promptParts);
       const rawText = result.response.text();
+
+      let parsedResponse;
       try {
-        const parsed = JSON.parse(rawText);
-        if (
-          typeof parsed.reply !== "string" ||
-          !Number.isInteger(parsed.step_index) ||
-          !["guided", "informational", "transition"].includes(parsed.mode)
-        ) {
-          throw new Error("envelope shape invalid");
-        }
-        if (parsed.action !== undefined && parsed.action !== null) {
-          if (
-            typeof parsed.action !== "object" ||
-            Array.isArray(parsed.action) ||
-            typeof parsed.action.type !== "string"
-          ) {
-            throw new Error("envelope shape invalid");
-          }
-        }
-        envelope = {
-          reply: parsed.reply,
-          session_focus: typeof parsed.session_focus === "string" ? parsed.session_focus : null,
-          step_index: parsed.step_index,
-          mode: parsed.mode,
-          phase: typeof parsed.phase === "string" ? parsed.phase : null,
-          action: parsed.action != null ? parsed.action : null,
-        };
-      } catch (parseErr) {
-        log.warn({ err: parseErr, rawText }, "Coach envelope parse failed; using raw text fallback");
-        envelope = {
-          reply: rawText,
-          session_focus: null,
-          step_index: 0,
-          mode: "informational",
-          phase: null,
-          action: null,
-        };
+        const cleanJson = rawText.replace(/```json|```/g, "").trim();
+        parsedResponse = JSON.parse(cleanJson);
+      } catch (e) {
+        parsedResponse = { reply: rawText };
       }
 
-      let extractions: ExtractedPsychData | null = null;
-      if (envelope.action?.type === "trigger_dna_extraction") {
-        log.debug({ historyCount: (body.history ?? []).length }, "Coach emitted trigger_dna_extraction, running extraction");
-        try {
-          const historyMessages: ChatHistoryMessage[] = (body.history ?? []).map(
-            (msg: { role: string; content: string }) => ({
-              role: msg.role === "assistant" ? "model" : msg.role,
-              parts: [{ text: msg.content }],
-            })
-          );
-          extractions = await runCoachTriggeredExtraction({
-            content: body.content.trim(),
-            history: historyMessages.slice(-20),
-          });
-          log.info({
-            hasExtraction: extractions !== null,
-            depthScore: extractions?.progress_assessment?.depth_score,
-            hasActionablePattern: extractions?.progress_assessment?.has_actionable_pattern,
-            newTraitsCount: extractions?.new_traits?.length ?? 0,
-            defenseMechCount: extractions?.defense_mechanisms?.length ?? 0,
-            snippetCount: extractions?.leaf_snippets?.length ?? 0,
-          }, "Coach extraction completed");
-        } catch (extractErr) {
-          log.error({ err: extractErr }, "Coach extraction failed");
-          extractions = null;
+      return NextResponse.json({
+        aiData: {
+          coach_reply: parsedResponse.reply || parsedResponse.coach_reply || rawText,
+          session_focus: parsedResponse.session_focus || currentFocus?.sessionFocus || null,
+          step_index: parsedResponse.step_index ?? currentFocus?.stepIndex ?? 0,
+          mode: parsedResponse.mode ?? currentFocus?.mode ?? "informational",
+          phase: parsedResponse.phase ?? currentFocus?.phase ?? null,
+          action: parsedResponse.action || null,
+          extractions: parsedResponse.extractions || null
         }
-      }
+      });
 
-      return NextResponse.json(
-        {
-          aiData: {
-            coach_reply: envelope.reply,
-            session_focus: envelope.session_focus,
-            step_index: envelope.step_index,
-            mode: envelope.mode,
-            phase: envelope.phase,
-            action: envelope.action,
-            extractions: extractions ?? undefined,
-          },
-        },
-        { status: 200 }
-      );
     } catch (err) {
       log.error({ err }, "Generation failed");
-      return NextResponse.json(
-        { error: "Failed to generate response" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to generate response" }, { status: 500 });
     }
   } catch (error) {
     logger.error({ err: error, msg: "Coach Chat API Error" });
-    return NextResponse.json(
-      { error: "Failed to generate chat response" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to generate chat response" }, { status: 500 });
   }
 }
