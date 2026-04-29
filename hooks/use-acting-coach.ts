@@ -142,7 +142,12 @@ export function useActingCoach(): UseActingCoachReturn {
             content: trimmedContent,
             history,
             auditionId,
-            currentFocus: session?.sessionFocus ?? null,
+            currentFocus: session?.sessionFocus != null ? {
+              sessionFocus: session.sessionFocus,
+              stepIndex: session.stepIndex,
+              mode: session.mode,
+              phase: session.phase,
+            } : null,
             document: document || undefined,
           }),
         });

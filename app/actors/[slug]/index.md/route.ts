@@ -38,8 +38,15 @@ export async function GET(
 
   // Derive base URL from request headers
   const headersList = await headers();
-  const host = headersList.get("host") || "theactorscopilot.com";
-  const proto = headersList.get("x-forwarded-proto") || "https";
+  const fallbackHost =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "") ||
+    process.env.VERCEL_URL ||
+    "localhost:3000";
+
+  const host = headersList.get("host") || fallbackHost;
+  const proto =
+    headersList.get("x-forwarded-proto") ||
+    (host.startsWith("localhost") ? "http" : "https");
   const baseUrl = `${proto}://${host}`;
 
   const markdown = profileToMarkdown(profile, baseUrl);

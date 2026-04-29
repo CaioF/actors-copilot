@@ -37,7 +37,9 @@ export function ProfileLivePreview() {
   const hasShowreels = showreels?.some((s) => s.url);
   const firstShowreelUrl = showreels?.find((s) => s.url)?.url;
 
-  const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://theactorscopilot.com';
+  const siteOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
   const profilePath = `actors/${slug || generateSlug(fullName || "")}`;
   const profileFullUrl = `${siteOrigin}/${profilePath}`;
 

@@ -10,6 +10,8 @@ import {
   Dna,
   Settings,
   CheckCircle2,
+  User,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
@@ -181,9 +183,11 @@ function SectionProgressRing({ current, total, isCompleted, sectionId, themesCov
 const HQ_EXTRACTIONS_FOR_COMPLETION = 5;
 
 const menuItems = [
-  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
-  { label: "Auditions", href: "/auditions", icon: Monitor },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
+  { label: "Acting Coach", href: "/acting-coach", icon: BookOpen },
+  { label: "Auditions", href: "/auditions", icon: Monitor },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -209,7 +213,7 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
   const pathname = usePathname();
 
-  const { formattedLastActive, sessionDuration } = useMemo(() => {
+  const { formattedLastActive } = useMemo(() => {
     const lastDate = normalizeDate(session?.lastActiveAt);
     
     const formattedDate = lastDate
@@ -220,21 +224,10 @@ export function ChatSidebar({
         })
       : "No recent activity";
 
-    let duration = session?.durationMinutes ?? 0;
-    
-    if (!duration) {
-      const startDate = normalizeDate((session as any)?.createdAt); 
-      if (startDate && lastDate) {
-        const diffMs = Math.abs(lastDate.getTime() - startDate.getTime());
-        duration = Math.floor(diffMs / (1000 * 60));
-      }
-    }
-
     return {
       formattedLastActive: formattedDate,
-      sessionDuration: duration > 0 ? duration : 1,
     };
-  }, [session?.lastActiveAt, session?.durationMinutes, session]);
+  }, [session?.lastActiveAt]);
 
 
   return (
@@ -263,8 +256,7 @@ export function ChatSidebar({
           Continue your discovery
         </h3>
         <p className="mt-1 text-[11px] leading-relaxed text-[#F5F0E8]/60">
-          Last session: {formattedLastActive} &middot;{" "}
-          {sessionDuration} {sessionDuration === 1 ? 'minute' : 'minutes'}
+          Last session: {formattedLastActive} 
         </p>
       </div>
 
