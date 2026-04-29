@@ -5,6 +5,25 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { signOut, onAuthStateChanged, getAuth, Auth, User } from 'firebase/auth';
 import { logger } from '@/lib/logger';
 
+class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+window.ResizeObserver = ResizeObserver;
+
+if (typeof window.PointerEvent === 'undefined') {
+  class PointerEvent extends MouseEvent {
+    constructor(type: string, params: PointerEventInit = {}) {
+      super(type, params);
+    }
+  }
+  window.PointerEvent = PointerEvent as any;
+  window.HTMLElement.prototype.scrollIntoView = jest.fn();
+  window.HTMLElement.prototype.hasPointerCapture = jest.fn();
+  window.HTMLElement.prototype.releasePointerCapture = jest.fn();
+}
+
 jest.mock('@/lib/logger', () => {
   const mockLog = {
     error: jest.fn(),
