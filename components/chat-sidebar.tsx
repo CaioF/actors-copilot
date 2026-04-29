@@ -10,6 +10,8 @@ import {
   Dna,
   Settings,
   CheckCircle2,
+  User,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
@@ -181,9 +183,11 @@ function SectionProgressRing({ current, total, isCompleted, sectionId, themesCov
 const HQ_EXTRACTIONS_FOR_COMPLETION = 5;
 
 const menuItems = [
-  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
-  { label: "Auditions", href: "/auditions", icon: Monitor },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
+  { label: "Acting Coach", href: "/acting-coach", icon: BookOpen },
+  { label: "Auditions", href: "/auditions", icon: Monitor },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
 ]
 
