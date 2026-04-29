@@ -13,7 +13,7 @@ export interface RetrievedExcerpt {
 }
 
 export interface CoachPromptInput {
-  
+  actorName?: string;
   actorBaseline?: string;
   excerpts: RetrievedExcerpt[];
   question: string;

@@ -81,9 +81,9 @@ export async function POST(request: Request) {
 
     let actorBaseline = "";
     if (profileSnap.exists) {
-      const summary = profileSnap.data()?.baselineSummary;
-      if (summary) {
-        actorBaseline = summary;
+      const profileData = profileSnap.data();
+      if (profileData) {
+        actorBaseline = JSON.stringify(profileData, null, 2);
       }
     }
 
@@ -138,6 +138,7 @@ export async function POST(request: Request) {
 
     // Context preparation without inline base64 string manipulation
     const promptText = buildCoachPrompt({
+      actorName: firstName,
       actorBaseline,
       excerpts,
       question: content,

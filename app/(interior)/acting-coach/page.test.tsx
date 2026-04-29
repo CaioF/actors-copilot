@@ -4,6 +4,12 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 
+// react-markdown Mock to avoid ESM crash on Jest (SyntaxError: Unexpected token 'export')
+jest.mock("react-markdown", () => ({
+  __esModule: true,
+  default: ({ children }: any) => <>{children}</>,
+}));
+
 // Mocks para o JSDOM não reclamar dos componentes do Radix UI/cmdk do QuickPromptsDropdown
 global.ResizeObserver = jest.fn().mockImplementation(() => ({
   observe: jest.fn(),

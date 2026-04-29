@@ -20,6 +20,13 @@ jest.mock("firebase-admin/firestore", () => ({
   getFirestore: jest.fn(() => "mocked-firestore-instance"),
 }));
 
+// NOVO: Adicionado o mock do Storage
+jest.mock("firebase-admin/storage", () => ({
+  getStorage: jest.fn(() => ({
+    bucket: jest.fn(() => "mocked-bucket-instance"),
+  })),
+}));
+
 jest.mock("@/lib/logger", () => ({
   logger: {
     error: jest.fn(),
@@ -41,6 +48,9 @@ describe("Firebase Admin Server Initialization", () => {
     
     const firestoreMock = require("firebase-admin/firestore");
     firestoreMock.getFirestore.mockClear();
+
+    const storageMock = require("firebase-admin/storage");
+    storageMock.getStorage.mockClear();
     
     (logger.error as jest.Mock).mockClear();
   });
@@ -52,7 +62,7 @@ describe("Firebase Admin Server Initialization", () => {
   const setupValidEnvironment = () => {
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "test-project-id";
     process.env.FIREBASE_CLIENT_EMAIL = "admin@test-project.iam.gserviceaccount.com";
-    process.env.FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\\nfake-key-line-1\\nfake-key-line-2\\n-----END PRIVATE KEY-----";
+    process.env.FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nfake-key-line-1\nfake-key-line-2\n-----END PRIVATE KEY-----";
   };
 
   describe("Environment Variable Validation", () => {
@@ -71,7 +81,6 @@ describe("Firebase Admin Server Initialization", () => {
       setupValidEnvironment();
       require("./firebase.admin");
 
-      // Usamos o require() dinâmico para pegar o mock exato que foi usado nesta execução
       const adminMock = require("firebase-admin");
       
       expect(adminMock.credential.cert).toHaveBeenCalledWith(
