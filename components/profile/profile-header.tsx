@@ -26,9 +26,9 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
   const fullName = watch("fullName");
   const [copied, setCopied] = useState(false);
 
-  const siteOrigin = 
-  process.env.NEXT_PUBLIC_SITE_URL || 
-  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 'http://localhost:3000');
+  const siteOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
   const profilePath = `actors/${slug || generateSlug(fullName || "")}`;
   // Display URL without protocol; full URL (with protocol) is used for copy/share
   const profileUrl = `${siteOrigin.replace(/^https?:\/\//, '')}/${profilePath}`;

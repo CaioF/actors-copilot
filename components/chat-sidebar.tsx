@@ -213,7 +213,7 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
   const pathname = usePathname();
 
-  const { formattedLastActive, sessionDuration } = useMemo(() => {
+  const { formattedLastActive } = useMemo(() => {
     const lastDate = normalizeDate(session?.lastActiveAt);
     
     const formattedDate = lastDate
@@ -224,21 +224,10 @@ export function ChatSidebar({
         })
       : "No recent activity";
 
-    let duration = session?.durationMinutes ?? 0;
-    
-    if (!duration) {
-      const startDate = normalizeDate((session as any)?.createdAt); 
-      if (startDate && lastDate) {
-        const diffMs = Math.abs(lastDate.getTime() - startDate.getTime());
-        duration = Math.floor(diffMs / (1000 * 60));
-      }
-    }
-
     return {
       formattedLastActive: formattedDate,
-      sessionDuration: duration > 0 ? duration : 1,
     };
-  }, [session?.lastActiveAt, session?.durationMinutes, session]);
+  }, [session?.lastActiveAt]);
 
 
   return (

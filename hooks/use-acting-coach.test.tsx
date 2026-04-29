@@ -166,6 +166,65 @@ describe("useActingCoach", () => {
       expect(callBody.currentFocus).toBe(null);
     });
 
+    it("sends full currentFocus object shape when session has a non-null sessionFocus", async () => {
+      const { onSnapshot } = require("firebase/firestore");
+
+      // Override onSnapshot for this test: first call returns a session with non-null focus
+      (onSnapshot as jest.Mock).mockImplementationOnce((ref: any, observer: any) => {
+        const { act: localAct } = require("@testing-library/react");
+        localAct(() => {
+          observer({
+            exists: () => true,
+            id: "coach-session-focused",
+            data: () => ({
+              createdAt: new Date(),
+              lastActiveAt: new Date(),
+              status: "active",
+              title: "Focused Session",
+              linkedAuditionId: null,
+              messageCount: 5,
+              sessionFocus: "Find your objective",
+              stepIndex: 2,
+              mode: "guided",
+              phase: "objective",
+            }),
+          });
+        });
+        return jest.fn();
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Good progress",
+            session_focus: "Find your objective",
+            step_index: 2,
+            mode: "guided",
+            phase: "objective",
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session?.sessionFocus).toBe("Find your objective");
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Help me find my objective");
+      });
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(callBody.currentFocus).toEqual({
+        sessionFocus: "Find your objective",
+        stepIndex: 2,
+        mode: "guided",
+        phase: "objective",
+      });
+    });
+
     it("includes auditionId in request when provided", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
