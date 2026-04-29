@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { Settings } from "lucide-react";
+import { Settings, Mail, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import Link from "next/link";
@@ -26,6 +26,7 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
   // We initialize the state as null because when the page loads, 
   // we don't know yet if the user is logged in.
   const [user, setUser] = useState<User | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const auth = getAuth();
@@ -55,9 +56,17 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
     .slice(0, 2);
 
   return (
+    <>
     <header className="flex bg-[#8BA2A8] items-center justify-between px-8 mb-10 py-6">
       <h1 className="font-title text-3xl font-bold text-[#2C3328]">{title}</h1>
       <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C7C0B5] text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0]"
+          aria-label="Support"
+        >
+          <Mail className="h-5 w-5" />
+        </button>
         <Link href={"/settings"}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C7C0B5] text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0]"
           aria-label="Settings"
@@ -79,5 +88,28 @@ export function DashboardHeader({ title = "My Self Tape Copilot" }: DashboardHea
         </Link>
       </div>
     </header>
+    {isModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="relative w-full max-w-sm rounded-2xl bg-[#F5F0E8] p-6 shadow-xl border border-[#C7C0B5]">
+          <button
+            onClick={() => setIsModalOpen(false)}
+            className="absolute right-4 top-4 rounded-full p-1 text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0] hover:text-[#2C3328]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <h2 className="mb-2 font-title text-xl font-bold text-[#2C3328]">Need Help?</h2>
+          <p className="text-sm text-[#4A5548]">
+            Mail to:{" "}
+            <a 
+              href="mailto:support@theactorscopilot.com" 
+              className="font-medium text-[#E8721A] transition-colors hover:text-[#C45A3C] hover:underline"
+            >
+              support@theactorscopilot.com
+            </a>
+          </p>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
