@@ -263,8 +263,7 @@ export function ChatSidebar({
           Continue your discovery
         </h3>
         <p className="mt-1 text-[11px] leading-relaxed text-[#F5F0E8]/60">
-          Last session: {formattedLastActive} &middot;{" "}
-          {sessionDuration} {sessionDuration === 1 ? 'minute' : 'minutes'}
+          Last session: {formattedLastActive} 
         </p>
       </div>
 
