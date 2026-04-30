@@ -30,7 +30,7 @@ jest.mock("firebase/auth", () => ({
 
 jest.mock("firebase/firestore", () => {
   const mockCollection = jest.fn(() => ({ _collection: true }));
-  const mockDoc = jest.fn(() => ({ _doc: true }));
+  const mockDoc = jest.fn((db, path) => ({ _doc: true, _path: typeof path === "string" ? path : db }));
   const mockQuery = jest.fn(() => ({ _query: true }));
 
   return {
@@ -613,6 +613,97 @@ describe("useActingCoach", () => {
       expect(writtenPayload).toHaveProperty("bio", "ok bio");
       expect(writtenPayload).not.toHaveProperty("slug");
       expect(writtenPayload).not.toHaveProperty("agencyEmail");
+    });
+
+    it("writes to users/{userPath}/profile/master when action.type is trigger_dna_extraction with passing quality gate", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "I've extracted your DNA insights.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "trigger_dna_extraction" },
+            extractions: {
+              progress_assessment: { has_actionable_pattern: true, depth_score: 5 },
+              new_traits: ["Resilient"],
+              core_values: ["Creativity"],
+              somatic_tells: ["Hand gestures"],
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("What are my patterns?");
+      });
+
+      expect(setDoc).toHaveBeenCalled();
+      const profileMasterWrite = setDoc.mock.calls.find(
+        (call) =>
+          call[1] &&
+          typeof call[1] === "object" &&
+          "lastUpdated" in call[1] &&
+          "psychology.traits" in call[1]
+      );
+      expect(profileMasterWrite).toBeDefined();
+      expect(profileMasterWrite[1]).toMatchObject({
+        lastUpdated: expect.any(Object),
+      });
+      expect(profileMasterWrite[1]["psychology.traits"]).toBeDefined();
+      expect(profileMasterWrite[1]["psychology.coreValues"]).toBeDefined();
+      expect(profileMasterWrite[1]["physicality.somaticTells"]).toBeDefined();
+    });
+
+    it("does NOT write to profile/master when trigger_dna_extraction has failing quality gate", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Interesting.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "trigger_dna_extraction" },
+            extractions: {
+              progress_assessment: { has_actionable_pattern: true, depth_score: 2 },
+              new_traits: ["Resilient"],
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("What are my patterns?");
+      });
+
+      const profileMasterWrite = setDoc.mock.calls.find(
+        (call) =>
+          call[0] &&
+          typeof call[0] === "object" &&
+          "_path" in call[0] &&
+          String(call[0]._path).includes("profile/master")
+      );
+      expect(profileMasterWrite).toBeUndefined();
     });
 
     it("does NOT trigger DNA quality gate for update_actor_profile action", async () => {
