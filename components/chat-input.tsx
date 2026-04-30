@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic, X } from "lucide-react"; 
+import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic, X, Dna } from "lucide-react"; 
 import { getAuth } from "firebase/auth";
 import { logger } from '@/lib/logger';
 
@@ -11,20 +11,25 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-/**
- * Standardized payload for attached documents, enforcing strong typing 
- * for Base64 encoded files sent to the Next.js API.
- */
 export interface AttachedDocument {
   data: string;
   mimeType: string;
   name: string;
 }
 
-/**
- * Renders a pulsating voice waveform to provide visual feedback during audio capture.
- * Uses staggered animation delays to simulate real-time audio input.
- */
+const DNA_RESERVOIRS = [
+  { title: "Early Childhood / Home", desc: "Safety, belonging, firsts wounds." },
+  { title: "School / Authority", desc: "Rules, powers, being seen or invisible" },
+  { title: "Identity / Self-Story", desc: "Who you believe you are" },
+  { title: "Friendship / Belonging", desc: "Acceptance, exclusion, loyalty" },
+  { title: "Romance / Intimacy", desc: "Desire, vulnerability, attachment" },
+  { title: "Loss / Grief", desc: "What you've had to let go" },
+  { title: "Ambition / Drive", desc: "What you're reaching for" },
+  { title: "Shame / Secret Self", desc: "What you hide why" },
+  { title: "Joy / Play", desc: "When you're most alive" },
+  { title: "Conflict / Anger", desc: "What makes you fight" }
+];
+
 function VoiceWaveform() {
   return (
     <div className="flex items-center justify-center gap-1.5 h-10 w-full bg-transparent">
@@ -45,44 +50,38 @@ function VoiceWaveform() {
   );
 }
 
-/**
- * Chat input component with text input, voice recording, and message submission.
- * @param props - The component props
- * @param props.onSend - Callback function to send a message
- * @param props.isLoading - Whether the AI is currently processing a request
- * @returns The chat input JSX element
- */
 export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything..." }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
-
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isDnaOpen, setIsDnaOpen] = useState(false);
+  const [pendingDocument, setPendingDocument] = useState<AttachedDocument | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  /**
-   * State management for the currently queued document attachment.
-   */
-  const [pendingDocument, setPendingDocument] = useState<AttachedDocument | null>(null);
-  
-  /**
-   * Reference to the hidden file input element, allowing us to programmatically 
-   * trigger the native OS file picker via the Paperclip UI button.
-   */
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dnaMenuRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Intercepts the native file selection event, reads the file via FileReader,
-   * extracts the Base64 payload, and updates the pending document state.
-   */
+  // Fecha o menu de DNA ao clicar fora dele
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dnaMenuRef.current && !dnaMenuRef.current.contains(event.target as Node)) {
+        setIsDnaOpen(false);
+      }
+    }
+    if (isDnaOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDnaOpen]);
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Reset the input value to ensure the onChange event fires even if 
-    // the user removes and selects the exact same file again.
     event.target.value = '';
 
     const reader = new FileReader();
@@ -100,14 +99,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
     };
   };
 
-  /**
-   * Programmatically triggers the hidden file input click event.
-   */
   const triggerFileSelect = () => fileInputRef.current?.click();
-
-  /**
-   * Clears the current pending document from memory and UI.
-   */
   const removeDocument = () => setPendingDocument(null);
 
   useEffect(() => {
@@ -121,20 +113,14 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
     inputRef.current?.focus();
   }, []);
 
-  // Focus automatically after AI finishes generating a response
   useEffect(() => {
     if (!isLoading && inputRef.current) {
-      // 10ms delay to ensure focus happens after any potential UI updates from the new message rendering
       setTimeout(() => {
         inputRef.current?.focus();
       }, 10);
     }
   }, [isLoading]);
 
-  /**
-   * Handles form submission by sending the trimmed message and/or the attached 
-   * document, then clearing the respective input states.
-   */
   const handleSubmit = () => {
     const hasText = value.trim().length > 0;
     const hasDoc = pendingDocument !== null;
@@ -146,11 +132,6 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
     setPendingDocument(null);
   };
 
-  /**
-   * Handles keyboard events for the input field.
-   * Submits the message when Enter is pressed (without Shift).
-   * @param e - The keyboard event
-   */
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -158,10 +139,6 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
     }
   };
 
-  /**
-   * Starts audio recording, requests microphone access, and sets up transcription on stop.
-   * @async
-   */
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -219,9 +196,6 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
     }
   };
 
-  /**
-   * Stops the currently active audio recording and releases microphone resources.
-   */
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -230,10 +204,6 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
     }
   };
 
-  /**
-   * Handles the main action button click based on current state.
-   * Stops recording if recording, submits if text exists, otherwise starts recording.
-   */
   const handleMainAction = () => {
     if (isTranscribing) return; 
     if (isRecording) stopRecording();
@@ -243,10 +213,8 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
 
   return (
     <div className="flex justify-center px-8 pb-3 pt-2">
-      {/* Mudamos de items-center para items-end para os botões ficarem no fundo quando a caixa crescer */}
       <div className="flex w-full max-w-2xl items-end gap-2 rounded-3xl border border-[#C7C0B5]/60 bg-[#F0E8DC] px-4 py-2 shadow-sm transition-all">
         
-        {/* Hidden file input strictly for handling OS file picker dialogs */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -265,41 +233,83 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
           <Paperclip className="h-5 w-5" />
         </button>
 
-      <div className="flex-1 overflow-hidden flex flex-col justify-end">
-        
-        {/* Document Attachment Badge 
-          Provides visual confirmation of a successfully queued document.
-        */}
-        {pendingDocument && (
-          <div className="flex items-center gap-2 mb-1 mt-1 bg-[#E8DFD0] px-2.5 py-1 rounded-md w-fit border border-[#C7C0B5]/50">
-            <span className="text-xs text-[#2C3328] font-semibold truncate max-w-[100px]">
-              {pendingDocument.name}
-            </span>
-            <button 
-              onClick={removeDocument} 
-              className="text-[#6B6B6B] hover:text-red-500 transition-colors"
-              aria-label="Remove attachment"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
+        <div className="flex-1 overflow-hidden flex flex-col justify-end">
+          {pendingDocument && (
+            <div className="flex items-center gap-2 mb-1 mt-1 bg-[#E8DFD0] px-2.5 py-1 rounded-md w-fit border border-[#C7C0B5]/50">
+              <span className="text-xs text-[#2C3328] font-semibold truncate max-w-[100px]">
+                {pendingDocument.name}
+              </span>
+              <button 
+                onClick={removeDocument} 
+                className="text-[#6B6B6B] hover:text-red-500 transition-colors"
+                aria-label="Remove attachment"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
-        {isRecording ? (
-          <VoiceWaveform />
-        ) : (
-          <textarea
-            ref={inputRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            placeholder={isTranscribing ? "Transcribing..." : placeholder ?? "Ask me anything..."}
-            disabled={isLoading || isTranscribing}
-            className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
-          />
-        )}
-      </div>
+          {isRecording ? (
+            <VoiceWaveform />
+          ) : (
+            <textarea
+              ref={inputRef}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              placeholder={isTranscribing ? "Transcribing..." : placeholder ?? "Ask me anything..."}
+              disabled={isLoading || isTranscribing}
+              className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
+            />
+          )}
+        </div>
+
+        {/* --- NOVO: BOTAO E POPOVER DE DNA --- */}
+        <div className="relative flex items-center justify-center mb-0.5" ref={dnaMenuRef}>
+          <button
+            onClick={() => setIsDnaOpen((prev) => !prev)}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors mr-1 ${
+              isDnaOpen 
+                ? "bg-[#E8DFD0] text-[#2C3328]" 
+                : "text-[#6B6B6B] hover:bg-[#E8DFD0] hover:text-[#2C3328]"
+            }`}
+            type="button"
+            aria-label="DNA Reservoirs"
+          >
+            <Dna className="h-5 w-5" />
+          </button>
+
+          {isDnaOpen && (
+            <div className="absolute bottom-[calc(100%+24px)] right-[-20px] sm:right-0 z-50 w-[85vw] max-w-[480px] rounded-2xl border border-[#E8DFD0] bg-[#F9F7F2] p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+              <h3 className="text-[#2C3328] font-semibold mb-3">Your DNA Reservoirs</h3>
+              <div className="h-[1px] w-full bg-[#E8DFD0] mb-4"></div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                {DNA_RESERVOIRS.map((item, index) => (
+                  <div 
+                    key={index} 
+                    className="flex flex-col cursor-pointer group"
+                    onClick={() => {
+                      // Opcional: Adicionar lógica ao clicar em um item de DNA
+                      console.log("Selecionou:", item.title);
+                      // setValue((prev) => prev + ` [${item.title}] `); // Exemplo de uso
+                      setIsDnaOpen(false);
+                    }}
+                  >
+                    <span className="text-sm font-medium text-[#2C3328] group-hover:text-[#E8721A] transition-colors">
+                      {item.title}
+                    </span>
+                    <span className="text-xs text-[#6B6B6B] mt-0.5">
+                      {item.desc}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        {/* --- FIM DO NOVO BLOCO DE DNA --- */}
 
         <button
           onClick={handleMainAction}
