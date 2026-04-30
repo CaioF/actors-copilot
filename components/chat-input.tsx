@@ -1,20 +1,37 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic, X, Dna } from "lucide-react"; 
+import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic, X, Dna, RefreshCw } from "lucide-react"; 
 import { getAuth } from "firebase/auth";
 import { logger } from '@/lib/logger';
 
-interface ChatInputProps {
-  onSend: (message: string, document?: AttachedDocument | null) => void;
-  isLoading: boolean;
-  placeholder?: string;
-}
-
+/**
+ * Standardized payload for attached documents.
+ */
 export interface AttachedDocument {
   data: string;
   mimeType: string;
   name: string;
+}
+
+/**
+ * Represents a single message object from the acting coach session.
+ */
+export interface SessionMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'coach' | 'system';
+  content: string;
+}
+
+/**
+ * Props for the ChatInput component.
+ */
+interface ChatInputProps {
+  onSend: (message: string, document?: AttachedDocument | null) => void;
+  isLoading: boolean;
+  placeholder?: string;
+  messages?: SessionMessage[];
+  sessionId?: string;
 }
 
 const DNA_RESERVOIRS = [
@@ -50,11 +67,18 @@ function VoiceWaveform() {
   );
 }
 
-export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything..." }: ChatInputProps) {
+export function ChatInput({ 
+  onSend, 
+  isLoading, 
+  placeholder = "Ask me anything...",
+  messages = [],
+  sessionId
+}: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isDnaOpen, setIsDnaOpen] = useState(false);
+  const [isUpdatingDna, setIsUpdatingDna] = useState(false);
   const [pendingDocument, setPendingDocument] = useState<AttachedDocument | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -63,21 +87,68 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dnaMenuRef = useRef<HTMLDivElement>(null);
 
-  // Fecha o menu de DNA ao clicar fora dele
+  /**
+   * Handles closing the DNA popover when clicking outside of it.
+   */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dnaMenuRef.current && !dnaMenuRef.current.contains(event.target as Node)) {
         setIsDnaOpen(false);
       }
     }
-    if (isDnaOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    if (isDnaOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDnaOpen]);
 
+  /**
+   * Extracts psychological data from the current session history via API.
+   * Filters the last 15 messages to prevent payload bloat.
+   */
+  const handleUpdateDna = async () => {
+    if (!messages || messages.length === 0) return;
+
+    setIsUpdatingDna(true);
+    try {
+      const auth = getAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+
+      if (!idToken) throw new Error("User not authenticated.");
+
+      // For performance, we analyze a sliding window of the most recent messages
+      const messagesToAnalyze = messages.slice(-15).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      const response = await fetch('/api/coach/updateDna', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          sessionId: sessionId,
+          messages: messagesToAnalyze 
+        }) 
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update DNA Vault. Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      logger.info({ msg: "DNA Vault updated successfully", data });
+      // TODO: Implement UI Toast Notification for success here.
+      
+    } catch (error) {
+      logger.error({ err: error, msg: 'Error updating DNA Vault' });
+      // TODO: Implement UI Toast Notification for error here.
+    } finally {
+      setIsUpdatingDna(false);
+    }
+  };
+
+  // ... (Keep existing handleFileUpload, triggerFileSelect, removeDocument, Textarea height useEffect, Focus useEffect) ...
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -174,14 +245,10 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
             const data = await response.json();
             if (data.text) {
                setValue(data.text);
-               
-               setTimeout(() => {
-                 inputRef.current?.focus();
-               }, 10);
+               setTimeout(() => inputRef.current?.focus(), 10);
             }
           } catch (error) {
             logger.error({ err: error, msg: 'Transcription error' });
-            alert("Failed to transcribe audio.");
           } finally {
             setIsTranscribing(false);
           }
@@ -192,7 +259,6 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
       setIsRecording(true);
     } catch (error) {
       logger.error({ err: error, msg: 'Mic access denied' });
-      alert("Please allow microphone access.");
     }
   };
 
@@ -265,7 +331,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
           )}
         </div>
 
-        {/* --- NOVO: BOTAO E POPOVER DE DNA --- */}
+        {/* DNA Button and Popover */}
         <div className="relative flex items-center justify-center mb-0.5" ref={dnaMenuRef}>
           <button
             onClick={() => setIsDnaOpen((prev) => !prev)}
@@ -282,7 +348,25 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
 
           {isDnaOpen && (
             <div className="absolute bottom-[calc(100%+24px)] right-[-20px] sm:right-0 z-50 w-[85vw] max-w-[480px] rounded-2xl border border-[#E8DFD0] bg-[#F9F7F2] p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-              <h3 className="text-[#2C3328] font-semibold mb-3">Your DNA Reservoirs</h3>
+              
+              {/* Refactored Header Layout */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[#2C3328] font-semibold">Your DNA Reservoirs</h3>
+                <button 
+                  onClick={handleUpdateDna}
+                  disabled={isUpdatingDna || messages.length === 0}
+                  className="flex items-center gap-1.5 rounded-full bg-[#E8DFD0] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#C7C0B5] disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Update DNA Vault based on current session"
+                >
+                  {isUpdatingDna ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Update Vault
+                </button>
+              </div>
+
               <div className="h-[1px] w-full bg-[#E8DFD0] mb-4"></div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
@@ -290,12 +374,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
                   <div 
                     key={index} 
                     className="flex flex-col cursor-pointer group"
-                    onClick={() => {
-                      // Opcional: Adicionar lógica ao clicar em um item de DNA
-                      console.log("Selecionou:", item.title);
-                      // setValue((prev) => prev + ` [${item.title}] `); // Exemplo de uso
-                      setIsDnaOpen(false);
-                    }}
+                    onClick={() => setIsDnaOpen(false)}
                   >
                     <span className="text-sm font-medium text-[#2C3328] group-hover:text-[#E8721A] transition-colors">
                       {item.title}
@@ -309,7 +388,6 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask me anything...
             </div>
           )}
         </div>
-        {/* --- FIM DO NOVO BLOCO DE DNA --- */}
 
         <button
           onClick={handleMainAction}
