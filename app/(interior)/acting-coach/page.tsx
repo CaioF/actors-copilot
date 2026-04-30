@@ -219,6 +219,8 @@ export default function ActingCoachPage() {
         onSend={handleSend}
         isLoading={isLoading}
         placeholder="Talk to your coach..."
+        messages={messages}
+        sessionId={session?.id}
       />
     </div>
   );
