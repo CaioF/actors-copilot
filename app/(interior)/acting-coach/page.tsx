@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Paperclip } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ChatInput } from "@/components/chat-input";
@@ -48,6 +48,8 @@ export default function ActingCoachPage() {
     sessions = [],
     sessionId,
   } = useActingCoach();
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null); 
   
   const searchParams = useSearchParams();
   const auditionId = searchParams.get("auditionId");
@@ -70,8 +72,18 @@ export default function ActingCoachPage() {
 
   // Auto-scroll to latest message on new messages, loading state, and session load
   useEffect(() => {
-    if (typeof bottomRef.current?.scrollIntoView === "function") {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      // Check if scrollTo is a function before calling it (prevents JSDOM test errors)
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        // Fallback for environments without scrollTo (like JSDOM tests)
+        container.scrollTop = container.scrollHeight;
+      }
     }
   }, [messages, isLoading]);
 
@@ -139,7 +151,7 @@ export default function ActingCoachPage() {
       </div>
 
       {/* Scrollable messages region (relative for floating quick-prompts trigger) */}
-      <div className="relative min-h-0 flex-1 overflow-y-auto px-8">
+      <div ref={scrollContainerRef} className="relative min-h-0 flex-1 overflow-y-auto px-8">
         {!isEmpty && (
           <div className="pointer-events-none sticky top-0 z-10 flex justify-end pt-2">
             <div className="pointer-events-auto">
@@ -183,7 +195,16 @@ export default function ActingCoachPage() {
                   }`}
                 >
                   {msg.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      {/*Render attachment indicator if it exists */}
+                      {msg.documentName && (
+                        <div className="flex items-center gap-1.5 self-end rounded-md bg-[#D66818] px-2 py-1 text-xs font-medium text-[#F5F0E8]/90">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="truncate max-w-[200px]">{msg.documentName}</span>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="text-sm">
                       {renderMarkdown(msg.content)}

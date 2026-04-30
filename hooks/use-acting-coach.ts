@@ -156,6 +156,7 @@ export function useActingCoach(): UseActingCoachReturn {
             role: "user",
             content: trimmedContent,
             timestamp: serverTimestamp(),
+            ...(document ? { documentName: document.name } : {}),
           });
         }
 
