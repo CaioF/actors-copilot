@@ -18,6 +18,7 @@ jest.mock("@/lib/firebase", () => ({
 jest.mock("firebase/auth", () => ({
   getAuth: jest.fn(() => ({
     currentUser: {
+      uid: "test-uid",
       getIdToken: mockGetIdToken,
     },
   })),
@@ -29,7 +30,7 @@ jest.mock("firebase/auth", () => ({
 
 jest.mock("firebase/firestore", () => {
   const mockCollection = jest.fn(() => ({ _collection: true }));
-  const mockDoc = jest.fn(() => ({ _doc: true }));
+  const mockDoc = jest.fn((db, path) => ({ _doc: true, _path: typeof path === "string" ? path : db }));
   const mockQuery = jest.fn(() => ({ _query: true }));
 
   return {
@@ -499,6 +500,251 @@ describe("useActingCoach", () => {
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
+    });
+
+    it("writes to actorProfiles/{uid} when action.type is update_actor_profile with valid payload", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "I've updated your bio.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "update_actor_profile", payload: { bio: "New bio text" } },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Update my bio");
+      });
+
+      expect(setDoc).toHaveBeenCalledWith(
+        expect.objectContaining({ _doc: true }),
+        expect.objectContaining({
+          bio: "New bio text",
+          lastUpdated: expect.any(Object),
+        }),
+        { merge: true }
+      );
+    });
+
+    it("does NOT write to actorProfiles when payload is empty", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "No update needed.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "update_actor_profile", payload: {} },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Update my bio");
+      });
+
+      const actorProfileWrites = setDoc.mock.calls.filter(
+        (call: any[]) => call[0] && call[0]._doc === true
+      );
+      expect(actorProfileWrites).toHaveLength(0);
+    });
+
+    it("strips restricted fields from update_actor_profile payload", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Done.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: {
+              type: "update_actor_profile",
+              payload: { slug: "evil-slug", agencyEmail: "x@y.com", bio: "ok bio" },
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Update my profile");
+      });
+
+      const actorProfileWrite = setDoc.mock.calls.find(
+        (call: any[]) =>
+          call[0] &&
+          typeof call[0] === "object" &&
+          "_doc" in call[0]
+      );
+      expect(actorProfileWrite).toBeDefined();
+      const writtenPayload = actorProfileWrite?.[1];
+      expect(writtenPayload).toHaveProperty("bio", "ok bio");
+      expect(writtenPayload).not.toHaveProperty("slug");
+      expect(writtenPayload).not.toHaveProperty("agencyEmail");
+    });
+
+    it("writes to users/{userPath}/profile/master when action.type is trigger_dna_extraction with passing quality gate", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "I've extracted your DNA insights.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "trigger_dna_extraction" },
+            extractions: {
+              progress_assessment: { has_actionable_pattern: true, depth_score: 5 },
+              new_traits: ["Resilient"],
+              core_values: ["Creativity"],
+              somatic_tells: ["Hand gestures"],
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("What are my patterns?");
+      });
+
+      expect(setDoc).toHaveBeenCalled();
+      const profileMasterWrite = setDoc.mock.calls.find(
+        (call: any[]) =>
+          call[1] &&
+          typeof call[1] === "object" &&
+          "lastUpdated" in call[1] &&
+          "psychology.traits" in call[1]
+      );
+      expect(profileMasterWrite).toBeDefined();
+      expect(profileMasterWrite[1]).toMatchObject({
+        lastUpdated: expect.any(Object),
+      });
+      expect(profileMasterWrite[1]["psychology.traits"]).toBeDefined();
+      expect(profileMasterWrite[1]["psychology.coreValues"]).toBeDefined();
+      expect(profileMasterWrite[1]["physicality.somaticTells"]).toBeDefined();
+    });
+
+    it("does NOT write to profile/master when trigger_dna_extraction has failing quality gate", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "Interesting.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "trigger_dna_extraction" },
+            extractions: {
+              progress_assessment: { has_actionable_pattern: true, depth_score: 2 },
+              new_traits: ["Resilient"],
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("What are my patterns?");
+      });
+
+      const profileMasterWrite = setDoc.mock.calls.find(
+        (call: any[]) =>
+          call[0] &&
+          typeof call[0] === "object" &&
+          "_path" in call[0] &&
+          String(call[0]._path).includes("profile/master")
+      );
+      expect(profileMasterWrite).toBeUndefined();
+    });
+
+    it("does NOT trigger DNA quality gate for update_actor_profile action", async () => {
+      const { setDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          aiData: {
+            coach_reply: "I've updated your profile.",
+            session_focus: null,
+            step_index: 0,
+            mode: null,
+            phase: null,
+            action: { type: "update_actor_profile", payload: { bio: "Updated" } },
+            extractions: {
+              progress_assessment: { has_actionable_pattern: true, depth_score: 5 },
+              new_traits: ["Resilient"],
+            },
+          },
+        }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Update my bio");
+      });
+
+      const profileMasterWrites = setDoc.mock.calls.filter(
+        (call: any[]) =>
+          call[0] &&
+          typeof call[0] === "object" &&
+          "_path" in call[0] &&
+          String(call[0]._path).includes("profile/master")
+      );
+      expect(profileMasterWrites).toHaveLength(0);
     });
   });
 

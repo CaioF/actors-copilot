@@ -15,6 +15,7 @@ export interface RetrievedExcerpt {
 export interface CoachPromptInput {
   actorName?: string;
   actorBaseline?: string;
+  actorProfile?: string;
   excerpts: RetrievedExcerpt[];
   question: string;
   history?: Array<{
@@ -48,6 +49,35 @@ export interface CoachCitation {
   excerptText: string;
 }
 
+export type CoachProfileUpdatePayload = Partial<
+  Pick<
+    import("@/lib/profile-types").ActorProfile,
+    | "headshot"
+    | "additionalPhotos"
+    | "playingAgeMin"
+    | "playingAgeMax"
+    | "location"
+    | "gender"
+    | "height"
+    | "heightUnit"
+    | "eyeColour"
+    | "hairColour"
+    | "nationalities"
+    | "ethnicity"
+    | "appearance"
+    | "awardsCallout"
+    | "bio"
+    | "showreels"
+    | "credits"
+    | "training"
+    | "skillsAndAccents"
+  >
+>;
+
+export type CoachAction =
+  | { type: "trigger_dna_extraction"; payload: Record<string, never> }
+  | { type: "update_actor_profile"; payload: CoachProfileUpdatePayload };
+
 export interface CoachApiResponse {
   aiData: {
     coach_reply: string;
@@ -55,7 +85,7 @@ export interface CoachApiResponse {
     step_index: number;
     mode: "guided" | "informational" | "transition" | null;
     phase: string | null;
-    action?: { type: string; payload?: Record<string, unknown> } | null;
+    action?: CoachAction | null;
     extractions?: import("@/lib/chat-types").ExtractedPsychData | null;
   };
 }
@@ -66,5 +96,5 @@ export interface CoachReplyEnvelope {
   step_index: number;
   mode: "guided" | "informational" | "transition";
   phase: string | null;
-  action: { type: string; payload?: Record<string, unknown> } | null;
+  action: CoachAction | null;
 }

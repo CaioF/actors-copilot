@@ -13,7 +13,8 @@ import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 export function buildCoachPrompt(input: CoachPromptInput): string {
   const { 
     actorName, 
-    actorBaseline, 
+    actorBaseline,
+    actorProfile,
     excerpts, 
     question, 
     history, 
@@ -35,6 +36,11 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
   // 3. Actor DNA / Baseline Context
   if (actorBaseline) {
     sections.push(`# ACTOR DNA & PSYCHOLOGY\n${actorBaseline}`);
+  }
+
+  // 3b. Actor Public Profile
+  if (actorProfile) {
+    sections.push(`# ACTOR PUBLIC PROFILE\n${actorProfile}`);
   }
 
   // 4. Current Session Focus

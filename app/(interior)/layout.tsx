@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { MicFab } from "@/components/mic-fab"
 import { DashboardFooter } from "@/components/dashboard-footer"
 import ProtectedRoute from "@/lib/context/ProtectedRoute"
+import { SidebarProvider } from "@/lib/context/SidebarContext"
 
 /**
  * Interior layout component that wraps dashboard pages.
@@ -16,18 +17,20 @@ export default function InteriorLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen bg-[#F0E8DC]">
-     
-      <ProtectedRoute>
-         <AppSidebar />
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          {children}
-          <DashboardFooter />
-        </div>
-        {}
-        
-      </ProtectedRoute>
-      
-    </div>
+    <SidebarProvider>
+      <div className="flex h-screen bg-[#F0E8DC]">
+
+        <ProtectedRoute>
+          <AppSidebar />
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+            {children}
+            <DashboardFooter />
+          </div>
+          {}
+
+        </ProtectedRoute>
+
+      </div>
+    </SidebarProvider>
   )
 }

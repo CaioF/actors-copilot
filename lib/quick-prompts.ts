@@ -2,7 +2,7 @@
  * Represents a specific category for the Quick Prompts dropdown.
  */
 export interface QuickPromptCategory {
-  id: "actors_craft" | "actors_career" | "actors_mindset";
+  id: "actors_craft" | "actors_career" | "actors_mindset" | "profile_management";
   label: string;
 }
 
@@ -12,7 +12,7 @@ export interface QuickPromptCategory {
 export interface QuickPrompt {
   id: string;
   text: string;
-  category: "actors_craft" | "actors_career" | "actors_mindset";
+  category: "actors_craft" | "actors_career" | "actors_mindset" | "profile_management";
   placeholderKeys: string[];
 }
 
@@ -23,6 +23,7 @@ export const QUICK_PROMPT_CATEGORIES: QuickPromptCategory[] = [
   { id: "actors_craft", label: "Actor's Craft" },
   { id: "actors_career", label: "Actor's Career" },
   { id: "actors_mindset", label: "Actor's Mindset" },
+  { id: "profile_management", label: "Profile Management" },
 ];
 
 /**
@@ -400,5 +401,43 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
     text: "How do I maintain my artistic integrity while still playing the 'industry game'?",
     category: "actors_mindset",
     placeholderKeys: [],
+  },
+
+  // --- Profile Management (6 Prompts) ---
+  {
+    id: "profile-bio",
+    text: "Write a professional bio for me based on my DNA profile and acting style",
+    category: "profile_management",
+    placeholderKeys: [],
+  },
+  {
+    id: "profile-bio-update",
+    text: "Set my bio to: [new bio text]",
+    category: "profile_management",
+    placeholderKeys: ["new bio text"],
+  },
+  {
+    id: "profile-headshot",
+    text: "Suggest criteria for choosing a main headshot for my profile",
+    category: "profile_management",
+    placeholderKeys: [],
+  },
+  {
+    id: "profile-credits",
+    text: "Set my credits to: [credit title], [role], [year], [category]",
+    category: "profile_management",
+    placeholderKeys: ["credit title", "role", "year", "category"],
+  },
+  {
+    id: "profile-skills",
+    text: "Set my skills and accents to [new skills list]",
+    category: "profile_management",
+    placeholderKeys: ["new skills list"],
+  },
+  {
+    id: "profile-training",
+    text: "Set my training to include: [institution], [qualification], [years], [category]",
+    category: "profile_management",
+    placeholderKeys: ["institution", "qualification", "years", "category"],
   },
 ];
