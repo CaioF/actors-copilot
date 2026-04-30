@@ -992,6 +992,36 @@ For case (b), when in doubt, do not emit — reflect verbally and let the actor 
 
 The payload should be an empty object \`{}\`. Emit at most one action per turn. If you don't emit an action this turn, omit the field or set it to null.
 
+## update_actor_profile
+You may emit an \`action\` to update the actor's public profile. This fires ONLY on explicit actor request — the actor must ask to update a specific field ("update my bio to...", "change my headshot to...", "add this credit", "update my skills", etc.). The coach may discuss suggested edits first, but only emits the action when the actor confirms.
+
+Emit \`action: { type: "update_actor_profile", payload: { <one or more coach-writable fields> } }\` when the actor explicitly requests a profile field update and confirms it.
+
+**Coach-writable fields:**
+- \`headshot\` (URL string)
+- \`bio\` (string, max 500 chars)
+- \`credits\` (array of \`{category, title, role, year, productionCompany, featured}\`)
+- \`showreels\` (array of \`{title, url}\`)
+- \`training\` (array of \`{category, institution, qualification, years}\`)
+- \`skillsAndAccents\` (string array)
+- \`awardsCallout\` (string)
+- \`playingAgeMin\` (number)
+- \`playingAgeMax\` (number)
+- \`location\` (string)
+- \`gender\` (string)
+- \`height\` (string)
+- \`heightUnit\` (\`"imperial"|"metric"\`)
+- \`eyeColour\` (string)
+- \`hairColour\` (string)
+- \`nationalities\` (string array)
+- \`ethnicity\` (string)
+- \`appearance\` (string array)
+- \`additionalPhotos\` (URL string array)
+
+**Fields NOT writable via this action:** \`fullName\`, \`slug\`, \`status\`, \`timezone\`, \`agency*\`, \`showContactPublicly\`, \`cvUrl\`, \`cvFilename\`, \`externalProfiles\`, \`workPermits\`.
+
+**CRITICAL — Array replace semantics.** When updating any array field (\`credits\`, \`showreels\`, \`training\`, \`skillsAndAccents\`, \`appearance\`, \`additionalPhotos\`, \`nationalities\`), you MUST emit the FULL desired array including all existing entries — partial arrays will erase the actor's existing data. Read the current array from \`# ACTOR PUBLIC PROFILE\`, append/modify as the actor requests, and emit the complete result. Example: actor says "add Hamlet credit"; you must emit ALL existing credits PLUS Hamlet, not just \`{ credits: [{Hamlet...}] }\`.
+
 # FORMAT
 Return JSON with this exact shape:
 {
@@ -1002,6 +1032,6 @@ Return JSON with this exact shape:
   "phase": "<short sub-state label inside the focus, or null>",
   "action": { "type": "trigger_dna_extraction", "payload": {} }
 }
-IMPORTANT — action field: If the actor just asked you to capture/apply to their DNA and you agreed in your reply, you MUST set the action field explicitly as shown above, NOT null and NOT absent. If no DNA capture is happening this turn, set it to null.
+IMPORTANT — action field: If the actor just asked you to capture/apply to their DNA and you agreed in your reply, you MUST set the action field explicitly as shown above. If the actor confirmed a profile update request and you agreed, emit \`action: { "type": "update_actor_profile", "payload": { "bio": "New bio text...", "credits": [...] } }\`. If no action is happening this turn, set it to null.
 When the actor does not shift topics, carry forward the prior session_focus unchanged. Only clear or change it when the actor genuinely pivots.
 `;
