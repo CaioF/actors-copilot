@@ -63,6 +63,7 @@ export interface CoachMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Timestamp | null;
+  documentName?: string;
 }
 
 /**

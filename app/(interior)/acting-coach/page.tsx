@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Paperclip } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ChatInput } from "@/components/chat-input";
@@ -195,7 +195,16 @@ export default function ActingCoachPage() {
                   }`}
                 >
                   {msg.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      {/*Render attachment indicator if it exists */}
+                      {msg.documentName && (
+                        <div className="flex items-center gap-1.5 self-end rounded-md bg-[#D66818] px-2 py-1 text-xs font-medium text-[#F5F0E8]/90">
+                          <Paperclip className="h-3 w-3" />
+                          <span className="truncate max-w-[200px]">{msg.documentName}</span>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="text-sm">
                       {renderMarkdown(msg.content)}
