@@ -66,6 +66,35 @@ describe("buildCoachPrompt", () => {
   describe("Actor Baseline Section", () => {
     const baseline = "The actor has extensive training in Meisner technique and prefers emotional authenticity over intellectualization.";
 
+    it("includes actorProfile when provided as a string", () => {
+      const actorProfileJson = JSON.stringify({ bio: "UNIQUE_ACTOR_PROFILE_DATA_MARKER_98765", credits: [] }, null, 2);
+      const prompt = buildCoachPrompt({
+        actorProfile: actorProfileJson,
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).toContain("# ACTOR PUBLIC PROFILE");
+      expect(prompt).toContain("UNIQUE_ACTOR_PROFILE_DATA_MARKER_98765");
+    });
+
+    it("omits actorProfile data when actorProfile is undefined", () => {
+      const prompt = buildCoachPrompt({
+        actorProfile: undefined,
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).not.toContain("UNIQUE_ACTOR_PROFILE_DATA_MARKER_98765");
+    });
+
+    it("omits actorProfile data when actorProfile is empty string", () => {
+      const prompt = buildCoachPrompt({
+        actorProfile: "",
+        excerpts: [],
+        question: "Test question?",
+      });
+      expect(prompt).not.toContain("UNIQUE_ACTOR_PROFILE_DATA_MARKER_98765");
+    });
+
     it("includes actor baseline when provided", () => {
       const prompt = buildCoachPrompt({
         actorBaseline: baseline,

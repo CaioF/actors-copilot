@@ -86,6 +86,7 @@ jest.mock("firebase/ai", () => {
 
 describe("Coach Chat Route", () => {
   let mockProfileDoc: { get: jest.Mock };
+  let mockActorProfileDoc: { get: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -94,6 +95,13 @@ describe("Coach Chat Route", () => {
       get: jest.fn().mockResolvedValue({
         exists: true,
         data: () => ({ baselineSummary: "Test actor baseline summary" }),
+      }),
+    };
+
+    mockActorProfileDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => ({ bio: "Existing bio", credits: [] }),
       }),
     };
 
@@ -106,7 +114,7 @@ describe("Coach Chat Route", () => {
     });
 
     const mockDb = {
-      doc: jest.fn().mockReturnValue(mockProfileDoc),
+      doc: jest.fn((path: string) => path.startsWith("actorProfiles/") ? mockActorProfileDoc : mockProfileDoc),
       collection: jest.fn().mockReturnValue({
         doc: jest.fn().mockReturnValue({
           collection: jest.fn().mockReturnValue({
@@ -340,5 +348,28 @@ describe("Coach Chat Route", () => {
 
     expect(res.status).toBe(500);
     expect(data.error).toBe("Failed to generate response");
+  });
+
+  describe("Actor Profile Section", () => {
+    it("includes actorProfile data when provided in buildCoachPrompt call", async () => {
+      (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+
+      const req = new Request("http://localhost/api/coach/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer valid-token",
+        },
+        body: JSON.stringify({ content: "Test question about my profile" }),
+      });
+
+      await POST(req);
+
+      expect(buildCoachPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorProfile: expect.stringContaining("Existing bio"),
+        })
+      );
+    });
   });
 });

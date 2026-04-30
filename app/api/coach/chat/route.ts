@@ -71,6 +71,14 @@ export async function POST(request: Request) {
       if (profileData) actorBaseline = JSON.stringify(profileData, null, 2);
     }
 
+    const actorProfileRef = db.doc(`actorProfiles/${decodedToken.uid}`);
+    const actorProfileSnap = await actorProfileRef.get();
+    let actorProfile = "";
+    if (actorProfileSnap.exists) {
+      const profileData = actorProfileSnap.data();
+      if (profileData) actorProfile = JSON.stringify(profileData, null, 2);
+    }
+
     let auditionSummaries: AuditionSummary[] = [];
     try {
       auditionSummaries = await getUserAuditionsSummary(userPath, db as any);
@@ -106,6 +114,7 @@ export async function POST(request: Request) {
     const promptText = buildCoachPrompt({
       actorName: firstName,
       actorBaseline,
+      actorProfile,
       excerpts,
       question: content,
       history: historyToInclude,

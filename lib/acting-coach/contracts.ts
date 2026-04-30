@@ -15,6 +15,7 @@ export interface RetrievedExcerpt {
 export interface CoachPromptInput {
   actorName?: string;
   actorBaseline?: string;
+  actorProfile?: string;
   excerpts: RetrievedExcerpt[];
   question: string;
   history?: Array<{
