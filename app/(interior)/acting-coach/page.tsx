@@ -48,6 +48,8 @@ export default function ActingCoachPage() {
     sessions = [],
     sessionId,
   } = useActingCoach();
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null); 
   
   const searchParams = useSearchParams();
   const auditionId = searchParams.get("auditionId");
@@ -70,8 +72,18 @@ export default function ActingCoachPage() {
 
   // Auto-scroll to latest message on new messages, loading state, and session load
   useEffect(() => {
-    if (typeof bottomRef.current?.scrollIntoView === "function") {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      // Check if scrollTo is a function before calling it (prevents JSDOM test errors)
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        // Fallback for environments without scrollTo (like JSDOM tests)
+        container.scrollTop = container.scrollHeight;
+      }
     }
   }, [messages, isLoading]);
 
@@ -139,7 +151,7 @@ export default function ActingCoachPage() {
       </div>
 
       {/* Scrollable messages region (relative for floating quick-prompts trigger) */}
-      <div className="relative min-h-0 flex-1 overflow-y-auto px-8">
+      <div ref={scrollContainerRef} className="relative min-h-0 flex-1 overflow-y-auto px-8">
         {!isEmpty && (
           <div className="pointer-events-none sticky top-0 z-10 flex justify-end pt-2">
             <div className="pointer-events-auto">
