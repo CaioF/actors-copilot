@@ -12,11 +12,13 @@ import {
   CheckCircle2,
   User,
   BookOpen,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
 import type { DNASession, DNASectionId } from "@/lib/chat-types";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSidebar } from "@/lib/context/SidebarContext";
 
 interface SectionProgressRingProps {
   current: number;
@@ -212,6 +214,12 @@ export function ChatSidebar({
   onSectionClick,
 }: ChatSidebarProps) {
   const pathname = usePathname();
+  const { isOpen, setIsOpen } = useSidebar();
+
+  // Auto-close mobile drawer on route change
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname, setIsOpen]);
 
   const { formattedLastActive } = useMemo(() => {
     const lastDate = normalizeDate(session?.lastActiveAt);
@@ -231,17 +239,44 @@ export function ChatSidebar({
 
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col bg-[#3D4A3C] text-[#F5F0E8]">
-      {/* Logo */}
-      <div className="flex items-center justify-center px-5 pt-6 pb-5">
-        {/* We wrap the image in a Link so clicking the logo goes home. 
+    <>
+      {/* Backdrop (mobile only, when open) */}
+      {isOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex h-full w-[220px] transform flex-col overflow-y-auto bg-[#3D4A3C] text-[#F5F0E8] shadow-xl transition-transform duration-200",
+          "md:relative md:z-auto md:h-auto md:w-[220px] md:shrink-0 md:translate-x-0 md:shadow-none",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        {/* Mobile close button */}
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          aria-label="Close menu"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-[#F5F0E8]/70 transition-colors hover:bg-[#F5F0E8]/10 hover:text-[#F5F0E8] md:hidden"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Logo */}
+        <div className="flex items-center justify-center px-5 pt-6 pb-5">
+        {/* We wrap the image in a Link so clicking the logo goes home.
             Added a slight hover scale effect for interactivity */}
         <Link href="/dashboard" className="block transition-transform hover:scale-105">
-          <Image 
-            src="/logo.png" 
-            alt="The Actors Copilot" 
-            width={100} 
-            height={100} 
+          <Image
+            src="/logo.png"
+            alt="The Actors Copilot"
+            width={100}
+            height={100}
             className="object-contain" // Ensures the image doesn't stretch or distort
             priority // Tells Next.js to load this immediately since it's above the fold
           />
@@ -359,6 +394,7 @@ export function ChatSidebar({
           </a>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

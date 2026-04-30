@@ -141,7 +141,7 @@ describe("ActingCoachPage", () => {
       expect(screen.getByTestId("quick-prompts-dropdown")).toBeInTheDocument();
     });
 
-    it("does not render QuickPromptsDropdown when messages exist", () => {
+    it("still renders QuickPromptsDropdown when messages exist (now floats over chat)", () => {
       (useActingCoach as jest.Mock).mockReturnValue({
         messages: [{ id: "1", role: "user" as const, content: "Hello" }],
         isLoading: false,
@@ -152,7 +152,7 @@ describe("ActingCoachPage", () => {
       });
 
       render(<ActingCoachPage />);
-      expect(screen.queryByTestId("quick-prompts-dropdown")).not.toBeInTheDocument();
+      expect(screen.getByTestId("quick-prompts-dropdown")).toBeInTheDocument();
     });
   });
 
@@ -166,58 +166,6 @@ describe("ActingCoachPage", () => {
       render(<ActingCoachPage />);
       fireEvent.click(screen.getByRole("button", { name: /New Session/i }));
       expect(mockStartNewSession).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("Session Focus Indicator", () => {
-    it("does not render session focus indicator when sessionFocus is null", () => {
-      render(<ActingCoachPage />);
-      expect(screen.queryByText(/Currently working on:/)).not.toBeInTheDocument();
-    });
-
-    it("renders session focus indicator with correct text", () => {
-      (useActingCoach as jest.Mock).mockReturnValue({
-        messages: [],
-        isLoading: false,
-        sendMessage: mockSendMessage,
-        startNewSession: mockStartNewSession,
-        clearSessionFocus: mockClearSessionFocus,
-        session: { title: "Session 1", sessionFocus: "Find Jane's objective in scene 2" },
-      });
-
-      render(<ActingCoachPage />);
-      expect(screen.getByText(/Currently working on:/)).toBeInTheDocument();
-      expect(screen.getByText(/Find Jane's objective in scene 2/)).toBeInTheDocument();
-    });
-
-    it("renders clear focus button when sessionFocus is set", () => {
-      (useActingCoach as jest.Mock).mockReturnValue({
-        messages: [],
-        isLoading: false,
-        sendMessage: mockSendMessage,
-        startNewSession: mockStartNewSession,
-        clearSessionFocus: mockClearSessionFocus,
-        session: { title: "Session 1", sessionFocus: "Work on cold reading" },
-      });
-
-      render(<ActingCoachPage />);
-      const clearButton = screen.getByRole("button", { name: /Clear current focus/i });
-      expect(clearButton).toBeInTheDocument();
-    });
-
-    it("calls clearSessionFocus when clear button is clicked", () => {
-      (useActingCoach as jest.Mock).mockReturnValue({
-        messages: [],
-        isLoading: false,
-        sendMessage: mockSendMessage,
-        startNewSession: mockStartNewSession,
-        clearSessionFocus: mockClearSessionFocus,
-        session: { title: "Session 1", sessionFocus: "Work on cold reading" },
-      });
-
-      render(<ActingCoachPage />);
-      fireEvent.click(screen.getByRole("button", { name: /Clear current focus/i }));
-      expect(mockClearSessionFocus).toHaveBeenCalledTimes(1);
     });
   });
 

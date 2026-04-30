@@ -567,7 +567,7 @@ describe("useActingCoach", () => {
       });
 
       const actorProfileWrites = setDoc.mock.calls.filter(
-        (call) => call[0] && call[0]._doc === true
+        (call: any[]) => call[0] && call[0]._doc === true
       );
       expect(actorProfileWrites).toHaveLength(0);
     });
@@ -603,7 +603,7 @@ describe("useActingCoach", () => {
       });
 
       const actorProfileWrite = setDoc.mock.calls.find(
-        (call) =>
+        (call: any[]) =>
           call[0] &&
           typeof call[0] === "object" &&
           "_doc" in call[0]
@@ -650,7 +650,7 @@ describe("useActingCoach", () => {
 
       expect(setDoc).toHaveBeenCalled();
       const profileMasterWrite = setDoc.mock.calls.find(
-        (call) =>
+        (call: any[]) =>
           call[1] &&
           typeof call[1] === "object" &&
           "lastUpdated" in call[1] &&
@@ -697,7 +697,7 @@ describe("useActingCoach", () => {
       });
 
       const profileMasterWrite = setDoc.mock.calls.find(
-        (call) =>
+        (call: any[]) =>
           call[0] &&
           typeof call[0] === "object" &&
           "_path" in call[0] &&
@@ -738,11 +738,11 @@ describe("useActingCoach", () => {
       });
 
       const profileMasterWrites = setDoc.mock.calls.filter(
-        (call) =>
+        (call: any[]) =>
           call[0] &&
           typeof call[0] === "object" &&
-          "_doc" in call[0] &&
-          String(call[0]).includes("profile/master")
+          "_path" in call[0] &&
+          String(call[0]._path).includes("profile/master")
       );
       expect(profileMasterWrites).toHaveLength(0);
     });

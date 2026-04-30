@@ -1,6 +1,8 @@
 "use client"
 
 import { useAuth } from "@/lib/context/AuthContext";
+import { useSidebar } from "@/lib/context/SidebarContext";
+import { useEffect } from "react";
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
@@ -15,6 +17,7 @@ import {
   LogOut,
   User,
   BookOpen,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -36,7 +39,13 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter();
   const {logout} = useAuth();
+  const { isOpen, setIsOpen } = useSidebar();
   const isChatPage = pathname.includes('/chat');
+
+  // Auto-close mobile drawer on route change
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname, setIsOpen]);
 
   /**
    * Handles user logout by calling the logout function from AuthContext.
@@ -46,9 +55,36 @@ export function AppSidebar() {
   }
 
   return (
-    <aside className="w-[220px] h-screen flex flex-col bg-[#3D4A3C] text-[#F5F0E8]">
-      {/* Logo */}
-      <div className="flex items-center justify-center px-5 pt-6 pb-5">
+    <>
+      {/* Backdrop (mobile only, when open) */}
+      {isOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex h-full w-[220px] transform flex-col bg-[#3D4A3C] text-[#F5F0E8] shadow-xl transition-transform duration-200",
+          "md:relative md:z-auto md:h-screen md:translate-x-0 md:shadow-none",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        {/* Mobile close button */}
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          aria-label="Close menu"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-[#F5F0E8]/70 transition-colors hover:bg-[#F5F0E8]/10 hover:text-[#F5F0E8] md:hidden"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Logo */}
+        <div className="flex items-center justify-center px-5 pt-6 pb-5">
         {/* We wrap the image in a Link so clicking the logo goes home. 
             Added a slight hover scale effect for interactivity */}
         <Link href="/dashboard" className="block transition-transform hover:scale-105">
@@ -150,6 +186,7 @@ export function AppSidebar() {
           </a>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

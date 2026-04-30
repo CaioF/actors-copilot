@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -33,7 +33,9 @@ interface UseActingCoachReturn {
   sendMessage: (content: string, auditionId?: string, document?: AttachedDocument | null) => Promise<void>;
   startNewSession: (opts?: { linkedAuditionId?: string | null }) => Promise<void>;
   clearSessionFocus: () => Promise<void>;
+  switchSession: (id: string) => void;
   session: CoachSession | null;
+  sessions: CoachSession[];
   sessionId: string;
 }
 
@@ -44,7 +46,9 @@ export function useActingCoach(): UseActingCoachReturn {
   const [sessionId, setSessionId] = useState(DEFAULT_SESSION_ID);
   const [userPath, setUserPath] = useState<string | null>(null);
   const [session, setSession] = useState<CoachSession | null>(null);
+  const [sessions, setSessions] = useState<CoachSession[]>([]);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const hasAutoSelectedSession = useRef(false);
 
   // --- Auth & Path Initialization ---
   useEffect(() => {
@@ -104,6 +108,30 @@ export function useActingCoach(): UseActingCoachReturn {
       setMessages(msgs);
     }, () => setMessages([]));
   }, [userPath, sessionId, isAuthLoading]);
+
+  // --- Sessions List Listener (for picker + auto-select most recent) ---
+  useEffect(() => {
+    if (!isFirebaseConfigured() || isAuthLoading || !userPath) return;
+
+    const sessionsRef = collection(getDb(), `users/${userPath}/coachSessions`);
+    const q = query(sessionsRef, orderBy("lastActiveAt", "desc"));
+
+    return onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(
+        (d) => ({ id: d.id, ...(d.data() as Omit<CoachSession, "id">) }),
+      );
+      setSessions(list);
+
+      // On first load, switch to the most recent session if one exists.
+      if (!hasAutoSelectedSession.current && list.length > 0) {
+        hasAutoSelectedSession.current = true;
+        if (list[0].id !== sessionId) {
+          setMessages([]);
+          setSessionId(list[0].id);
+        }
+      }
+    }, () => setSessions([]));
+  }, [userPath, isAuthLoading]);
 
   // --- Core Message Logic ---
   const sendMessage = useCallback(
@@ -256,6 +284,7 @@ export function useActingCoach(): UseActingCoachReturn {
         mode: null,
         phase: null,
       });
+      hasAutoSelectedSession.current = true;
       setMessages([]);
       setError(null);
       setSessionId(newSessionId);
@@ -273,6 +302,14 @@ export function useActingCoach(): UseActingCoachReturn {
     });
   }, [userPath, sessionId]);
 
+  const switchSession = useCallback((id: string) => {
+    if (!id || id === sessionId) return;
+    hasAutoSelectedSession.current = true;
+    setMessages([]);
+    setError(null);
+    setSessionId(id);
+  }, [sessionId]);
+
   return {
     messages,
     isLoading,
@@ -280,7 +317,9 @@ export function useActingCoach(): UseActingCoachReturn {
     sendMessage,
     startNewSession,
     clearSessionFocus,
+    switchSession,
     session,
+    sessions,
     sessionId,
   };
 }

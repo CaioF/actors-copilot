@@ -48,7 +48,7 @@ export function QuickPromptsDropdown({ onSelect }: QuickPromptsDropdownProps) {
         </button>
       </PopoverTrigger>
       
-      <PopoverContent className="w-[560px] p-0 border border-[#C7C0B5] shadow-2xl rounded-xl bg-white" align="center" sideOffset={12}>
+      <PopoverContent className="w-[560px] max-w-[calc(100vw-2rem)] p-0 border border-[#C7C0B5] shadow-2xl rounded-xl bg-white" align="end" sideOffset={12} collisionPadding={16}>
         {fillingPrompt ? (
           <PlaceholderFillForm
             promptText={fillingPrompt.text}
