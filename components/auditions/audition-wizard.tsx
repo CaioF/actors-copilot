@@ -252,6 +252,46 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
     }
   };
 
+  const handleCoachClick = async () => {
+    if (!currentUser) {
+      alert("Please log in to save your audition and open the coach.");
+      return;
+    }
+
+    try {
+      const firstName = currentUser.displayName 
+        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") 
+        : "Actor";
+      const userPath = `${currentUser.uid}_${firstName}`;
+
+      const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
+      
+      const docRef = await addDoc(auditionsRef, {
+        project: formData.project,
+        role: formData.role,
+        deadline: formData.deadline || null,
+        auditionTimezone: formData.auditionTimezone || null,
+        actorLocalDeadline: localDeadlineStr,
+        castingDirectorName: formData.castingDirectorName || null, 
+        performanceMap: resultData,
+        analysisType: mode,
+        createdAt: serverTimestamp(),
+        status: "completed"
+      });
+
+      const safeProject = formData.project || "this project";
+      const safeRole = formData.role || "the character";
+
+      router.push(
+        `/acting-coach?auditionId=${encodeURIComponent(docRef.id)}&project=${encodeURIComponent(formData.project)}&role=${encodeURIComponent(formData.role)}`
+      );
+
+    } catch (error) {
+      logger.error({ err: error, msg: 'Error saving audition before going to coach' });
+      alert("Failed to save the audition. Please try again.");
+    }
+  };
+
 
   return (
     <div className="flex flex-col flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-2 h-full">
@@ -393,8 +433,11 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
                </div>
 
                {/* --- MAIN UI RENDERER --- */}
-               {mode === "sides" ? <StepResultSides data={resultData} /> : <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} />}
-
+               {mode === "sides" ? (
+                <StepResultSides data={resultData} onCoachClick={handleCoachClick} />
+              ) : (
+                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} />
+              )}
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
                  <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">

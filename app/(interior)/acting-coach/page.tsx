@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronDown, Plus, Paperclip } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -53,22 +53,32 @@ export default function ActingCoachPage() {
   
   const searchParams = useSearchParams();
   const auditionId = searchParams.get("auditionId");
-  const project = searchParams.get("project");
-  const role = searchParams.get("role");
+
+  const project = searchParams.get("project") || "this project";
+  const role = searchParams.get("role") || "the character";
 
   const hasFiredInitialMessage = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const [pendingInitialMessage, setPendingInitialMessage] = useState(false);
+
   // Auto-trigger session context if coming from a specific audition
   useEffect(() => {
-    if (auditionId && project && role && !hasFiredInitialMessage.current) {
+    if (auditionId && !hasFiredInitialMessage.current) {
       hasFiredInitialMessage.current = true;
+      startNewSession({ linkedAuditionId: auditionId });
+      setPendingInitialMessage(true); 
+    }
+  }, [auditionId, startNewSession]);
+  useEffect(() => {
+    if (pendingInitialMessage && session?.linkedAuditionId === auditionId) {
+      setPendingInitialMessage(false); 
       sendMessage(
         `I want to work on my ${project} audition as ${role}.`,
-        auditionId
+        auditionId ?? undefined
       );
     }
-  }, [auditionId, project, role, sendMessage]);
+  }, [pendingInitialMessage, session, auditionId, project, role, sendMessage]);
 
   // Auto-scroll to latest message on new messages, loading state, and session load
   useEffect(() => {
@@ -87,8 +97,11 @@ export default function ActingCoachPage() {
     }
   }, [messages, isLoading]);
 
-  const handleSend = (content: string, document?: AttachedDocument | null) =>
-    sendMessage(content, undefined, document);
+  const handleSend = (content: string, document?: AttachedDocument | null) => {
+    const currentAuditionId = session?.linkedAuditionId || auditionId || undefined;
+    
+    sendMessage(content, currentAuditionId, document);
+  };
 
   const isEmpty = messages.length === 0 && !isLoading;
 
