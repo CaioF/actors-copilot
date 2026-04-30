@@ -199,6 +199,38 @@ export function useActingCoach(): UseActingCoachReturn {
             }
           }
         }
+
+        // 5. Handle Profile Update Action — runs independently of userPath (uses uid from auth)
+        if (data.aiData.action?.type === "update_actor_profile" && data.aiData.action?.payload) {
+          const auth = getAuth();
+          const uid = auth.currentUser?.uid;
+          if (uid) {
+            const COACH_WRITABLE_FIELDS = new Set([
+              "headshot", "additionalPhotos", "playingAgeMin", "playingAgeMax",
+              "location", "gender", "height", "heightUnit", "eyeColour", "hairColour",
+              "nationalities", "ethnicity", "appearance", "awardsCallout", "bio",
+              "showreels", "credits", "training", "skillsAndAccents",
+            ]);
+            const rawPayload = data.aiData.action.payload as Record<string, unknown>;
+            const safePayload: Record<string, unknown> = { lastUpdated: serverTimestamp() };
+            for (const [key, value] of Object.entries(rawPayload)) {
+              if (COACH_WRITABLE_FIELDS.has(key)) {
+                safePayload[key] = value;
+              }
+            }
+            if (Object.keys(safePayload).length > 1) {
+              try {
+                await setDoc(
+                  doc(getDb(), "actorProfiles", uid),
+                  safePayload,
+                  { merge: true }
+                );
+              } catch (writeError) {
+                log.error({ err: writeError, msg: "Coach profile write failed" });
+              }
+            }
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to get coach response");
       } finally {
