@@ -26,6 +26,7 @@ interface StepResultProps {
     outro?: string;
   };
   localDeadlineStr?: string | null;
+  onCoachClick?: () => void;
 }
 
 /**
@@ -45,7 +46,7 @@ const getSectionIcon = (title: string, index: number) => {
   return fallbacks[index % fallbacks.length];
 };
 
-export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
+export function StepResultBrief({ data, localDeadlineStr, onCoachClick }: StepResultProps) {
   const [activeSection, setActiveSection] = useState("section-0");
 
   useEffect(() => {
@@ -204,6 +205,20 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
             <div className="prose prose-slate max-w-none prose-p:italic prose-p:m-0 text-sm">
               <ReactMarkdown>{data.outro}</ReactMarkdown>
             </div>
+          </div>
+        )}
+
+        {onCoachClick && (
+          <div className="mt-2">
+            <button
+              onClick={onCoachClick}
+              className="w-full rounded-full bg-[#E8721A] py-4 text-base font-semibold text-white transition-colors hover:bg-[#d66a18]"
+            >
+              Take this to my Coach →
+            </button>
+            <p className="mt-2 text-center text-sm text-[#6B6B6B]">
+              Open a coaching session with this breakdown pre-loaded
+            </p>
           </div>
         )}
       </div>

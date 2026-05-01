@@ -279,12 +279,21 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
         status: "completed"
       });
 
-      const safeProject = formData.project || "this project";
-      const safeRole = formData.role || "the character";
+      const safeProject = formData.project?.trim();
+      const safeRole = formData.role?.trim();
+      const queryParams = new URLSearchParams({
+        auditionId: docRef.id,
+      });
 
-      router.push(
-        `/acting-coach?auditionId=${encodeURIComponent(docRef.id)}&project=${encodeURIComponent(formData.project)}&role=${encodeURIComponent(formData.role)}`
-      );
+      if (safeProject) {
+        queryParams.set("project", safeProject);
+      }
+
+      if (safeRole) {
+        queryParams.set("role", safeRole);
+      }
+
+      router.push(`/acting-coach?${queryParams.toString()}`);
 
     } catch (error) {
       logger.error({ err: error, msg: 'Error saving audition before going to coach' });
@@ -436,7 +445,7 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
                {mode === "sides" ? (
                 <StepResultSides data={resultData} onCoachClick={handleCoachClick} />
               ) : (
-                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} />
+                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} onCoachClick={handleCoachClick} />
               )}
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
