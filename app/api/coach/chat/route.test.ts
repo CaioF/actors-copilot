@@ -84,6 +84,12 @@ jest.mock("firebase/ai", () => {
   };
 });
 
+jest.mock("mammoth", () => ({
+  __esModule: true,
+  default: { extractRawText: jest.fn() },
+}));
+import mammoth from "mammoth";
+
 describe("Coach Chat Route", () => {
   let mockProfileDoc: { get: jest.Mock };
   let mockActorProfileDoc: { get: jest.Mock };
@@ -275,6 +281,117 @@ describe("Coach Chat Route", () => {
 
       expect(res.status).toBe(400);
       expect(data.error).toBe("Document exceeds 20MB limit");
+    });
+
+    it("extracts .docx text via mammoth and includes it as a text part (not inlineData)", async () => {
+      (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+      (mammoth.extractRawText as jest.Mock).mockResolvedValue({ value: "Extracted script body", messages: [] });
+
+      const req = new Request("http://localhost/api/coach/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer valid-token" },
+        body: JSON.stringify({
+          content: "Analyze this docx",
+          document: {
+            data: "ZG9jeC1iYXNlNjQ=",
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            name: "scene.docx",
+          },
+        }),
+      });
+
+      const res = await POST(req);
+
+      expect(res.status).toBe(200);
+      expect(mammoth.extractRawText).toHaveBeenCalledTimes(1);
+      const callArgs = (mammoth.extractRawText as jest.Mock).mock.calls[0][0];
+      expect(Buffer.isBuffer(callArgs.buffer)).toBe(true);
+
+      const parts = mockGenerateContent.mock.calls[0][0];
+      expect(parts).toHaveLength(2);
+      expect(parts[0]).toEqual({ text: "Test composed prompt" });
+      expect(parts[1].text).toContain("scene.docx");
+      expect(parts[1].text).toContain("Extracted script body");
+      expect(parts[1].inlineData).toBeUndefined();
+    });
+
+    it("returns 400 when mammoth extracts empty text from .docx", async () => {
+      (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+      (mammoth.extractRawText as jest.Mock).mockResolvedValue({ value: "   ", messages: [] });
+
+      const req = new Request("http://localhost/api/coach/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer valid-token" },
+        body: JSON.stringify({
+          content: "Analyze",
+          document: {
+            data: "ZG9jeC1iYXNlNjQ=",
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            name: "empty.docx",
+          },
+        }),
+      });
+
+      const res = await POST(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(data.error).toContain("Could not extract text");
+    });
+
+    it("extracts .rtf text and includes it as a text part (not inlineData)", async () => {
+      (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+
+      const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl{\\f0 Times;}}\\f0 Hello \\b world\\b0 .\\par Second line.}`;
+      const rtfBase64 = Buffer.from(rtfContent, "utf8").toString("base64");
+
+      const req = new Request("http://localhost/api/coach/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer valid-token" },
+        body: JSON.stringify({
+          content: "Read this brief",
+          document: { data: rtfBase64, mimeType: "application/rtf", name: "brief.rtf" },
+        }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+
+      const parts = mockGenerateContent.mock.calls[0][0];
+      expect(parts).toHaveLength(2);
+      expect(parts[1].text).toContain("brief.rtf");
+      expect(parts[1].text).toContain("Hello");
+      expect(parts[1].text).toContain("world");
+      expect(parts[1].text).toContain("Second line");
+      expect(parts[1].text).not.toContain("\\rtf1");
+      expect(parts[1].text).not.toContain("\\fonttbl");
+      expect(parts[1].inlineData).toBeUndefined();
+    });
+
+    it("decodes .md as plain text and includes it as a text part", async () => {
+      (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+
+      const mdContent = "# Scene 1\n\nA quiet room. **JANE** enters.";
+      const mdBase64 = Buffer.from(mdContent, "utf8").toString("base64");
+
+      const req = new Request("http://localhost/api/coach/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer valid-token" },
+        body: JSON.stringify({
+          content: "Read this scene",
+          document: { data: mdBase64, mimeType: "text/markdown", name: "scene.md" },
+        }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+
+      const parts = mockGenerateContent.mock.calls[0][0];
+      expect(parts).toHaveLength(2);
+      expect(parts[1].text).toContain("scene.md");
+      expect(parts[1].text).toContain("# Scene 1");
+      expect(parts[1].text).toContain("**JANE**");
+      expect(parts[1].inlineData).toBeUndefined();
     });
 
     it("includes inlineData in AI prompt when valid document is provided", async () => {

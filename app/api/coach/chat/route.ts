@@ -10,10 +10,9 @@ import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure
 import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
 import type { AuditionSummary } from "@/lib/acting-coach/contracts";
-import type { AttachedDocument } from "@/components/chat-input";
+import { documentToPromptPart, validateDocumentPayload } from "@/lib/document-processing";
 
 const MAX_HISTORY_MESSAGES = 20;
-const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
 export async function POST(request: Request) {
   try {
@@ -30,25 +29,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
-    // --- Document Validation Block ---
     if (document !== undefined) {
-      if (!document || typeof document !== "object") {
-        return NextResponse.json({ error: "Invalid document format" }, { status: 400 });
-      }
-      const doc = document as AttachedDocument;
-      if (!doc.data || typeof doc.data !== "string") {
-        return NextResponse.json({ error: "Document data is required" }, { status: 400 });
-      }
-      if (!doc.mimeType || typeof doc.mimeType !== "string") {
-        return NextResponse.json({ error: "Document mimeType is required" }, { status: 400 });
-      }
-      const supportedMimes = ["text/plain", "application/pdf", "image/jpeg", "image/png", "image/webp"];
-      if (!supportedMimes.includes(doc.mimeType)) {
-        return NextResponse.json({ error: `Unsupported document type: ${doc.mimeType}` }, { status: 400 });
-      }
-      const decodedSize = (doc.data.length * 3) / 4;
-      if (decodedSize > MAX_DOCUMENT_SIZE_BYTES) {
-        return NextResponse.json({ error: "Document exceeds 20MB limit" }, { status: 400 });
+      const validation = validateDocumentPayload(document);
+      if (!validation.ok) {
+        return NextResponse.json({ error: validation.error }, { status: validation.status });
       }
     }
 
@@ -131,7 +115,12 @@ export async function POST(request: Request) {
 
     const promptParts: any[] = [{ text: promptText }];
     if (document?.data && document?.mimeType) {
-      promptParts.push({ inlineData: { data: document.data, mimeType: document.mimeType } });
+      const docPart = await documentToPromptPart(document);
+      if (!docPart.ok) {
+        log.error({ mimeType: document.mimeType }, "Document processing failed");
+        return NextResponse.json({ error: docPart.error }, { status: docPart.status });
+      }
+      promptParts.push(docPart.part);
     }
 
     let replyText = "";

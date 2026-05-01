@@ -288,6 +288,7 @@ describe("useActingCoach", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
+        json: async () => ({}),
       });
 
       const { result } = renderHook(() => useActingCoach());
@@ -302,6 +303,37 @@ describe("useActingCoach", () => {
 
       expect(result.current.error).not.toBeNull();
       expect(result.current.isLoading).toBe(false);
+    });
+
+    it("surfaces server error message and writes an assistant chat message on failure", async () => {
+      const { addDoc } = require("firebase/firestore");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Unsupported document type: text/csv" }),
+      });
+
+      const { result } = renderHook(() => useActingCoach());
+
+      await waitFor(() => {
+        expect(result.current.session).not.toBeNull();
+      });
+
+      await act(async () => {
+        await result.current.sendMessage("Look at this file");
+      });
+
+      expect(result.current.error).toBe("Unsupported document type: text/csv");
+
+      // addDoc called twice: user message, then assistant error message
+      expect(addDoc).toHaveBeenCalledTimes(2);
+      const errorMessageCall = addDoc.mock.calls[1];
+      expect(errorMessageCall[1]).toMatchObject({
+        role: "assistant",
+        content: expect.stringContaining("Unsupported document type: text/csv"),
+      });
+      expect(errorMessageCall[1].content).toMatch(/try again/i);
     });
 
     it("sets error on missing coach_reply in response", async () => {
