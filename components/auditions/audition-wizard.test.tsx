@@ -59,16 +59,13 @@ describe("AuditionWizard", () => {
     it("caps step at 4 when already at maximum", async () => {
       render(<AuditionWizard mode="sides" />);
       
-      const nextButtons = screen.getAllByRole("button", { name: "Next" });
-      let stepButton = nextButtons[nextButtons.length - 1];
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
       
-      for (let i = 0; i < 10; i++) {
-        await act(async () => {
-          fireEvent.click(stepButton);
-        });
-      }
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
       
-      expect(screen.queryByText("Review & Generate")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+      
+      expect(screen.getByText("Review & Generate")).toBeInTheDocument();
     });
   });
 

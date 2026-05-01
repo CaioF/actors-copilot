@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import "@testing-library/jest-dom";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QuickPromptsDropdown } from "./quick-prompts-dropdown";
 
@@ -38,11 +38,12 @@ describe("components/quick-prompts-dropdown", () => {
   });
 
   it("opens popover, renders search input, categories, and prompts on click", async () => {
-    const user = userEvent.setup();
+
     render(<QuickPromptsDropdown onSelect={jest.fn()} />);
 
     const trigger = screen.getByRole("button", { name: "Quick Prompts" });
-    await user.click(trigger);
+    
+    fireEvent.click(trigger);
 
     expect(await screen.findByPlaceholderText("Search prompts...")).toBeInTheDocument();
     
@@ -52,13 +53,14 @@ describe("components/quick-prompts-dropdown", () => {
 
   it("calls onSelect with the prompt's id and closes popover on selection", async () => {
     const mockOnSelect = jest.fn();
-    const user = userEvent.setup();
+    // 1. Remova o const user = userEvent.setup();
     render(<QuickPromptsDropdown onSelect={mockOnSelect} />);
 
-    await user.click(screen.getByRole("button", { name: "Quick Prompts" }));
+    const trigger = screen.getByRole("button", { name: "Quick Prompts" });
+    fireEvent.click(trigger); // <-- AQUI
     
     const firstPrompt = await screen.findByText(/I'm working on a scene/i);
-    await user.click(firstPrompt);
+    fireEvent.click(firstPrompt); // <-- E AQUI
 
     expect(mockOnSelect).toHaveBeenCalledWith(
       "I'm working on a scene. Help me define my character's Overall Objective and then walk me through a 'Destination' exercise to make that goal physical."
