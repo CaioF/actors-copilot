@@ -118,7 +118,7 @@ describe('Authentication POST Route (Kajabi Verification)', () => {
         const data = await res.json();
 
         expect(res.status).toBe(403);
-        expect(data.error).toBe("You don't have the required 'The Actor's Copilot' plan. Please check your purchase history.");
+        expect(data.error).toBe("You don't have the required 'The Actor's Copilot' offer. Please check your purchase history.");
     });
 
     /**

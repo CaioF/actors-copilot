@@ -213,7 +213,7 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
             .filter((id: string) => acceptedOfferIds.includes(id));
 
         if (userMatchedOffers.length === 0) {
-            return { success: false, message: "You don't have the required 'The Actor's Copilot' plan. Please check your purchase history." };
+            return { success: false, message: "You don't have the required 'The Actor's Copilot' offer. Please check your purchase history." };
         }
         
         return { success: true, message: "Purchase verified successfully.", offers: userMatchedOffers };

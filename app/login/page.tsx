@@ -44,16 +44,15 @@ export default function LoginPage() {
         setErrorMsg('');
         try {
             await loginWithGoogle();
-        } catch (error: unknown) { // Use unknown aqui
+        } catch (error: unknown) { 
             if (isFirebaseError(error)) {
-                // Tratamento específico do Firebase
                 if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
                     return; 
                 }
                 setErrorMsg(error.message);
             } else {
-                // Erro genérico (ex: rede)
-                setErrorMsg('Access denied. Please try again later.');
+                const message = error instanceof Error ? error.message : 'Access denied. Please try again later.';
+                setErrorMsg(message);
             }
         }
     }
@@ -220,10 +219,32 @@ export default function LoginPage() {
 
                     {/* Mensagens de Erro */}
                     {errorMsg && (
-                        <p className="text-destructive text-sm text-center mt-4 font-medium animate-in fade-in slide-in-from-top-2">
-                            {errorMsg}
-                        </p>
-                    )}
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+        <p className="text-destructive text-sm text-center font-medium">
+            {errorMsg}
+        </p>
+
+        {errorMsg.includes("You don't have the required 'The Actor's Copilot' offer") && (
+            <div className="flex flex-col gap-2">
+                <a 
+                    href="https://theactorscopilot.com/#pricing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-[#cf5b02] hover:bg-[#E8721A]/90 text-white text-center rounded-full py-3 text-sm font-bold transition-colors shadow-sm"
+                >
+                    Buy Premium Plan
+                </a>
+                
+                <a 
+                    href="mailto:support@theactorscopilot.com" 
+                    className="w-full border border-gray-200 hover:bg-gray-50 text-muted-foreground text-center rounded-full py-3 text-sm font-medium transition-colors"
+                >
+                    Contact Support
+                </a>
+            </div>
+            )}
+        </div>
+         )}
 
                     {/* Toggle Login/Cadastro */}
                     <div className="text-center pt-4">
