@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { auth } from '@/lib/firebase.admin';
-import { SignJWT } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { logger, createChildLogger } from '@/lib/logger';
 
 interface KajabiContact {
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         const issuer = 'kajabi-auth-callback';
         const audience = 'kajabi-dashboard';
 
-        const token = await new SignJWT({ email: userEmail })
+        const token = await new SignJWT({ email: userEmail, offers: hasAccess.offers })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuer(issuer)
             .setAudience(audience)
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
  * @param {string} email - The user's authenticated email address from Firebase.
  * @returns {Promise<{ success: boolean; message?: string }>} An object containing the verification result and an optional user-facing error message.
  */
-async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; message?: string }> {
+async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; message?: string; offers?: string[] }> {
     // TODO: Implement an LRU cache or Redis for the Kajabi access token to avoid requesting a new OAuth token on every login.
     // TODO: Consider adding a retry mechanism for Kajabi API timeouts to improve reliability.
 
@@ -196,23 +196,61 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
             return { success: false, message: "You don't have any active offers in your account." };
         }
 
-        const requiredOfferId = process.env.KAJABI_REQUIRED_OFFER_ID;
-        if (!requiredOfferId) {
-            return { success: false, message: "An unexpected error occurred during validation. Please try again." };
-        }
+        const businessOfferIdsString = process.env.KAJABI_REQUIRED_OFFER_ID;
+        const economyOfferIdString = process.env.KAJABI_ECONOMY_OFFER_ID;
         
-        const hasRequiredOffer = offersData.data.some(
-            (offer: KajabiOffer) => String(offer.id) === String(requiredOfferId)
-        );
+        if (!businessOfferIdsString || !economyOfferIdString) {
+            return { success: false, message: "System configuration error. Missing offer IDs. Please contact support." };
+        }
 
-        if (!hasRequiredOffer) {
+        const acceptedOfferIds = [
+            ...businessOfferIdsString.split(',').map(id => id.trim()),
+            ...economyOfferIdString.split(',').map(id => id.trim())
+        ].filter(Boolean); 
+        
+        const userMatchedOffers = offersData.data
+            .map((offer: KajabiOffer) => String(offer.id))
+            .filter((id: string) => acceptedOfferIds.includes(id));
+
+        if (userMatchedOffers.length === 0) {
             return { success: false, message: "You don't have the required 'The Actor's Copilot' offer. Please check your purchase history." };
         }
         
-        return { success: true, message: "Purchase verified successfully." };
+        return { success: true, message: "Purchase verified successfully.", offers: userMatchedOffers };
 
     } catch (error) {
         logger.error({ err: error, email, msg: 'Error verifying Kajabi purchase' });
         return { success: false, message: "An unexpected error occurred during validation. Please try again." };
+    }
+}
+
+export async function GET() {
+    try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get('kajabi_session')?.value;
+
+        if (!token) {
+            return NextResponse.json({ offers: [] }, { status: 401 });
+        }
+
+        const jwtSecret = process.env.JWT_SECRET;
+        const jwtIssuer = process.env.JWT_ISSUER;
+        const jwtAudience = process.env.JWT_AUDIENCE;
+
+        if (!jwtSecret || !jwtIssuer || !jwtAudience) {
+            logger.error({ msg: 'Missing JWT verification configuration in auth callback GET handler' });
+            return NextResponse.json({ offers: [] }, { status: 500 });
+        }
+
+        const secret = new TextEncoder().encode(jwtSecret);
+        const { payload } = await jwtVerify(token, secret, {
+            algorithms: ['HS256'],
+            issuer: jwtIssuer,
+            audience: jwtAudience,
+        });
+
+        return NextResponse.json({ offers: payload.offers || [] });
+    } catch (error) {
+        return NextResponse.json({ offers: [] }, { status: 401 });
     }
 }

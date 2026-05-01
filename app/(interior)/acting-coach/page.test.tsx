@@ -302,7 +302,6 @@ describe("ActingCoachPage", () => {
         expect(mockSendMessage).toHaveBeenCalledTimes(1);
       });
 
-      // Rerenderiza mais uma vez para garantir
       rerender(<ActingCoachPage />);
 
       expect(mockSendMessage).toHaveBeenCalledTimes(1);

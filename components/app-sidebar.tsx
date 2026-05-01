@@ -38,9 +38,12 @@ const menuItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter();
-  const {logout} = useAuth();
+  const {logout, user } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
   const isChatPage = pathname.includes('/chat');
+
+  const businessId = process.env.NEXT_PUBLIC_KAJABI_BUSINESS_ID || "";
+  const isBusinessClass = !!(user?.offers?.includes(businessId));
 
   // Auto-close mobile drawer on route change
   useEffect(() => {
@@ -167,9 +170,9 @@ export function AppSidebar() {
         </nav>
       </div>
 
-      
 
       {/* Premium Plan */}
+      {!isBusinessClass && (
       <div className="p-4">
         <div className="rounded-xl bg-[#2C3328] p-4">
           <h4 className="font-title text-lg font-bold text-[#F5F0E8]">Bussiness Class</h4>
@@ -186,6 +189,7 @@ export function AppSidebar() {
           </a>
         </div>
       </div>
+      )}
       </aside>
     </>
   )
