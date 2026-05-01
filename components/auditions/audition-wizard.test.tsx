@@ -43,20 +43,18 @@ import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
 
 describe("AuditionWizard", () => {
   describe("handleNext", () => {
-    it("increments step from 1 to 2", async () => {
+    it("increments step from 1 to 2", () => {
       render(<AuditionWizard mode="sides" />);
       
       expect(screen.getByText("Basics")).toBeInTheDocument();
       
       const nextButton = screen.getByRole("button", { name: "Next" });
-      await act(async () => {
-        fireEvent.click(nextButton);
-      });
+      fireEvent.click(nextButton);
       
       expect(screen.getByText(/Upload Sides/i)).toBeInTheDocument();
     });
 
-    it("caps step at 4 when already at maximum", async () => {
+    it("caps step at 4 when already at maximum", () => {
       render(<AuditionWizard mode="sides" />);
       
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -64,26 +62,21 @@ describe("AuditionWizard", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
       
       expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
-      
       expect(screen.getByText("Review & Generate")).toBeInTheDocument();
     });
   });
 
   describe("handleBack", () => {
-    it("decrements step from 2 to 1", async () => {
+    it("decrements step from 2 to 1", () => {
       render(<AuditionWizard mode="sides" />);
       
       const nextButton = screen.getByRole("button", { name: "Next" });
-      await act(async () => {
-        fireEvent.click(nextButton);
-      });
+      fireEvent.click(nextButton);
       
       expect(screen.getByText(/Upload Sides/i)).toBeInTheDocument();
       
       const backButton = screen.getByRole("button", { name: "Back" });
-      await act(async () => {
-        fireEvent.click(backButton);
-      });
+      fireEvent.click(backButton);
       
       expect(screen.getByText("Basics")).toBeInTheDocument();
     });
@@ -99,18 +92,14 @@ describe("AuditionWizard", () => {
   });
 
   describe("updateFormData", () => {
-    it("merges partial data correctly and preserves existing keys", async () => {
+    it("merges partial data correctly and preserves existing keys", () => {
       render(<AuditionWizard mode="sides" />);
       
       const projectInput = screen.getByPlaceholderText("e.g., The Morning Show Season 5");
-      await act(async () => {
-        fireEvent.change(projectInput, { target: { value: "Test Project" } });
-      });
+      fireEvent.change(projectInput, { target: { value: "Test Project" } });
       
       const roleInput = screen.getByPlaceholderText("e.g., Dr. Sarah Chen");
-      await act(async () => {
-        fireEvent.change(roleInput, { target: { value: "Test Role" } });
-      });
+      fireEvent.change(roleInput, { target: { value: "Test Role" } });
       
       expect(projectInput).toHaveValue("Test Project");
       expect(roleInput).toHaveValue("Test Role");

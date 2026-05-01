@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         const issuer = 'kajabi-auth-callback';
         const audience = 'kajabi-dashboard';
 
-        const token = await new SignJWT({ email: userEmail })
+        const token = await new SignJWT({ email: userEmail, offers: hasAccess.offers })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuer(issuer)
             .setAudience(audience)
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
  * @param {string} email - The user's authenticated email address from Firebase.
  * @returns {Promise<{ success: boolean; message?: string }>} An object containing the verification result and an optional user-facing error message.
  */
-async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; message?: string }> {
+async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; message?: string; offers?: string[] }> {
     // TODO: Implement an LRU cache or Redis for the Kajabi access token to avoid requesting a new OAuth token on every login.
     // TODO: Consider adding a retry mechanism for Kajabi API timeouts to improve reliability.
 
@@ -196,24 +196,27 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
             return { success: false, message: "You don't have any active offers in your account." };
         }
 
-        // 1. Puxa a string com os IDs (ex: "id1, id2")
-        const requiredOfferIdsString = process.env.KAJABI_REQUIRED_OFFER_ID;
+        const businessOfferIdsString = process.env.KAJABI_REQUIRED_OFFER_ID;
+        const economyOfferIdString = process.env.KAJABI_ECONOMY_OFFER_ID;
         
-        if (!requiredOfferIdsString) {
-            return { success: false, message: "An unexpected error occurred during validation. Please try again." };
+        if (!businessOfferIdsString || !economyOfferIdString) {
+            return { success: false, message: "System configuration error. Missing offer IDs. Please contact support." };
         }
 
-        const acceptedOfferIds = requiredOfferIdsString.split(',').map(id => id.trim());
+        const acceptedOfferIds = [
+            ...businessOfferIdsString.split(',').map(id => id.trim()),
+            ...economyOfferIdString.split(',').map(id => id.trim())
+        ].filter(Boolean); 
         
-        const hasRequiredOffer = offersData.data.some(
-            (offer: KajabiOffer) => acceptedOfferIds.includes(String(offer.id))
-        );
+        const userMatchedOffers = offersData.data
+            .map((offer: KajabiOffer) => String(offer.id))
+            .filter((id: string) => acceptedOfferIds.includes(id));
 
-        if (!hasRequiredOffer) {
+        if (userMatchedOffers.length === 0) {
             return { success: false, message: "You don't have the required 'The Actor's Copilot' plan. Please check your purchase history." };
         }
         
-        return { success: true, message: "Purchase verified successfully." };
+        return { success: true, message: "Purchase verified successfully.", offers: userMatchedOffers };
 
     } catch (error) {
         logger.error({ err: error, email, msg: 'Error verifying Kajabi purchase' });

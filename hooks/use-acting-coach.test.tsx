@@ -40,34 +40,30 @@ jest.mock("firebase/firestore", () => {
     orderBy: jest.fn(),
     addDoc: jest.fn(async () => ({ id: "msg-123" })),
     onSnapshot: jest.fn((ref, observer) => {
-      // Importamos o act dinamicamente para evitar problemas de escopo no jest.mock
-      const { act } = require("@testing-library/react");
-      
-      // Envolvemos a chamada do observer no act() e rodamos de forma síncrona
-      act(() => {
-        if (ref._query) {
-          observer({
-            docs: [],
-          });
-        } else {
-          observer({
-            exists: () => true,
-            id: "coach-session-1",
-            data: () => ({
-              createdAt: new Date(),
-              lastActiveAt: new Date(),
-              status: "active",
-              title: "New Session",
-              linkedAuditionId: null,
-              messageCount: 0,
-              sessionFocus: null,
-              stepIndex: 0,
-              mode: null,
-              phase: null,
-            }),
-          });
-        }
-      });
+      // Removido o act() daqui. Executar o observer livremente 
+      // evita deadlocks na fila de testes do React.
+      if (ref._query) {
+        observer({
+          docs: [],
+        });
+      } else {
+        observer({
+          exists: () => true,
+          id: "coach-session-1",
+          data: () => ({
+            createdAt: new Date(),
+            lastActiveAt: new Date(),
+            status: "active",
+            title: "New Session",
+            linkedAuditionId: null,
+            messageCount: 0,
+            sessionFocus: null,
+            stepIndex: 0,
+            mode: null,
+            phase: null,
+          }),
+        });
+      }
       return jest.fn(); // Função de unsubscribe
     }),
     serverTimestamp: jest.fn(() => new Date()),
@@ -87,13 +83,16 @@ describe("useActingCoach", () => {
   });
 
   describe("Initialization", () => {
-    it("returns default state on mount", async () => {
-      const { result } = renderHook(() => useActingCoach());
+    it("returns default state on mount", () => {
+      // Unmount adicionado para evitar "sangramento" de efeitos assíncronos no próximo teste
+      const { result, unmount } = renderHook(() => useActingCoach());
 
       expect(result.current.messages).toEqual([]);
       expect(result.current.isLoading).toBe(false);
       expect(result.current.error).toBeNull();
       expect(result.current.sessionId).toBe("coach-session-1");
+      
+      unmount();
     });
 
     it("initializes session metadata listener and sets session", async () => {
@@ -172,24 +171,22 @@ describe("useActingCoach", () => {
 
       // Override onSnapshot for this test: first call returns a session with non-null focus
       (onSnapshot as jest.Mock).mockImplementationOnce((ref: any, observer: any) => {
-        const { act: localAct } = require("@testing-library/react");
-        localAct(() => {
-          observer({
-            exists: () => true,
-            id: "coach-session-focused",
-            data: () => ({
-              createdAt: new Date(),
-              lastActiveAt: new Date(),
-              status: "active",
-              title: "Focused Session",
-              linkedAuditionId: null,
-              messageCount: 5,
-              sessionFocus: "Find your objective",
-              stepIndex: 2,
-              mode: "guided",
-              phase: "objective",
-            }),
-          });
+        // Removido o act() interno daqui também
+        observer({
+          exists: () => true,
+          id: "coach-session-focused",
+          data: () => ({
+            createdAt: new Date(),
+            lastActiveAt: new Date(),
+            status: "active",
+            title: "Focused Session",
+            linkedAuditionId: null,
+            messageCount: 5,
+            sessionFocus: "Find your objective",
+            stepIndex: 2,
+            mode: "guided",
+            phase: "objective",
+          }),
         });
         return jest.fn();
       });

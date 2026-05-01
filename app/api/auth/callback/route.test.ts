@@ -38,6 +38,7 @@ describe('Authentication POST Route (Kajabi Verification)', () => {
         process.env.KAJABI_CLIENT_ID = 'test_client';
         process.env.KAJABI_CLIENT_SECRET = 'test_secret';
         process.env.KAJABI_REQUIRED_OFFER_ID = '12345';
+        process.env.KAJABI_ECONOMY_OFFER_ID = '67890'; 
 
         // Setup mock cookie store
         mockCookieSet = jest.fn();
