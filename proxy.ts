@@ -39,15 +39,27 @@ export async function proxy(request: NextRequest) {
 
         if (isRestrictedPath) {
             const userOffers = payload.offers as string[] | undefined;
-            const economyOfferId = process.env.KAJABI_ECONOMY_OFFER_ID;
+
+            const economyOfferIds = new Set(
+                (process.env.KAJABI_ECONOMY_OFFER_ID ?? '')
+                    .split(',')
+                    .map((offerId) => offerId.trim())
+                    .filter((offerId) => offerId.length > 0)
+            );
 
             // Failsafe: if the token doesn't have offers recorded, redirect to dashboard
             if (!userOffers || userOffers.length === 0) {
                 return NextResponse.redirect(new URL('/dashboard', request.url));
             }
 
-            // The Lock: Checks if the user ONLY has the Economy Class plan
-            const hasOnlyEconomy = userOffers.length === 1 && userOffers[0] === economyOfferId;
+            // Configuration error: deny premium access if economy offer IDs are missing/empty
+            if (economyOfferIds.size === 0) {
+                console.error('[proxy] KAJABI_ECONOMY_OFFER_ID environment variable is not set or empty. Denying access to premium routes.');
+                return NextResponse.redirect(new URL('/dashboard', request.url));
+            }
+
+            // The Lock: Checks if the user only has Economy-class plans, even if multiple Economy offers exist
+            const hasOnlyEconomy = userOffers.every((offer) => economyOfferIds.has(offer));
 
             if (hasOnlyEconomy) {
                 

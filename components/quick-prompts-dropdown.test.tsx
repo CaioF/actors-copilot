@@ -2,7 +2,6 @@
 import "@testing-library/jest-dom";
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { QuickPromptsDropdown } from "./quick-prompts-dropdown";
 
 beforeAll(() => {
@@ -53,14 +52,13 @@ describe("components/quick-prompts-dropdown", () => {
 
   it("calls onSelect with the prompt's id and closes popover on selection", async () => {
     const mockOnSelect = jest.fn();
-    // 1. Remova o const user = userEvent.setup();
     render(<QuickPromptsDropdown onSelect={mockOnSelect} />);
 
     const trigger = screen.getByRole("button", { name: "Quick Prompts" });
-    fireEvent.click(trigger); // <-- AQUI
+    fireEvent.click(trigger);
     
     const firstPrompt = await screen.findByText(/I'm working on a scene/i);
-    fireEvent.click(firstPrompt); // <-- E AQUI
+    fireEvent.click(firstPrompt);
 
     expect(mockOnSelect).toHaveBeenCalledWith(
       "I'm working on a scene. Help me define my character's Overall Objective and then walk me through a 'Destination' exercise to make that goal physical."

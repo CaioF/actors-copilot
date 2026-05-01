@@ -104,8 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to log in to Kajabi");
             }
 
-            const userWithOffers: AppUser = Object.assign(result.user, { offers: data.offers });
-            setUser(userWithOffers);
+            // The POST callback response does not hydrate offer data; rely on the
+            // existing auth/user hydration path to populate `offers` later.
+            setUser(result.user as AppUser);
 
             // Redirect to the protected dashboard upon successful session creation
             window.location.href = "/dashboard"; 
@@ -154,8 +155,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish secure session.");
             }
 
-            const userWithOffers: AppUser = Object.assign(result.user, { offers: data.offers });
-            setUser(userWithOffers);
+            // The POST callback response does not hydrate offer data; rely on the
+            // existing auth/user hydration path to populate `offers` later.
+            setUser(result.user as AppUser);
 
             window.location.href = "/dashboard"; 
         } catch (error: unknown) {

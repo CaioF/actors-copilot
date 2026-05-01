@@ -44,7 +44,6 @@ export function AppSidebar() {
 
   const businessId = process.env.NEXT_PUBLIC_KAJABI_BUSINESS_ID || "";
   const isBusinessClass = !!(user?.offers?.includes(businessId));
-;
 
   // Auto-close mobile drawer on route change
   useEffect(() => {

@@ -233,8 +233,21 @@ export async function GET() {
             return NextResponse.json({ offers: [] }, { status: 401 });
         }
 
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-        const { payload } = await jwtVerify(token, secret);
+        const jwtSecret = process.env.JWT_SECRET;
+        const jwtIssuer = process.env.JWT_ISSUER;
+        const jwtAudience = process.env.JWT_AUDIENCE;
+
+        if (!jwtSecret || !jwtIssuer || !jwtAudience) {
+            logger.error({ msg: 'Missing JWT verification configuration in auth callback GET handler' });
+            return NextResponse.json({ offers: [] }, { status: 500 });
+        }
+
+        const secret = new TextEncoder().encode(jwtSecret);
+        const { payload } = await jwtVerify(token, secret, {
+            algorithms: ['HS256'],
+            issuer: jwtIssuer,
+            audience: jwtAudience,
+        });
 
         return NextResponse.json({ offers: payload.offers || [] });
     } catch (error) {
