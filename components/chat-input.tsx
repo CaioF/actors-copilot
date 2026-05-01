@@ -149,6 +149,26 @@ export function ChatInput({
   };
 
   // ... (Keep existing handleFileUpload, triggerFileSelect, removeDocument, Textarea height useEffect, Focus useEffect) ...
+  const inferMimeType = (file: File): string => {
+    if (file.type) return file.type;
+    const ext = file.name.toLowerCase().split('.').pop() ?? '';
+    switch (ext) {
+      case 'md':
+      case 'markdown':
+        return 'text/markdown';
+      case 'rtf':
+        return 'application/rtf';
+      case 'txt':
+        return 'text/plain';
+      case 'pdf':
+        return 'application/pdf';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      default:
+        return '';
+    }
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -157,14 +177,14 @@ export function ChatInput({
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    
+
     reader.onload = () => {
       const base64String = reader.result as string;
-      const base64Data = base64String.split(',')[1]; 
+      const base64Data = base64String.split(',')[1];
 
       setPendingDocument({
         data: base64Data,
-        mimeType: file.type,
+        mimeType: inferMimeType(file),
         name: file.name
       });
     };
@@ -286,7 +306,7 @@ export function ChatInput({
           ref={fileInputRef} 
           onChange={handleFileUpload} 
           className="hidden" 
-          accept=".pdf,.txt,.doc,.docx"
+          accept=".pdf,.txt,.doc,.docx,.rtf,.md,.markdown"
         />
 
         <button

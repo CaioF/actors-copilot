@@ -181,7 +181,16 @@ export function useActingCoach(): UseActingCoachReturn {
           }),
         });
 
-        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        if (!response.ok) {
+          let serverError = "";
+          try {
+            const errBody = await response.json();
+            if (errBody && typeof errBody.error === "string") serverError = errBody.error;
+          } catch {
+            // response body wasn't JSON; fall through
+          }
+          throw new Error(serverError || `Request failed: ${response.status}`);
+        }
         const data = await response.json();
         if (!data?.aiData?.coach_reply) throw new Error("Invalid response from coach");
 
@@ -261,7 +270,21 @@ export function useActingCoach(): UseActingCoachReturn {
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to get coach response");
+        const message = err instanceof Error ? err.message : "Failed to get coach response";
+        setError(message);
+
+        if (userPath) {
+          try {
+            const messagesRef = collection(getDb(), `users/${userPath}/coachSessions/${sessionId}/messages`);
+            await addDoc(messagesRef, {
+              role: "assistant",
+              content: `Sorry, something went wrong: ${message}. Please try again.`,
+              timestamp: serverTimestamp(),
+            });
+          } catch (writeErr) {
+            log.debug({ err: writeErr }, "Failed to write error message to chat");
+          }
+        }
       } finally {
         setIsLoading(false);
       }

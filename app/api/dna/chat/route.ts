@@ -4,6 +4,7 @@ import { createChildLogger } from '@/lib/logger';
 import { logger } from '@/lib/logger';
 import type { ChatHistoryMessage, ExtractedPsychData } from '@/lib/chat-types';
 import { EXTRACTION_TOOL } from '@/lib/dna/extraction/extraction-tool-schema';
+import { documentToPromptPart, validateDocumentPayload } from '@/lib/document-processing';
 
 /**
  * Handles conversational DNA extraction chat, running dual AI models: one for Socratic
@@ -22,6 +23,13 @@ export async function POST(request: Request) {
 
         const body = await request.json();
         const { content, currentSection, actorName, history, previouslyAsked, pivotFlag, document } = body;
+
+        if (document !== undefined) {
+            const validation = validateDocumentPayload(document);
+            if (!validation.ok) {
+                return NextResponse.json({ error: validation.error }, { status: validation.status });
+            }
+        }
 
         const specificSectionDirective = SECTION_PROMPTS[currentSection] || SECTION_PROMPTS['identity'];
 
@@ -167,7 +175,7 @@ export async function POST(request: Request) {
             ${dynamicCommand}
 
             ${hasDocumentAttached ? `
-            The user has attached a document alongside their message. You MUST read the contents of this document (provided as inlineData). 
+            The user has attached a document alongside their message. You MUST read the contents of this document (provided either as inline binary data or extracted text below).
             Explicitly acknowledge that you have received and read the file, and deeply integrate its contents into your next Socratic response.
             ` : ""}
             
@@ -225,25 +233,18 @@ export async function POST(request: Request) {
 
         // Primary execution: Always generate the conversational response.
         type PromptPart = { text: string } | { inlineData: { data: string; mimeType: string } };
-        
-        /**
-         * Initialize the prompt array with the mandatory system directives and user input.
-         */
+
         const promptParts: PromptPart[] = [
             { text: finalPromptForAI }
         ];
 
-        /**
-         * If a valid document payload was provided in the request, append it as 
-         * inlineData. Vertex AI engine natively processes this alongside the text.
-         */
         if (document && document.data && document.mimeType) {
-            promptParts.push({
-                inlineData: {
-                    data: document.data,
-                    mimeType: document.mimeType
-                }
-            });
+            const docPart = await documentToPromptPart(document);
+            if (!docPart.ok) {
+                log.error({ mimeType: document.mimeType }, 'Document processing failed');
+                return NextResponse.json({ error: docPart.error }, { status: docPart.status });
+            }
+            promptParts.push(docPart.part);
         }
 
         const chatResult = await chat.sendMessage(promptParts);
