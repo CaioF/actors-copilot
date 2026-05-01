@@ -19,6 +19,7 @@ import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-type
 import type { DNASession, DNASectionId } from "@/lib/chat-types";
 import { useState, useMemo, useEffect } from "react";
 import { useSidebar } from "@/lib/context/SidebarContext";
+import { useAuth } from "@/lib/context/AuthContext";
 
 interface SectionProgressRingProps {
   current: number;
@@ -213,8 +214,14 @@ export function ChatSidebar({
   activeSection,
   onSectionClick,
 }: ChatSidebarProps) {
+
   const pathname = usePathname();
   const { isOpen, setIsOpen } = useSidebar();
+
+  const {user } = useAuth();
+
+  const businessId = process.env.NEXT_PUBLIC_KAJABI_BUSINESS_ID || "";
+  const isBusinessClass = !!(user?.offers?.includes(businessId));
 
   // Auto-close mobile drawer on route change
   useEffect(() => {
@@ -376,13 +383,12 @@ export function ChatSidebar({
       </div>
 
       {/* Premium Plan */}
-      <div className="p-2 pt-1">
-        <div className="rounded-xl bg-[#2C3328] p-3">
-          <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
-            Business Class
-          </h4>
+      {!isBusinessClass && (
+      <div className="p-4">
+        <div className="rounded-xl bg-[#2C3328] p-4">
+          <h4 className="font-title text-lg font-bold text-[#F5F0E8]">Bussiness Class</h4>
           <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
-            Upgrade to Business Class to unlock more features
+            Upgrade to Bussiness Class to unlock more features
           </p>
           <a 
             href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout" 
@@ -394,6 +400,7 @@ export function ChatSidebar({
           </a>
         </div>
       </div>
+      )}
       </aside>
     </>
   );

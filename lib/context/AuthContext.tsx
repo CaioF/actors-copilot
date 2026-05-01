@@ -6,11 +6,18 @@ import { getApp } from "@/lib/firebase";
 import { logger } from '@/lib/logger';
 
 /**
+ * Extends the default Firebase User to include custom Kajabi offer claims.
+ */
+export interface AppUser extends User {
+    offers?: string[]; 
+}
+
+/**
  * Defines the shape of the authentication context state and its available methods.
  * @interface AuthContextType
  */
 interface AuthContextType {
-    user: User | null; // The authenticated Firebase user object, or null if unauthenticated.
+    user: AppUser | null; // The authenticated Firebase user object, or null if unauthenticated.
     loading: boolean; // Indicates if the authentication state is currently being resolved.
     loginWithGoogle: () => Promise<void>;
     loginWithEmail: (email: string, password: string) => Promise<void>;
@@ -59,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = getAuth(app);
     
     // State initialization
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
      
     /**
@@ -96,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await signOut(auth);
                 throw new Error(data.error || "Failed to log in to Kajabi");
             }
+
+            const userWithOffers: AppUser = Object.assign(result.user, { offers: data.offers });
+            setUser(userWithOffers);
 
             // Redirect to the protected dashboard upon successful session creation
             window.location.href = "/dashboard"; 
@@ -135,12 +145,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }
             });
+
+            const data = await response.json();
             
             if (!response.ok) {
-                const data = await response.json();
+                
                 await signOut(auth);
                 throw new Error(data.error || "Failed to establish secure session.");
             }
+
+            const userWithOffers: AppUser = Object.assign(result.user, { offers: data.offers });
+            setUser(userWithOffers);
+
             window.location.href = "/dashboard"; 
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -174,11 +190,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }
             });
             
+            const data = await response.json();
+
             if (!response.ok) {
-                const data = await response.json();
                 await signOut(auth);
                 throw new Error(data.error || "Failed to establish secure session.");
             }
+            const userWithOffers: AppUser = Object.assign(result.user, { offers: data.offers });
+            setUser(userWithOffers);
             window.location.href = "/dashboard"; 
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -224,13 +243,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * Automatically cleans up the listener when the component unmounts.
      */
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
-        
-        return () => unsubscribe();
-    }, [auth]);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        if (currentUser) {
+            try {
+                // Buscamos os dados da sessão atual (que vêm do seu JWT no cookie)
+                const response = await fetch('/api/auth/callback', { method: 'GET' });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Mesclamos o usuário do Firebase com as ofertas do nosso banco/JWT
+                    const userWithOffers: AppUser = Object.assign(currentUser, { 
+                        offers: data.offers || [] 
+                    });
+                    setUser(userWithOffers);
+                } else {
+                    setUser(currentUser as AppUser);
+                }
+            } catch (err) {
+                logger.error({ err, msg: "Failed to hydrate session offers" });
+                setUser(currentUser as AppUser);
+            }
+        } else {
+            setUser(null);
+        }
+        setLoading(false);
+    });
+    
+    return () => unsubscribe();
+}, [auth]);
+    
 
     return (
         <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, loginWithEmail, signupWithEmail }}>

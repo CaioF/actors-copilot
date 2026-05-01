@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { auth } from '@/lib/firebase.admin';
-import { SignJWT } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { logger, createChildLogger } from '@/lib/logger';
 
 interface KajabiContact {
@@ -221,5 +221,23 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
     } catch (error) {
         logger.error({ err: error, email, msg: 'Error verifying Kajabi purchase' });
         return { success: false, message: "An unexpected error occurred during validation. Please try again." };
+    }
+}
+
+export async function GET() {
+    try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get('kajabi_session')?.value;
+
+        if (!token) {
+            return NextResponse.json({ offers: [] }, { status: 401 });
+        }
+
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+        const { payload } = await jwtVerify(token, secret);
+
+        return NextResponse.json({ offers: payload.offers || [] });
+    } catch (error) {
+        return NextResponse.json({ offers: [] }, { status: 401 });
     }
 }
