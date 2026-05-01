@@ -196,17 +196,21 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
             return { success: false, message: "You don't have any active offers in your account." };
         }
 
-        const requiredOfferId = process.env.KAJABI_REQUIRED_OFFER_ID;
-        if (!requiredOfferId) {
+        // 1. Puxa a string com os IDs (ex: "id1, id2")
+        const requiredOfferIdsString = process.env.KAJABI_REQUIRED_OFFER_ID;
+        
+        if (!requiredOfferIdsString) {
             return { success: false, message: "An unexpected error occurred during validation. Please try again." };
         }
+
+        const acceptedOfferIds = requiredOfferIdsString.split(',').map(id => id.trim());
         
         const hasRequiredOffer = offersData.data.some(
-            (offer: KajabiOffer) => String(offer.id) === String(requiredOfferId)
+            (offer: KajabiOffer) => acceptedOfferIds.includes(String(offer.id))
         );
 
         if (!hasRequiredOffer) {
-            return { success: false, message: "You don't have the required 'The Actor's Copilot' offer. Please check your purchase history." };
+            return { success: false, message: "You don't have the required 'The Actor's Copilot' plan. Please check your purchase history." };
         }
         
         return { success: true, message: "Purchase verified successfully." };

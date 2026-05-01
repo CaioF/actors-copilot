@@ -240,7 +240,6 @@ describe("ActingCoachPage", () => {
       mockSearchParams.set("project", "FOUNDATION");
       mockSearchParams.set("role", "TECHNICIAN");
 
-      // Fazemos o mockStartNewSession fingir que a sessão carregou com o ID novo
       mockStartNewSession.mockImplementationOnce(() => {
         (useActingCoach as jest.Mock).mockReturnValue({
           messages: [],
@@ -248,17 +247,13 @@ describe("ActingCoachPage", () => {
           sendMessage: mockSendMessage,
           startNewSession: mockStartNewSession,
           clearSessionFocus: mockClearSessionFocus,
-          session: { title: "New Session", sessionFocus: null, linkedAuditionId: "aud-123" }, // <--- O SEGREDO AQUI
+          session: { title: "New Session", sessionFocus: null, linkedAuditionId: "aud-123" }, 
         });
         return Promise.resolve();
       });
 
-      // Em testes com React 19, devemos usar o formato assíncrono (Promise) 
-      // ou empacotar em render/act quando o useEffect causa atualizações em cascata.
-      // O render inicial já lida com o primeiro useEffect.
       const { rerender } = render(<ActingCoachPage />);
 
-      // E agora forçamos um re-render para o React pegar o mock atualizado do nosso startNewSession
       rerender(<ActingCoachPage />);
 
       await waitFor(() => {
@@ -304,7 +299,6 @@ describe("ActingCoachPage", () => {
         expect(mockSendMessage).toHaveBeenCalledTimes(1);
       });
 
-      // Rerenderiza mais uma vez para garantir
       rerender(<ActingCoachPage />);
 
       expect(mockSendMessage).toHaveBeenCalledTimes(1);
