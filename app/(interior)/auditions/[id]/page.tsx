@@ -1,6 +1,6 @@
 "use client"
 
-import { RefObject, useEffect, useRef, useState } from "react"
+import { RefObject, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown"
 
 import { StepResultSides } from "@/components/auditions/step/step-result"
 import { StepResultBrief } from "@/components/auditions/step/step-result-brief"
+import { calculateLocalDeadline } from "@/lib/time-utils"
 
 interface PerformanceSection {
   title: string;
@@ -51,7 +52,16 @@ export default function AuditionDetailView() {
   const [auditionData, setAuditionData] = useState<AuditionData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(false)
-  
+
+  const localDeadlineStr = useMemo(() => {
+    if (!auditionData?.deadline || !auditionData?.auditionTimezone) return null;
+    const actorTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return calculateLocalDeadline(auditionData.deadline, auditionData.auditionTimezone, actorTz);
+  }, [auditionData?.deadline, auditionData?.auditionTimezone]);
+
+  const hasBothAnalyses = (auditionData?.hasSides && auditionData?.hasBrief) || false;
+  const hasNewSchema = auditionData?.hasSides !== undefined || auditionData?.hasBrief !== undefined;
+
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrintDocument = useReactToPrint({
     contentRef: printRef, // hidden template reference
@@ -64,7 +74,7 @@ export default function AuditionDetailView() {
       if (user && auditionId) {
         const firstName = user.displayName ? user.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") : "Actor"
         const userPath = `${user.uid}_${firstName}`
-        
+
         await fetchAuditionDetails(userPath, auditionId)
       } else {
         setError(true)
@@ -90,7 +100,7 @@ export default function AuditionDetailView() {
       if (docSnap.exists()) {
         const data = docSnap.data() as AuditionData
         setAuditionData(data)
-        
+
       }
     } catch (err) {
       logger.error({ err, msg: 'Error fetching audition' })
@@ -159,21 +169,58 @@ export default function AuditionDetailView() {
 
         {/* DYNAMIC RESULT COMPONENT */}
         <div>
-          {auditionData.performanceMap ? (
-             currentAnalysisType === "brief" ? (
-               <StepResultBrief data={auditionData.performanceMap} />
-             ) : (
-               <StepResultSides
-                 data={auditionData.performanceMap}
-                 onCoachClick={() =>
-                   router.push(
-                     `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}`
-                   )
-                 }
-               />
-             )
+          {hasNewSchema ? (
+            hasBothAnalyses ? (
+              <div className="space-y-8">
+                <div className="rounded-2xl bg-[#FCFAF7] p-4 border-l-4 border-[#FF7316]">
+                  <h2 className="text-lg font-bold text-[#2C3328]">Sides Analysis</h2>
+                </div>
+                {auditionData.sidesPerformanceMap && (
+                  <StepResultSides
+                    data={auditionData.sidesPerformanceMap}
+                    onCoachClick={() =>
+                      router.push(
+                        `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}`
+                      )
+                    }
+                  />
+                )}
+                <div className="rounded-2xl bg-[#FCFAF7] p-4 border-l-4 border-[#E8721A]">
+                  <h2 className="text-lg font-bold text-[#2C3328]">Brief Analysis</h2>
+                </div>
+                {auditionData.briefPerformanceMap && (
+                  <StepResultBrief data={auditionData.briefPerformanceMap} localDeadlineStr={localDeadlineStr} />
+                )}
+              </div>
+            ) : auditionData.hasSides && auditionData.sidesPerformanceMap ? (
+              <StepResultSides
+                data={auditionData.sidesPerformanceMap}
+                onCoachClick={() =>
+                  router.push(
+                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}`
+                  )
+                }
+              />
+            ) : auditionData.hasBrief && auditionData.briefPerformanceMap ? (
+              <StepResultBrief data={auditionData.briefPerformanceMap} localDeadlineStr={localDeadlineStr} />
+            ) : (
+              <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>
+            )
+          ) : auditionData.performanceMap ? (
+            currentAnalysisType === "brief" ? (
+              <StepResultBrief data={auditionData.performanceMap} />
+            ) : (
+              <StepResultSides
+                data={auditionData.performanceMap}
+                onCoachClick={() =>
+                  router.push(
+                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}`
+                  )
+                }
+              />
+            )
           ) : (
-             <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>
+            <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>
           )}
         </div>
       </div>
@@ -182,7 +229,7 @@ export default function AuditionDetailView() {
       {/* hidden template for pdf printing */}
       <div className="hidden">
         <div ref={printRef} className="bg-white p-12 text-black max-w-[210mm] mx-auto font-title">
-          
+
           {/* Doc header */}
           <div className="border-b-2 border-black pb-4 mb-8 flex justify-between items-end">
             <div>
@@ -194,47 +241,214 @@ export default function AuditionDetailView() {
             </div>
             <div className="text-right">
               <p className="text-xs text-gray-400 uppercase tracking-widest font-sans font-bold">
-                {currentAnalysisType}
+                {hasBothAnalyses ? "Sides + Brief" : currentAnalysisType}
               </p>
             </div>
           </div>
 
-          {/* Intro Block */}
-          {auditionData?.performanceMap?.intro && (
-            <div className="mb-10 p-6 bg-gray-50 border-l-4 border-black break-inside-avoid">
-              <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
-                <ReactMarkdown>{auditionData.performanceMap.intro}</ReactMarkdown>
-              </div>
-            </div>
-          )}
-
-          {/* Sections Loop */}
-          <div className="space-y-10 mt-10">
-            {auditionData?.performanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
-              <div key={idx} className="break-inside-avoid pt-8">
-                <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
-                  {sec.title}
-                </h3>
-                <ul className="space-y-4">
-                  {sec.items.map((item: string, i: number) => (
-                    <li key={i} className="flex items-start text-black">
-                      <span className="mr-4 text-black font-bold text-lg">•</span>
-                      <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
-                        <ReactMarkdown>{item}</ReactMarkdown>
+          {hasNewSchema ? (
+            hasBothAnalyses ? (
+              <>
+                {/* SIDES ANALYSIS PRINT */}
+                <div className="mb-12">
+                  <div className="border-b-2 border-[#FF7316] pb-2 mb-6">
+                    <h2 className="text-2xl font-bold text-black">SIDES ANALYSIS</h2>
+                  </div>
+                  {auditionData.sidesPerformanceMap?.intro && (
+                    <div className="mb-10 p-6 bg-gray-50 border-l-4 border-[#FF7316] break-inside-avoid">
+                      <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
+                        <ReactMarkdown>{auditionData.sidesPerformanceMap.intro}</ReactMarkdown>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+                    </div>
+                  )}
+                  <div className="space-y-10 mt-10">
+                    {auditionData.sidesPerformanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
+                      <div key={`sides-${idx}`} className="break-inside-avoid pt-8">
+                        <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
+                          {sec.title}
+                        </h3>
+                        <ul className="space-y-4">
+                          {sec.items.map((item: string, i: number) => (
+                            <li key={`sides-${i}`} className="flex items-start text-black">
+                              <span className="mr-4 text-black font-bold text-lg">•</span>
+                              <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
+                                <ReactMarkdown>{item}</ReactMarkdown>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  {auditionData.sidesPerformanceMap?.outro && (
+                    <div className="mt-12 pt-8 border-t border-[#FF7316] text-center break-inside-avoid">
+                      <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
+                        <ReactMarkdown>{auditionData.sidesPerformanceMap.outro}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-          {auditionData?.performanceMap?.outro && (
-            <div className="mt-12 pt-8 border-t border-black text-center break-inside-avoid">
-              <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
-                <ReactMarkdown>{auditionData.performanceMap.outro}</ReactMarkdown>
+                {/* BRIEF ANALYSIS PRINT */}
+                <div className="mb-12">
+                  <div className="border-b-2 border-[#E8721A] pb-2 mb-6">
+                    <h2 className="text-2xl font-bold text-black">BRIEF ANALYSIS</h2>
+                  </div>
+                  {auditionData.briefPerformanceMap?.intro && (
+                    <div className="mb-10 p-6 bg-gray-50 border-l-4 border-[#E8721A] break-inside-avoid">
+                      <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
+                        <ReactMarkdown>{auditionData.briefPerformanceMap.intro}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-10 mt-10">
+                    {auditionData.briefPerformanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
+                      <div key={`brief-${idx}`} className="break-inside-avoid pt-8">
+                        <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
+                          {sec.title}
+                        </h3>
+                        <ul className="space-y-4">
+                          {sec.items.map((item: string, i: number) => (
+                            <li key={`brief-${i}`} className="flex items-start text-black">
+                              <span className="mr-4 text-black font-bold text-lg">•</span>
+                              <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
+                                <ReactMarkdown>{item}</ReactMarkdown>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  {auditionData.briefPerformanceMap?.outro && (
+                    <div className="mt-12 pt-8 border-t border-[#E8721A] text-center break-inside-avoid">
+                      <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
+                        <ReactMarkdown>{auditionData.briefPerformanceMap.outro}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : auditionData.hasSides && auditionData.sidesPerformanceMap ? (
+              <>
+                <div className="border-b-2 border-[#FF7316] pb-2 mb-6">
+                  <h2 className="text-2xl font-bold text-black">SIDES ANALYSIS</h2>
+                </div>
+                {auditionData.sidesPerformanceMap.intro && (
+                  <div className="mb-10 p-6 bg-gray-50 border-l-4 border-[#FF7316] break-inside-avoid">
+                    <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
+                      <ReactMarkdown>{auditionData.sidesPerformanceMap.intro}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-10 mt-10">
+                  {auditionData.sidesPerformanceMap.sections.map((sec: PerformanceSection, idx: number) => (
+                    <div key={idx} className="break-inside-avoid pt-8">
+                      <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
+                        {sec.title}
+                      </h3>
+                      <ul className="space-y-4">
+                        {sec.items.map((item: string, i: number) => (
+                          <li key={i} className="flex items-start text-black">
+                            <span className="mr-4 text-black font-bold text-lg">•</span>
+                            <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
+                              <ReactMarkdown>{item}</ReactMarkdown>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                {auditionData.sidesPerformanceMap.outro && (
+                  <div className="mt-12 pt-8 border-t border-[#FF7316] text-center break-inside-avoid">
+                    <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
+                      <ReactMarkdown>{auditionData.sidesPerformanceMap.outro}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : auditionData.hasBrief && auditionData.briefPerformanceMap ? (
+              <>
+                <div className="border-b-2 border-[#E8721A] pb-2 mb-6">
+                  <h2 className="text-2xl font-bold text-black">BRIEF ANALYSIS</h2>
+                </div>
+                {auditionData.briefPerformanceMap.intro && (
+                  <div className="mb-10 p-6 bg-gray-50 border-l-4 border-[#E8721A] break-inside-avoid">
+                    <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
+                      <ReactMarkdown>{auditionData.briefPerformanceMap.intro}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-10 mt-10">
+                  {auditionData.briefPerformanceMap.sections.map((sec: PerformanceSection, idx: number) => (
+                    <div key={idx} className="break-inside-avoid pt-8">
+                      <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
+                        {sec.title}
+                      </h3>
+                      <ul className="space-y-4">
+                        {sec.items.map((item: string, i: number) => (
+                          <li key={i} className="flex items-start text-black">
+                            <span className="mr-4 text-black font-bold text-lg">•</span>
+                            <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
+                              <ReactMarkdown>{item}</ReactMarkdown>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                {auditionData.briefPerformanceMap.outro && (
+                  <div className="mt-12 pt-8 border-t border-[#E8721A] text-center break-inside-avoid">
+                    <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
+                      <ReactMarkdown>{auditionData.briefPerformanceMap.outro}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-center text-gray-500">No performance map data found for this audition.</p>
+            )
+          ) : (
+            <>
+              {/* Legacy single-analysis print */}
+              {auditionData?.performanceMap?.intro && (
+                <div className="mb-10 p-6 bg-gray-50 border-l-4 border-black break-inside-avoid">
+                  <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
+                    <ReactMarkdown>{auditionData.performanceMap.intro}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-10 mt-10">
+                {auditionData?.performanceMap?.sections.map((sec: PerformanceSection, idx: number) => (
+                  <div key={idx} className="break-inside-avoid pt-8">
+                    <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
+                      {sec.title}
+                    </h3>
+                    <ul className="space-y-4">
+                      {sec.items.map((item: string, i: number) => (
+                        <li key={i} className="flex items-start text-black">
+                          <span className="mr-4 text-black font-bold text-lg">•</span>
+                          <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
+                            <ReactMarkdown>{item}</ReactMarkdown>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
-            </div>
+
+              {auditionData?.performanceMap?.outro && (
+                <div className="mt-12 pt-8 border-t border-black text-center break-inside-avoid">
+                  <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
+                    <ReactMarkdown>{auditionData.performanceMap.outro}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
         </div>
