@@ -174,7 +174,7 @@ describe("POST /api/auditions/analyzeSides", () => {
       expect(payload.error).toBe("No sides text or valid file provided for analysis.");
     });
 
-    it("should return 413 Payload Too Large when the file exceeds 20MB", async () => {
+    it("should return 400 Bad Request when the file exceeds 20MB", async () => {
       // Arrange
       const oversizedFile: MockFile = {
         size: 21 * 1024 * 1024, // 21MB
@@ -190,9 +190,16 @@ describe("POST /api/auditions/analyzeSides", () => {
 
       // Act
       const response = await POST(request);
+      const payload = await response.json();
 
       // Assert
-      expect(response.status).toBe(413);
+      expect(response.status).toBe(400);
+      expect(payload.error).toBe("Validation failed");
+      expect(payload.details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ message: expect.stringContaining("20MB") }),
+        ])
+      );
     });
 
     it("should return 400 Bad Request when an unsupported MIME type is uploaded", async () => {
@@ -414,6 +421,40 @@ describe("POST /api/auditions/analyzeSides", () => {
       const afterLabel = capturedPrompt.split("=== PRIOR CHARACTER BRIEF ANALYSIS ===")[1];
       const summaryOnly = afterLabel.split("CRITICAL:")[0];
       expect(summaryOnly.trim().length).toBeLessThanOrEqual(1500);
+    });
+
+    it("should use 'Actor' in prompt when actorName is empty string (proving || not ??)", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked AI Introduction",
+                  sections: [{ title: "Mocked Beat", items: ["Tactic 1", "Tactic 2"] }],
+                  outro: "Mocked AI Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+        actorName: "",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("You are coaching Actor");
     });
   });
 });

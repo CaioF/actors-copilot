@@ -192,7 +192,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(payload.error).toBe("No brief text or valid file provided for analysis.");
     });
 
-    it("should return 413 Payload Too Large when the brief file exceeds 20MB", async () => {
+    it("should return 400 Bad Request when the brief file exceeds 20MB", async () => {
       // Arrange
       const oversizedFile: MockFile = {
         size: 21 * 1024 * 1024, // 21MB
@@ -208,9 +208,16 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
       // Act
       const response = await POST(request);
+      const payload = await response.json();
 
       // Assert
-      expect(response.status).toBe(413);
+      expect(response.status).toBe(400);
+      expect(payload.error).toBe("Validation failed");
+      expect(payload.details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ message: expect.stringContaining("20MB") }),
+        ])
+      );
     });
 
     it("should return 400 Bad Request when an unsupported MIME type is uploaded", async () => {
@@ -538,6 +545,40 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(response.status).toBe(200);
       const enrichmentBlock = capturedPrompt.split("=== PRIOR SIDES ANALYSIS ===")[1];
       expect(enrichmentBlock.trim().length).toBeLessThanOrEqual(1500);
+    });
+
+    it("should use 'Actor' in prompt when actorName is empty string (proving || not ??)", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        actorName: "",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("You are coaching Actor");
     });
   });
 });

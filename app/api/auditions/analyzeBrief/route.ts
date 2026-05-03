@@ -4,11 +4,7 @@ import mammoth from "mammoth";
 import { BRIEF_ANALYSIS_PROMPT, BRIEF_CINEMATIC_PROMPT, BRIEF_COMMERCIAL_PROMPT, BRIEF_THEATER_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
 import { logger } from '@/lib/logger';
-
-const ALLOWED_MIME_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
-];
+import { auditionFormDataSchema } from "@/lib/schemas/audition";
 
 interface PerformanceMap {
   intro: string;
@@ -78,7 +74,7 @@ export async function POST(request: Request) {
 
     // 2. EXTRACT INCOMING DATA AND FILES
     const formData = await request.formData();
-    
+
     // Explicitly reject sidesFile to prevent accidental misuse of the endpoint
     if (formData.has("sidesFile")) {
       return NextResponse.json(
@@ -87,51 +83,48 @@ export async function POST(request: Request) {
       );
     }
 
-    const projectType = formData.get("projectType") as string || "cinematic"; 
-    
-    // Security: Bound string lengths to prevent excessive token usage
-    const rawProject = formData.get("project") as string || "";
-    const rawRole = formData.get("role") as string || "";
-    const project = rawProject.substring(0, 150).trim(); 
-    const role = rawRole.substring(0, 100).trim();
-    
-    // Extract routing and personalization parameters
-    const userPath = formData.get("userPath") as string;
-    const actorName = formData.get("actorName") as string || "Actor";
+    const textFields = {
+      projectType: (formData.get("projectType") as string | null) ?? undefined,
+      project: (formData.get("project") as string | null) ?? undefined,
+      role: (formData.get("role") as string | null) ?? undefined,
+      actorName: (formData.get("actorName") as string | null) ?? undefined,
+      userPath: (formData.get("userPath") as string | null) ?? undefined,
+      sidesText: (formData.get("sidesText") as string | null) ?? undefined,
+      briefText: (formData.get("briefText") as string | null) ?? undefined,
+      sidesFile: formData.get("sidesFile") as File | undefined,
+      briefFile: formData.get("briefFile") as File | undefined,
+      deadline: (formData.get("deadline") as string | null) ?? undefined,
+      auditionTimezone: (formData.get("auditionTimezone") as string | null) ?? undefined,
+      priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
+      priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
+    };
 
-    let briefText = (formData.get("briefText") as string) || "";
-    const briefFile = formData.get("briefFile") as File | null;
-    const priorSidesSummary = ((formData.get("priorSidesSummary") as string) || "").substring(0, 1500).trim();
-
-    const deadline = (formData.get("deadline") as string)?.substring(0, 50).trim() || null;
-    const auditionTimezone = (formData.get("auditionTimezone") as string)?.substring(0, 50).trim() || null;
-
-    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
-
-    // Validate the Brief File
-    if (briefFile) {
-      if (briefFile.size > MAX_FILE_SIZE) {
-        return NextResponse.json(
-          { error: "Brief file exceeds 20MB limit" },
-          { status: 413 }
-        );
-      }
-
-      const isDocx = briefFile.name.toLowerCase().endsWith('.docx');
-
-      if (!ALLOWED_MIME_TYPES.includes(briefFile.type) && !isDocx) {
-        return NextResponse.json(
-          { error: "Only PDFs and Word documents (.docx) are allowed for the brief." },
-          { status: 400 }
-        );
-      }
+    const parseResult = auditionFormDataSchema.safeParse(textFields);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parseResult.error.issues },
+        { status: 400 }
+      );
     }
+
+    const validated = parseResult.data;
+    const userPath = validated.userPath;
+    const project = validated.project ?? "";
+    const role = validated.role ?? "";
+    const projectType = validated.projectType ?? "cinematic";
+    const actorName = validated.actorName || "Actor";
+    let briefText = validated.briefText ?? "";
+    const deadline = validated.deadline ?? null;
+    const auditionTimezone = validated.auditionTimezone ?? null;
+    const priorSidesSummary = (validated.priorSidesSummary ?? "").substring(0, 1500).trim();
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
       logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate a brief for ${userPath}` });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
+
+    const briefFile = formData.get("briefFile") as File | null;
 
     // 3. PARSE FILES SAFELY (PDFs & DOCX)
     if (briefFile) {

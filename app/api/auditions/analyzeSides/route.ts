@@ -4,11 +4,7 @@ import mammoth from "mammoth";
 import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
 import { logger } from '@/lib/logger';
-
-const ALLOWED_MIME_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // .docx
-];
+import { auditionFormDataSchema } from "@/lib/schemas/audition";
 
 interface PerformanceMap {
   intro: string;
@@ -77,22 +73,40 @@ export async function POST(request: Request) {
 
     // 2. EXTRACT INCOMING DATA AND FILES
     const formData = await request.formData();
-    const projectType = formData.get("projectType") as string || "cinematic"; // Default to cinematic if not provided
-    // Security: Bound string lengths to prevent excessive token usage (native prompt injection mitigation)
-    const rawProject = formData.get("project") as string || "";
-    const rawRole = formData.get("role") as string || "";
-    const project = rawProject.substring(0, 150).trim(); 
-    const role = rawRole.substring(0, 100).trim();
-    const deadline = formData.get("deadline") as string;
-    
-    // Extract routing and personalization parameters
-    const userPath = formData.get("userPath") as string;
-    const actorName = formData.get("actorName") as string || "Actor";
 
-    let sidesText = (formData.get("sidesText") as string) || "";
+    const textFields = {
+      projectType: (formData.get("projectType") as string | null) ?? undefined,
+      project: (formData.get("project") as string | null) ?? undefined,
+      role: (formData.get("role") as string | null) ?? undefined,
+      actorName: (formData.get("actorName") as string | null) ?? undefined,
+      userPath: (formData.get("userPath") as string | null) ?? undefined,
+      sidesText: (formData.get("sidesText") as string | null) ?? undefined,
+      briefText: (formData.get("briefText") as string | null) ?? undefined,
+      sidesFile: formData.get("sidesFile") as File | undefined,
+      briefFile: formData.get("briefFile") as File | undefined,
+      deadline: (formData.get("deadline") as string | null) ?? undefined,
+      auditionTimezone: (formData.get("auditionTimezone") as string | null) ?? undefined,
+      priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
+      priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
+    };
 
-    const sidesFile = formData.get("sidesFile") as File | null;
-    const priorBriefSummary = ((formData.get("priorBriefSummary") as string) || "").substring(0, 1500).trim();
+    const parseResult = auditionFormDataSchema.safeParse(textFields);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parseResult.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const validated = parseResult.data;
+    const userPath = validated.userPath;
+    const project = validated.project ?? "";
+    const role = validated.role ?? "";
+    const projectType = validated.projectType ?? "cinematic";
+    const actorName = validated.actorName || "Actor";
+    let sidesText = validated.sidesText ?? "";
+    const deadline = validated.deadline ?? null;
+    const priorBriefSummary = (validated.priorBriefSummary ?? "").substring(0, 1500).trim();
 
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
       logger.warn({
@@ -102,26 +116,8 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
-  
-    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-    if (sidesFile) {
-      if (sidesFile.size > MAX_FILE_SIZE) {
-        return NextResponse.json(
-          { error: "File exceeds 20MB limit" },
-          { status: 413 }
-        );
-      }
-
-      const isDocx = sidesFile.name.toLowerCase().endsWith('.docx');
-
-      if (!ALLOWED_MIME_TYPES.includes(sidesFile.type) && !isDocx) {
-        return NextResponse.json(
-          { error: "Only PDFs and Word documents (.docx) are allowed" },
-          { status: 400 }
-        );
-      }
-    }
+    const sidesFile = formData.get("sidesFile") as File | null;
 
     if (sidesFile) {
       const arrayBuffer = await sidesFile.arrayBuffer();
@@ -163,8 +159,6 @@ export async function POST(request: Request) {
         categoryInstruction = THEATHER_MODE_PROMPT;
     }
     
-
-
     // 5. INITIALIZE VERTEX AI FOR FIREBASE
     const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
@@ -236,7 +230,6 @@ export async function POST(request: Request) {
         logger.error({ err: parseError, msg: 'Failed to parse AI JSON output' });
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
     }
-
 
     // RETURN TO FRONTEND
     return NextResponse.json({
