@@ -1,4 +1,5 @@
 import PDFParser from "pdf2json";
+import { logger } from "@/lib/logger";
 
 export const PDF_TIMEOUT_MS = 60000;
 
@@ -15,7 +16,12 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
 
     pdfParser.on("pdfParser_dataReady", () => {
       const rawText = pdfParser.getRawTextContent();
-      resolve(decodeURIComponent(rawText));
+      try {
+        resolve(decodeURIComponent(rawText));
+      } catch (error) {
+        logger.warn({ err: error, msg: 'Failed to decode pdf text' });
+        resolve(rawText);
+      }
     });
 
     pdfParser.parseBuffer(buffer);

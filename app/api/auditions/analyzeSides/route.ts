@@ -36,7 +36,12 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
     pdfParser.on("pdfParser_dataReady", () => {
       const rawText = pdfParser.getRawTextContent();
-      resolve(decodeURIComponent(rawText));
+      try {
+        resolve(decodeURIComponent(rawText));
+      } catch (error) {
+        logger.warn({ err: error, msg: 'Failed to decode pdf text' });
+        resolve(rawText);
+      }
     });
 
     pdfParser.parseBuffer(buffer);
