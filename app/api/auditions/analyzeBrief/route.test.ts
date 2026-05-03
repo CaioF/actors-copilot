@@ -329,5 +329,111 @@ describe("POST /api/auditions/analyzeBrief", () => {
         expect.objectContaining({ msg: "Failed to parse AI JSON output" })
       );
     });
+
+    it("should include deadline and auditionTimezone in the prompt when provided", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        deadline: "2026-06-15T14:00",
+        auditionTimezone: "America/Los_Angeles",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("Deadline: 2026-06-15");
+      expect(capturedPrompt).toContain("Project Timezone: America/Los_Angeles");
+    });
+
+    it("should omit deadline line from prompt when deadline is missing", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        auditionTimezone: "America/Los_Angeles",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).not.toContain("Deadline:");
+      expect(capturedPrompt).toContain("Project Timezone: America/Los_Angeles");
+    });
+
+    it("should omit timezone line from prompt when auditionTimezone is missing", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        deadline: "2026-06-15T14:00",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("Deadline: 2026-06-15");
+      expect(capturedPrompt).not.toContain("Project Timezone:");
+    });
   });
 });

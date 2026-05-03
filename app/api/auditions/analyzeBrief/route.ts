@@ -102,6 +102,9 @@ export async function POST(request: Request) {
     let briefText = (formData.get("briefText") as string) || "";
     const briefFile = formData.get("briefFile") as File | null;
 
+    const deadline = (formData.get("deadline") as string)?.substring(0, 50).trim() || null;
+    const auditionTimezone = (formData.get("auditionTimezone") as string)?.substring(0, 50).trim() || null;
+
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     // Validate the Brief File
@@ -226,6 +229,8 @@ export async function POST(request: Request) {
       - Project Category: ${projectType.toUpperCase()}
       - Project: ${project || "Not specified"}
       - Role: ${role || "Not specified"}
+      ${deadline ? `- Deadline: ${deadline}` : ""}
+      ${auditionTimezone ? `- Project Timezone: ${auditionTimezone}` : ""}
 
       CHARACTER BRIEF / CASTING NOTES:
       ${briefText}
