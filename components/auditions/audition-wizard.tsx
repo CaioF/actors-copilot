@@ -13,7 +13,7 @@ import { StepUpload } from "./step/step-upload";
 import { StepReview } from "./step/step-review";
 import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { collection, addDoc, updateDoc, getDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, getDoc, getDocs, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { StepResultBrief } from "./step/step-result-brief";
 import { logger } from '@/lib/logger';
@@ -230,6 +230,36 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       // Point exactly to the user's auditions sub-collection
       const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
 
+      // --- DEDUPLICATION GUARD (Task 3b) ---
+      // Skip dedupe when auditionId is set (enrichment mode) or project/role are empty
+      if (!auditionId) {
+        const trimmedProject = formData.project.trim();
+        const trimmedRole = formData.role.trim();
+        if (trimmedProject && trimmedRole) {
+          try {
+            const dedupeQuery = query(
+              auditionsRef,
+              where("project", "==", trimmedProject),
+              where("role", "==", trimmedRole),
+              where("analysisType", "==", mode)
+            );
+            const dedupeSnap = await getDocs(dedupeQuery);
+            if (dedupeSnap.docs.length > 0) {
+              const existingId = dedupeSnap.docs[0].id;
+              const confirmMessage = `You already have a ${mode} analysis for '${formData.project}' as '${formData.role}'. Would you like to enrich the existing audition instead?`;
+              if (window.confirm(confirmMessage)) {
+                const otherMode = mode === "sides" ? "brief" : "sides";
+                router.push(`/auditions/new/${otherMode}?enrichAuditionId=${existingId}`);
+                return;
+              }
+            }
+          } catch (error) {
+            // Firestore index not ready — gracefully fall back to addDoc
+            logger.warn({ err: error, msg: 'Dedupe query failed, proceeding with addDoc' });
+          }
+        }
+      }
+
       if (auditionId) {
         // ENRICHMENT MODE: merge with existing doc
         const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
@@ -306,6 +336,36 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
       const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
       let docRefId: string;
+
+      // --- DEDUPLICATION GUARD (Task 3b) ---
+      // Skip dedupe when auditionId is set (enrichment mode) or project/role are empty
+      if (!auditionId) {
+        const trimmedProject = formData.project.trim();
+        const trimmedRole = formData.role.trim();
+        if (trimmedProject && trimmedRole) {
+          try {
+            const dedupeQuery = query(
+              auditionsRef,
+              where("project", "==", trimmedProject),
+              where("role", "==", trimmedRole),
+              where("analysisType", "==", mode)
+            );
+            const dedupeSnap = await getDocs(dedupeQuery);
+            if (dedupeSnap.docs.length > 0) {
+              const existingId = dedupeSnap.docs[0].id;
+              const confirmMessage = `You already have a ${mode} analysis for '${formData.project}' as '${formData.role}'. Would you like to enrich the existing audition instead?`;
+              if (window.confirm(confirmMessage)) {
+                const otherMode = mode === "sides" ? "brief" : "sides";
+                router.push(`/auditions/new/${otherMode}?enrichAuditionId=${existingId}`);
+                return;
+              }
+            }
+          } catch (error) {
+            // Firestore index not ready — gracefully fall back to addDoc
+            logger.warn({ err: error, msg: 'Dedupe query failed, proceeding with addDoc' });
+          }
+        }
+      }
 
       if (auditionId) {
         // ENRICHMENT MODE: merge with existing doc
