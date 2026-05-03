@@ -101,6 +101,7 @@ export async function POST(request: Request) {
 
     let briefText = (formData.get("briefText") as string) || "";
     const briefFile = formData.get("briefFile") as File | null;
+    const priorSidesSummary = ((formData.get("priorSidesSummary") as string) || "").substring(0, 1500).trim();
 
     const deadline = (formData.get("deadline") as string)?.substring(0, 50).trim() || null;
     const auditionTimezone = (formData.get("auditionTimezone") as string)?.substring(0, 50).trim() || null;
@@ -234,6 +235,7 @@ export async function POST(request: Request) {
 
       CHARACTER BRIEF / CASTING NOTES:
       ${briefText}
+      ${priorSidesSummary ? `\n=== PRIOR SIDES ANALYSIS ===\n${priorSidesSummary}` : ""}
     `;
 
     // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE

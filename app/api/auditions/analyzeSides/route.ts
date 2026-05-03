@@ -92,6 +92,7 @@ export async function POST(request: Request) {
     let sidesText = (formData.get("sidesText") as string) || "";
 
     const sidesFile = formData.get("sidesFile") as File | null;
+    const priorBriefSummary = ((formData.get("priorBriefSummary") as string) || "").substring(0, 1500).trim();
 
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
       logger.warn({
@@ -219,6 +220,7 @@ export async function POST(request: Request) {
 
       AUDITION SIDES (SCRIPT):
       ${sidesText || "No sides provided."}
+      ${priorBriefSummary ? `\n=== PRIOR CHARACTER BRIEF ANALYSIS ===\n${priorBriefSummary}` : ""}
 
       CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
     `;

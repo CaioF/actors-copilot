@@ -435,5 +435,109 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(capturedPrompt).toContain("Deadline: 2026-06-15");
       expect(capturedPrompt).not.toContain("Project Timezone:");
     });
+
+    it("should inject priorSidesSummary into the prompt as a labeled enrichment block", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective with a heart of gold.",
+        priorSidesSummary: "The character speaks in iambic pentameter and contemplates mortality.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("=== PRIOR SIDES ANALYSIS ===");
+      expect(capturedPrompt).toContain("The character speaks in iambic pentameter and contemplates mortality.");
+    });
+
+    it("should omit enrichment block when priorSidesSummary is absent", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective with a heart of gold.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).not.toContain("=== PRIOR SIDES ANALYSIS ===");
+    });
+
+    it("should truncate priorSidesSummary exceeding 1500 characters", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const longSummary = "B".repeat(2000);
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        priorSidesSummary: longSummary,
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      const enrichmentBlock = capturedPrompt.split("=== PRIOR SIDES ANALYSIS ===")[1];
+      expect(enrichmentBlock.trim().length).toBeLessThanOrEqual(1500);
+    });
   });
 });

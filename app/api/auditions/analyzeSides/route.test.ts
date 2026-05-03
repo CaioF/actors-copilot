@@ -310,5 +310,110 @@ describe("POST /api/auditions/analyzeSides", () => {
         expect.objectContaining({ msg: "Failed to parse AI JSON output" })
       );
     });
+
+    it("should inject priorBriefSummary into the prompt as a labeled enrichment block", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked AI Introduction",
+                  sections: [{ title: "Mocked Beat", items: ["Tactic 1", "Tactic 2"] }],
+                  outro: "Mocked AI Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+        priorBriefSummary: "This character is a tragic hero with a fatal flaw.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+      expect(capturedPrompt).toContain("This character is a tragic hero with a fatal flaw.");
+    });
+
+    it("should omit enrichment block when priorBriefSummary is absent", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked AI Introduction",
+                  sections: [{ title: "Mocked Beat", items: ["Tactic 1", "Tactic 2"] }],
+                  outro: "Mocked AI Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).not.toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+    });
+
+    it("should truncate priorBriefSummary exceeding 1500 characters", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked AI Introduction",
+                  sections: [{ title: "Mocked Beat", items: ["Tactic 1", "Tactic 2"] }],
+                  outro: "Mocked AI Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const longSummary = "A".repeat(2000);
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+        priorBriefSummary: longSummary,
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      const afterLabel = capturedPrompt.split("=== PRIOR CHARACTER BRIEF ANALYSIS ===")[1];
+      const summaryOnly = afterLabel.split("CRITICAL:")[0];
+      expect(summaryOnly.trim().length).toBeLessThanOrEqual(1500);
+    });
   });
 });
