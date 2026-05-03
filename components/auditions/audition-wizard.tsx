@@ -64,6 +64,38 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!auditionId || !currentUser) return;
+
+    const firstName = currentUser.displayName
+      ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
+      : "Actor";
+    const userPath = `${currentUser.uid}_${firstName}`;
+
+    const prefillAudition = async () => {
+      try {
+        const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) return;
+
+        const data = docSnap.data();
+        setFormData((prev) => ({
+          ...prev,
+          project: data.project || "",
+          role: data.role || "",
+          deadline: data.deadline || "",
+          auditionTimezone: data.auditionTimezone || "",
+          castingDirectorName: data.castingDirectorName || "",
+        }));
+      } catch (error) {
+        logger.warn({ err: error, msg: "Failed to pre-fill audition enrichment data" });
+      }
+    };
+
+    void prefillAudition();
+  }, [auditionId, currentUser]);
+
   // Handlers para navegação
   /**
    * Navigates to the next step in the audition wizard.
@@ -100,22 +132,21 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
    * Step 2: Generates the character breakdown via API.
    */
   const handleGenerate = async () => {
-    setCurrentStep(4); 
-    setIsGenerating(true); 
+    setCurrentStep(4);
+    setIsGenerating(true);
 
     const actorTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  
-  // Calcula o prazo local antes de chamar a API
-  if (formData.deadline && formData.auditionTimezone) {
-    const converted = calculateLocalDeadline(
-      formData.deadline, 
-      formData.auditionTimezone, 
-      actorTimezone
-    );
-    setLocalDeadlineStr(converted);
-  } else {
-    setLocalDeadlineStr(null);
-  }
+
+    if (formData.deadline && formData.auditionTimezone) {
+      const converted = calculateLocalDeadline(
+        formData.deadline,
+        formData.auditionTimezone,
+        actorTimezone
+      );
+      setLocalDeadlineStr(converted);
+    } else {
+      setLocalDeadlineStr(null);
+    }
 
     try {
       if (!currentUser) {
@@ -125,40 +156,90 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
         return;
       }
 
-      // --- DYNAMIC PATH CALCULATION ---
       const actorName = currentUser.displayName ? currentUser.displayName.split(" ")[0] : "Actor";
-      const firstName = currentUser.displayName 
-        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") 
+      const firstName = currentUser.displayName
+        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
         : "Actor";
       const userPath = `${currentUser.uid}_${firstName}`;
 
       const token = await currentUser.getIdToken();
 
+      let priorSidesSummary = "";
+      let priorBriefSummary = "";
+
+      if (auditionId) {
+        try {
+          const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            const existing = docSnap.data() as {
+              sidesPerformanceMap?: AuditionAnalysisResult | null;
+              briefPerformanceMap?: AuditionAnalysisResult | null;
+            };
+
+            const complementaryMap = mode === "brief"
+              ? existing.sidesPerformanceMap
+              : existing.briefPerformanceMap;
+
+            if (complementaryMap) {
+              const summaryParts: string[] = [];
+
+              if (complementaryMap.intro) {
+                summaryParts.push(complementaryMap.intro);
+              }
+
+              complementaryMap.sections.forEach((section) => {
+                if (section.title) {
+                  summaryParts.push(section.title);
+                }
+
+                section.items.forEach((item) => {
+                  summaryParts.push(`- ${item}`);
+                });
+              });
+
+              if (complementaryMap.outro) {
+                summaryParts.push(complementaryMap.outro);
+              }
+
+              const summaryText = summaryParts.join("\n").substring(0, 1500).trim();
+
+              if (mode === "brief") {
+                priorSidesSummary = summaryText;
+              } else {
+                priorBriefSummary = summaryText;
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn({ err: error, msg: "Failed to fetch complementary enrichment summary" });
+        }
+      }
+
       // STAGE 1: SMART DNA SYNTHESIS (Uses the cache logic we just built)
       const dnaResponse = await fetch('/api/dna/synthesize', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ userPath: userPath })
       });
-      
+
       // We wait for the backend to confirm the profile is ready (either cached or newly generated)
-      await dnaResponse.json(); 
+      await dnaResponse.json();
 
       // STAGE 2: GENERATE character breakdown
       const payload = new FormData();
-      
+
       payload.append("projectType", formData.projectType || "cinematic"); // Defaults to cinematic if not set
       payload.append("project", formData.project);
       payload.append("role", formData.role);
       if (formData.deadline) payload.append("deadline", formData.deadline);
       if (formData.auditionTimezone) payload.append("auditionTimezone", formData.auditionTimezone);
-
-      const actorTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       payload.append("actorTimezone", actorTimezone);
-      
+
       if (mode === "sides") {
         payload.append("sidesText", formData.sidesText);
         if (formData.sidesFile) payload.append("sidesFile", formData.sidesFile);
@@ -167,32 +248,33 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
         if (formData.briefFile) payload.append("briefFile", formData.briefFile);
       }
 
-      // Pass the actor's info so the backend knows who to coach and where to find the profile
       payload.append("actorName", actorName);
       payload.append("userPath", userPath);
+      if (priorSidesSummary) payload.append("priorSidesSummary", priorSidesSummary);
+      if (priorBriefSummary) payload.append("priorBriefSummary", priorBriefSummary);
 
-      const endpoint = mode === "sides" 
-        ? "/api/auditions/analyzeSides" 
+      const endpoint = mode === "sides"
+        ? "/api/auditions/analyzeSides"
         : "/api/auditions/analyzeBrief";
 
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}` 
+          'Authorization': `Bearer ${token}`
         },
-        body: payload, 
+        body: payload,
       });
 
       if (!response.ok) {
-        const errorText = await response.text(); 
+        const errorText = await response.text();
         logger.error({ err: errorText, msg: 'API Error' });
         throw new Error(`Falha na requisição: ${response.status}`);
       }
 
       const data = await response.json();
 
-      if (response.ok && data.data?.sections) { 
-        setResultData(data.data as AuditionAnalysisResult); 
+      if (response.ok && data.data?.sections) {
+        setResultData(data.data as AuditionAnalysisResult);
         setIsGenerating(false);
       } else {
         logger.error({ err: data.error, msg: 'Server Error' });

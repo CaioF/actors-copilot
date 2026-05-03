@@ -6,7 +6,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
 import { getDb } from "@/lib/firebase"
 import { logger } from '@/lib/logger';
-import { Loader2, ArrowLeft, Printer } from "lucide-react"
+import { Loader2, ArrowLeft, Printer, Film, ShoppingBag } from "lucide-react"
 import { useReactToPrint } from "react-to-print"
 import ReactMarkdown from "react-markdown"
 
@@ -156,6 +156,26 @@ export default function AuditionDetailView() {
             <span className="px-3 mt-2 py-1 rounded-full bg-[#E8721A] text-[11px] text-white uppercase tracking-wider font-semibold">
               {currentAnalysisType} Breakdown
             </span>
+
+            {auditionData.hasSides && !auditionData.hasBrief && (
+              <button
+                onClick={() => router.push(`/auditions/new/brief?enrichAuditionId=${auditionId}`)}
+                className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-4 py-2 rounded-full font-medium transition-colors text-sm"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                Attach Brief
+              </button>
+            )}
+
+            {auditionData.hasBrief && !auditionData.hasSides && (
+              <button
+                onClick={() => router.push(`/auditions/new/sides?enrichAuditionId=${auditionId}`)}
+                className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-4 py-2 rounded-full font-medium transition-colors text-sm"
+              >
+                <Film className="w-4 h-4" />
+                Attach Sides
+              </button>
+            )}
       </div>
 
       <div className=" max-w-5xl mx-auto">
@@ -457,4 +477,3 @@ export default function AuditionDetailView() {
     </main>
   )
 }
-

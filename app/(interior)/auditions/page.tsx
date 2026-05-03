@@ -468,6 +468,32 @@ export default function AuditionsPage() {
                     <Printer className="w-4 h-4" />
                   </button>
 
+                  {audition.hasSides && !audition.hasBrief && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/auditions/new/brief?enrichAuditionId=${audition.id}`);
+                      }}
+                      className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
+                      title="Attach Brief"
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {audition.hasBrief && !audition.hasSides && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/auditions/new/sides?enrichAuditionId=${audition.id}`);
+                      }}
+                      className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
+                      title="Attach Sides"
+                    >
+                      <Film className="w-4 h-4" />
+                    </button>
+                  )}
+
                   {/* Delete Dialog */}
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

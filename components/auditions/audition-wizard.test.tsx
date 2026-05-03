@@ -321,6 +321,9 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     });
     firestoreModule.collection.mockReturnValue({ id: "auditions-ref" });
     firestoreModule.doc.mockImplementation((_db: unknown, path: string) => ({ path }));
+    firestoreModule.query.mockReturnValue({ id: "query-ref" });
+    firestoreModule.where.mockReturnValue({ id: "where-clause" });
+    firestoreModule.getDocs.mockResolvedValue({ docs: [] });
     firestoreModule.addDoc.mockResolvedValue({ id: "new-doc-id" });
     firestoreModule.updateDoc.mockResolvedValue(undefined);
     firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
@@ -552,6 +555,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
     firestoreModule.doc.mockImplementation((_db: unknown, path: string) => ({ path }));
     firestoreModule.query.mockReturnValue({ id: "query-ref" });
     firestoreModule.where.mockReturnValue({ id: "where-clause" });
+    firestoreModule.getDocs.mockResolvedValue({ docs: [] });
     firestoreModule.addDoc.mockResolvedValue({ id: "new-doc-id" });
     firestoreModule.updateDoc.mockResolvedValue(undefined);
     firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
@@ -574,7 +578,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
 
     it("navigates to enrichment URL when user confirms duplicate dialog (Save Output path)", async () => {
       firestoreModule.getDocs.mockResolvedValue({ docs: [duplicateDoc] });
-      global.confirm.mockReturnValue(true);
+      (global.confirm as jest.Mock).mockReturnValue(true);
 
       await goToGeneratedResult("sides", generatedSidesResult);
 
@@ -591,7 +595,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
 
     it("proceeds with addDoc when user declines duplicate dialog (Save Output path)", async () => {
       firestoreModule.getDocs.mockResolvedValue({ docs: [duplicateDoc] });
-      global.confirm.mockReturnValue(false);
+      (global.confirm as jest.Mock).mockReturnValue(false);
 
       await goToGeneratedResult("sides", generatedSidesResult);
 
@@ -773,7 +777,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
 
     it("navigates to enrichment URL without creating doc when user confirms (coach path)", async () => {
       firestoreModule.getDocs.mockResolvedValue({ docs: [duplicateDoc] });
-      global.confirm.mockReturnValue(true);
+      (global.confirm as jest.Mock).mockReturnValue(true);
 
       await goToGeneratedResult("sides", generatedSidesResult);
 
@@ -790,7 +794,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
 
     it("proceeds through coach save flow when user declines duplicate dialog", async () => {
       firestoreModule.getDocs.mockResolvedValue({ docs: [duplicateDoc] });
-      global.confirm.mockReturnValue(false);
+      (global.confirm as jest.Mock).mockReturnValue(false);
 
       await goToGeneratedResult("sides", generatedSidesResult);
 
@@ -892,6 +896,88 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
       expect(firestoreModule.getDocs).not.toHaveBeenCalled();
       expect(firestoreModule.updateDoc).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("AuditionWizard enrichment prefill (Task 7)", () => {
+  const mockUser = { uid: "user123", displayName: "Actor Test", getIdToken: jest.fn().mockResolvedValue("token") };
+  const firebaseModule = require("@/lib/firebase");
+  const authModule = require("firebase/auth");
+  const firestoreModule = require("firebase/firestore");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    firebaseModule.getDb.mockReturnValue({});
+    authModule.getAuth.mockReturnValue({ currentUser: mockUser });
+    authModule.onAuthStateChanged.mockImplementation((_auth: unknown, cb: (user: typeof mockUser | null) => void) => {
+      cb(mockUser);
+      return jest.fn();
+    });
+    firestoreModule.doc.mockImplementation((_db: unknown, path: string) => ({ path }));
+  });
+
+  it("pre-fills formData with project, role, deadline, auditionTimezone, and castingDirectorName when auditionId is provided", async () => {
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: "2026-06-15T14:00",
+        auditionTimezone: "America/Los_Angeles",
+        castingDirectorName: "Nina Gold",
+      }),
+    });
+
+    await act(async () => {
+      render(<AuditionWizard mode="brief" auditionId="existing-audition-id" />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("e.g., The Morning Show Season 5")).toHaveValue("Hamlet");
+      expect(screen.getByPlaceholderText("e.g., Dr. Sarah Chen")).toHaveValue("Ophelia");
+      expect(screen.getByDisplayValue("2026-06-15T14:00")).toBeInTheDocument();
+      expect(screen.getByLabelText(/audition timezone/i)).toHaveValue("America/Los_Angeles");
+      expect(screen.getByDisplayValue("Nina Gold")).toBeInTheDocument();
+    });
+  });
+
+  it("handles missing/deleted audition doc gracefully during prefill", async () => {
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => false,
+      data: () => null,
+    });
+
+    render(<AuditionWizard mode="sides" auditionId="deleted-audition-id" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("e.g., The Morning Show Season 5")).toHaveValue("");
+      expect(screen.getByPlaceholderText("e.g., Dr. Sarah Chen")).toHaveValue("");
+    });
+  });
+
+  it("does not prefill when auditionId is not provided", async () => {
+    render(<AuditionWizard mode="sides" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("e.g., The Morning Show Season 5")).toHaveValue("");
+    });
+
+    expect(firestoreModule.getDoc).not.toHaveBeenCalled();
+  });
+
+  it("does not prefill until currentUser is available", async () => {
+    authModule.onAuthStateChanged.mockImplementation((_auth: unknown, cb: (user: null) => void) => {
+      cb(null);
+      return jest.fn();
+    });
+
+    render(<AuditionWizard mode="sides" auditionId="existing-audition-id" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("e.g., The Morning Show Season 5")).toHaveValue("");
+    });
+
+    expect(firestoreModule.getDoc).not.toHaveBeenCalled();
   });
 });
 
