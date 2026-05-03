@@ -33,6 +33,8 @@ interface Audition {
   projectType?: "cinematic" | "commercial" | "theater"
   analysisType: "sides" | "brief"
   castingDirectorName?: string
+  hasSides?: boolean
+  hasBrief?: boolean
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -141,7 +143,9 @@ export default function AuditionsPage() {
           status: statusStr,
           projectType: data.projectType || "cinematic",
           analysisType: data.analysisType || "sides",
-          castingDirectorName: data.castingDirectorName || ""
+          castingDirectorName: data.castingDirectorName || "",
+          hasSides: data.hasSides ?? false,
+          hasBrief: data.hasBrief ?? false
         };
       });
 

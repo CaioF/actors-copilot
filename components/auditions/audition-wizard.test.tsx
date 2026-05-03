@@ -1,6 +1,8 @@
 /** @jest-environment jsdom */
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
+
+const mockPush = jest.fn();
 
 jest.mock("@/lib/firebase", () => ({
   getDb: jest.fn(),
@@ -19,12 +21,15 @@ jest.mock("firebase/auth", () => ({
 jest.mock("firebase/firestore", () => ({
   collection: jest.fn(),
   addDoc: jest.fn(),
+  updateDoc: jest.fn(),
+  getDoc: jest.fn(),
+  doc: jest.fn(),
   serverTimestamp: jest.fn(),
 }));
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
-    push: jest.fn(),
+    push: mockPush,
   })),
 }));
 
@@ -40,6 +45,23 @@ jest.mock("react-markdown", () => ({
 import { AuditionWizard } from "./audition-wizard";
 import { StepUpload } from "./step/step-upload";
 import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
+
+class IntersectionObserverMock {
+  observe = jest.fn();
+  disconnect = jest.fn();
+  unobserve = jest.fn();
+  takeRecords = jest.fn(() => []);
+}
+
+Object.defineProperty(window, "IntersectionObserver", {
+  writable: true,
+  value: IntersectionObserverMock,
+});
+
+Object.defineProperty(global, "IntersectionObserver", {
+  writable: true,
+  value: IntersectionObserverMock,
+});
 
 describe("AuditionWizard", () => {
   describe("handleNext", () => {
@@ -228,6 +250,226 @@ describe("StepUpload", () => {
       
       expect(defaultProps.onFileChange).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("AuditionWizard enrichment (Task 3)", () => {
+  const generatedSidesResult = {
+    intro: "Sides intro",
+    sections: [{ title: "Objective", items: ["Play the truth"] }],
+    outro: "Sides outro",
+  };
+  const generatedBriefResult = {
+    intro: "Brief intro",
+    sections: [{ title: "Checklist", items: ["Do the prep"] }],
+    outro: "Brief outro",
+  };
+  const mockUser = { uid: "user123", displayName: "Actor Test", getIdToken: jest.fn().mockResolvedValue("token") };
+  const firebaseModule = require("@/lib/firebase");
+  const authModule = require("firebase/auth");
+  const firestoreModule = require("firebase/firestore");
+  const mockFetch = jest.fn();
+
+  const createResponse = (body: unknown, ok = true) => ({
+    ok,
+    json: jest.fn().mockResolvedValue(body),
+    text: jest.fn().mockResolvedValue(JSON.stringify(body)),
+  });
+
+  const goToGeneratedResult = async (mode: "sides" | "brief", result: typeof generatedSidesResult, auditionId?: string) => {
+    render(<AuditionWizard mode={mode} auditionId={auditionId} />);
+
+    fireEvent.change(screen.getByPlaceholderText("e.g., The Morning Show Season 5"), {
+      target: { value: "Hamlet" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g., Dr. Sarah Chen"), {
+      target: { value: "Ophelia" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    mockFetch
+      .mockResolvedValueOnce(createResponse({ ok: true }))
+      .mockResolvedValueOnce(createResponse({ data: result }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /generate breakdown/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save output/i })).toBeInTheDocument();
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPush.mockReset();
+    Object.defineProperty(global, "fetch", {
+      writable: true,
+      value: mockFetch,
+    });
+
+    firebaseModule.getDb.mockReturnValue({});
+    authModule.getAuth.mockReturnValue({ currentUser: mockUser });
+    authModule.onAuthStateChanged.mockImplementation((_auth: unknown, cb: (user: typeof mockUser | null) => void) => {
+      cb(mockUser);
+      return jest.fn();
+    });
+    firestoreModule.collection.mockReturnValue({ id: "auditions-ref" });
+    firestoreModule.doc.mockImplementation((_db: unknown, path: string) => ({ path }));
+    firestoreModule.addDoc.mockResolvedValue({ id: "new-doc-id" });
+    firestoreModule.updateDoc.mockResolvedValue(undefined);
+    firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
+  });
+
+  it("uses updateDoc and preserves existing sidesPerformanceMap when saving a brief enrichment", async () => {
+    const existingSidesMap = {
+      intro: "Existing sides intro",
+      sections: [{ title: "Existing Objective", items: ["Hold on tighter"] }],
+      outro: "Existing sides outro",
+    };
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: "2026-06-15T14:00",
+        auditionTimezone: "America/Los_Angeles",
+        actorLocalDeadline: "Jun 15, 2026 2:00 PM",
+        castingDirectorName: "Nina Gold",
+        performanceMap: existingSidesMap,
+        sidesPerformanceMap: existingSidesMap,
+        briefPerformanceMap: null,
+        hasSides: true,
+        hasBrief: false,
+        analysisType: "sides",
+        createdAt: "OLD_TS",
+        status: "completed",
+      }),
+    });
+
+    await goToGeneratedResult("brief", generatedBriefResult, "audition-brief");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.updateDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
+      { path: "users/user123_Actor/auditions/audition-brief" },
+      expect.objectContaining({
+        analysisType: "sides",
+        performanceMap: existingSidesMap,
+        sidesPerformanceMap: existingSidesMap,
+        briefPerformanceMap: generatedBriefResult,
+        hasSides: true,
+        hasBrief: true,
+        castingDirectorName: "Nina Gold",
+        deadline: "2026-06-15T14:00",
+        auditionTimezone: "America/Los_Angeles",
+        actorLocalDeadline: "Jun 15, 2026 2:00 PM",
+      })
+    );
+    expect(mockPush).toHaveBeenCalledWith("/auditions");
+  });
+
+  it("uses updateDoc and preserves existing briefPerformanceMap when taking a sides enrichment to coach", async () => {
+    const existingBriefMap = {
+      intro: "Existing brief intro",
+      sections: [{ title: "Existing Checklist", items: ["Know the brief"] }],
+      outro: "Existing brief outro",
+    };
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: null,
+        auditionTimezone: null,
+        actorLocalDeadline: null,
+        castingDirectorName: "Nina Gold",
+        performanceMap: existingBriefMap,
+        sidesPerformanceMap: null,
+        briefPerformanceMap: existingBriefMap,
+        hasSides: false,
+        hasBrief: true,
+        analysisType: "brief",
+        createdAt: "OLD_TS",
+        status: "completed",
+      }),
+    });
+
+    await goToGeneratedResult("sides", generatedSidesResult, "audition-sides");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /take this to my coach/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.updateDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
+      { path: "users/user123_Actor/auditions/audition-sides" },
+      expect.objectContaining({
+        analysisType: "brief",
+        performanceMap: existingBriefMap,
+        sidesPerformanceMap: generatedSidesResult,
+        briefPerformanceMap: existingBriefMap,
+        hasSides: true,
+        hasBrief: true,
+        castingDirectorName: "Nina Gold",
+      })
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringContaining("/acting-coach?auditionId=audition-sides")
+    );
+  });
+
+  it("writes legacy and dual-map fields when saving a new sides audition", async () => {
+    await goToGeneratedResult("sides", generatedSidesResult);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(firestoreModule.updateDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.addDoc).toHaveBeenCalledWith(
+      { id: "auditions-ref" },
+      expect.objectContaining({
+        project: "Hamlet",
+        role: "Ophelia",
+        performanceMap: generatedSidesResult,
+        analysisType: "sides",
+        sidesPerformanceMap: generatedSidesResult,
+        briefPerformanceMap: null,
+        hasSides: true,
+        hasBrief: false,
+        createdAt: "SERVER_TS",
+        status: "completed",
+      })
+    );
+    expect(mockPush).toHaveBeenCalledWith("/auditions");
+  });
+
+  it("accepts auditionId prop without breaking render in both modes", () => {
+    const { rerender } = render(<AuditionWizard mode="sides" auditionId="test-id" />);
+    expect(screen.getByText("Basics")).toBeInTheDocument();
+
+    rerender(<AuditionWizard mode="brief" auditionId="test-id" />);
+    expect(screen.getByText("Basics")).toBeInTheDocument();
   });
 });
 

@@ -13,7 +13,7 @@ import { StepUpload } from "./step/step-upload";
 import { StepReview } from "./step/step-review";
 import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, getDoc, doc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { StepResultBrief } from "./step/step-result-brief";
 import { logger } from '@/lib/logger';
@@ -32,13 +32,14 @@ interface AuditionAnalysisResult {
 
 interface AuditionWizardProps {
   mode: "sides" | "brief";
+  auditionId?: string;
 }
 /**
  * AuditionWizard Component
  * Multi-step wizard for creating character breakdowns. Handles project info collection,
  * sides/brief upload, review, AI generation, and saving to Firestore.
  */
-export function AuditionWizard({ mode }: AuditionWizardProps) {
+export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   const router = useRouter(); // Used for redirecting after saving
   const [currentStep, setCurrentStep] = useState<AuditionStep>(1);
   const [formData, setFormData] = useState<AuditionFormData>(initialAuditionData);
@@ -220,28 +221,67 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
     try {
       // --- DYNAMIC PATH CALCULATION ---
       // calculate the userPath exactly as we did in use-chat.ts to keep architecture consistent
-      const firstName = currentUser.displayName 
-        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") 
+      const firstName = currentUser.displayName
+        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
         : "Actor";
-      
+
       const userPath = `${currentUser.uid}_${firstName}`;
 
       // Point exactly to the user's auditions sub-collection
       const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
-      
-      // Save the generated breakdown alongside the basic project data
-      await addDoc(auditionsRef, {
-        project: formData.project,
-        role: formData.role,
-        deadline: formData.deadline || null,
-        auditionTimezone: formData.auditionTimezone || null,
-        actorLocalDeadline: localDeadlineStr,
-        castingDirectorName: formData.castingDirectorName || null,
-        performanceMap: resultData, // The fully structured AI JSON
-        analysisType: mode,
-        createdAt: serverTimestamp(),
-        status: "completed"
-      });
+
+      if (auditionId) {
+        // ENRICHMENT MODE: merge with existing doc
+        const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const existing = docSnap.data();
+          const merged = {
+            ...existing,
+            ...(mode === "sides"
+              ? { sidesPerformanceMap: resultData, hasSides: true }
+              : { briefPerformanceMap: resultData, hasBrief: true }),
+          };
+          await updateDoc(docRef, merged);
+        } else {
+          // Doc no longer exists, fall back to addDoc
+          await addDoc(auditionsRef, {
+            project: formData.project,
+            role: formData.role,
+            deadline: formData.deadline || null,
+            auditionTimezone: formData.auditionTimezone || null,
+            actorLocalDeadline: localDeadlineStr,
+            castingDirectorName: formData.castingDirectorName || null,
+            performanceMap: resultData,
+            analysisType: mode,
+            sidesPerformanceMap: mode === "sides" ? resultData : null,
+            briefPerformanceMap: mode === "brief" ? resultData : null,
+            hasSides: mode === "sides",
+            hasBrief: mode === "brief",
+            createdAt: serverTimestamp(),
+            status: "completed"
+          });
+        }
+      } else {
+        // NEW AUDITION MODE: addDoc with legacy fields + new dual-map fields
+        await addDoc(auditionsRef, {
+          project: formData.project,
+          role: formData.role,
+          deadline: formData.deadline || null,
+          auditionTimezone: formData.auditionTimezone || null,
+          actorLocalDeadline: localDeadlineStr,
+          castingDirectorName: formData.castingDirectorName || null,
+          performanceMap: resultData,
+          analysisType: mode,
+          sidesPerformanceMap: mode === "sides" ? resultData : null,
+          briefPerformanceMap: mode === "brief" ? resultData : null,
+          hasSides: mode === "sides",
+          hasBrief: mode === "brief",
+          createdAt: serverTimestamp(),
+          status: "completed"
+        });
+      }
 
       // Redirect back to the Dashboard
       router.push("/auditions");
@@ -259,30 +299,73 @@ export function AuditionWizard({ mode }: AuditionWizardProps) {
     }
 
     try {
-      const firstName = currentUser.displayName 
-        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") 
+      const firstName = currentUser.displayName
+        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
         : "Actor";
       const userPath = `${currentUser.uid}_${firstName}`;
 
       const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
-      
-      const docRef = await addDoc(auditionsRef, {
-        project: formData.project,
-        role: formData.role,
-        deadline: formData.deadline || null,
-        auditionTimezone: formData.auditionTimezone || null,
-        actorLocalDeadline: localDeadlineStr,
-        castingDirectorName: formData.castingDirectorName || null, 
-        performanceMap: resultData,
-        analysisType: mode,
-        createdAt: serverTimestamp(),
-        status: "completed"
-      });
+      let docRefId: string;
+
+      if (auditionId) {
+        // ENRICHMENT MODE: merge with existing doc
+        const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const existing = docSnap.data();
+          const merged = {
+            ...existing,
+            ...(mode === "sides"
+              ? { sidesPerformanceMap: resultData, hasSides: true }
+              : { briefPerformanceMap: resultData, hasBrief: true }),
+          };
+          await updateDoc(docRef, merged);
+          docRefId = auditionId;
+        } else {
+          const newDocRef = await addDoc(auditionsRef, {
+            project: formData.project,
+            role: formData.role,
+            deadline: formData.deadline || null,
+            auditionTimezone: formData.auditionTimezone || null,
+            actorLocalDeadline: localDeadlineStr,
+            castingDirectorName: formData.castingDirectorName || null,
+            performanceMap: resultData,
+            analysisType: mode,
+            sidesPerformanceMap: mode === "sides" ? resultData : null,
+            briefPerformanceMap: mode === "brief" ? resultData : null,
+            hasSides: mode === "sides",
+            hasBrief: mode === "brief",
+            createdAt: serverTimestamp(),
+            status: "completed"
+          });
+          docRefId = newDocRef.id;
+        }
+      } else {
+        // NEW AUDITION MODE
+        const docRef = await addDoc(auditionsRef, {
+          project: formData.project,
+          role: formData.role,
+          deadline: formData.deadline || null,
+          auditionTimezone: formData.auditionTimezone || null,
+          actorLocalDeadline: localDeadlineStr,
+          castingDirectorName: formData.castingDirectorName || null,
+          performanceMap: resultData,
+          analysisType: mode,
+          sidesPerformanceMap: mode === "sides" ? resultData : null,
+          briefPerformanceMap: mode === "brief" ? resultData : null,
+          hasSides: mode === "sides",
+          hasBrief: mode === "brief",
+          createdAt: serverTimestamp(),
+          status: "completed"
+        });
+        docRefId = docRef.id;
+      }
 
       const safeProject = formData.project?.trim();
       const safeRole = formData.role?.trim();
       const queryParams = new URLSearchParams({
-        auditionId: docRef.id,
+        auditionId: docRefId,
       });
 
       if (safeProject) {

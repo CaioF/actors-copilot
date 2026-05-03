@@ -27,7 +27,13 @@ interface PerformanceMap {
 interface AuditionData {
   project: string;
   role: string;
+  deadline?: string | null;
+  auditionTimezone?: string | null;
   performanceMap?: PerformanceMap;
+  sidesPerformanceMap?: PerformanceMap | null;
+  briefPerformanceMap?: PerformanceMap | null;
+  hasSides?: boolean;
+  hasBrief?: boolean;
   analysisType?: "sides" | "brief";
 }
 
