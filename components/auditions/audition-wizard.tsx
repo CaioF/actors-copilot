@@ -402,6 +402,26 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   });
 
   /**
+   * Builds the Firestore update payload for enrichment mode.
+   * Merges updated audition metadata (project/role/deadline/timezone/castingDirectorName)
+   * with the new performance map so enrichment saves keep the full doc in sync.
+   */
+  const buildMergeUpdate = (existing: Record<string, unknown>) => ({
+    ...existing,
+    // Keep metadata in sync with any edits made during enrichment
+    project: formData.project.trim(),
+    role: formData.role.trim(),
+    deadline: formData.deadline || null,
+    auditionTimezone: formData.auditionTimezone || null,
+    actorLocalDeadline: localDeadlineStr,
+    castingDirectorName: formData.castingDirectorName?.trim() || null,
+    // Merge the newly generated performance map
+    ...(mode === "sides"
+      ? { sidesPerformanceMap: resultData, hasSides: true }
+      : { briefPerformanceMap: resultData, hasBrief: true }),
+  });
+
+  /**
    * Returns the id of an existing audition matching project+role+analysisType, or null.
    * Returns null when project/role are empty (drafts), or when the dedupe index isn't ready.
    * Skipped entirely in enrichment mode (`auditionId` prop set).
@@ -447,13 +467,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
         if (docSnap.exists()) {
           const existing = docSnap.data();
-          const merged = {
-            ...existing,
-            ...(mode === "sides"
-              ? { sidesPerformanceMap: resultData, hasSides: true }
-              : { briefPerformanceMap: resultData, hasBrief: true }),
-          };
-          await updateDoc(docRef, merged);
+          await updateDoc(docRef, buildMergeUpdate(existing));
         } else {
           await addDoc(auditionsRef, newAuditionDoc());
         }
@@ -494,13 +508,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
         if (docSnap.exists()) {
           const existing = docSnap.data();
-          const merged = {
-            ...existing,
-            ...(mode === "sides"
-              ? { sidesPerformanceMap: resultData, hasSides: true }
-              : { briefPerformanceMap: resultData, hasBrief: true }),
-          };
-          await updateDoc(docRef, merged);
+          await updateDoc(docRef, buildMergeUpdate(existing));
           docRefId = auditionId;
         } else {
           const newDocRef = await addDoc(auditionsRef, newAuditionDoc());

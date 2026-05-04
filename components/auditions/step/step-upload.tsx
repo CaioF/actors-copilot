@@ -78,11 +78,28 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
 
   /**
    * Handles file selection from the file input dialog.
+   * Validates that selected files are PDF or DOCX format.
    * @param e - ChangeEvent from the file input
    */
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFileChange(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+
+      const isPDF = selectedFile.type === "application/pdf";
+      const isDocxType = selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isDocxExt = selectedFile.name.toLowerCase().endsWith('.docx');
+
+      if (isPDF || isDocxType || isDocxExt) {
+        onFileChange(selectedFile);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "That file type isn't supported",
+          description: `We only read PDFs and Word documents (.docx). You selected a ${selectedFile.type || "file"} called "${selectedFile.name}". Convert it to PDF or paste the text into the box below.`,
+        });
+      }
+      // Reset the input so the same file can be re-selected after rejection
+      e.target.value = "";
     }
   };
 

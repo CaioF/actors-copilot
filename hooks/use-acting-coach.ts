@@ -39,6 +39,8 @@ interface UseActingCoachReturn {
   sessionId: string;
   /** True until Firebase auth has finished loading. Use to gate auto-trigger effects. */
   isAuthLoading: boolean;
+  /** True when auth has loaded and the user is signed in (userPath is non-null). */
+  isAuthenticated: boolean;
 }
 
 export function useActingCoach(): UseActingCoachReturn {
@@ -348,5 +350,6 @@ export function useActingCoach(): UseActingCoachReturn {
     sessions,
     sessionId,
     isAuthLoading,
+    isAuthenticated: !isAuthLoading && userPath !== null,
   };
 }

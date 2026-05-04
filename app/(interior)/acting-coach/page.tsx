@@ -47,7 +47,7 @@ export default function ActingCoachPage() {
     session,
     sessions = [],
     sessionId,
-    isAuthLoading,
+    isAuthenticated,
   } = useActingCoach();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -76,16 +76,18 @@ export default function ActingCoachPage() {
   };
 
   // Auto-trigger session context if coming from a specific audition.
-  // Gated on `!isAuthLoading` so we don't flip hasFiredInitialMessage before
+  // Gated on `isAuthenticated` so we don't flip hasFiredInitialMessage before
   // startNewSession has a userPath — that race used to leave the user staring
   // at an empty coach with no auto-message.
   useEffect(() => {
-    if (auditionId && !hasFiredInitialMessage.current && !isAuthLoading) {
-      hasFiredInitialMessage.current = true;
-      void startNewSession({ linkedAuditionId: auditionId });
-      setPendingInitialMessage(true);
+    if (auditionId && !hasFiredInitialMessage.current && isAuthenticated) {
+      void (async () => {
+        await startNewSession({ linkedAuditionId: auditionId });
+        hasFiredInitialMessage.current = true;
+        setPendingInitialMessage(true);
+      })();
     }
-  }, [auditionId, isAuthLoading, startNewSession]);
+  }, [auditionId, isAuthenticated, startNewSession]);
 
   useEffect(() => {
     if (pendingInitialMessage && session?.linkedAuditionId === auditionId) {
