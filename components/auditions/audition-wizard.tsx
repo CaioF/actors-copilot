@@ -381,13 +381,16 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     return `${currentUser.uid}_${firstName}`;
   };
 
+  // Trimmed project/role so the values stored in Firestore match exactly what the
+  // dedup query (findDuplicateId) compares against — otherwise "Hamlet " (trailing
+  // space) saves as one doc but never matches the next "Hamlet" lookup.
   const newAuditionDoc = () => ({
-    project: formData.project,
-    role: formData.role,
+    project: formData.project.trim(),
+    role: formData.role.trim(),
     deadline: formData.deadline || null,
     auditionTimezone: formData.auditionTimezone || null,
     actorLocalDeadline: localDeadlineStr,
-    castingDirectorName: formData.castingDirectorName || null,
+    castingDirectorName: formData.castingDirectorName?.trim() || null,
     performanceMap: resultData,
     analysisType: mode,
     sidesPerformanceMap: mode === "sides" ? resultData : null,
