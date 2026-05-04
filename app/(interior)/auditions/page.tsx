@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Calendar, Trash2, Loader2, Edit2, Eye, Printer, Film, ShoppingBag, Drama } from "lucide-react"
+import { Search, Calendar, Trash2, Loader2, Edit2, Eye, Printer, Film, ShoppingBag, Drama, BookOpen, ClipboardList } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { useRouter } from "next/navigation"
 import { logger } from '@/lib/logger';
@@ -21,6 +21,7 @@ import {
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { collection, query, orderBy, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 type AuditionStatus = "Completed" | "Processing" | "Draft"
 
@@ -72,6 +73,7 @@ export default function AuditionsPage() {
   const [userPath, setUserPath] = useState<string | null>(null)
 
   const router = useRouter()
+  const { toast } = useToast()
   const [editingAudition, setEditingAudition] = useState<Audition | null>(null)
   const [editForm, setEditForm] = useState({ 
     project: "", 
@@ -185,7 +187,11 @@ export default function AuditionsPage() {
       setEditingAudition(null);
     } catch (error) {
       logger.error({ err: error, msg: 'Failed to update audition' });
-      alert("Error saving changes.");
+      toast({
+        variant: "destructive",
+        title: "Couldn't save changes",
+        description: "We couldn't update this audition. Check your connection and try Save Changes again — your edits are still in the form.",
+      });
     }
   }
 
@@ -228,7 +234,11 @@ export default function AuditionsPage() {
       
     } catch (error) {
       logger.error({ err: error, msg: 'Error deleting audition' });
-      alert("Failed to delete audition. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Couldn't delete that audition",
+        description: "Something blocked the delete (network or permissions). The audition is still in your list — try again in a moment.",
+      });
     }
   }
 
@@ -477,7 +487,7 @@ export default function AuditionsPage() {
                       className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
                       title="Attach Brief"
                     >
-                      <ShoppingBag className="w-4 h-4" />
+                      <ClipboardList className="w-4 h-4" />
                     </button>
                   )}
 
@@ -490,7 +500,7 @@ export default function AuditionsPage() {
                       className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
                       title="Attach Sides"
                     >
-                      <Film className="w-4 h-4" />
+                      <BookOpen className="w-4 h-4" />
                     </button>
                   )}
 

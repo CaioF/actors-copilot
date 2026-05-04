@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { UploadCloud, FileText, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface StepUploadProps {
   title: string;
@@ -26,6 +27,7 @@ interface StepUploadProps {
 export function StepUpload({ title, description, file, text, onFileChange, onTextChange }: StepUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   // Previne o comportamento padrão do navegador de abrir o arquivo
   /**
@@ -65,18 +67,39 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
       if (isPDF || isDocxType || isDocxExt) {
         onFileChange(droppedFile);
       } else {
-        alert("Please upload a PDF or Word (.docx) file.");
+        toast({
+          variant: "destructive",
+          title: "That file type isn't supported",
+          description: `We only read PDFs and Word documents (.docx). You dropped a ${droppedFile.type || "file"} called "${droppedFile.name}". Convert it to PDF or paste the text into the box below.`,
+        });
       }
     }
   };
 
   /**
    * Handles file selection from the file input dialog.
+   * Validates that selected files are PDF or DOCX format.
    * @param e - ChangeEvent from the file input
    */
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFileChange(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+
+      const isPDF = selectedFile.type === "application/pdf";
+      const isDocxType = selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isDocxExt = selectedFile.name.toLowerCase().endsWith('.docx');
+
+      if (isPDF || isDocxType || isDocxExt) {
+        onFileChange(selectedFile);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "That file type isn't supported",
+          description: `We only read PDFs and Word documents (.docx). You selected a ${selectedFile.type || "file"} called "${selectedFile.name}". Convert it to PDF or paste the text into the box below.`,
+        });
+      }
+      // Reset the input so the same file can be re-selected after rejection
+      e.target.value = "";
     }
   };
 

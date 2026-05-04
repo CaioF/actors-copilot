@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       briefFile: formData.get("briefFile") as File | undefined,
       deadline: (formData.get("deadline") as string | null) ?? undefined,
       auditionTimezone: (formData.get("auditionTimezone") as string | null) ?? undefined,
+      castingDirectorName: (formData.get("castingDirectorName") as string | null) ?? undefined,
       priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
       priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
     };
@@ -106,6 +107,8 @@ export async function POST(request: Request) {
     const actorName = validated.actorName || "Actor";
     let sidesText = validated.sidesText ?? "";
     const deadline = validated.deadline ?? null;
+    const auditionTimezone = validated.auditionTimezone ?? null;
+    const castingDirectorName = (validated.castingDirectorName ?? "").trim();
     const priorBriefSummary = (validated.priorBriefSummary ?? "").substring(0, 1500).trim();
 
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
@@ -211,6 +214,10 @@ export async function POST(request: Request) {
       CONTEXT:
       - Project Category: ${projectType.toUpperCase()}
       - Project: ${project || "Not specified"}
+      - Role: ${role || "Not specified"}
+      ${deadline ? `- Deadline: ${deadline}` : ""}
+      ${auditionTimezone ? `- Project Timezone: ${auditionTimezone}` : ""}
+      ${castingDirectorName ? `- Casting Director (named by the actor): ${castingDirectorName}` : ""}
 
       AUDITION SIDES (SCRIPT):
       ${sidesText || "No sides provided."}

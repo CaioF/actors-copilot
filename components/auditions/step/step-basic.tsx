@@ -104,25 +104,23 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
       {/* Formulário */}
       <div className="pt-6 space-y-10">
 
-          {/* Input: Casting Director Name */}
-        {mode === "brief" && (
-          <div>
-            <label htmlFor="castingDirectorName" className="block text-sm font-medium text-[#B7BCB6] mb-3">
-              Casting Director Name (optional)
-            </label>
-            <div className="relative">
-              <User className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
-              <input
-                id="castingDirectorName"
-                type="text"
-                placeholder="e.g., Jane Smith"
-                value={data.castingDirectorName || ""}
-                onChange={(e) => updateData({ castingDirectorName: e.target.value })}
-                className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/40 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
-              />
-            </div>
+          {/* Input: Casting Director Name (shown in both modes — name persists across enrichment) */}
+        <div>
+          <label htmlFor="castingDirectorName" className="block text-sm font-medium text-[#B7BCB6] mb-3">
+            Casting Director Name (optional)
+          </label>
+          <div className="relative">
+            <User className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
+            <input
+              id="castingDirectorName"
+              type="text"
+              placeholder="e.g., Jane Smith"
+              value={data.castingDirectorName || ""}
+              onChange={(e) => updateData({ castingDirectorName: e.target.value })}
+              className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/40 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
+            />
           </div>
-        )}
+        </div>
         
         {/* Input: Project/Production */}
         <div>
@@ -154,9 +152,8 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
           />
         </div>
 
-        {/* Input: Deadline */}
-        {mode === "brief" &&
-          <div>
+        {/* Input: Deadline (shown in both modes — applies to the audition, not just the brief) */}
+        <div>
           <label htmlFor="deadline" className="block text-sm font-medium text-[#B7BCB6] mb-3">
             Deadline (Date & Time)
           </label>
@@ -164,17 +161,15 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
             <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#2C3328]/40" />
             <input
               id="deadline"
-              type="datetime-local" // <-- Mudança aqui
+              type="datetime-local"
               value={data.deadline || ""}
               onChange={(e) => updateData({ deadline: e.target.value })}
               className="w-full bg-[#EADDCE] rounded-xl pl-14 pr-5 py-4 text-[#2C3328] focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all"
             />
           </div>
         </div>
-        }
-        
-        {mode === "brief" && (
-          <div>
+
+        <div>
             <label htmlFor="auditionTimezone" className="block text-sm font-medium text-[#B7BCB6] mb-3">
               Audition Timezone
             </label>
@@ -255,7 +250,6 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
             </select>
           </div>
         </div>
-        )}
       </div>
     </div>
   );
