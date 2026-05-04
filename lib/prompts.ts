@@ -666,7 +666,7 @@ The JSON must follow this exact schema:
 }
 
 JSON RULES:
-- Every one of the 12 sections below MUST be its own object in the "sections" array, in this EXACT order.
+- Every one of the 20 sections below MUST be its own object in the "sections" array, in this EXACT order.
 - For sections that require paragraphs, break them down into separate strings within the "items" array.
 - Make sure to escape quotes properly.
 
@@ -675,11 +675,21 @@ DO NOT output any conversational filler before the opening quote or after the cl
 [START WITH]:
 "{Actor Name}, you already earned this audition, so trust that you are good enough to be here. Before learning the lines, read this breakdown slowly. Let it shape your inner world first, so the text grows out of thought, need, and behavior rather than early memorization."
 
-# THE 12 REQUIRED SECTIONS (DO NOT REARRANGE)
+# THE 20 REQUIRED SECTIONS (DO NOT REARRANGE)
 
 ## 1. Objective
-* **Requirement:** One clear, hard-hitting sentence.
-* **Focus:** What is the single most important thing this character cannot leave the scene without? Must be scene-based and active.
+* **Requirement:** ONE actable sentence the actor can say in a single breath. NOT a feeling, NOT a description — a demand for a result from the other person.
+* **Hard rules (all four MUST be satisfied — re-write until they are):**
+  1. Starts with "To " followed by an active verb the character can DO TO the other person ("To make them stay", "To get them to admit the truth", "To force them to finally hear me").
+  2. Targets another human being in the scene. You cannot have an objective alone — name (or clearly imply) who it's aimed at.
+  3. The "win" is observable: you can state in one short clause exactly what the other person has to say or do for the character to win the scene.
+  4. The stakes are high and immediate: it is obvious what the character loses if they fail. Carry that loss inside the verb choice.
+* **Banned patterns:** No clinical metaphors, no nested sub-clauses, no "so that..." trailers, no internal-state verbs ("to feel", "to process", "to understand", "to come to terms with"). If you can't say it in one breath, it's too long to act — cut it down.
+* **Bad example (wordy, internal, un-actable):** "To surgically extract the poison of a forty-year silence and force another human being to witness it, so you do not suffocate from the storage."
+* **Good rewrites of that same beat (any of these style):**
+  - Direct action: "To force them to finally hear my truth."
+  - Primal need: "To make them feel the weight of my silence."
+  - Emergency: "To break this silence before it destroys me."
 
 ## 2. Snapshot
 * **Requirement:** A rich, penetrating paragraph (4-6 sentences) with a strong point of view.
@@ -697,34 +707,62 @@ DO NOT output any conversational filler before the opening quote or after the cl
 * **Requirement:** 3-4 concrete, behaviorally useful statements. Expand on each.
 * **Focus:** Name the most alive contradictions (e.g., the tension between self-image and truth, control and fear, strength and need). Explain *how* this contradiction manifests in their body or voice.
 
-## 6. Emotional Palette
+## 6. Relationship Dynamics
+* **Requirement:** One paragraph per other character in the scene (or per implied off-stage relationship that drives the moment). If the sides do not name another character, infer who they must be from context and label clearly (e.g., "The unseen voice on the phone — likely her estranged sister, based on the tonal register of the lines").
+* **Focus:** For each relationship, answer three things: (1) who they are to this character, (2) what the character needs from them in this scene, (3) how the character actually feels about them underneath the surface. Make the dynamic specific, behavioral, and playable — not generic.
+
+## 7. Emotional Palette
 * **Requirement:** A curated list of layered, emotionally specific phrasing (e.g., "restrained fury," "clinical curiosity," "protective shame"). Provide 4-6 colors and add a brief sentence explaining exactly *where* in the scene this color lives.
 
-## 7. Key Beats / Turning Points
+## 8. Key Beats / Turning Points
 * **Requirement:** Numbered beat structure. Provide rich detail for each beat.
-* **Focus:** Detail the exact micro-shifts. Track the progression of pressure, revelation, tactic shifts, silence, reversal, exposure, or control shift. Describe what changes psychologically and dynamically between the characters in each beat. 
+* **Focus:** Detail the exact micro-shifts. Track the progression of pressure, revelation, tactic shifts, silence, reversal, exposure, or control shift. Describe what changes psychologically and dynamically between the characters in each beat.
 
-## 8. Tactics
+## 9. Tactics
 * **Requirement:** Bulleted list of 5-7 specific, active, behavior-based verbs.
-* **Focus:** Identify *how* the character pursues the objective (e.g., "uses silence as pressure", "names a shared memory to disarm"). Explain *why* they use this specific tactic in this moment. 
+* **Focus:** Identify *how* the character pursues the objective (e.g., "uses silence as pressure", "names a shared memory to disarm"). Explain *why* they use this specific tactic in this moment.
 
-## 9. Obstacles
+## 10. Obstacles
 * **Requirement:** A deep analysis of both internal and external blocks (2-3 paragraphs).
 * **Focus:** Make the scene harder. Heighten stakes and tension. Show what blocks the objective, focusing heavily on the character's own internal resistance (grief, ego, trauma, fear of exposure).
 
-## 10. Coach Notes
-* **Requirement:** 3-4 substantial, high-level directives.
-* **Focus:** Premium acting direction. Correct likely misplays, point out where the actor might fall into "indicating," and deepen their understanding of the scene's hidden traps. 
+## 11. The "Why Now?" / Stakes
+* **Requirement:** 1-2 sharp paragraphs naming the inciting pressure of THIS specific moment.
+* **Focus:** Why is this conversation happening today and not yesterday or next week? Identify the inciting incident — the thing that has just changed, ruptured, expired, or surfaced — that makes the scene unavoidable right now. Tie it directly to what is at stake if the character walks out empty-handed.
 
-## 11. Self-Tape Plan
+## 12. The Moment Before
+* **Requirement:** 1 vivid paragraph (3-5 sentences).
+* **Focus:** Describe the immediate physical and emotional state the character is carrying into the very first line. Where were they 30 seconds ago? What were they doing, hearing, holding, fearing? Give the actor a concrete sensory and emotional ramp so they don't start cold.
+
+## 13. The Moment After
+* **Requirement:** 1 vivid paragraph (3-5 sentences).
+* **Focus:** Where is the character headed — emotionally, physically, narratively — the instant the scene cuts? This is the "living past the cut" tail that keeps the eyes alive in the final beat of the take. Be specific about the next action and the unfinished feeling.
+
+## 14. Inner Monologue / Subtext
+* **Requirement:** A short list of 4-6 specific inner-voice lines, paired with the surface line they sit beneath when relevant.
+* **Focus:** What is the character actually thinking while the other person is talking? What is the real meaning under their own lines vs. the words coming out of their mouth? Show the gap between text and truth so the actor can play the subtext, not the dialogue.
+
+## 15. The Secret
+* **Requirement:** 1 tight paragraph (3-4 sentences).
+* **Focus:** Name the one thing this character is hiding — from the scene partner, from themselves, or both. Make it specific, dramatic, and consistent with the scene's logic. This is the private weight behind the eyes that the camera will read even when the lines are mundane.
+
+## 16. Physical Life & Environment
+* **Requirement:** A short, sensory list of 4-6 concrete details.
+* **Focus:** Where is the character physically? Temperature, light, smell, what they're touching, what's pressing on them (uncomfortable shoes, hangover, held breath). Suggest one specific physical center or tic for the character (e.g., "leads with the chin", "hands always near the throat", "shoulders an inch too high"). Make it actor-usable.
+
+## 17. Coach Notes
+* **Requirement:** 3-4 substantial, high-level directives.
+* **Focus:** Premium acting direction. Correct likely misplays, point out where the actor might fall into "indicating," and deepen their understanding of the scene's hidden traps.
+
+## 18. Self-Tape Plan
 * **Requirement:** Highly practical, camera-ready notes.
 * **Focus:** Translate this deep analysis into self-tape reality (eye-line, stillness, silence, tempo, frame energy). Where is the power in doing less on camera?
 
-## 12. The Bold Choice
+## 19. The Bold Choice
 * **Requirement:** 1-2 highly specific, unexpected, yet entirely justifiable acting choices.
 * **Focus:** What is the wildcard, counter-intuitive choice that will make the casting group sit up and pay attention? Suggest a specific physical behavior, an opposing sensory anchor, or an immediate, truthful reaction to subtext that breaks the predictable rhythm of the scene. It must be a dangerous but grounded choice that sets this self-tape apart from the hundreds of others doing the "obvious" read.
 
-## 13. Personal DNA Connection
+## 20. Personal DNA Connection
 * **Requirement:** A profound, targeted bridge between the character's wound/engine and the actor's specific UAP (DNA Vault).
 * **Focus:** Actively mine the actor's provided DNA Profile. Select 1 to 3 relevant emotional parallels from their profile. Identify the shared emotional pattern and how to use it safely in performance without overplaying. (e.g., "In your DNA sessions, you discussed [X]... use that specific feeling of being dismissed here."). If the DNA profile lacks a clear parallel, explicitly acknowledge it and provide a highly specific, sensory prompt to help them scan their own memory.
 

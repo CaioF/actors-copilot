@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame } from "lucide-react";
+import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Hourglass, Brain, Lock, MapPin } from "lucide-react";
 import React from "react";
 
 interface Section {
@@ -22,7 +22,7 @@ interface StepResultProps {
 export function StepResultSides({ data, onCoachClick }: StepResultProps) {
   
   const [activeSection, setActiveSection] = useState("section-objective");
-  const hasFullSections = data?.sections && data.sections.length >= 13;
+  const hasFullSections = data?.sections && data.sections.length >= 20;
   
   useEffect(() => {
     if (!hasFullSections) return;
@@ -68,9 +68,15 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
     { id: "section-objective", icon: Target, label: "Objective" },
     { id: "section-snapshot", icon: Eye, label: "Snapshot" },
     { id: "section-character", icon: User, label: "Character Breakdown" },
+    { id: "section-relationships", icon: Users, label: "Relationship Dynamics" },
     { id: "section-palette", icon: Heart, label: "Emotional Palette" },
     { id: "section-beats", icon: Key, label: "Key Beats" },
     { id: "section-tactics", icon: Shield, label: "Tactics & Obstacles" },
+    { id: "section-why-now", icon: Clock, label: "The “Why Now?” / Stakes" },
+    { id: "section-moment", icon: Hourglass, label: "The Moment Before & After" },
+    { id: "section-monologue", icon: Brain, label: "Inner Monologue / Subtext" },
+    { id: "section-secret", icon: Lock, label: "The Secret" },
+    { id: "section-physical", icon: MapPin, label: "Physical Life & Environment" },
     { id: "section-notes", icon: MessageCircle, label: "Coach Notes" },
     { id: "section-tape", icon: Video, label: "Self-Tape Plan" },
     { id: "section-bold-choice", icon: Flame, label: "The Bold Choice" },
@@ -151,14 +157,25 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 6. Emotional Palette */}
+            {/* 6. Relationship Dynamics */}
+            <div id="section-relationships" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <Users className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">Relationship Dynamics</h3>
+              </div>
+              <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
+                {s[5].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+              </div>
+            </div>
+
+            {/* 7. Emotional Palette */}
             <div id="section-palette" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Heart className="text-[#FF7316]" size={24} />
                 <h3 className="text-xl font-bold text-gray-900">Emotional Palette</h3>
               </div>
               <div className="flex flex-wrap gap-2.5">
-                {s[5].items.map((item, i) => (
+                {s[6].items.map((item, i) => (
                   <span key={i} className="px-4 py-1.5 rounded-full border border-gray-300 text-gray-700 text-sm bg-transparent">
                     {item.replace(/^\s*[-*•]\s*/, '').trim()}
                   </span>
@@ -166,14 +183,14 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 7. Key Beats / Turning Points */}
+            {/* 8. Key Beats / Turning Points */}
             <div id="section-beats" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Key className="text-[#FF7316]" size={24} />
                 <h3 className="text-xl font-bold text-gray-900">Key Beats / Turning Points</h3>
               </div>
               <div className="space-y-5">
-                {s[6].items.map((item, i) => (
+                {s[7].items.map((item, i) => (
                   <div key={i} className="flex gap-4 items-start">
                     <div className="w-7 h-7 mt-0.5 rounded-full bg-[#FF7316] text-white flex items-center justify-center shrink-0 text-xs font-bold">
                       {String(i + 1).padStart(2, '0')}
@@ -186,7 +203,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 8 & 9. Tactics & Obstacles */}
+            {/* 9 & 10. Tactics & Obstacles */}
             <div id="section-tactics" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Shield className="text-[#FF7316]" size={24} />
@@ -195,7 +212,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               <div className="mb-6">
                 <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Tactics — how she pursues</h4>
                 <ul className="space-y-3">
-                  {s[7].items.map((item, i) => (
+                  {s[8].items.map((item, i) => (
                     <li key={i} className="flex gap-3 items-start text-gray-700 text-[15px]">
                       <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
                       {renderMarkdown(item)}
@@ -207,7 +224,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               <div>
                 <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Obstacles — what blocks her</h4>
                 <ul className="space-y-3">
-                  {s[8].items.map((item, i) => (
+                  {s[9].items.map((item, i) => (
                     <li key={i} className="flex gap-3 items-start text-gray-700 text-[15px]">
                       <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
                       {renderMarkdown(item)}
@@ -217,25 +234,104 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 10. Coach Notes */}
+            {/* 11. The "Why Now?" / Stakes */}
+            <div id="section-why-now" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <Clock className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">The “Why Now?” / Stakes</h3>
+              </div>
+              <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
+                {s[10].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+              </div>
+            </div>
+
+            {/* 12 & 13. The Moment Before & After */}
+            <div id="section-moment" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-6">
+                <Hourglass className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">The Moment Before & After</h3>
+              </div>
+              <div className="mb-6">
+                <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment Before</h4>
+                <div className="text-gray-700 text-[15px]">
+                  {s[11].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+                </div>
+              </div>
+              <hr className="border-gray-200 my-6" />
+              <div>
+                <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment After (living past the cut)</h4>
+                <div className="text-gray-700 text-[15px]">
+                  {s[12].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+                </div>
+              </div>
+            </div>
+
+            {/* 14. Inner Monologue / Subtext */}
+            <div id="section-monologue" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <Brain className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">Inner Monologue / Subtext</h3>
+              </div>
+              <ul className="space-y-3">
+                {s[13].items.map((item, i) => (
+                  <li key={i} className="flex gap-3 items-start text-gray-700 text-[15px]">
+                    <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
+                    {renderMarkdown(item)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 15. The Secret */}
+            <div id="section-secret" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <Lock className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">The Secret</h3>
+              </div>
+              <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
+                {s[14].items.map((item, i) => (
+                  <div key={i} className="p-5 bg-[#FDECE2]/40 border border-[#FDECE2] rounded-xl italic">
+                    {renderMarkdown(item)}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 16. Physical Life & Environment */}
+            <div id="section-physical" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <MapPin className="text-[#FF7316]" size={24} />
+                <h3 className="text-xl font-bold text-gray-900">Physical Life & Environment</h3>
+              </div>
+              <ul className="space-y-3">
+                {s[15].items.map((item, i) => (
+                  <li key={i} className="flex gap-3 items-start text-gray-700 text-[15px]">
+                    <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
+                    {renderMarkdown(item)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 17. Coach Notes */}
             <div id="section-notes" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <MessageCircle className="text-[#FF7316]" size={24} />
                 <h3 className="text-xl font-bold text-gray-900">Coach Notes</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
-                {s[9].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+                {s[16].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
               </div>
             </div>
 
-            {/* 11. Self-Tape Plan */}
+            {/* 18. Self-Tape Plan */}
             <div id="section-tape" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Video className="text-[#FF7316]" size={24} />
                 <h3 className="text-xl font-bold text-gray-900">Self-Tape Plan</h3>
               </div>
               <ul className="space-y-4">
-                {s[10].items.map((item, i) => (
+                {s[17].items.map((item, i) => (
                   <li key={i} className="flex gap-3 items-start">
                     <div
                       aria-hidden="true"
@@ -249,13 +345,14 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </ul>
             </div>
 
+            {/* 19. The Bold Choice */}
             <div id="section-bold-choice" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Flame className="text-[#FF7316]" size={24} />
                 <h3 className="text-xl font-bold text-gray-900">The Bold Choice</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
-                {s[11].items.map((item, i) => (
+                {s[18].items.map((item, i) => (
                   <div key={i} className="p-5 bg-[#FDECE2]/50 border border-[#FDECE2] rounded-xl">
                     {renderMarkdown(item)}
                   </div>
@@ -263,7 +360,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 12. Personal DNA */}
+            {/* 20. Personal DNA */}
             <div id="section-dna" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Dna className="text-[#FF7316]" size={24} />
@@ -272,7 +369,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               <div>
                 <h4 className="font-bold text-gray-900 mb-3 text-sm tracking-tight">Suggested reservoirs to access for this role</h4>
                 <div className="flex flex-wrap gap-2.5">
-                  {s[12].items.map((item, i) => {
+                  {s[19].items.map((item, i) => {
                      const isShortTag = item.length < 30 && !item.includes(':');
                      if (isShortTag) {
                        return (
