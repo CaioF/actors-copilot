@@ -61,6 +61,26 @@ describe("extractTextFromPDF", () => {
       expect(result).toBe("Acting Notes");
     });
 
+    it("gracefully handles malformed URI sequences and returns raw text", async () => {
+      let dataReadyCallback: () => void;
+      mockOn.mockImplementation((event: string, cb: () => void) => {
+        if (event === "pdfParser_dataReady") {
+          dataReadyCallback = cb;
+        }
+      });
+      mockParseBuffer.mockImplementation(() => {
+        dataReadyCallback?.();
+      });
+      // Malformed URI sequence that would cause decodeURIComponent to throw
+      mockGetRawTextContent.mockReturnValue("%E0%A4%A");
+
+      const buffer = Buffer.from("fake pdf");
+      const result = await extractTextFromPDF(buffer);
+
+      // Should return the raw text, not throw
+      expect(result).toBe("%E0%A4%A");
+    });
+
     it("rejects with timeout error after configured limit", async () => {
       const timeoutHolder: { callback: (() => void) | null } = { callback: null };
       jest.spyOn(global, "setTimeout").mockImplementation(

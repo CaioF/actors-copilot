@@ -452,6 +452,133 @@ describe("buildCoachPrompt", () => {
       expect(prompt).toContain("• Item 1");
       expect(prompt).toContain("• Item 2");
     });
+
+    it("renders both SIDES BREAKDOWN and BRIEF BREAKDOWN when both maps are present", () => {
+      const auditionFullData = {
+        project: "Hamlet",
+        role: "Ophelia",
+        hasSides: true,
+        hasBrief: true,
+        sidesPerformanceMap: {
+          intro: "Sides intro text",
+          sections: [
+            { title: "Sides Scene", items: ["Sides line one", "Sides line two"] },
+          ],
+          outro: "Sides outro text",
+        },
+        briefPerformanceMap: {
+          intro: "Brief intro text",
+          sections: [
+            { title: "Character Brief", items: ["Brief insight one", "Brief insight two"] },
+          ],
+          outro: "Brief outro text",
+        },
+      };
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData,
+      });
+      expect(prompt).toContain("# ACTIVE AUDITION BREAKDOWN");
+      expect(prompt).toContain("# SIDES BREAKDOWN");
+      expect(prompt).toContain("# BRIEF BREAKDOWN");
+      expect(prompt).toContain("Sides intro text");
+      expect(prompt).toContain("### Sides Scene");
+      expect(prompt).toContain("Sides line one");
+      expect(prompt).toContain("Sides outro text");
+      expect(prompt).toContain("Brief intro text");
+      expect(prompt).toContain("### Character Brief");
+      expect(prompt).toContain("Brief insight one");
+      expect(prompt).toContain("Brief outro text");
+      expect(prompt).toContain("Project: Hamlet");
+      expect(prompt).toContain("Role: Ophelia");
+    });
+
+    it("renders only SIDES BREAKDOWN when only sidesPerformanceMap is present", () => {
+      const auditionFullData = {
+        project: "Hamlet",
+        role: "Ophelia",
+        hasSides: true,
+        hasBrief: false,
+        sidesPerformanceMap: {
+          intro: "Sides only intro",
+          sections: [{ title: "Sides Section", items: ["Sides item"] }],
+        },
+        briefPerformanceMap: null,
+      };
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData,
+      });
+      expect(prompt).toContain("# ACTIVE AUDITION BREAKDOWN");
+      expect(prompt).toContain("# SIDES BREAKDOWN");
+      expect(prompt).not.toContain("# BRIEF BREAKDOWN");
+      expect(prompt).toContain("Sides only intro");
+      expect(prompt).toContain("Sides item");
+    });
+
+    it("renders only BRIEF BREAKDOWN when only briefPerformanceMap is present", () => {
+      const auditionFullData = {
+        project: "Hamlet",
+        role: "Ophelia",
+        hasSides: false,
+        hasBrief: true,
+        sidesPerformanceMap: null,
+        briefPerformanceMap: {
+          intro: "Brief only intro",
+          sections: [{ title: "Brief Section", items: ["Brief item"] }],
+        },
+      };
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData,
+      });
+      expect(prompt).toContain("# ACTIVE AUDITION BREAKDOWN");
+      expect(prompt).toContain("# BRIEF BREAKDOWN");
+      expect(prompt).not.toContain("# SIDES BREAKDOWN");
+      expect(prompt).toContain("Brief only intro");
+      expect(prompt).toContain("Brief item");
+    });
+
+    it("falls back to legacy performanceMap when new dual-map fields are absent (backward compat)", () => {
+      const auditionFullData = {
+        project: "LegacyProject",
+        role: "LegacyRole",
+        performanceMap: {
+          intro: "Legacy intro",
+          sections: [{ title: "Legacy Section", items: ["Legacy item"] }],
+          outro: "Legacy outro",
+        },
+      };
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData,
+      });
+      expect(prompt).toContain("# ACTIVE AUDITION BREAKDOWN");
+      expect(prompt).not.toContain("# SIDES BREAKDOWN");
+      expect(prompt).not.toContain("# BRIEF BREAKDOWN");
+      expect(prompt).toContain("Legacy intro");
+      expect(prompt).toContain("Legacy item");
+      expect(prompt).toContain("Legacy outro");
+    });
+
+    it("omits audition enrichment section entirely when auditionFullData has no maps", () => {
+      const auditionFullData = {
+        project: "EmptyProject",
+        role: "EmptyRole",
+      };
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData,
+      });
+      expect(prompt).not.toContain("# ACTIVE AUDITION BREAKDOWN");
+      expect(prompt).not.toContain("# SIDES BREAKDOWN");
+      expect(prompt).not.toContain("# BRIEF BREAKDOWN");
+    });
   });
 
   describe("Section Ordering", () => {

@@ -54,14 +54,21 @@ jest.mock("@/lib/firebase", () => ({
 // TYPE DEFINITIONS & UTILS
 // ============================================================================
 
-interface MockFile {
-  size: number;
-  name: string;
-  type: string;
-  arrayBuffer: () => Promise<ArrayBuffer>;
-}
+type FormDataValue = string | File | null;
 
-type FormDataValue = string | MockFile | null;
+/**
+ * Creates a real File instance with an optionally overridden size and arrayBuffer.
+ * This ensures instanceof File checks pass in the schema while keeping tests fast.
+ */
+function makeFile(name: string, type: string, size: number, arrayBufferValue: ArrayBuffer = new ArrayBuffer(8)): File {
+  const file = new File(["x"], name, { type });
+  Object.defineProperty(file, "size", { value: size, configurable: true });
+  Object.defineProperty(file, "arrayBuffer", {
+    value: jest.fn().mockResolvedValue(arrayBufferValue),
+    configurable: true,
+  });
+  return file;
+}
 
 /**
  * Constructs a mock Next.js Request object with strictly typed form data.
@@ -192,14 +199,9 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(payload.error).toBe("No brief text or valid file provided for analysis.");
     });
 
-    it("should return 413 Payload Too Large when the brief file exceeds 20MB", async () => {
+    it("should return 400 Bad Request when the brief file exceeds 20MB", async () => {
       // Arrange
-      const oversizedFile: MockFile = {
-        size: 21 * 1024 * 1024, // 21MB
-        name: "massive_director_notes.pdf",
-        type: "application/pdf",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const oversizedFile = makeFile("massive_director_notes.pdf", "application/pdf", 21 * 1024 * 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: oversizedFile,
@@ -208,19 +210,21 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
       // Act
       const response = await POST(request);
+      const payload = await response.json();
 
       // Assert
-      expect(response.status).toBe(413);
+      expect(response.status).toBe(400);
+      expect(payload.error).toBe("Validation failed");
+      expect(payload.details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ message: expect.stringContaining("20MB") }),
+        ])
+      );
     });
 
     it("should return 400 Bad Request when an unsupported MIME type is uploaded", async () => {
       // Arrange
-      const invalidFile: MockFile = {
-        size: 1024,
-        name: "moodboard.png",
-        type: "image/png",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const invalidFile = makeFile("moodboard.png", "image/png", 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: invalidFile,
@@ -259,12 +263,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
     it("should successfully extract text from a DOCX brief file using Mammoth", async () => {
       // Arrange
       mockedMammothExtract.mockResolvedValue({ value: "Extracted DOCX brief content" });
-      const docxFile: MockFile = {
-        size: 1024,
-        name: "casting_notes.docx",
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const docxFile = makeFile("casting_notes.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: docxFile,
@@ -281,12 +280,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
     it("should successfully extract text from a PDF brief file using pdf2json", async () => {
       // Arrange
-      const pdfFile: MockFile = {
-        size: 1024,
-        name: "character_breakdown.pdf",
-        type: "application/pdf",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const pdfFile = makeFile("character_breakdown.pdf", "application/pdf", 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: pdfFile,
@@ -328,6 +322,250 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ msg: "Failed to parse AI JSON output" })
       );
+    });
+
+    it("should include deadline and auditionTimezone in the prompt when provided", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        deadline: "2026-06-15T14:00",
+        auditionTimezone: "America/Los_Angeles",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("Deadline: 2026-06-15");
+      expect(capturedPrompt).toContain("Project Timezone: America/Los_Angeles");
+    });
+
+    it("should omit deadline line from prompt when deadline is missing", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        auditionTimezone: "America/Los_Angeles",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).not.toContain("Deadline:");
+      expect(capturedPrompt).toContain("Project Timezone: America/Los_Angeles");
+    });
+
+    it("should omit timezone line from prompt when auditionTimezone is missing", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        deadline: "2026-06-15T14:00",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("Deadline: 2026-06-15");
+      expect(capturedPrompt).not.toContain("Project Timezone:");
+    });
+
+    it("should inject priorSidesSummary into the prompt as a labeled enrichment block", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective with a heart of gold.",
+        priorSidesSummary: "The character speaks in iambic pentameter and contemplates mortality.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("=== PRIOR SIDES ANALYSIS ===");
+      expect(capturedPrompt).toContain("The character speaks in iambic pentameter and contemplates mortality.");
+    });
+
+    it("should omit enrichment block when priorSidesSummary is absent", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective with a heart of gold.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).not.toContain("=== PRIOR SIDES ANALYSIS ===");
+    });
+
+    it("should truncate priorSidesSummary exceeding 1500 characters", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const longSummary = "B".repeat(2000);
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        priorSidesSummary: longSummary,
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      const enrichmentBlock = capturedPrompt.split("=== PRIOR SIDES ANALYSIS ===")[1];
+      expect(enrichmentBlock.trim().length).toBeLessThanOrEqual(1500);
+    });
+
+    it("should use 'Actor' in prompt when actorName is empty string (proving || not ??)", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+        actorName: "",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("You are coaching Actor");
     });
   });
 });

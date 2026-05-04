@@ -19,13 +19,13 @@ export default function DashboardPage() {
     <main className="flex flex-1 flex-col">
       <DashboardHeader title="My Self Tape Copilot" />
 
-     
+
       {/* Step Cards*/}
       <div className="flex gap-6 px-8 pb-4">
         <StepCard
           stepNumber={1}
           title="Personal DNA Upload"
-          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition\u00A0analyses\u00A0will\u00A0become."}
+          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition analyses will become."}
           link="/chat"
           ctaLabel="Start building your DNA with the identity section"
           ctaIcon={Dna}
@@ -34,21 +34,21 @@ export default function DashboardPage() {
         />
         <StepCard
           stepNumber={2}
-          title="Audition Sides Upload"
-          description="Upload your sides and generate a clear, playable breakdown in minutes. The Copilot maps the role to your Personal DNA — producing grounded objectives, stakes, beats, turns, and tactics tailored to you. No guesswork. No spiraling. Just direction you can act on."
-          link="/auditions/new/sides"
-          ctaLabel="Start New Audition"
-          ctaIcon={Monitor}
+          title="Casting Brief Upload"
+          description={"Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost you trust."}
+          link="/auditions/new/brief"
+          ctaLabel="Upload Character Brief"
+          ctaIcon={Sparkles}
           variant="orange"
           bodyVariant="dark"
         />
         <StepCard
           stepNumber={3}
-          title="Casting Brief Upload"
-          description={"Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost\u00A0you\u00A0trust."}
-          link="/auditions/new/brief"
-          ctaLabel="Upload Character Brief"
-          ctaIcon={Sparkles}
+          title="Audition Sides Upload"
+          description="Upload your sides and generate a clear, playable breakdown in minutes. The Copilot maps the role to your Personal DNA — producing grounded objectives, stakes, beats, turns, and tactics tailored to you. No guesswork. No spiraling. Just direction you can act on."
+          link="/auditions/new/sides"
+          ctaLabel="Start New Audition"
+          ctaIcon={Monitor}
           variant="orange"
           bodyVariant="dark"
         />
@@ -82,12 +82,12 @@ export default function DashboardPage() {
 
 
       {isBaselineModalOpen && (
-        <HistoryUploadModal 
-          onClose={() => setIsBaselineModalOpen(false)} 
+        <HistoryUploadModal
+          onClose={() => setIsBaselineModalOpen(false)}
           onSuccess={() => {
             setIsBaselineModalOpen(false);
-            
-          }} 
+
+          }}
         />
       )}
     </main>

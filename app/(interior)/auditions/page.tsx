@@ -33,6 +33,8 @@ interface Audition {
   projectType?: "cinematic" | "commercial" | "theater"
   analysisType: "sides" | "brief"
   castingDirectorName?: string
+  hasSides?: boolean
+  hasBrief?: boolean
 }
 
 const filters: Array<"All" | AuditionStatus> = ["All", "Draft", "Processing", "Completed"]
@@ -141,7 +143,9 @@ export default function AuditionsPage() {
           status: statusStr,
           projectType: data.projectType || "cinematic",
           analysisType: data.analysisType || "sides",
-          castingDirectorName: data.castingDirectorName || ""
+          castingDirectorName: data.castingDirectorName || "",
+          hasSides: data.hasSides ?? (data.analysisType === "sides"),
+          hasBrief: data.hasBrief ?? (data.analysisType === "brief")
         };
       });
 
@@ -463,6 +467,32 @@ export default function AuditionsPage() {
                   >
                     <Printer className="w-4 h-4" />
                   </button>
+
+                  {audition.hasSides && !audition.hasBrief && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/auditions/new/brief?enrichAuditionId=${audition.id}`);
+                      }}
+                      className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
+                      title="Attach Brief"
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {audition.hasBrief && !audition.hasSides && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/auditions/new/sides?enrichAuditionId=${audition.id}`);
+                      }}
+                      className="p-2 text-[#F5F0E8]/40 hover:text-[#E8721A] transition-colors rounded-full hover:bg-white/10"
+                      title="Attach Sides"
+                    >
+                      <Film className="w-4 h-4" />
+                    </button>
+                  )}
 
                   {/* Delete Dialog */}
                   <AlertDialog>
