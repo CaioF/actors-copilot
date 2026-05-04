@@ -82,9 +82,13 @@ export default function ActingCoachPage() {
   useEffect(() => {
     if (auditionId && !hasFiredInitialMessage.current && isAuthenticated) {
       void (async () => {
-        await startNewSession({ linkedAuditionId: auditionId });
-        hasFiredInitialMessage.current = true;
-        setPendingInitialMessage(true);
+        try {
+          await startNewSession({ linkedAuditionId: auditionId });
+          hasFiredInitialMessage.current = true;
+          setPendingInitialMessage(true);
+        } catch {
+          // startNewSession failed — leave hasFiredInitialMessage false so it retries
+        }
       })();
     }
   }, [auditionId, isAuthenticated, startNewSession]);
