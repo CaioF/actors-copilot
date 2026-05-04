@@ -144,8 +144,8 @@ export default function AuditionsPage() {
           projectType: data.projectType || "cinematic",
           analysisType: data.analysisType || "sides",
           castingDirectorName: data.castingDirectorName || "",
-          hasSides: data.hasSides ?? false,
-          hasBrief: data.hasBrief ?? false
+          hasSides: data.hasSides ?? (data.analysisType === "sides"),
+          hasBrief: data.hasBrief ?? (data.analysisType === "brief")
         };
       });
 

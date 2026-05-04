@@ -312,11 +312,13 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       // Point exactly to the user's auditions sub-collection
       const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
 
+      // Normalize project/role once so the dedup query and all Firestore writes stay consistent
+      const trimmedProject = formData.project.trim();
+      const trimmedRole = formData.role.trim();
+
       // --- DEDUPLICATION GUARD (Task 3b) ---
       // Skip dedupe when auditionId is set (enrichment mode) or project/role are empty
       if (!auditionId) {
-        const trimmedProject = formData.project.trim();
-        const trimmedRole = formData.role.trim();
         if (trimmedProject && trimmedRole) {
           try {
             const dedupeQuery = query(
@@ -328,7 +330,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
             const dedupeSnap = await getDocs(dedupeQuery);
             if (dedupeSnap.docs.length > 0) {
               const existingId = dedupeSnap.docs[0].id;
-              const confirmMessage = `You already have a ${mode} analysis for '${formData.project}' as '${formData.role}'. Would you like to enrich the existing audition instead?`;
+              const confirmMessage = `You already have a ${mode} analysis for '${trimmedProject}' as '${trimmedRole}'. Would you like to enrich the existing audition instead?`;
               if (window.confirm(confirmMessage)) {
                 const otherMode = mode === "sides" ? "brief" : "sides";
                 router.push(`/auditions/new/${otherMode}?enrichAuditionId=${existingId}`);
@@ -359,8 +361,8 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
         } else {
           // Doc no longer exists, fall back to addDoc
           await addDoc(auditionsRef, {
-            project: formData.project,
-            role: formData.role,
+            project: trimmedProject,
+            role: trimmedRole,
             deadline: formData.deadline || null,
             auditionTimezone: formData.auditionTimezone || null,
             actorLocalDeadline: localDeadlineStr,
@@ -378,8 +380,8 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       } else {
         // NEW AUDITION MODE: addDoc with legacy fields + new dual-map fields
         await addDoc(auditionsRef, {
-          project: formData.project,
-          role: formData.role,
+          project: trimmedProject,
+          role: trimmedRole,
           deadline: formData.deadline || null,
           auditionTimezone: formData.auditionTimezone || null,
           actorLocalDeadline: localDeadlineStr,

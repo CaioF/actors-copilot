@@ -1,5 +1,18 @@
 import { auditionFormDataSchema } from "./audition";
 
+/**
+ * Creates a real File instance with an optionally overridden size.
+ * This avoids allocating large buffers in tests while still exercising
+ * the instanceof File check in auditionFileSchema.
+ */
+function makeFile(name: string, type: string, size?: number): File {
+  const file = new File(["x"], name, { type });
+  if (size !== undefined) {
+    Object.defineProperty(file, "size", { value: size, configurable: true });
+  }
+  return file;
+}
+
 describe("auditionFormDataSchema", () => {
   describe("valid inputs", () => {
     it("should pass with valid minimal FormData object (text only)", () => {
@@ -31,8 +44,8 @@ describe("auditionFormDataSchema", () => {
         userPath: "user456_path",
         sidesText: "What's in a name?",
         briefText: "Young maiden from Verona",
-        sidesFile: { size: 1024, name: "script.pdf", type: "application/pdf" } as File,
-        briefFile: { size: 512, name: "brief.docx", type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } as File,
+        sidesFile: makeFile("script.pdf", "application/pdf", 1024),
+        briefFile: makeFile("brief.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 512),
         deadline: "2026-06-15T14:00",
         auditionTimezone: "America/Los_Angeles",
         priorSidesSummary: "Prior sides summary text",
@@ -71,7 +84,7 @@ describe("auditionFormDataSchema", () => {
         userPath: "user111_path",
         sidesText: "",
         briefText: "",
-        sidesFile: { size: 2048, name: "sides.docx", type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } as File,
+        sidesFile: makeFile("sides.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 2048),
         briefFile: undefined,
         deadline: undefined,
         auditionTimezone: undefined,
@@ -271,7 +284,7 @@ describe("auditionFormDataSchema", () => {
 
   describe("file validation", () => {
     it("should fail when sidesFile exceeds 20MB", () => {
-      const oversizedFile = { size: 21 * 1024 * 1024, name: "script.pdf", type: "application/pdf" } as File;
+      const oversizedFile = makeFile("script.pdf", "application/pdf", 21 * 1024 * 1024);
       const invalidInput = {
         projectType: "cinematic",
         project: "Test Project",
@@ -295,7 +308,7 @@ describe("auditionFormDataSchema", () => {
     });
 
     it("should fail when briefFile exceeds 20MB", () => {
-      const oversizedFile = { size: 25 * 1024 * 1024, name: "brief.pdf", type: "application/pdf" } as File;
+      const oversizedFile = makeFile("brief.pdf", "application/pdf", 25 * 1024 * 1024);
       const invalidInput = {
         projectType: "cinematic",
         project: "Test Project",
@@ -319,7 +332,7 @@ describe("auditionFormDataSchema", () => {
     });
 
     it("should fail when file has unsupported MIME type", () => {
-      const invalidFile = { size: 1024, name: "image.jpg", type: "image/jpeg" } as File;
+      const invalidFile = makeFile("image.jpg", "image/jpeg", 1024);
       const invalidInput = {
         projectType: "cinematic",
         project: "Test Project",
@@ -343,7 +356,7 @@ describe("auditionFormDataSchema", () => {
     });
 
     it("should pass with file at exactly 20MB", () => {
-      const exactFile = { size: 20 * 1024 * 1024, name: "script.pdf", type: "application/pdf" } as File;
+      const exactFile = makeFile("script.pdf", "application/pdf", 20 * 1024 * 1024);
       const validInput = {
         projectType: "cinematic",
         project: "Test Project",
@@ -361,6 +374,29 @@ describe("auditionFormDataSchema", () => {
       };
       const result = auditionFormDataSchema.safeParse(validInput);
       expect(result.success).toBe(true);
+    });
+
+    it("should fail gracefully (not throw) when sidesFile is a non-File value like a string", () => {
+      const invalidInput = {
+        projectType: "cinematic",
+        project: "Test Project",
+        role: "Test Role",
+        actorName: "Actor",
+        userPath: "user_path",
+        sidesText: "",
+        briefText: "",
+        sidesFile: "not-a-file",
+        briefFile: undefined,
+        deadline: undefined,
+        auditionTimezone: undefined,
+        priorSidesSummary: "",
+        priorBriefSummary: "",
+      };
+      const result = auditionFormDataSchema.safeParse(invalidInput);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe("Must be a File object");
+      }
     });
   });
 

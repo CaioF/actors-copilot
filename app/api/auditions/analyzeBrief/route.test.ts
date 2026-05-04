@@ -54,14 +54,21 @@ jest.mock("@/lib/firebase", () => ({
 // TYPE DEFINITIONS & UTILS
 // ============================================================================
 
-interface MockFile {
-  size: number;
-  name: string;
-  type: string;
-  arrayBuffer: () => Promise<ArrayBuffer>;
-}
+type FormDataValue = string | File | null;
 
-type FormDataValue = string | MockFile | null;
+/**
+ * Creates a real File instance with an optionally overridden size and arrayBuffer.
+ * This ensures instanceof File checks pass in the schema while keeping tests fast.
+ */
+function makeFile(name: string, type: string, size: number, arrayBufferValue: ArrayBuffer = new ArrayBuffer(8)): File {
+  const file = new File(["x"], name, { type });
+  Object.defineProperty(file, "size", { value: size, configurable: true });
+  Object.defineProperty(file, "arrayBuffer", {
+    value: jest.fn().mockResolvedValue(arrayBufferValue),
+    configurable: true,
+  });
+  return file;
+}
 
 /**
  * Constructs a mock Next.js Request object with strictly typed form data.
@@ -194,12 +201,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
     it("should return 400 Bad Request when the brief file exceeds 20MB", async () => {
       // Arrange
-      const oversizedFile: MockFile = {
-        size: 21 * 1024 * 1024, // 21MB
-        name: "massive_director_notes.pdf",
-        type: "application/pdf",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const oversizedFile = makeFile("massive_director_notes.pdf", "application/pdf", 21 * 1024 * 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: oversizedFile,
@@ -222,12 +224,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
     it("should return 400 Bad Request when an unsupported MIME type is uploaded", async () => {
       // Arrange
-      const invalidFile: MockFile = {
-        size: 1024,
-        name: "moodboard.png",
-        type: "image/png",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const invalidFile = makeFile("moodboard.png", "image/png", 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: invalidFile,
@@ -266,12 +263,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
     it("should successfully extract text from a DOCX brief file using Mammoth", async () => {
       // Arrange
       mockedMammothExtract.mockResolvedValue({ value: "Extracted DOCX brief content" });
-      const docxFile: MockFile = {
-        size: 1024,
-        name: "casting_notes.docx",
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const docxFile = makeFile("casting_notes.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: docxFile,
@@ -288,12 +280,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
     it("should successfully extract text from a PDF brief file using pdf2json", async () => {
       // Arrange
-      const pdfFile: MockFile = {
-        size: 1024,
-        name: "character_breakdown.pdf",
-        type: "application/pdf",
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
-      };
+      const pdfFile = makeFile("character_breakdown.pdf", "application/pdf", 1024);
       const formData = {
         userPath: "user123_ValidActor",
         briefFile: pdfFile,
