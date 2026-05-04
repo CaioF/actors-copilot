@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { StepUpload } from "@/components/auditions/step/step-upload"; 
+import { StepUpload } from "@/components/auditions/step/step-upload";
 import { CheckCircle2 } from "lucide-react";
 import { getAuth } from "firebase/auth";
 import { logger } from '@/lib/logger';
+import { useToast } from "@/hooks/use-toast";
 
 interface HistoryUploadModalProps {
   onClose: () => void;
@@ -26,6 +27,7 @@ export function HistoryUploadModal({ onClose, onSuccess }: HistoryUploadModalPro
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const { toast } = useToast();
 
   /**
    * Handles the submission of history/baseline data.
@@ -66,7 +68,15 @@ export function HistoryUploadModal({ onClose, onSuccess }: HistoryUploadModalPro
 
     } catch (error) {
       logger.error({ err: error, msg: 'Error saving history' });
-      alert("Failed to save history. Make sure your PDF is not encrypted or corrupted.");
+      const message = error instanceof Error ? error.message : "";
+      toast({
+        variant: "destructive",
+        title: "Couldn't save your baseline",
+        description:
+          message.toLowerCase().includes("auth")
+            ? "Your session may have expired — try logging out and back in, then upload again."
+            : "We couldn't read that file. Most often the PDF is password-protected, scanned-as-image, or corrupted. Try a clean PDF or paste the text directly into the box.",
+      });
     } finally {
       setIsSubmitting(false);
     }

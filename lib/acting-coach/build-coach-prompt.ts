@@ -65,6 +65,34 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     const briefMap = auditionFullData.briefPerformanceMap as PerformanceMap | null | undefined;
     const legacyMap = auditionFullData.performanceMap as PerformanceMap | null | undefined;
 
+    // Audition-level metadata that should travel with EVERY map (deadline, timezones,
+    // casting director). The coach uses this to advise on pacing, time-pressure, and
+    // who the actor is performing for — without this, advice like "rest tonight, tape
+    // tomorrow morning" is impossible.
+    const project = typeof auditionFullData.project === "string" ? auditionFullData.project : null;
+    const role = typeof auditionFullData.role === "string" ? auditionFullData.role : null;
+    const deadline = typeof auditionFullData.deadline === "string" ? auditionFullData.deadline : null;
+    const auditionTimezone = typeof auditionFullData.auditionTimezone === "string" ? auditionFullData.auditionTimezone : null;
+    const actorLocalDeadline = typeof auditionFullData.actorLocalDeadline === "string" ? auditionFullData.actorLocalDeadline : null;
+    const castingDirectorName = typeof auditionFullData.castingDirectorName === "string" ? auditionFullData.castingDirectorName : null;
+
+    const buildHeader = (): string => {
+      const lines: string[] = [];
+      if (project) lines.push(`Project: ${project}`);
+      if (role) lines.push(`Role: ${role}`);
+      if (deadline) {
+        const tz = auditionTimezone ? ` (project tz: ${auditionTimezone})` : "";
+        lines.push(`Deadline: ${deadline}${tz}`);
+      }
+      if (actorLocalDeadline) {
+        lines.push(`Actor's local deadline: ${actorLocalDeadline}`);
+      }
+      if (castingDirectorName) {
+        lines.push(`Casting Director: ${castingDirectorName}`);
+      }
+      return lines.join("\n");
+    };
+
     const renderMap = (pm: PerformanceMap | null | undefined, label: string): string => {
       const lines: string[] = [];
       if (pm?.intro) lines.push(`Overview:\n${pm.intro}`);
@@ -85,36 +113,20 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     const bothMapsPresent = sidesPresent && briefPresent;
     const legacyOnly = !bothMapsPresent && legacyMap;
 
-    if (bothMapsPresent) {
-      const projectLine = typeof auditionFullData.project === "string"
-        ? `Project: ${auditionFullData.project}`
-        : "";
-      const roleLine = typeof auditionFullData.role === "string"
-        ? `Role: ${auditionFullData.role}`
-        : "";
-      const header = [projectLine, roleLine].filter(Boolean).join("\n");
+    const header = buildHeader();
 
+    if (bothMapsPresent) {
       const sidesSection = renderMap(sidesMap ?? null, "SIDES BREAKDOWN");
       const briefSection = renderMap(briefMap ?? null, "BRIEF BREAKDOWN");
-
       sections.push(`${header}\n\n${sidesSection}\n\n${briefSection}`.trim());
     } else if (sidesPresent) {
-      const lines: string[] = [];
-      if (typeof auditionFullData.project === "string") lines.push(`Project: ${auditionFullData.project}`);
-      if (typeof auditionFullData.role === "string") lines.push(`Role: ${auditionFullData.role}`);
       const mapLines = renderMap(sidesMap ?? null, "SIDES BREAKDOWN");
-      if (mapLines) sections.push(`${lines.join("\n")}\n\n${mapLines}`);
+      if (mapLines) sections.push(`${header}\n\n${mapLines}`.trim());
     } else if (briefPresent) {
-      const lines: string[] = [];
-      if (typeof auditionFullData.project === "string") lines.push(`Project: ${auditionFullData.project}`);
-      if (typeof auditionFullData.role === "string") lines.push(`Role: ${auditionFullData.role}`);
       const mapLines = renderMap(briefMap ?? null, "BRIEF BREAKDOWN");
-      if (mapLines) sections.push(`${lines.join("\n")}\n\n${mapLines}`);
+      if (mapLines) sections.push(`${header}\n\n${mapLines}`.trim());
     } else if (legacyOnly) {
       const lines: string[] = [];
-      if (typeof auditionFullData.project === "string") lines.push(`Project: ${auditionFullData.project}`);
-      if (typeof auditionFullData.role === "string") lines.push(`Role: ${auditionFullData.role}`);
-
       if (legacyMap?.intro) lines.push(`\nOverview:\n${legacyMap.intro}`);
       if (legacyMap?.sections) {
         legacyMap.sections.forEach((sec) => {
@@ -123,8 +135,7 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
         });
       }
       if (legacyMap?.outro) lines.push(`\n${legacyMap.outro}`);
-
-      sections.push(`# ACTIVE AUDITION BREAKDOWN\n${lines.join("\n")}`);
+      sections.push(`# ACTIVE AUDITION BREAKDOWN\n${header}\n${lines.join("\n")}`.trim());
     }
   }
 

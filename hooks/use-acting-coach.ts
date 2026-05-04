@@ -37,6 +37,8 @@ interface UseActingCoachReturn {
   session: CoachSession | null;
   sessions: CoachSession[];
   sessionId: string;
+  /** True until Firebase auth has finished loading. Use to gate auto-trigger effects. */
+  isAuthLoading: boolean;
 }
 
 export function useActingCoach(): UseActingCoachReturn {
@@ -345,5 +347,6 @@ export function useActingCoach(): UseActingCoachReturn {
     session,
     sessions,
     sessionId,
+    isAuthLoading,
   };
 }

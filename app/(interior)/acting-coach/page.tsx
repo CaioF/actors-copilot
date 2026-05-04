@@ -47,38 +47,54 @@ export default function ActingCoachPage() {
     session,
     sessions = [],
     sessionId,
+    isAuthLoading,
   } = useActingCoach();
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null); 
-  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const searchParams = useSearchParams();
   const auditionId = searchParams.get("auditionId");
 
   const project = searchParams.get("project") || "this project";
   const role = searchParams.get("role") || "the character";
+  const analysisType = searchParams.get("analysisType"); // "sides" | "brief" | null
 
   const hasFiredInitialMessage = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const [pendingInitialMessage, setPendingInitialMessage] = useState(false);
 
-  // Auto-trigger session context if coming from a specific audition
-  useEffect(() => {
-    if (auditionId && !hasFiredInitialMessage.current) {
-      hasFiredInitialMessage.current = true;
-      startNewSession({ linkedAuditionId: auditionId });
-      setPendingInitialMessage(true); 
+  // Tailor the auto-trigger message to the source analysis (sides vs brief).
+  const buildStarterMessage = (): string => {
+    if (analysisType === "brief") {
+      return `Help me build the character for my ${project} audition (role: ${role}). Walk me through what the casting brief tells us — start with who this character is and what the casting team seems to want.`;
     }
-  }, [auditionId, startNewSession]);
+    if (analysisType === "sides") {
+      return `I want to rehearse my sides for my ${project} audition as ${role}. Where should we start — should we read through the objective and beats first, or jump straight into a tactic?`;
+    }
+    return `I want to work on my ${project} audition as ${role}.`;
+  };
+
+  // Auto-trigger session context if coming from a specific audition.
+  // Gated on `!isAuthLoading` so we don't flip hasFiredInitialMessage before
+  // startNewSession has a userPath — that race used to leave the user staring
+  // at an empty coach with no auto-message.
+  useEffect(() => {
+    if (auditionId && !hasFiredInitialMessage.current && !isAuthLoading) {
+      hasFiredInitialMessage.current = true;
+      void startNewSession({ linkedAuditionId: auditionId });
+      setPendingInitialMessage(true);
+    }
+  }, [auditionId, isAuthLoading, startNewSession]);
+
   useEffect(() => {
     if (pendingInitialMessage && session?.linkedAuditionId === auditionId) {
-      setPendingInitialMessage(false); 
-      sendMessage(
-        `I want to work on my ${project} audition as ${role}.`,
-        auditionId ?? undefined
-      );
+      setPendingInitialMessage(false);
+      sendMessage(buildStarterMessage(), auditionId ?? undefined);
     }
-  }, [pendingInitialMessage, session, auditionId, project, role, sendMessage]);
+    // buildStarterMessage closes over project/role/analysisType — list deps explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingInitialMessage, session, auditionId, project, role, analysisType, sendMessage]);
 
   // Auto-scroll to latest message on new messages, loading state, and session load
   useEffect(() => {

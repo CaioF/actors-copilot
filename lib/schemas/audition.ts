@@ -28,6 +28,7 @@ export const auditionFormDataSchema = z.object({
   briefFile: auditionFileSchema,
   deadline: z.string().max(50).optional(),
   auditionTimezone: z.string().max(50).optional(),
+  castingDirectorName: z.string().max(150).optional(),
   priorSidesSummary: enrichmentField,
   priorBriefSummary: enrichmentField,
 });

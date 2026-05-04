@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { UploadCloud, FileText, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface StepUploadProps {
   title: string;
@@ -26,6 +27,7 @@ interface StepUploadProps {
 export function StepUpload({ title, description, file, text, onFileChange, onTextChange }: StepUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   // Previne o comportamento padrão do navegador de abrir o arquivo
   /**
@@ -65,7 +67,11 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
       if (isPDF || isDocxType || isDocxExt) {
         onFileChange(droppedFile);
       } else {
-        alert("Please upload a PDF or Word (.docx) file.");
+        toast({
+          variant: "destructive",
+          title: "That file type isn't supported",
+          description: `We only read PDFs and Word documents (.docx). You dropped a ${droppedFile.type || "file"} called "${droppedFile.name}". Convert it to PDF or paste the text into the box below.`,
+        });
       }
     }
   };

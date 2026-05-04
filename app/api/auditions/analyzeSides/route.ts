@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       briefFile: formData.get("briefFile") as File | undefined,
       deadline: (formData.get("deadline") as string | null) ?? undefined,
       auditionTimezone: (formData.get("auditionTimezone") as string | null) ?? undefined,
+      castingDirectorName: (formData.get("castingDirectorName") as string | null) ?? undefined,
       priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
       priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
     };

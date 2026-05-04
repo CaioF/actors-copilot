@@ -95,6 +95,7 @@ export async function POST(request: Request) {
       briefFile: formData.get("briefFile") as File | undefined,
       deadline: (formData.get("deadline") as string | null) ?? undefined,
       auditionTimezone: (formData.get("auditionTimezone") as string | null) ?? undefined,
+      castingDirectorName: (formData.get("castingDirectorName") as string | null) ?? undefined,
       priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
       priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
     };
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
     let briefText = validated.briefText ?? "";
     const deadline = validated.deadline ?? null;
     const auditionTimezone = validated.auditionTimezone ?? null;
+    const castingDirectorName = (validated.castingDirectorName ?? "").trim();
     const priorSidesSummary = (validated.priorSidesSummary ?? "").substring(0, 1500).trim();
 
     // Security Check: Ensure the requested userPath belongs to the authenticated user
@@ -225,6 +227,7 @@ export async function POST(request: Request) {
       - Role: ${role || "Not specified"}
       ${deadline ? `- Deadline: ${deadline}` : ""}
       ${auditionTimezone ? `- Project Timezone: ${auditionTimezone}` : ""}
+      ${castingDirectorName ? `- Casting Director (named by the actor — verify against the brief and reflect in your "People Mentioned" section if confirmed): ${castingDirectorName}` : ""}
 
       CHARACTER BRIEF / CASTING NOTES:
       ${briefText}

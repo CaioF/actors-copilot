@@ -97,8 +97,29 @@ export function StepResultBrief({ data, localDeadlineStr, onCoachClick }: StepRe
             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Audition Details</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {(() => {
-                const parts = data.intro.split(/(Project:|Role:|Type:|Deadline:|Strict Deadline:|CRITICAL WARNING:|WARNING:)/i);
-                
+                // Tolerant intro parser. The brief AI returns `intro` as a free-form string
+                // (per BRIEF_ANALYSIS_PROMPT), so we accept several drift patterns:
+                //   - Plain "Project: Foo"
+                //   - Bolded "**Project:** Foo" or "**Project**: Foo"
+                //   - Dash separator "Project - Foo" / "Project — Foo"
+                //   - Trailing colon variants and surrounding whitespace
+                // If the parser produces 0 fields, we fall back to rendering the whole intro.
+                const LABELS = [
+                  "CRITICAL WARNING",
+                  "WARNING",
+                  "Strict Deadline",
+                  "Deadline",
+                  "Project",
+                  "Role",
+                  "Type",
+                ];
+                // Strip markdown bold/italic so the splitter doesn't trip on `**Project:**`.
+                const cleaned = data.intro.replace(/\*\*/g, "").replace(/__/g, "");
+                // Build a regex that captures any label followed by `:` or ` -` or ` —`.
+                const labelGroup = LABELS.map((l) => l.replace(/ /g, "\\s+")).join("|");
+                const splitter = new RegExp(`(${labelGroup})\\s*[:\\-—]\\s*`, "gi");
+                const parts = cleaned.split(splitter);
+
                 if (parts.length <= 1) {
                   return (
                     <div className="col-span-full text-sm text-gray-700 leading-relaxed">
@@ -107,50 +128,62 @@ export function StepResultBrief({ data, localDeadlineStr, onCoachClick }: StepRe
                   );
                 }
 
-                const items = [];
+                // Capture any prose that came BEFORE the first label so it's not lost.
+                const prelude = parts[0]?.trim();
+
+                const items: Array<{ label: string; value: string }> = [];
                 for (let i = 1; i < parts.length; i += 2) {
-                  items.push({
-                    label: parts[i].replace(':', '').trim(),
-                    value: parts[i + 1]?.replace(/^[.\s]+|[.\s]+$/g, '').trim() 
-                  });
+                  const rawLabel = (parts[i] || "").trim();
+                  const rawValue = (parts[i + 1] || "").replace(/^[.\s]+|[.\s]+$/g, "").trim();
+                  if (!rawLabel || !rawValue) continue;
+                  items.push({ label: rawLabel, value: rawValue });
                 }
 
-                return items.map((item, idx) => {
-                  const isWarning = item.label.toUpperCase().includes('WARNING');
+                if (items.length === 0) {
                   return (
-                    <div 
-                      key={idx} 
-                      className={isWarning ? "col-span-full bg-[#FFF5F0] p-5 rounded-xl border border-[#FF7316]/20 mt-2" : "flex flex-col gap-1.5"}
-                    >
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${isWarning ? 'text-[#FF7316]' : 'text-gray-400'}`}>
-                        {item.label}
-                      </span>
-                      <span className={`text-sm ${isWarning ? 'text-gray-900 font-medium leading-relaxed' : 'text-gray-900 font-semibold'}`}>
-                        {item.value}
-                      </span>
+                    <div className="col-span-full text-sm text-gray-700 leading-relaxed">
+                      {data.intro}
                     </div>
                   );
-                });
+                }
+
+                return (
+                  <>
+                    {prelude && (
+                      <div className="col-span-full text-sm text-gray-600 italic leading-relaxed">
+                        {prelude}
+                      </div>
+                    )}
+                    {items.map((item, idx) => {
+                      const isWarning = item.label.toUpperCase().includes("WARNING");
+                      return (
+                        <div
+                          key={idx}
+                          className={isWarning ? "col-span-full bg-[#FFF5F0] p-5 rounded-xl border border-[#FF7316]/20 mt-2" : "flex flex-col gap-1.5"}
+                        >
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${isWarning ? "text-[#FF7316]" : "text-gray-400"}`}>
+                            {item.label}
+                          </span>
+                          <span className={`text-sm ${isWarning ? "text-gray-900 font-medium leading-relaxed" : "text-gray-900 font-semibold"}`}>
+                            {item.value}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
               })()}
             </div>
           </div>
         )}
 
-        {localDeadlineStr && (
-          <div className="rounded-2xl bg-[#FFF5F0] shadow-sm p-5 border border-[#FF7316]/30 flex items-center gap-4 animate-in fade-in duration-500">
-            <div className="bg-white p-3 rounded-full shadow-sm flex items-center justify-center shrink-0">
-              <CalendarDays className="text-[#FF7316]" size={24} />
-            </div>
-            <div>
-              <h4 className="text-[11px] font-bold text-[#FF7316] uppercase tracking-widest mb-0.5">
-                Your Local Deadline
-              </h4>
-              <p className="text-gray-900 font-bold text-lg">
-                {localDeadlineStr}
-              </p>
-            </div>
-          </div>
-        )}
+        {/*
+          Local-deadline pill removed from this card on 2026-05 — the detail page and
+          wizard result page now render it in the header so it sits above BOTH analysis
+          cards (Sides + Brief). The `localDeadlineStr` prop is kept on this component
+          so the wizard can still pass it for backward-compat callers, but no UI hangs
+          off it here. Drop the prop on a future cleanup once all callers migrate.
+        */}
 
         {/* Dynamic Sections Loop */}
         {data.sections.map((section, idx) => {
