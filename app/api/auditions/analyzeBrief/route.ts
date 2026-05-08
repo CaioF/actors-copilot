@@ -204,34 +204,37 @@ export async function POST(request: Request) {
       }
     });
 
-    // 6. COMPILE PAYLOAD FOR AI
+// 6. COMPILE PAYLOAD FOR AI
     // Adjusted prompt payload strictly for briefs, director notes, and character archetypes
     const prompt = `
       You are coaching ${actorName} on how to build a character and understand the world of this project.
 
       ${categoryInstruction}
       
-      === ACTOR'S DNA VAULT (MASTER PROFILE) ===
+      <actor_dna>
       CRITICAL INSTRUCTION: You MUST use this profile as the psychological lens. 
       Identify which specific traits, past experiences, or emotional reservoirs from their DNA 
       perfectly align with the director's vision and character archetype described below.
       
       ${actorDNAContext}
-      ==========================================
+      </actor_dna>
       
       Here are the casting materials for analysis:
 
-      CONTEXT:
+      <context>
       - Project Category: ${projectType.toUpperCase()}
       - Project: ${project || "Not specified"}
       - Role: ${role || "Not specified"}
       ${deadline ? `- Deadline: ${deadline}` : ""}
       ${auditionTimezone ? `- Project Timezone: ${auditionTimezone}` : ""}
       ${castingDirectorName ? `- Casting Director (named by the actor — verify against the brief and reflect in your "People Mentioned" section if confirmed): ${castingDirectorName}` : ""}
+      </context>
 
-      CHARACTER BRIEF / CASTING NOTES:
+      <casting_brief>
       ${briefText}
-      ${priorSidesSummary ? `\n=== PRIOR SIDES ANALYSIS ===\n${priorSidesSummary}` : ""}
+      </casting_brief>
+      
+      ${priorSidesSummary ? `\n<prior_sides_analysis>\n${priorSidesSummary}\n</prior_sides_analysis>` : ""}
     `;
 
     // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE

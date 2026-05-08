@@ -336,7 +336,7 @@ describe("POST /api/auditions/analyzeSides", () => {
 
       // Assert
       expect(response.status).toBe(200);
-      expect(capturedPrompt).toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+      expect(capturedPrompt).toContain("<prior_brief_analysis>");
       expect(capturedPrompt).toContain("This character is a tragic hero with a fatal flaw.");
     });
 
@@ -370,7 +370,7 @@ describe("POST /api/auditions/analyzeSides", () => {
 
       // Assert
       expect(response.status).toBe(200);
-      expect(capturedPrompt).not.toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+      expect(capturedPrompt).not.toContain("<prior_brief_analysis>");
     });
 
     it("should truncate priorBriefSummary exceeding 1500 characters", async () => {
@@ -405,11 +405,11 @@ describe("POST /api/auditions/analyzeSides", () => {
 
       // Assert
       expect(response.status).toBe(200);
-      const afterLabel = capturedPrompt.split("=== PRIOR CHARACTER BRIEF ANALYSIS ===")[1];
-      const summaryOnly = afterLabel.split("CRITICAL:")[0];
+      const summaryOnly = capturedPrompt.split("<prior_brief_analysis>")[1].split("</prior_brief_analysis>")[0];
       expect(summaryOnly.trim().length).toBeLessThanOrEqual(1500);
     });
 
+   
     it("should use 'Actor' in prompt when actorName is empty string (proving || not ??)", async () => {
       // Arrange
       let capturedPrompt = "";

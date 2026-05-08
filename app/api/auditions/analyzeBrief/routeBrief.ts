@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
 import mammoth from "mammoth";
-import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
+import { BRIEF_ANALYSIS_PROMPT, BRIEF_CINEMATIC_PROMPT, BRIEF_COMMERCIAL_PROMPT, BRIEF_THEATER_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
 import { logger } from '@/lib/logger';
 import { auditionFormDataSchema } from "@/lib/schemas/audition";
@@ -17,7 +17,7 @@ interface PerformanceMap {
 
 /**
  * Safely extracts raw text content from a PDF buffer using pdf2json.
- * Includes a 80-second timeout to prevent malformed or malicious PDFs from hanging the server.
+ * Includes a 60-second timeout to prevent malformed or malicious PDFs from hanging the server.
  * @param buffer - The PDF file content as a Node.js Buffer
  * @returns A promise resolving to the extracted text content
  * @async
@@ -32,6 +32,7 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
     pdfParser.on("pdfParser_dataReady", () => {
       const rawText = pdfParser.getRawTextContent();
+      
       try {
         resolve(decodeURIComponent(rawText));
       } catch (error) {
@@ -45,18 +46,18 @@ const extractTextFromPDF = (buffer: Buffer): Promise<string> => {
 
   // Security: Kill the process if the PDF is too complex or acting as a "Zip Bomb"
   const timeoutPromise = new Promise<string>((_, reject) =>
-    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (80s). The file might be corrupted or too complex.")), 80000)
+    setTimeout(() => reject(new Error("PDF parsing timeout exceeded (60s). The file might be corrupted or too complex.")), 60000)
   );
 
   return Promise.race([parsePromise, timeoutPromise]);
 };
 
 /**
- * Analyzes audition materials (sides, project context) using AI to generate
- * a personalized performance coaching breakdown for an actor.
- * @param request - HTTP request containing form data with project type, sides text/file,
- *                  actor name, and user path for DNA profile lookup
- * @returns JSON response with structured performance coaching data or error
+ * Analyzes character briefs and casting notes using AI to generate
+ * a personalized character conception and world-building map for the actor.
+ * @param request - HTTP request containing form data with project type, brief text/file,
+ * actor name, and user path for DNA profile lookup
+ * @returns JSON response with structured breakdown data or error
  * @async
  */
 export async function POST(request: Request) {
@@ -73,6 +74,14 @@ export async function POST(request: Request) {
 
     // 2. EXTRACT INCOMING DATA AND FILES
     const formData = await request.formData();
+
+    // Explicitly reject sidesFile to prevent accidental misuse of the endpoint
+    if (formData.has("sidesFile")) {
+      return NextResponse.json(
+        { error: "This endpoint is strictly for Brief analysis. Do not send 'sidesFile'." },
+        { status: 400 }
+      );
+    }
 
     const textFields = {
       projectType: (formData.get("projectType") as string | null) ?? undefined,
@@ -105,47 +114,46 @@ export async function POST(request: Request) {
     const role = validated.role ?? "";
     const projectType = validated.projectType ?? "cinematic";
     const actorName = validated.actorName || "Actor";
-    let sidesText = validated.sidesText ?? "";
+    let briefText = validated.briefText ?? "";
     const deadline = validated.deadline ?? null;
     const auditionTimezone = validated.auditionTimezone ?? null;
     const castingDirectorName = (validated.castingDirectorName ?? "").trim();
-    const priorBriefSummary = (validated.priorBriefSummary ?? "").substring(0, 1500).trim();
+    const priorSidesSummary = (validated.priorSidesSummary ?? "").substring(0, 1500).trim();
 
+    // Security Check: Ensure the requested userPath belongs to the authenticated user
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
-      logger.warn({
-        msg: "SECURITY ALERT: Unauthorized access attempt",
-        authenticatedUserId,
-        userPath,
-      });
+      logger.warn({ authenticatedUserId, userPath, msg: `SECURITY ALERT: User ${authenticatedUserId} attempted to generate a brief for ${userPath}` });
       return NextResponse.json({ error: "Unauthorized access to this path." }, { status: 403 });
     }
 
-    const sidesFile = formData.get("sidesFile") as File | null;
+    const briefFile = formData.get("briefFile") as File | null;
 
-    if (sidesFile) {
-      const arrayBuffer = await sidesFile.arrayBuffer();
+    // 3. PARSE FILES SAFELY (PDFs & DOCX)
+    if (briefFile) {
+      const arrayBuffer = await briefFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       
-      if (sidesFile.type === "application/pdf") {
-        sidesText = await extractTextFromPDF(buffer);
-      } else if (sidesFile.name.toLowerCase().endsWith(".docx") || sidesFile.type.includes("wordprocessingml")) {
+      if (briefFile.type === "application/pdf") {
+        briefText = await extractTextFromPDF(buffer);
+      } else if (briefFile.name.toLowerCase().endsWith(".docx") || briefFile.type.includes("wordprocessingml")) {
         const result = await mammoth.extractRawText({ buffer: buffer });
-        sidesText = result.value;
+        briefText = result.value;
       }
     }
 
-    if (!sidesText.trim()) {
-      return NextResponse.json(
-        { error: "No sides text or valid file provided for analysis." },
-        { status: 400 }
-      );
+    // Ensure we have something to analyze
+    if (!briefText.trim()) {
+       return NextResponse.json(
+         { error: "No brief text or valid file provided for analysis." },
+         { status: 400 }
+       );
     }
 
-    // FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
+    // 4. FETCH THE ACTOR'S MASTER PROFILE (The Secret Sauce)
     const profileRef = db.doc(`users/${userPath}/profile/master`);
     const profileSnap = await profileRef.get();
     
-    let actorDNAContext = "No DNA profile found. Provide high-level, generalized acting coaching based solely on the script.";
+    let actorDNAContext = "No DNA profile found. Provide high-level, generalized character breakdown based solely on the brief.";
     
     if (profileSnap.exists) {
       const profileData = profileSnap.data();
@@ -153,15 +161,16 @@ export async function POST(request: Request) {
       actorDNAContext = JSON.stringify(profileData, null, 2);
     } 
 
-    //special instruction based on project type
+    // Special instruction based on project type
     let categoryInstruction = "";
-    
     if (projectType === "commercial") {
-        categoryInstruction = COMMERCIAL_MODE_PROMPT;
+        categoryInstruction = BRIEF_COMMERCIAL_PROMPT;
     } else if (projectType === "theater") {
-        categoryInstruction = THEATHER_MODE_PROMPT;
+        categoryInstruction = BRIEF_THEATER_PROMPT;
+    } else if (projectType === "cinematic") {
+        categoryInstruction = BRIEF_CINEMATIC_PROMPT;
     }
-    
+
     // 5. INITIALIZE VERTEX AI FOR FIREBASE
     const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
@@ -170,7 +179,7 @@ export async function POST(request: Request) {
 
     const model = getGenerativeModel(ai, { 
       model: "gemini-3.1-pro-preview", 
-      systemInstruction: { role: "user", parts: [{ text: AUDITION_COACH_PROMPT }] },
+      systemInstruction: { role: "user", parts: [{ text: BRIEF_ANALYSIS_PROMPT }] }, 
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: {
@@ -196,40 +205,36 @@ export async function POST(request: Request) {
     });
 
     // 6. COMPILE PAYLOAD FOR AI
+    // Adjusted prompt payload strictly for briefs, director notes, and character archetypes
     const prompt = `
-      You are coaching ${actorName}. 
+      You are coaching ${actorName} on how to build a character and understand the world of this project.
 
       ${categoryInstruction}
       
-      <actor_dna>
-      CRITICAL INSTRUCTION: You MUST use this profile as the psychological lens for your entire breakdown. 
-      Do not just tack it on at the end. Weave their specific emotional triggers, strengths, and past 
-      tendencies into the Coach Notes and Tactics.
+      === ACTOR'S DNA VAULT (MASTER PROFILE) ===
+      CRITICAL INSTRUCTION: You MUST use this profile as the psychological lens. 
+      Identify which specific traits, past experiences, or emotional reservoirs from their DNA 
+      perfectly align with the director's vision and character archetype described below.
       
       ${actorDNAContext}
-      </actor_dna>
+      ==========================================
       
-      Here are the audition materials for analysis:
+      Here are the casting materials for analysis:
 
-      <context>
+      CONTEXT:
       - Project Category: ${projectType.toUpperCase()}
       - Project: ${project || "Not specified"}
       - Role: ${role || "Not specified"}
       ${deadline ? `- Deadline: ${deadline}` : ""}
       ${auditionTimezone ? `- Project Timezone: ${auditionTimezone}` : ""}
-      ${castingDirectorName ? `- Casting Director (named by the actor): ${castingDirectorName}` : ""}
-      </context>
+      ${castingDirectorName ? `- Casting Director (named by the actor — verify against the brief and reflect in your "People Mentioned" section if confirmed): ${castingDirectorName}` : ""}
 
-      <audition_sides>
-      ${sidesText || "No sides provided."}
-      </audition_sides>
-      
-      ${priorBriefSummary ? `\n<prior_brief_analysis>\n${priorBriefSummary}\n</prior_brief_analysis>` : ""}
-
-      CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
+      CHARACTER BRIEF / CASTING NOTES:
+      ${briefText}
+      ${priorSidesSummary ? `\n=== PRIOR SIDES ANALYSIS ===\n${priorSidesSummary}` : ""}
     `;
 
-    // EXECUTE AI INFERENCE AND PARSE RESPONSE
+    // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
@@ -241,17 +246,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'AI returned malformed data.' }, { status: 502 });
     }
 
-    // RETURN TO FRONTEND
+    // 8. RETURN TO FRONTEND
     return NextResponse.json({
       success: true,
-      message: "Performance Map generated successfully.",
+      message: "Brief Map generated successfully.",
       data: performanceMap,
     });
 
   } catch (error) {
-    logger.error({ err: error, msg: 'Error during Audition synthesis' });
+    logger.error({ err: error, msg: 'Error during Brief synthesis' });
     return NextResponse.json(
-      { success: false, error: "Internal Server Error during synthesis." },
+      { success: false, error: "Internal Server Error during brief synthesis." },
       { status: 500 }
     );
   }

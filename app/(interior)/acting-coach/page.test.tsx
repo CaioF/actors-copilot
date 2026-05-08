@@ -17,6 +17,19 @@ jest.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ title }: { title: string }) => <div data-testid="dashboard-header">{title}</div>,
 }));
 
+jest.mock("firebase/auth", () => ({
+  getAuth: jest.fn(() => ({})),
+  onAuthStateChanged: jest.fn((auth, cb) => {
+    // Simula que o usuário logou instantaneamente
+    cb({ uid: "user-123" });
+    return jest.fn(); // unsubscribe mock
+  }),
+}));
+
+jest.mock("@/lib/firebase", () => ({
+  getDb: jest.fn(() => ({ app: {} })),
+}));
+
 interface MockChatInputProps {
   onSend: (content: string) => void;
   placeholder?: string;
@@ -100,6 +113,7 @@ describe("ActingCoachPage", () => {
       startNewSession: mockStartNewSession,
       clearSessionFocus: mockClearSessionFocus,
       session: { title: "Session 1", sessionFocus: null },
+      isAuthenticated: true,
     });
   });
 
@@ -250,6 +264,7 @@ describe("ActingCoachPage", () => {
           startNewSession: mockStartNewSession,
           clearSessionFocus: mockClearSessionFocus,
           session: { title: "New Session", sessionFocus: null, linkedAuditionId: "aud-123" },
+          isAuthenticated: true,
         });
         return Promise.resolve();
       });
@@ -291,6 +306,7 @@ describe("ActingCoachPage", () => {
           startNewSession: mockStartNewSession,
           clearSessionFocus: mockClearSessionFocus,
           session: { title: "New Session", sessionFocus: null, linkedAuditionId: "aud-123" },
+          isAuthenticated: true,
         });
         return Promise.resolve();
       });

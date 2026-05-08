@@ -188,7 +188,7 @@ describe("Sides → Brief enrichment integration", () => {
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
-    expect(capturedPrompt).toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+    expect(capturedPrompt).toContain("<prior_brief_analysis>");
     expect(capturedPrompt).toContain(priorBrief);
   });
 
@@ -217,7 +217,7 @@ describe("Sides → Brief enrichment integration", () => {
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
-    expect(capturedPrompt).toContain("=== PRIOR SIDES ANALYSIS ===");
+    expect(capturedPrompt).toContain("<prior_sides_analysis>");
     expect(capturedPrompt).toContain(priorSides);
   });
 
@@ -241,7 +241,7 @@ describe("Sides → Brief enrichment integration", () => {
     const response = await analyzeBrief(request);
 
     expect(response.status).toBe(200);
-    expect(capturedPrompt).not.toContain("=== PRIOR SIDES ANALYSIS ===");
+    expect(capturedPrompt).not.toContain("<prior_sides_analysis>");
   });
 
   it("analyzeSides omits enrichment block when priorBriefSummary is absent", async () => {
@@ -264,7 +264,7 @@ describe("Sides → Brief enrichment integration", () => {
     const response = await analyzeSides(request);
 
     expect(response.status).toBe(200);
-    expect(capturedPrompt).not.toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+    expect(capturedPrompt).not.toContain("<prior_sides_analysis>");
   });
 
   it("analyzeSides truncates priorBriefSummary exceeding 1500 chars", async () => {
@@ -289,8 +289,7 @@ describe("Sides → Brief enrichment integration", () => {
     const response = await analyzeSides(request);
 
     expect(response.status).toBe(200);
-    const afterLabel = capturedPrompt.split("=== PRIOR CHARACTER BRIEF ANALYSIS ===")[1];
-    const summaryOnly = afterLabel.split("CRITICAL:")[0];
+    const summaryOnly = capturedPrompt.split("<prior_brief_analysis>")[1].split("</prior_brief_analysis>")[0];
     expect(summaryOnly.trim().length).toBeLessThanOrEqual(1500);
   });
 
@@ -316,8 +315,8 @@ describe("Sides → Brief enrichment integration", () => {
     const response = await analyzeBrief(request);
 
     expect(response.status).toBe(200);
-    const afterLabel = capturedPrompt.split("=== PRIOR SIDES ANALYSIS ===")[1];
-    expect(afterLabel.trim().length).toBeLessThanOrEqual(1500);
+    const summaryOnly = capturedPrompt.split("<prior_sides_analysis>")[1].split("</prior_sides_analysis>")[0];
+    expect(summaryOnly.trim().length).toBeLessThanOrEqual(1500);
   });
 
   it("enrichment block appears after CHARACTER BRIEF section in Brief route", async () => {
@@ -341,7 +340,7 @@ describe("Sides → Brief enrichment integration", () => {
     await analyzeBrief(request);
 
     const briefSectionIdx = capturedPrompt.indexOf("CHARACTER BRIEF / CASTING NOTES:");
-    const enrichIdx = capturedPrompt.indexOf("=== PRIOR SIDES ANALYSIS ===");
+    const enrichIdx = capturedPrompt.indexOf("<prior_sides_analysis>");
     expect(briefSectionIdx).toBeLessThan(enrichIdx);
     expect(enrichIdx).toBeGreaterThan(0);
   });
@@ -411,7 +410,7 @@ describe("Brief → Sides enrichment integration", () => {
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
-    expect(capturedPrompt).toContain("=== PRIOR SIDES ANALYSIS ===");
+    expect(capturedPrompt).toContain("<prior_sides_analysis>");
     expect(capturedPrompt).toContain(priorSides);
   });
 
@@ -439,7 +438,7 @@ describe("Brief → Sides enrichment integration", () => {
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
-    expect(capturedPrompt).toContain("=== PRIOR CHARACTER BRIEF ANALYSIS ===");
+    expect(capturedPrompt).toContain("<prior_brief_analysis>");
     expect(capturedPrompt).toContain(priorBrief);
   });
 
@@ -449,7 +448,7 @@ describe("Brief → Sides enrichment integration", () => {
 
     mockedGetGenerativeModel.mockImplementation((_ai, _config) => ({
       generateContent: jest.fn().mockImplementation((prompt: string) => {
-        if (prompt.includes("AUDITION SIDES")) {
+        if (prompt.includes("<audition_sides>")) {
           sidesPrompt = prompt;
         } else {
           briefPrompt = prompt;
@@ -484,11 +483,10 @@ describe("Brief → Sides enrichment integration", () => {
     await analyzeSides(sidesReq);
     await analyzeBrief(briefReq);
 
-    const sidesEnrichBlock = sidesPrompt.split("=== PRIOR CHARACTER BRIEF ANALYSIS ===")[1].split("CRITICAL:")[0];
+    const sidesEnrichBlock = sidesPrompt.split("<prior_brief_analysis>")[1].split("</prior_brief_analysis>")[0];
     expect(sidesEnrichBlock.trim().length).toBeLessThanOrEqual(1500);
 
-    const briefEnrichBlock = briefPrompt.split("=== PRIOR SIDES ANALYSIS ===")[1];
+    const briefEnrichBlock = briefPrompt.split("<prior_sides_analysis>")[1].split("</prior_sides_analysis>")[0];
     expect(briefEnrichBlock.trim().length).toBeLessThanOrEqual(1500);
   });
 });
-
