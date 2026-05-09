@@ -129,20 +129,22 @@ export default function ActingCoachPage() {
 
   const headerTitleText = session?.title ? `Acting Coach — ${session.title}` : "Acting Coach";
   const headerTitleSlot = sessions.length > 0 ? (
-    <div className="flex min-w-0 items-center gap-3">
-      <h1 className="font-title text-3xl font-bold text-[#2C3328]">Acting Coach</h1>
-      <span className="font-title text-3xl font-bold text-[#2C3328]/60">—</span>
+    <div className="flex min-w-0 flex-col md:flex-row md:items-center gap-0 md:gap-3">
+      <div className="flex items-center gap-2">
+        <h1 className="font-title text-xl md:text-3xl font-bold text-[#2C3328] truncate">Acting Coach</h1>
+        <span className="hidden md:inline font-title text-3xl font-bold text-[#2C3328]/60">—</span>
+      </div>
       <DropdownMenu>
-        <DropdownMenuTrigger className="group inline-flex min-w-0 max-w-full items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[#7A9098] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2C3328]/40">
-          <span className="truncate font-title text-3xl font-bold text-[#2C3328]">
+        <DropdownMenuTrigger className="group inline-flex min-w-0 max-w-[200px] sm:max-w-md md:max-w-full items-center gap-2 rounded-lg md:px-2 py-1 text-left transition-colors hover:bg-[#7A9098] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2C3328]/40">
+          <span className="truncate font-title text-base sm:text-xl md:text-3xl font-bold text-[#2C3328]">
             {session ? sessionLabel(session) : "Select a session"}
           </span>
           {session?.lastActiveAt && (
-            <span className="shrink-0 text-sm font-medium text-[#2C3328]/50">
+            <span className="hidden lg:inline shrink-0 text-sm font-medium text-[#2C3328]/50">
               {relativeTime(session.lastActiveAt)}
             </span>
           )}
-          <ChevronDown className="h-5 w-5 shrink-0 text-[#E8721A] transition-transform group-data-[state=open]:rotate-180" />
+          <ChevronDown className="h-4 w-4 md:h-5 md:w-5 shrink-0 text-[#E8721A] transition-transform group-data-[state=open]:rotate-180" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
@@ -172,13 +174,13 @@ export default function ActingCoachPage() {
       <DashboardHeader title={headerTitleText} titleSlot={headerTitleSlot} />
 
       {/* Fixed title row */}
-      <div className="flex items-center justify-between gap-4 px-8 pt-2 pb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 sm:px-8 pt-2 pb-6">
         <p className="text-sm text-[#6B6B6B]">
           Your coach is ready. What are we working on?
         </p>
         <button
           onClick={() => startNewSession()}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#E8721A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d66a18]"
+          className="inline-flex w-full sm:w-auto justify-center shrink-0 items-center gap-2 rounded-full bg-[#E8721A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d66a18]"
         >
           <Plus className="h-4 w-4" />
           New Session
@@ -186,7 +188,7 @@ export default function ActingCoachPage() {
       </div>
 
       {/* Scrollable messages region (relative for floating quick-prompts trigger) */}
-      <div ref={scrollContainerRef} className="relative min-h-0 flex-1 overflow-y-auto px-8">
+      <div ref={scrollContainerRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
         {!isEmpty && (
           <div className="pointer-events-none sticky top-0 z-10 flex justify-end pt-2">
             <div className="pointer-events-auto">
@@ -223,7 +225,7 @@ export default function ActingCoachPage() {
                 }`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-5 py-4 ${
+                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-5 py-4 ${
                     msg.role === "user"
                       ? "bg-[#E8721A] text-white"
                       : "bg-[#E8DFD0] text-[#2C3328] shadow-sm"
@@ -236,7 +238,7 @@ export default function ActingCoachPage() {
                       {msg.documentName && (
                         <div className="flex items-center gap-1.5 self-end rounded-md bg-[#D66818] px-2 py-1 text-xs font-medium text-[#F5F0E8]/90">
                           <Paperclip className="h-3 w-3" />
-                          <span className="truncate max-w-[200px]">{msg.documentName}</span>
+                          <span className="truncate max-w-[150px] sm:max-w-[200px]">{msg.documentName}</span>
                         </div>
                       )}
                     </div>

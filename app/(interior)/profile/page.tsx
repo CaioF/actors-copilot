@@ -132,17 +132,17 @@ export default function ProfilePage() {
           methods.reset(defaults);
         }
       } catch (error: unknown) {
-    if (cancelled) return;
-    const isFirestoreError = typeof error === 'object' && error !== null && 'code' in error;
-    const isGenericError = error instanceof Error;
-    const errorCode = isFirestoreError ? (error as FirestoreError).code : null;
-    const errorMessage = isGenericError ? error.message : "";
-    if (errorCode === "unavailable" || errorMessage.includes("offline")) {
-        logger.warn({ msg: 'Firestore offline, using defaults.' });
-    } else {
-        logger.error({ err: error, msg: 'Error loading profile' });
-    }
-    methods.reset(defaults);
+        if (cancelled) return;
+        const isFirestoreError = typeof error === 'object' && error !== null && 'code' in error;
+        const isGenericError = error instanceof Error;
+        const errorCode = isFirestoreError ? (error as FirestoreError).code : null;
+        const errorMessage = isGenericError ? error.message : "";
+        if (errorCode === "unavailable" || errorMessage.includes("offline")) {
+            logger.warn({ msg: 'Firestore offline, using defaults.' });
+        } else {
+            logger.error({ err: error, msg: 'Error loading profile' });
+        }
+        methods.reset(defaults);
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -316,7 +316,7 @@ export default function ProfilePage() {
     <main className="flex flex-1 flex-col">
       <DashboardHeader title="My Profile" />
 
-      <div className="px-8 pb-8">
+      <div className="px-4 sm:px-8 pb-4 sm:pb-8">
         <FormProvider {...methods}>
           <ProfileHeader
             onPublish={publishProfile}
@@ -324,14 +324,14 @@ export default function ProfilePage() {
             saveStatus={saveStatus}
           />
 
-          <div className="flex gap-8">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mt-2 lg:mt-0">
             {/* Left column: Form */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 order-2 lg:order-1">
               <ActorProfileForm onSave={saveProfile} saveStatus={saveStatus} />
             </div>
 
-            {/* Right column: Live Preview */}
-            <div className="hidden w-[280px] flex-shrink-0 lg:block">
+            {/* Right column: Live Preview & Autofill */}
+            <div className="w-full lg:w-[280px] flex-shrink-0 order-1 lg:order-2">
               <div className="space-y-4">
                 <ImdbAutofill onSuccess={handleAutofillSuccess} />
                 <ProfileLivePreview />
