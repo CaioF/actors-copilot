@@ -36,6 +36,14 @@ jest.mock('@/lib/logger', () => {
   };
 });
 
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  })),
+}));
+
 jest.mock('@/lib/firebase', () => ({
     getApp: jest.fn(),
 }));
@@ -92,7 +100,10 @@ describe('AuthContext', () => {
     describe('logout', () => {
         it('success: Firebase signOut + backend logout called', async () => {
             mockSignOut.mockResolvedValue(undefined);
-            (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+            (global.fetch as jest.Mock).mockResolvedValue({ 
+                ok: true, 
+                json: async () => ({}) 
+            });
 
             const { getByTestId } = render(
                 <AuthProvider>

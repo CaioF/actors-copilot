@@ -430,6 +430,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(capturedPrompt).not.toContain("Project Timezone:");
     });
 
+
     it("should inject priorSidesSummary into the prompt as a labeled enrichment block", async () => {
       // Arrange
       let capturedPrompt = "";
@@ -461,7 +462,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
       // Assert
       expect(response.status).toBe(200);
-      expect(capturedPrompt).toContain("=== PRIOR SIDES ANALYSIS ===");
+      expect(capturedPrompt).toContain("<prior_sides_analysis>");
       expect(capturedPrompt).toContain("The character speaks in iambic pentameter and contemplates mortality.");
     });
 
@@ -495,7 +496,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
       // Assert
       expect(response.status).toBe(200);
-      expect(capturedPrompt).not.toContain("=== PRIOR SIDES ANALYSIS ===");
+      expect(capturedPrompt).not.toContain("<prior_sides_analysis>");
     });
 
     it("should truncate priorSidesSummary exceeding 1500 characters", async () => {
@@ -530,7 +531,7 @@ describe("POST /api/auditions/analyzeBrief", () => {
 
       // Assert
       expect(response.status).toBe(200);
-      const enrichmentBlock = capturedPrompt.split("=== PRIOR SIDES ANALYSIS ===")[1];
+      const enrichmentBlock = capturedPrompt.split("<prior_sides_analysis>")[1].split("</prior_sides_analysis>")[0];
       expect(enrichmentBlock.trim().length).toBeLessThanOrEqual(1500);
     });
 

@@ -345,7 +345,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
       data: () => ({
         project: "Hamlet",
         role: "Ophelia",
-        deadline: "2026-06-15T14:00",
+        deadline: null,
         auditionTimezone: "America/Los_Angeles",
         actorLocalDeadline: "Jun 15, 2026 2:00 PM",
         castingDirectorName: "Nina Gold",
@@ -381,9 +381,9 @@ describe("AuditionWizard enrichment (Task 3)", () => {
         hasSides: true,
         hasBrief: true,
         castingDirectorName: "Nina Gold",
-        deadline: "2026-06-15T14:00",
+        deadline: null,
         auditionTimezone: "America/Los_Angeles",
-        actorLocalDeadline: "Jun 15, 2026 2:00 PM",
+        actorLocalDeadline: null,
       })
     );
     expect(mockPush).toHaveBeenCalledWith("/auditions");
