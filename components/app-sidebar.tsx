@@ -181,7 +181,7 @@ export function AppSidebar() {
             Upgrade to Bussiness Class to unlock more features
           </p>
           <a 
-            href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout" 
+            href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout?coupon_code=UPGRADE19" 
             target="_blank" 
             rel="noopener noreferrer"
             className="mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"

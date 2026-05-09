@@ -19,13 +19,12 @@ export default function DashboardPage() {
     <main className="flex flex-1 flex-col">
       <DashboardHeader title="My Self Tape Copilot" />
 
-
       {/* Step Cards*/}
-      <div className="flex gap-6 px-8 pb-4">
+      <div className="flex flex-col lg:flex-row gap-6 px-4 sm:px-8 pb-4">
         <StepCard
           stepNumber={1}
           title="Personal DNA Upload"
-          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition analyses will become."}
+          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition analyses will become."}
           link="/chat"
           ctaLabel="Start building your DNA with the identity section"
           ctaIcon={Dna}
@@ -35,7 +34,7 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={2}
           title="Casting Brief Upload"
-          description={"Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost you trust."}
+          description={"Upload the casting brief and the Copilot extracts every requirement: director/casting/producer context, tone references, and a clean checklist for framing, file size, naming, slate/ident, upload link, and deadline — so you don't miss details that cost you trust."}
           link="/auditions/new/brief"
           ctaLabel="Upload Character Brief"
           ctaIcon={Sparkles}
@@ -58,7 +57,7 @@ export default function DashboardPage() {
       <MemoryRecordingBanner />
 
        {/*Baseline Upload (Head Start) */}
-      <div className="mx-8 mt-4 bg-[#3D4A3C] rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-xl border border-[#B7BCB6]/10">
+      <div className="mx-4 sm:mx-8 mt-4 bg-[#3D4A3C] rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-xl border border-[#B7BCB6]/10">
         <div className="flex gap-4 items-start">
           <div className="bg-[#FF7316]/20 p-3 rounded-2xl shrink-0 sm:mt-0">
             <FileText className="w-6 h-6 text-[#FF7316]" />
@@ -74,19 +73,17 @@ export default function DashboardPage() {
         </div>
         <button
           onClick={() => setIsBaselineModalOpen(true)}
-          className="px-6 py-3 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 hover:scale-105 active:scale-95"
+          className="w-full sm:w-auto px-6 py-3 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 hover:scale-105 active:scale-95 text-center"
         >
           Upload Baseline
         </button>
       </div>
-
 
       {isBaselineModalOpen && (
         <HistoryUploadModal
           onClose={() => setIsBaselineModalOpen(false)}
           onSuccess={() => {
             setIsBaselineModalOpen(false);
-
           }}
         />
       )}

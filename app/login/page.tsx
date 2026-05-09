@@ -20,26 +20,13 @@ function isFirebaseError(error: unknown): error is FirebaseError {
   );
 }
 
-/**
- * Main authentication page component.
- * Renders the login interface alongside app features and manages 
- * the Google login flow utilizing the AuthContext.
- *
- * @returns {JSX.Element} The rendered login page component.
- */
 export default function LoginPage() {
     const { loginWithGoogle, loginWithEmail, signupWithEmail, loading } = useAuth();
 
     const [errorMsg, setErrorMsg] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [isSignUp, setIsSignUp] = useState(false);
 
-    /**
-     * Initiates the Google login flow and handles UI error state.
-     * Silently ignores errors caused by the user intentionally closing the OAuth pop-up.
-     * @returns {Promise<void>}
-     */
     const handleLogin = async () => {
         setErrorMsg('');
         try {
@@ -57,14 +44,8 @@ export default function LoginPage() {
         }
     }
 
-    /**
-     * Handles form submission for Email/Password Authentication.
-     * Determines whether to execute login or signup based on component state,
-     * and maps Firebase error codes to user-friendly messages.
-     * * @param {React.FormEvent} e - The form submission event.
-     */
     const handleEmailAuth = async (e: React.FormEvent) => {
-        e.preventDefault(); // Impede a página de recarregar
+        e.preventDefault();
         setErrorMsg('');
         
         if (!email || !password) {
@@ -73,26 +54,33 @@ export default function LoginPage() {
         }
 
         try {
-            if (isSignUp) {
-                await signupWithEmail(email, password);
-            } else {
-                await loginWithEmail(email, password);
-            }
-        } catch (error: unknown) {
-        if (isFirebaseError(error)) {
-            const ERROR_MESSAGES: Record<string, string> = {
-                'auth/invalid-credential': 'Invalid email or password.',
-                'auth/wrong-password': 'Invalid email or password.',
-                'auth/email-already-in-use': 'This email is already in use. Please log in.',
-                'auth/weak-password': 'Password should be at least 6 characters.',
-            };
+            // Passo 1: Tenta fazer o Login primeiro
+            await loginWithEmail(email, password);
+        } catch (error: any) {
+            // Puxa o código de erro original do Firebase que foi passado via 'cause' no AuthContext
+            const errorCode = error.cause?.code || error.code;
 
-            setErrorMsg(ERROR_MESSAGES[error.code] || 'An error occurred. Please try again.');
-        } else {
-            const message = error instanceof Error ? error.message : 'Connection failed.';
-            setErrorMsg(message);
+            if (errorCode === 'auth/invalid-credential') {
+                // Passo 2: O login falhou com credencial inválida. A conta pode não existir. Vamos tentar criar!
+                try {
+                    await signupWithEmail(email, password);
+                } catch (signupError: any) {
+                    const signupErrorCode = signupError.cause?.code || signupError.code;
+
+                    if (signupErrorCode === 'auth/email-already-in-use') {
+                        // Se falhou ao criar porque o e-mail JÁ EXISTE, então o erro original de fato era SENHA INCORRETA.
+                        setErrorMsg('Invalid email or password.');
+                    } else if (signupErrorCode === 'auth/weak-password') {
+                        setErrorMsg('Password should be at least 6 characters.');
+                    } else {
+                        setErrorMsg(signupError.message || 'An error occurred during authentication.');
+                    }
+                }
+            } else {
+                // Cai aqui se for outro erro de login (ex: falha de rede, conta desativada)
+                setErrorMsg(error.message || 'Connection failed.');
+            }
         }
-    }
     }
 
     return (
@@ -103,24 +91,19 @@ export default function LoginPage() {
             {/* ========================================================= */}
             <div className="hidden md:flex md:w-1/2 bg-background flex-col justify-between p-12 lg:p-20">
                 
-                {/* Logo Container*/}
-                {/* Logo */}
                 <div className="flex items-center justify-left px-5 pt-6 ">
-                    {/* We wrap the image in a Link so clicking the logo goes home. 
-                        Added a slight hover scale effect for interactivity */}
                     <Link href="/dashboard" className="block transition-transform hover:scale-105">
                     <Image 
                         src="/logo.png" 
                         alt="The Actors Copilot" 
                         width={150} 
                         height={150} 
-                        className="object-contain" // Ensures the image doesn't stretch or distort
-                        priority // Tells Next.js to load this immediately since it's above the fold
+                        className="object-contain"
+                        priority 
                     />
                     </Link>
                 </div>
 
-                {/* Main Heading & Copy */}
                 <div className="max-w-md my-auto">
                     <h1 className="text-4xl lg:text-5xl font-title text-foreground leading-tight mb-6">
                         Your AI Partner<br />for Self-Taping
@@ -130,7 +113,6 @@ export default function LoginPage() {
                     </p>
                 </div>
 
-                {/* Feature Highlights List */}
                 <div className="space-y-6 max-w-md">
                     <FeatureItem 
                         icon={<Sparkles className="w-5 h-5 text-foreground" />} 
@@ -156,8 +138,18 @@ export default function LoginPage() {
             <div className="w-full md:w-1/2 bg-white flex items-center justify-center p-8">
                 <div className="w-full max-w-sm space-y-8">
                     
-                    {/* Form Header */}
-                    {/* 👇 O NOVO FORMULÁRIO DE E-MAIL/SENHA */}
+                    {/* Mobile Logo (Hidden on desktop) */}
+                    <div className="flex justify-center md:hidden pb-2">
+                        <Image 
+                            src="/logo.png" 
+                            alt="The Actors Copilot" 
+                            width={120} 
+                            height={120} 
+                            className="object-contain"
+                            priority 
+                        />
+                    </div>
+                    
                     <form onSubmit={handleEmailAuth} className="space-y-4 pt-4">
                         <div>
                             <label className="text-m font-medium text-foreground mb-1 block"> Email</label> 
@@ -190,22 +182,18 @@ export default function LoginPage() {
                         >
                             {loading ? (
                                 <span className="animate-pulse">Processing...</span>
-                            ) : isSignUp ? (
-                                "Create Account"
                             ) : (
-                                "Log In"
+                                "Continue"
                             )}
                         </button>
                     </form>
 
-                    {/* Divisor "OR" */}
                     <div className="relative flex items-center py-4">
                         <div className="flex-grow border-t border-gray-200"></div>
                         <span className="flex-shrink-0 mx-4 text-muted-foreground text-sm">or</span>
                         <div className="flex-grow border-t border-gray-200"></div>
                     </div>
 
-                    {/* Botão Antigo do Google */}
                     <div>
                         <button 
                             type="button"
@@ -217,53 +205,33 @@ export default function LoginPage() {
                         </button>
                     </div>
 
-                    {/* Mensagens de Erro */}
                     {errorMsg && (
-    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-        <p className="text-destructive text-sm text-center font-medium">
-            {errorMsg}
-        </p>
-
-        {errorMsg.includes("You don't have the required 'The Actor's Copilot' offer") && (
-            <div className="flex flex-col gap-2">
-                <a 
-                    href="https://theactorscopilot.com/#pricing"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-[#cf5b02] hover:bg-[#E8721A]/90 text-white text-center rounded-full py-3 text-sm font-bold transition-colors shadow-sm"
-                >
-                    Buy Premium Plan
-                </a>
-                
-                <a 
-                    href="mailto:support@theactorscopilot.com" 
-                    className="w-full border border-gray-200 hover:bg-gray-50 text-muted-foreground text-center rounded-full py-3 text-sm font-medium transition-colors"
-                >
-                    Contact Support
-                </a>
-            </div>
-            )}
-        </div>
-         )}
-
-                    {/* Toggle Login/Cadastro */}
-                    <div className="text-center pt-4">
-                        <p className="text-sm text-muted-foreground">
-                            {isSignUp ? "Already have an account?" : "Don't have an account?"}
-                            <button 
-                                type="button"
-                                onClick={() => {
-                                    setIsSignUp(!isSignUp);
-                                    setErrorMsg(''); // Limpa os erros ao trocar de tela
-                                }}
-                                className="ml-1 text-primary hover:underline font-medium outline-none"
-                            >
-                                {isSignUp ? "Log in" : "Sign up"}
-                            </button>
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <p className="text-destructive text-sm text-center font-medium">
+                            {errorMsg}
                         </p>
-                    </div>
 
-
+                        {errorMsg.includes("You don't have the required 'The Actor's Copilot' offer") && (
+                            <div className="flex flex-col gap-2">
+                                <a 
+                                    href="https://theactorscopilot.com/#pricing"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full bg-[#cf5b02] hover:bg-[#E8721A]/90 text-white text-center rounded-full py-3 text-sm font-bold transition-colors shadow-sm"
+                                >
+                                    Buy Premium Plan
+                                </a>
+                                
+                                <a 
+                                    href="mailto:support@theactorscopilot.com" 
+                                    className="w-full border border-gray-200 hover:bg-gray-50 text-muted-foreground text-center rounded-full py-3 text-sm font-medium transition-colors"
+                                >
+                                    Contact Support
+                                </a>
+                            </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -271,15 +239,6 @@ export default function LoginPage() {
     );
 }
 
-/**
- * UI Helper component to render feature items, maintaining DRY principles.
- *
- * @param {Object} props - The component properties.
- * @param {React.ReactNode} props.icon - The Lucide React icon element.
- * @param {string} props.title - The feature title.
- * @param {string} props.description - The feature description.
- * @returns {JSX.Element} A formatted feature item layout.
- */
 function FeatureItem({ icon, title, description }: { icon: ReactNode, title: string, description: string }) {
     return (
         <div className="flex items-start gap-4">
