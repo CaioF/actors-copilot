@@ -172,7 +172,7 @@ async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; 
         );
 
         if (!userInKajabi) {
-            return { success: false, message: "Email not found in our members list. Are you using the right Google Account?" };
+            return { success: false, message: "Email not found in our members list. Are you using the right Email Account?" };
         }
 
         const offerUrl = userInKajabi.relationships.offers?.links.self;
