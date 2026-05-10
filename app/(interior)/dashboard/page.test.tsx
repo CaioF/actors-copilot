@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 jest.mock("@/components/dashboard-header", () => ({
@@ -40,17 +40,20 @@ jest.mock("@/lib/firestore.utils", () => ({
   markHasSeenIntroVideo: (...args: unknown[]) => mockMarkHasSeenIntroVideo(...args),
 }));
 
-const mockLogger = {
-  error: jest.fn(),
-  warn: jest.fn(),
-  info: jest.fn(),
-};
-
 jest.mock("@/lib/logger", () => ({
-  logger: mockLogger,
-  createChildLogger: jest.fn().mockReturnValue(mockLogger),
+  logger: {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+  },
+  createChildLogger: jest.fn().mockReturnValue({
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+  }),
 }));
 
+import { logger } from "@/lib/logger";
 import DashboardPage from "./page";
 
 describe("DashboardPage - Intro Video Flow", () => {
@@ -132,8 +135,8 @@ describe("DashboardPage - Intro Video Flow", () => {
         expect(screen.queryByTestId("intro-video-modal")).not.toBeInTheDocument();
       });
 
-      expect(mockLogger.error).toHaveBeenCalledTimes(1);
-      expect(mockLogger.error).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           err: expect.any(Error),
           msg: "Error getting intro video seen status",
@@ -150,8 +153,8 @@ describe("DashboardPage - Intro Video Flow", () => {
         expect(screen.queryByTestId("intro-video-modal")).toBeInTheDocument();
       });
 
-      expect(mockLogger.error).toHaveBeenCalledTimes(1);
-      expect(mockLogger.error).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           err: expect.any(Error),
           msg: "Error marking intro video as seen",
@@ -169,7 +172,7 @@ describe("DashboardPage - Intro Video Flow", () => {
       });
 
       const closeButton = screen.getByRole("button", { name: /close intro video/i });
-      closeButton.click();
+      fireEvent.click(closeButton);
 
       await waitFor(() => {
         expect(screen.queryByTestId("intro-video-modal")).not.toBeInTheDocument();
