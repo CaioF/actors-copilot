@@ -72,11 +72,11 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
     { id: "section-palette", icon: Heart, label: "Emotional Palette" },
     { id: "section-beats", icon: Key, label: "Key Beats" },
     { id: "section-tactics", icon: Shield, label: "Tactics & Obstacles" },
-    { id: "section-why-now", icon: Clock, label: "The “Why Now?” / Stakes" },
-    { id: "section-moment", icon: Hourglass, label: "The Moment Before & After" },
-    { id: "section-monologue", icon: Brain, label: "Inner Monologue / Subtext" },
+    { id: "section-why-now", icon: Clock, label: "The Stakes" },
+    { id: "section-moment", icon: Hourglass, label: "The Moment" },
+    { id: "section-monologue", icon: Brain, label: "Inner Monologue" },
     { id: "section-secret", icon: Lock, label: "The Secret" },
-    { id: "section-physical", icon: MapPin, label: "Physical Life & Environment" },
+    { id: "section-physical", icon: MapPin, label: "Physicality & Setting" },
     { id: "section-notes", icon: MessageCircle, label: "Coach Notes" },
     { id: "section-tape", icon: Video, label: "Self-Tape Plan" },
     { id: "section-bold-choice", icon: Flame, label: "The Bold Choice" },
@@ -234,22 +234,22 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 11. The "Why Now?" / Stakes */}
+            {/* 11. The Stakes */}
             <div id="section-why-now" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <Clock className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">The “Why Now?” / Stakes</h3>
+                <h3 className="text-xl font-bold text-gray-900">The Stakes</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
                 {s[10].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
               </div>
             </div>
 
-            {/* 12 & 13. The Moment Before & After */}
+            {/* 12 & 13. The Moment */}
             <div id="section-moment" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Hourglass className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">The Moment Before & After</h3>
+                <h3 className="text-xl font-bold text-gray-900">The Moment</h3>
               </div>
               <div className="mb-6">
                 <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment Before</h4>
@@ -259,18 +259,18 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
               <hr className="border-gray-200 my-6" />
               <div>
-                <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment After (living past the cut)</h4>
+                <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment After</h4>
                 <div className="text-gray-700 text-[15px]">
                   {s[12].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
                 </div>
               </div>
             </div>
 
-            {/* 14. Inner Monologue / Subtext */}
+            {/* 14. Inner Monologue */}
             <div id="section-monologue" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <Brain className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">Inner Monologue / Subtext</h3>
+                <h3 className="text-xl font-bold text-gray-900">Inner Monologue</h3>
               </div>
               <ul className="space-y-3">
                 {s[13].items.map((item, i) => (
@@ -297,11 +297,11 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 16. Physical Life & Environment */}
+            {/* 16. Physicality & Setting */}
             <div id="section-physical" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <MapPin className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">Physical Life & Environment</h3>
+                <h3 className="text-xl font-bold text-gray-900">Physicality & Setting</h3>
               </div>
               <ul className="space-y-3">
                 {s[15].items.map((item, i) => (

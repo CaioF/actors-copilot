@@ -730,7 +730,7 @@ DO NOT output any conversational filler before the opening quote or after the cl
 * **Requirement:** A deep analysis of both internal and external blocks (2-3 paragraphs).
 * **Focus:** Make the scene harder. Heighten stakes and tension. Show what blocks the objective, focusing heavily on the character's own internal resistance (grief, ego, trauma, fear of exposure).
 
-## 11. The "Why Now?" / Stakes
+## 11. The Stakes
 * **Requirement:** 1-2 sharp paragraphs naming the inciting pressure of THIS specific moment.
 * **Focus:** Why is this conversation happening today and not yesterday or next week? Identify the inciting incident — the thing that has just changed, ruptured, expired, or surfaced — that makes the scene unavoidable right now. Tie it directly to what is at stake if the character walks out empty-handed.
 
@@ -750,7 +750,7 @@ DO NOT output any conversational filler before the opening quote or after the cl
 * **Requirement:** 1 tight paragraph (3-4 sentences).
 * **Focus:** Name the one thing this character is hiding — from the scene partner, from themselves, or both. Make it specific, dramatic, and consistent with the scene's logic. This is the private weight behind the eyes that the camera will read even when the lines are mundane.
 
-## 16. Physical Life & Environment
+## 16. Physicality & Setting
 * **Requirement:** A short, sensory list of 4-6 concrete details.
 * **Focus:** Where is the character physically? Temperature, light, smell, what they're touching, what's pressing on them (uncomfortable shoes, hangover, held breath). Suggest one specific physical center or tic for the character (e.g., "leads with the chin", "hands always near the throat", "shoulders an inch too high"). Make it actor-usable.
 

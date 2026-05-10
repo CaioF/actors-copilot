@@ -70,7 +70,7 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
   },
   {
     id: "craft-7",
-    text: "Help me build the Moment Before. Suggest three different 'entrances'—three different previous circumstances and how each one changes the first line of the scene.",
+    text: "Help me build the Moment Before. Suggest three different 'entrances' — three different previous circumstances and how each one changes the first line of the scene.",
     category: "actors_craft",
     placeholderKeys: [],
   },
