@@ -2,8 +2,8 @@
  * @jest-environment node
  */
 import { saveRawMessageToFirestore } from "./firestore.utils";
-import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { getApp } from "@/lib/firebase";
+import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
+import { getApp, getDb } from "@/lib/firebase";
 import { logger } from "@/lib/logger";
 
 // --- MOCK SETUP ---
@@ -25,11 +25,15 @@ jest.mock("firebase/firestore", () => ({
   getFirestore: jest.fn(),
   collection: jest.fn(),
   addDoc: jest.fn(),
+  doc: jest.fn(),
+  getDoc: jest.fn(),
+  setDoc: jest.fn(),
   serverTimestamp: jest.fn(() => "mocked-server-timestamp"),
 }));
 
 jest.mock("@/lib/firebase", () => ({
   getApp: jest.fn(() => "mocked-firebase-app"),
+  getDb: jest.fn(() => "mocked-db-instance"),
 }));
 
 describe("Firestore Utilities - saveRawMessageToFirestore", () => {
@@ -115,6 +119,129 @@ describe("Firestore Utilities - saveRawMessageToFirestore", () => {
         expect.objectContaining({
           err: networkError,
           msg: 'Error saving message to Firestore'
+        })
+      );
+    });
+  });
+});
+
+describe("Intro video helpers", () => {
+  const mockUserId = "test-user-123";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe("getHasSeenIntroVideo", () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("returns false when the actor profile document does not exist", async () => {
+      const { getHasSeenIntroVideo } = await import("./firestore.utils");
+      const mockDocRef = "mocked-doc-ref";
+      (doc as jest.Mock).mockReturnValue(mockDocRef);
+      (getDoc as jest.Mock).mockResolvedValueOnce({ exists: () => false });
+
+      const result = await getHasSeenIntroVideo(mockUserId);
+
+      expect(doc).toHaveBeenCalledWith(expect.anything(), "actorProfiles", mockUserId);
+      expect(getDoc).toHaveBeenCalledWith(mockDocRef);
+      expect(result).toBe(false);
+    });
+
+    it("returns false when hasSeenIntroVideo is not explicitly true", async () => {
+      const { getHasSeenIntroVideo } = await import("./firestore.utils");
+      const mockDocRef = "mocked-doc-ref";
+      (doc as jest.Mock).mockReturnValue(mockDocRef);
+      (getDoc as jest.Mock).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ hasSeenIntroVideo: false }),
+      });
+
+      const result = await getHasSeenIntroVideo(mockUserId);
+
+      expect(result).toBe(false);
+    });
+
+    it("returns true only when docSnap.data().hasSeenIntroVideo === true", async () => {
+      const { getHasSeenIntroVideo } = await import("./firestore.utils");
+      const mockDocRef = "mocked-doc-ref";
+      (doc as jest.Mock).mockReturnValue(mockDocRef);
+      (getDoc as jest.Mock).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ hasSeenIntroVideo: true }),
+      });
+
+      const result = await getHasSeenIntroVideo(mockUserId);
+
+      expect(result).toBe(true);
+    });
+
+    it("logs and re-throws when getDoc fails", async () => {
+      const { getHasSeenIntroVideo } = await import("./firestore.utils");
+      const mockDocRef = "mocked-doc-ref";
+      const networkError = new Error("Firebase: Network Unavailable");
+      (doc as jest.Mock).mockReturnValue(mockDocRef);
+      (getDoc as jest.Mock).mockRejectedValueOnce(networkError);
+
+      await expect(getHasSeenIntroVideo(mockUserId)).rejects.toThrow("Firebase: Network Unavailable");
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: networkError,
+          msg: "Error getting intro video seen status",
+        })
+      );
+    });
+  });
+
+  describe("markHasSeenIntroVideo", () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("calls setDoc with actorProfiles path and merge true", async () => {
+      const { markHasSeenIntroVideo } = await import("./firestore.utils");
+      const mockDocRef = "mocked-doc-ref";
+      (doc as jest.Mock).mockReturnValue(mockDocRef);
+      (setDoc as jest.Mock).mockResolvedValueOnce(undefined);
+
+      await markHasSeenIntroVideo(mockUserId);
+
+      expect(doc).toHaveBeenCalledWith(expect.anything(), "actorProfiles", mockUserId);
+      expect(setDoc).toHaveBeenCalledWith(
+        mockDocRef,
+        { hasSeenIntroVideo: true },
+        { merge: true }
+      );
+    });
+
+    it("logs and re-throws when setDoc fails", async () => {
+      const { markHasSeenIntroVideo } = await import("./firestore.utils");
+      const mockDocRef = "mocked-doc-ref";
+      const writeError = new Error("Firebase: Permission Denied");
+      (doc as jest.Mock).mockReturnValue(mockDocRef);
+      (setDoc as jest.Mock).mockRejectedValueOnce(writeError);
+
+      await expect(markHasSeenIntroVideo(mockUserId)).rejects.toThrow("Firebase: Permission Denied");
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: writeError,
+          msg: "Error marking intro video as seen",
         })
       );
     });
