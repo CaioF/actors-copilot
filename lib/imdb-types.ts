@@ -62,6 +62,7 @@ export interface Credit {
 export interface Showreel {
     title: string;
     url: string;
+    thumbnailUrl?: string;
 }
 
 export interface KnownForEntry {

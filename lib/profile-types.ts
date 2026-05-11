@@ -55,6 +55,7 @@ export type ExternalProfileKey = (typeof EXTERNAL_PROFILE_FIELDS)[number]["key"]
 const showreelSchema = z.object({
   title: z.string(),
   url: z.string(),
+  thumbnailUrl: z.string().optional(),
 });
 
 const creditSchema = z.object({

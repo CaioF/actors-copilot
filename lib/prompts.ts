@@ -932,6 +932,7 @@ Return ONLY a valid JSON object. No markdown, no conversational filler.
     {
       "title": "Title like 'Showreel 2025', 'Demo Reel 2:19' - extract from [Title](https://www.imdb.com/video/vi.../) patterns",
       "url": "Full video URL like https://www.imdb.com/video/vi2837170201/"
+      "thumbnailUrl": "Optional thumbnail URL if available in the source metadata"
     }
   ]
 }
@@ -1053,7 +1054,7 @@ Emit \`action: { type: "update_actor_profile", payload: { <one or more coach-wri
 - \`headshot\` (URL string)
 - \`bio\` (string, max 500 chars)
 - \`credits\` (array of \`{category, title, role, year, productionCompany, featured}\`)
-- \`showreels\` (array of \`{title, url}\`)
+- \`showreels\` (array of \`{title, url, thumbnailUrl}\`)
 - \`training\` (array of \`{category, institution, qualification, years}\`)
 - \`skillsAndAccents\` (string array)
 - \`awardsCallout\` (string)
