@@ -2,8 +2,8 @@
  * @jest-environment node
  */
 import { saveRawMessageToFirestore } from "./firestore.utils";
-import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
-import { getApp, getDb } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { logger } from "@/lib/logger";
 
 // --- MOCK SETUP ---
@@ -22,7 +22,6 @@ jest.mock('@/lib/logger', () => {
 });
 
 jest.mock("firebase/firestore", () => ({
-  getFirestore: jest.fn(),
   collection: jest.fn(),
   addDoc: jest.fn(),
   doc: jest.fn(),
@@ -32,7 +31,6 @@ jest.mock("firebase/firestore", () => ({
 }));
 
 jest.mock("@/lib/firebase", () => ({
-  getApp: jest.fn(() => "mocked-firebase-app"),
   getDb: jest.fn(() => "mocked-db-instance"),
 }));
 
@@ -56,15 +54,14 @@ describe("Firestore Utilities - saveRawMessageToFirestore", () => {
       const mockDbInstance = "mocked-db-instance";
       const mockCollectionRef = "mocked-collection-ref";
       
-      (getFirestore as jest.Mock).mockReturnValue(mockDbInstance);
+      (getDb as jest.Mock).mockReturnValue(mockDbInstance);
       (collection as jest.Mock).mockReturnValue(mockCollectionRef);
 
       // Act: Execute the function
       await saveRawMessageToFirestore(mockUserId, mockMessageData);
 
       // Assert: Verify the internal Firebase routing logic
-      expect(getApp).toHaveBeenCalledTimes(1);
-      expect(getFirestore).toHaveBeenCalledWith("mocked-firebase-app");
+      expect(getDb).toHaveBeenCalledTimes(1);
       expect(collection).toHaveBeenCalledWith(
         mockDbInstance,
         "users",

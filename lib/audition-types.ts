@@ -25,8 +25,9 @@ export interface CriticalBriefFact {
 
 // Brief analyze API returns the existing PerformanceMap shape with an optional
 // structured criticalBriefFacts channel carried alongside intro/sections/outro.
-// The wizard extracts criticalBriefFacts to its own top-level field on the
-// audition document — it is not stored inside briefPerformanceMap.
+// The wizard currently persists that full brief result inside briefPerformanceMap
+// and also mirrors criticalBriefFacts onto AuditionDocument.criticalBriefFacts
+// so downstream enrichment and coaching can read a stable top-level field.
 export interface BriefAnalysisResult extends PerformanceMap {
   criticalBriefFacts?: CriticalBriefFact[];
 }

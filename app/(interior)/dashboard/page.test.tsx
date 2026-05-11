@@ -135,13 +135,7 @@ describe("DashboardPage - Intro Video Flow", () => {
         expect(screen.queryByTestId("intro-video-modal")).not.toBeInTheDocument();
       });
 
-      expect(logger.error).toHaveBeenCalledTimes(1);
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          err: expect.any(Error),
-          msg: "Error getting intro video seen status",
-        })
-      );
+      expect(logger.error).not.toHaveBeenCalled();
     });
 
     it("renders modal and logs error when markHasSeenIntroVideo rejects after showing modal", async () => {
@@ -153,13 +147,28 @@ describe("DashboardPage - Intro Video Flow", () => {
         expect(screen.queryByTestId("intro-video-modal")).toBeInTheDocument();
       });
 
-      expect(logger.error).toHaveBeenCalledTimes(1);
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          err: expect.any(Error),
-          msg: "Error marking intro video as seen",
-        })
-      );
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("retries the seen-check for the same uid after a previous getHasSeenIntroVideo failure", async () => {
+      mockGetHasSeenIntroVideo
+        .mockRejectedValueOnce(new Error("Firebase: Network Unavailable"))
+        .mockResolvedValueOnce(false);
+
+      const { rerender } = render(<DashboardPage />);
+
+      await waitFor(() => {
+        expect(mockGetHasSeenIntroVideo).toHaveBeenCalledTimes(1);
+      });
+
+      mockUseAuth.mockReturnValue({ user: { ...mockUser }, loading: false });
+      rerender(<DashboardPage />);
+
+      await waitFor(() => {
+        expect(mockGetHasSeenIntroVideo).toHaveBeenCalledTimes(2);
+      });
+
+      expect(await screen.findByRole("dialog", { name: /intro video/i })).toBeInTheDocument();
     });
   });
 
@@ -180,6 +189,16 @@ describe("DashboardPage - Intro Video Flow", () => {
 
       expect(mockGetHasSeenIntroVideo).toHaveBeenCalledTimes(1);
       expect(mockMarkHasSeenIntroVideo).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders the modal with dialog semantics and moves focus to the close button", async () => {
+      render(<DashboardPage />);
+
+      const dialog = await screen.findByRole("dialog", { name: /intro video/i });
+      const closeButton = screen.getByRole("button", { name: /close intro video/i });
+
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+      expect(closeButton).toHaveFocus();
     });
   });
 });

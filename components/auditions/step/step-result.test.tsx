@@ -1,11 +1,12 @@
 /** @jest-environment jsdom */
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import type { ReactNode } from "react";
 import { StepResultSides } from "./step-result";
 
 jest.mock("react-markdown", () => ({
   __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 class IntersectionObserverMock {

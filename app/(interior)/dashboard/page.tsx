@@ -9,7 +9,6 @@ import { HistoryUploadModal } from "@/components/history-upload-modal";
 import { IntroVideoModal } from "@/components/intro-video-modal";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getHasSeenIntroVideo, markHasSeenIntroVideo } from "@/lib/firestore.utils";
-import { logger } from "@/lib/logger";
 
 /**
  * Main dashboard page showing the self-tape copilot workflow.
@@ -25,22 +24,18 @@ export default function DashboardPage() {
   useEffect(() => {
     if (loading || !user || checkedIntroUserIdRef.current === user.uid) return;
 
-    checkedIntroUserIdRef.current = user.uid;
     let cancelled = false;
 
     const checkAndShowIntroVideo = async () => {
       try {
         const hasSeen = await getHasSeenIntroVideo(user.uid);
+        checkedIntroUserIdRef.current = user.uid;
         if (!hasSeen && !cancelled) {
           setIsIntroVideoOpen(true);
-          try {
-            await markHasSeenIntroVideo(user.uid);
-          } catch (err) {
-            logger.error({ err, msg: "Error marking intro video as seen" });
-          }
+          await markHasSeenIntroVideo(user.uid).catch(() => undefined);
         }
-      } catch (err) {
-        logger.error({ err, msg: "Error getting intro video seen status" });
+      } catch {
+        checkedIntroUserIdRef.current = null;
       }
     };
 

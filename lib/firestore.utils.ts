@@ -1,5 +1,5 @@
-import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
-import { getApp, getDb } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getDb } from '@/lib/firebase';
 import { logger } from '@/lib/logger';
 
 /**
@@ -20,7 +20,7 @@ export async function saveRawMessageToFirestore(
     }
 ): Promise<void> {
     try {
-        const db = getFirestore(getApp());
+        const db = getDb();
         const chatLogsRef = collection(db, 'users', userId, 'chatLogs');
         
         await addDoc(chatLogsRef, {

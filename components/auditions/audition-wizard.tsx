@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Printer, Trash2, Save, CalendarDays, User as UserIcon } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
-import ReactMarkdown from "react-markdown";
 import { AuditionFormData, initialAuditionData, AuditionStep, CriticalBriefFact } from "@/lib/audition-types";
 import { Stepper } from "./stepper";
 import { StepBasics } from "./step/step-basic";
 import { StepUpload } from "./step/step-upload";
 import { StepReview } from "./step/step-review";
+import { PerformanceMapPrintBlock } from "./step/performance-map-print-block";
 import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, updateDoc, getDoc, getDocs, doc, query, where, serverTimestamp } from "firebase/firestore";
@@ -803,61 +803,13 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                      <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
                    </div>
 
-                   {/* Critical Brief Facts Block */}
-                   {resultData?.criticalBriefFacts && resultData.criticalBriefFacts.length > 0 && (
-                     <div className="mb-10 p-6 border-2 border-black break-inside-avoid">
-                       <h2 className="text-xl font-bold text-black mb-3 uppercase tracking-wide">
-                         Critical Facts from the Casting Brief
-                       </h2>
-                       <ul className="space-y-2">
-                         {resultData.criticalBriefFacts.map((fact, i) => (
-                           <li key={i} className="text-black text-[15px]">
-                             <span className="font-bold uppercase text-xs mr-2">[{fact.importance}]</span>
-                             <span className="font-semibold">{fact.label}:</span> {fact.value}
-                           </li>
-                         ))}
-                       </ul>
-                     </div>
-                   )}
-
-                   {/* Intro Block */}
-                   {resultData?.intro && (
-                     <div className="mb-10 p-6 bg-gray-50 border-l-4 border-black break-inside-avoid">
-                       <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
-                         <ReactMarkdown>{resultData.intro}</ReactMarkdown>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* Sections Loop */}
-                   <div className="space-y-10">
-                     {resultData?.sections?.map((sec: PerformanceSection, idx: number) => (
-                       <div key={idx} className="break-inside-avoid">
-                         <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
-                           {sec.title}
-                         </h3>
-                         <ul className="space-y-4">
-                           {sec.items.map((item: string, i: number) => (
-                             <li key={i} className="flex items-start text-black">
-                               <span className="mr-4 text-black font-bold text-lg">•</span>
-                               <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
-                                 <ReactMarkdown>{item}</ReactMarkdown>
-                               </div>
-                             </li>
-                           ))}
-                         </ul>
-                       </div>
-                     ))}
-                   </div>
-
-                   {/* Final Block */}
-                   {resultData?.outro && (
-                     <div className="mt-12 pt-8 border-t border-black text-center break-inside-avoid">
-                       <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
-                         <ReactMarkdown>{resultData.outro}</ReactMarkdown>
-                       </div>
-                     </div>
-                   )}
+                    <PerformanceMapPrintBlock
+                      data={resultData}
+                      heading={null}
+                      accentColor="black"
+                      keyPrefix="wizard"
+                      criticalFacts={resultData?.criticalBriefFacts ?? null}
+                    />
                  </div>
                </div>
 
