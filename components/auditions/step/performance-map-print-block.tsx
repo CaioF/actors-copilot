@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import type { CriticalBriefFact } from "@/lib/audition-types";
 
 interface PerformanceSection {
   title: string;
@@ -11,6 +12,7 @@ interface PerformanceMap {
   intro?: string;
   sections: PerformanceSection[];
   outro?: string;
+  criticalBriefFacts?: CriticalBriefFact[] | null;
 }
 
 interface PerformanceMapPrintBlockProps {
@@ -21,6 +23,9 @@ interface PerformanceMapPrintBlockProps {
   accentColor?: string;
   /** Stable key prefix so React keys don't collide when two blocks render in the same parent. */
   keyPrefix?: string;
+  /** Critical brief facts (director/casting non-negotiables) rendered as a highlighted
+   *  block above the intro. Pass undefined or [] to skip. */
+  criticalFacts?: CriticalBriefFact[] | null;
 }
 
 /**
@@ -34,14 +39,38 @@ export function PerformanceMapPrintBlock({
   heading = null,
   accentColor = "black",
   keyPrefix = "pm",
+  criticalFacts = null,
 }: PerformanceMapPrintBlockProps) {
   if (!data) return null;
+  const resolvedCriticalFacts = criticalFacts ?? data.criticalBriefFacts ?? null;
 
   return (
     <div className="mb-12">
       {heading && (
         <div className="border-b-2 pb-2 mb-6" style={{ borderColor: accentColor }}>
           <h2 className="text-2xl font-bold text-black">{heading}</h2>
+        </div>
+      )}
+
+      {resolvedCriticalFacts && resolvedCriticalFacts.length > 0 && (
+        <div
+          className="mb-10 p-6 border-2 break-inside-avoid"
+          style={{ borderColor: accentColor }}
+        >
+          <h3 className="text-lg font-bold text-black mb-3 uppercase tracking-wide">
+            Critical Facts from the Casting Brief
+          </h3>
+          <ul className="space-y-2">
+            {resolvedCriticalFacts.map((fact, i) => (
+              <li
+                key={`${keyPrefix}-fact-${i}`}
+                className="text-black text-[15px]"
+              >
+                <span className="font-bold uppercase text-xs mr-2">[{fact.importance}]</span>
+                <span className="font-semibold">{fact.label}:</span> {fact.value}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

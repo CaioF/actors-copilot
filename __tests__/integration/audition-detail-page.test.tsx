@@ -252,4 +252,82 @@ describe("AuditionDetailView regression (legacy single-analysis)", () => {
       expect(screen.getByText(/attach sides/i)).toBeInTheDocument();
     });
   });
+
+  it("renders the critical-facts block on a dual-map audition with criticalBriefFacts stored", async () => {
+    const dualWithFacts = {
+      project: "Hamlet",
+      role: "Ophelia",
+      sidesPerformanceMap: {
+        intro: "Ophelia sides intro",
+        sections: [{ title: "The Flowers", items: ["There's rosemary"] }],
+        outro: "Ophelia sides outro",
+      },
+      briefPerformanceMap: {
+        intro: "Ophelia brief intro",
+        sections: [{ title: "Psychology", items: ["Betrayal"] }],
+        outro: "Ophelia brief outro",
+      },
+      criticalBriefFacts: [
+        { label: "Character Age", value: "Early 20s", importance: "critical" },
+        { label: "Accent", value: "RP English", importance: "important" },
+      ],
+      hasSides: true,
+      hasBrief: true,
+      analysisType: "sides",
+    };
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => dualWithFacts,
+    });
+
+    const Page = require("@/app/(interior)/auditions/[id]/page");
+    const AuditionDetailView = Page.default || Page;
+    render(<AuditionDetailView />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Hamlet")[0]).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("region", { name: /critical facts from the casting brief/i })
+    ).toBeInTheDocument();
+    // Label/value pairs appear in both the screen block and the hidden print template
+    expect(screen.getAllByText("Character Age:").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Early 20s/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Accent:").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RP English/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not render the critical-facts block when criticalBriefFacts is absent", async () => {
+    const sidesOnlyNofacts = {
+      project: "Hamlet",
+      role: "Ophelia",
+      sidesPerformanceMap: {
+        intro: "Ophelia sides intro",
+        sections: [{ title: "The Flowers", items: ["There's rosemary"] }],
+        outro: "Ophelia sides outro",
+      },
+      hasSides: true,
+      hasBrief: false,
+      analysisType: "sides",
+    };
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => sidesOnlyNofacts,
+    });
+
+    const Page = require("@/app/(interior)/auditions/[id]/page");
+    const AuditionDetailView = Page.default || Page;
+    render(<AuditionDetailView />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Hamlet")[0]).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("region", { name: /critical facts from the casting brief/i })
+    ).not.toBeInTheDocument();
+  });
 });

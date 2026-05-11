@@ -1,5 +1,6 @@
 import { buildCoachPrompt } from "./build-coach-prompt";
 import { CoachPromptInput, RetrievedExcerpt, AuditionSummary } from "./contracts";
+import type { CriticalBriefFact } from "@/lib/audition-types";
 
 describe("buildCoachPrompt", () => {
   describe("Initialization & Basic Functionality", () => {
@@ -622,6 +623,151 @@ describe("buildCoachPrompt", () => {
       expect(refIdx).toBeGreaterThan(auditionsIdx);
       expect(historyIdx).toBeGreaterThan(refIdx);
       expect(questionIdx).toBeGreaterThan(historyIdx);
+    });
+  });
+
+  describe("CriticalBriefFacts Type Plumbing", () => {
+    it("accepts criticalBriefFacts in auditionFullData without type casts", () => {
+      const criticalBriefFacts: CriticalBriefFact[] = [
+        { label: "Character Age", value: "Late 30s", importance: "important" },
+        { label: "Director Style", value: "Method-oriented", importance: "critical" },
+      ];
+      const auditionFullData = {
+        project: "TestProject",
+        role: "TestRole",
+        hasSides: true,
+        hasBrief: true,
+        sidesPerformanceMap: {
+          intro: "Sides intro",
+          sections: [{ title: "Sides Section", items: ["Sides item"] }],
+        },
+        briefPerformanceMap: {
+          intro: "Brief intro",
+          sections: [{ title: "Brief Section", items: ["Brief item"] }],
+        },
+        criticalBriefFacts,
+      };
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData,
+      });
+      expect(prompt).toContain("TestProject");
+    });
+  });
+
+  describe("Critical Brief Facts Section", () => {
+    const criticalBriefFacts: CriticalBriefFact[] = [
+      { label: "Character Age", value: "Late 30s", importance: "critical" },
+      { label: "Director Style", value: "Method-oriented", importance: "important" },
+    ];
+
+    it("includes # CRITICAL BRIEF FACTS section when criticalBriefFacts is present", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: {
+          project: "Hamlet",
+          role: "Ophelia",
+          criticalBriefFacts,
+        },
+      });
+      expect(prompt).toContain("# CRITICAL BRIEF FACTS");
+      expect(prompt).toContain("Character Age: Late 30s (critical)");
+      expect(prompt).toContain("Director Style: Method-oriented (important)");
+    });
+
+    it("omits # CRITICAL BRIEF FACTS section when criticalBriefFacts is undefined", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: { project: "Hamlet", role: "Ophelia" },
+      });
+      expect(prompt).not.toContain("# CRITICAL BRIEF FACTS");
+    });
+
+    it("omits # CRITICAL BRIEF FACTS section when criticalBriefFacts is null", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: { project: "Hamlet", role: "Ophelia", criticalBriefFacts: null },
+      });
+      expect(prompt).not.toContain("# CRITICAL BRIEF FACTS");
+    });
+
+    it("omits # CRITICAL BRIEF FACTS section when criticalBriefFacts is empty", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: { project: "Hamlet", role: "Ophelia", criticalBriefFacts: [] },
+      });
+      expect(prompt).not.toContain("# CRITICAL BRIEF FACTS");
+    });
+
+    it("skips malformed facts with empty label or value rather than rendering placeholders", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: {
+          project: "Hamlet",
+          role: "Ophelia",
+          criticalBriefFacts: [
+            { label: "", value: "orphaned value", importance: "critical" },
+            { label: "Valid Fact", value: "kept", importance: "important" },
+            { label: "Missing Value", value: "", importance: "critical" },
+          ],
+        },
+      });
+      expect(prompt).toContain("# CRITICAL BRIEF FACTS");
+      expect(prompt).toContain("Valid Fact: kept (important)");
+      expect(prompt).not.toContain("orphaned value");
+      expect(prompt).not.toContain("Missing Value: ");
+    });
+
+    it("renders critical brief facts alongside both performance maps, not in place of them", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: {
+          project: "Hamlet",
+          role: "Ophelia",
+          hasSides: true,
+          hasBrief: true,
+          sidesPerformanceMap: {
+            intro: "Sides intro",
+            sections: [{ title: "Sides Section", items: ["sides item"] }],
+          },
+          briefPerformanceMap: {
+            intro: "Brief intro",
+            sections: [{ title: "Brief Section", items: ["brief item"] }],
+          },
+          criticalBriefFacts,
+        },
+      });
+      expect(prompt).toContain("# CRITICAL BRIEF FACTS");
+      expect(prompt).toContain("# SIDES BREAKDOWN");
+      expect(prompt).toContain("# BRIEF BREAKDOWN");
+    });
+
+    it("places # CRITICAL BRIEF FACTS before # ACTIVE AUDITION BREAKDOWN", () => {
+      const prompt = buildCoachPrompt({
+        excerpts: [],
+        question: "Test question?",
+        auditionFullData: {
+          project: "Hamlet",
+          role: "Ophelia",
+          hasSides: true,
+          sidesPerformanceMap: {
+            intro: "Sides intro",
+            sections: [{ title: "Sides Section", items: ["sides item"] }],
+          },
+          criticalBriefFacts,
+        },
+      });
+      const factsIdx = prompt.indexOf("# CRITICAL BRIEF FACTS");
+      const mapIdx = prompt.indexOf("# ACTIVE AUDITION BREAKDOWN");
+      expect(factsIdx).toBeGreaterThan(0);
+      expect(mapIdx).toBeGreaterThan(factsIdx);
     });
   });
 });

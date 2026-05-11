@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Hourglass, Brain, Lock, MapPin } from "lucide-react";
+import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Hourglass, Brain, Lock, MapPin, AlertTriangle } from "lucide-react";
 import React from "react";
+import type { CriticalBriefFact } from "@/lib/audition-types";
 
 interface Section {
   title: string;
@@ -15,6 +16,7 @@ interface StepResultProps {
     intro?: string;
     sections: Section[];
     outro?: string;
+    criticalBriefFacts?: CriticalBriefFact[];
   };
   onCoachClick?: () => void;
 }
@@ -72,11 +74,11 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
     { id: "section-palette", icon: Heart, label: "Emotional Palette" },
     { id: "section-beats", icon: Key, label: "Key Beats" },
     { id: "section-tactics", icon: Shield, label: "Tactics & Obstacles" },
-    { id: "section-why-now", icon: Clock, label: "The “Why Now?” / Stakes" },
-    { id: "section-moment", icon: Hourglass, label: "The Moment Before & After" },
-    { id: "section-monologue", icon: Brain, label: "Inner Monologue / Subtext" },
+    { id: "section-why-now", icon: Clock, label: "The Stakes" },
+    { id: "section-moment", icon: Hourglass, label: "The Moment" },
+    { id: "section-monologue", icon: Brain, label: "Inner Monologue" },
     { id: "section-secret", icon: Lock, label: "The Secret" },
-    { id: "section-physical", icon: MapPin, label: "Physical Life & Environment" },
+    { id: "section-physical", icon: MapPin, label: "Physicality & Setting" },
     { id: "section-notes", icon: MessageCircle, label: "Coach Notes" },
     { id: "section-tape", icon: Video, label: "Self-Tape Plan" },
     { id: "section-bold-choice", icon: Flame, label: "The Bold Choice" },
@@ -88,7 +90,51 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
       
       {/* LEFT COLUMN: MAIN CONTENT */}
       <div className="space-y-6">
-        
+
+        {/* CRITICAL BRIEF FACTS — director/casting-supplied non-negotiables that must be honored
+            even if they are not present in the sides text. Rendered prominently above the
+            normal analysis so the actor reads them first. */}
+        {data.criticalBriefFacts && data.criticalBriefFacts.length > 0 && (
+          <section
+            id="section-critical-brief-facts"
+            role="region"
+            aria-labelledby="critical-brief-facts-heading"
+            className="rounded-2xl bg-[#FFF1E8] border-2 border-[#FF7316] shadow-sm p-6 sm:p-8 scroll-mt-8"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="text-[#FF7316]" size={24} aria-hidden="true" />
+              <h3 id="critical-brief-facts-heading" className="text-xl font-bold text-[#7A2E00]">
+                Critical Facts from the Casting Brief
+              </h3>
+            </div>
+            <p className="text-sm text-[#7A2E00]/80 mb-4">
+              Director- or casting-supplied facts that are non-negotiable for this audition. Honor these even when the sides do not mention them.
+            </p>
+            <ul className="space-y-3">
+              {data.criticalBriefFacts.map((fact, i) => (
+                <li
+                  key={`${fact.label}-${i}`}
+                  className="flex items-start gap-3 p-3 rounded-lg bg-white border border-[#FF7316]/30"
+                >
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                      fact.importance === "critical"
+                        ? "bg-[#FF7316] text-white"
+                        : "bg-[#FFE0CC] text-[#7A2E00]"
+                    }`}
+                  >
+                    {fact.importance}
+                  </span>
+                  <div className="text-[15px] text-[#2C3328]">
+                    <span className="font-semibold">{fact.label}:</span>{" "}
+                    <span>{fact.value}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {data.intro && (
           <div className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border-l-4 border-[#FF7316]">
             <div className="prose prose-slate max-w-none prose-p:text-lg prose-p:italic prose-p:leading-relaxed text-gray-700">
@@ -234,22 +280,22 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 11. The "Why Now?" / Stakes */}
+            {/* 11. The Stakes */}
             <div id="section-why-now" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <Clock className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">The “Why Now?” / Stakes</h3>
+                <h3 className="text-xl font-bold text-gray-900">The Stakes</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
                 {s[10].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
               </div>
             </div>
 
-            {/* 12 & 13. The Moment Before & After */}
+            {/* 12 & 13. The Moment */}
             <div id="section-moment" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-6">
                 <Hourglass className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">The Moment Before & After</h3>
+                <h3 className="text-xl font-bold text-gray-900">The Moment</h3>
               </div>
               <div className="mb-6">
                 <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment Before</h4>
@@ -259,18 +305,18 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
               <hr className="border-gray-200 my-6" />
               <div>
-                <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment After (living past the cut)</h4>
+                <h4 className="font-bold text-gray-900 mb-3 font-title tracking-tight">Moment After</h4>
                 <div className="text-gray-700 text-[15px]">
                   {s[12].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
                 </div>
               </div>
             </div>
 
-            {/* 14. Inner Monologue / Subtext */}
+            {/* 14. Inner Monologue */}
             <div id="section-monologue" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <Brain className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">Inner Monologue / Subtext</h3>
+                <h3 className="text-xl font-bold text-gray-900">Inner Monologue</h3>
               </div>
               <ul className="space-y-3">
                 {s[13].items.map((item, i) => (
@@ -297,11 +343,11 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
-            {/* 16. Physical Life & Environment */}
+            {/* 16. Physicality & Setting */}
             <div id="section-physical" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <MapPin className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">Physical Life & Environment</h3>
+                <h3 className="text-xl font-bold text-gray-900">Physicality & Setting</h3>
               </div>
               <ul className="space-y-3">
                 {s[15].items.map((item, i) => (

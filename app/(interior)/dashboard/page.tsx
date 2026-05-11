@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dna, Monitor, Sparkles, FileText } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { StepCard } from "@/components/step-card";
 import { MemoryRecordingBanner } from "@/components/memory-recording-banner";
 import { HistoryUploadModal } from "@/components/history-upload-modal";
+import { IntroVideoModal } from "@/components/intro-video-modal";
+import { useAuth } from "@/lib/context/AuthContext";
+import { getHasSeenIntroVideo, markHasSeenIntroVideo } from "@/lib/firestore.utils";
 
 /**
  * Main dashboard page showing the self-tape copilot workflow.
@@ -14,6 +17,34 @@ import { HistoryUploadModal } from "@/components/history-upload-modal";
  */
 export default function DashboardPage() {
   const [isBaselineModalOpen, setIsBaselineModalOpen] = useState(false);
+  const [isIntroVideoOpen, setIsIntroVideoOpen] = useState(false);
+  const { user, loading } = useAuth();
+  const checkedIntroUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (loading || !user || checkedIntroUserIdRef.current === user.uid) return;
+
+    let cancelled = false;
+
+    const checkAndShowIntroVideo = async () => {
+      try {
+        const hasSeen = await getHasSeenIntroVideo(user.uid);
+        checkedIntroUserIdRef.current = user.uid;
+        if (!hasSeen && !cancelled) {
+          setIsIntroVideoOpen(true);
+          await markHasSeenIntroVideo(user.uid).catch(() => undefined);
+        }
+      } catch {
+        checkedIntroUserIdRef.current = null;
+      }
+    };
+
+    checkAndShowIntroVideo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user]);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -86,6 +117,10 @@ export default function DashboardPage() {
             setIsBaselineModalOpen(false);
           }}
         />
+      )}
+
+      {isIntroVideoOpen && (
+        <IntroVideoModal onClose={() => setIsIntroVideoOpen(false)} />
       )}
     </main>
   );

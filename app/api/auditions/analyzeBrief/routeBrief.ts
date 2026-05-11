@@ -13,6 +13,11 @@ interface PerformanceMap {
     items: string[];
   }[];
   outro: string;
+  criticalBriefFacts?: {
+    label: string;
+    value: string;
+    importance: "critical" | "important";
+  }[] | null;
 }
 
 /**
@@ -197,10 +202,22 @@ export async function POST(request: Request) {
                 required: ["title", "items"]
               }
             },
-            outro: { type: SchemaType.STRING }
+            outro: { type: SchemaType.STRING },
+            criticalBriefFacts: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  label: { type: SchemaType.STRING },
+                  value: { type: SchemaType.STRING },
+                  importance: { type: SchemaType.STRING }
+                },
+                required: ["label", "value", "importance"]
+              }
+            }
           },
           required: ["intro", "sections", "outro"]
-        } 
+        }
       }
     });
 
@@ -211,27 +228,32 @@ export async function POST(request: Request) {
 
       ${categoryInstruction}
       
-      === ACTOR'S DNA VAULT (MASTER PROFILE) ===
-      CRITICAL INSTRUCTION: You MUST use this profile as the psychological lens. 
-      Identify which specific traits, past experiences, or emotional reservoirs from their DNA 
+      <actor_dna>
+      CRITICAL INSTRUCTION: You MUST use this profile as the psychological lens.
+      Identify which specific traits, past experiences, or emotional reservoirs from their DNA
       perfectly align with the director's vision and character archetype described below.
-      
+
       ${actorDNAContext}
-      ==========================================
-      
+      </actor_dna>
+
       Here are the casting materials for analysis:
 
-      CONTEXT:
+      <context>
       - Project Category: ${projectType.toUpperCase()}
       - Project: ${project || "Not specified"}
       - Role: ${role || "Not specified"}
       ${deadline ? `- Deadline: ${deadline}` : ""}
       ${auditionTimezone ? `- Project Timezone: ${auditionTimezone}` : ""}
       ${castingDirectorName ? `- Casting Director (named by the actor — verify against the brief and reflect in your "People Mentioned" section if confirmed): ${castingDirectorName}` : ""}
+      </context>
 
-      CHARACTER BRIEF / CASTING NOTES:
+      <casting_brief>
       ${briefText}
-      ${priorSidesSummary ? `\n=== PRIOR SIDES ANALYSIS ===\n${priorSidesSummary}` : ""}
+      </casting_brief>
+
+      ${priorSidesSummary ? `\n<prior_sides_analysis>\n${priorSidesSummary}\n</prior_sides_analysis>` : ""}
+
+      REMINDER: In addition to the chronological workflow sections, extract any director- or casting-supplied character facts that are critical for performance but may be absent from the sides into the dedicated "criticalBriefFacts" output field, labeling each fact with an importance of "critical" or "important". These critical brief facts must be preserved verbatim so they survive into downstream sides analysis and coaching.
     `;
 
     // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE

@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Printer, Trash2, Save, CalendarDays, User as UserIcon } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
-import ReactMarkdown from "react-markdown";
-import { AuditionFormData, initialAuditionData, AuditionStep } from "@/lib/audition-types";
+import { AuditionFormData, initialAuditionData, AuditionStep, CriticalBriefFact } from "@/lib/audition-types";
 import { Stepper } from "./stepper";
 import { StepBasics } from "./step/step-basic";
 import { StepUpload } from "./step/step-upload";
 import { StepReview } from "./step/step-review";
+import { PerformanceMapPrintBlock } from "./step/performance-map-print-block";
 import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, updateDoc, getDoc, getDocs, doc, query, where, serverTimestamp } from "firebase/firestore";
@@ -39,6 +39,7 @@ interface AuditionAnalysisResult {
   intro?: string;
   sections: PerformanceSection[];
   outro?: string;
+  criticalBriefFacts?: CriticalBriefFact[];
 }
 
 interface AuditionWizardProps {
@@ -239,6 +240,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
       let priorSidesSummary = "";
       let priorBriefSummary = "";
+      let criticalBriefFactsPayload = "";
 
       if (auditionId) {
         try {
@@ -249,6 +251,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
             const existing = docSnap.data() as {
               sidesPerformanceMap?: AuditionAnalysisResult | null;
               briefPerformanceMap?: AuditionAnalysisResult | null;
+              criticalBriefFacts?: CriticalBriefFact[] | null;
             };
 
             const complementaryMap = mode === "brief"
@@ -283,6 +286,13 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
               } else {
                 priorBriefSummary = summaryText;
               }
+            }
+
+            // When generating sides for an audition that already has brief-derived
+            // critical facts, send them through their own non-lossy structured channel
+            // so they survive into the sides prompt and resulting analysis.
+            if (mode === "sides" && existing.criticalBriefFacts && existing.criticalBriefFacts.length > 0) {
+              criticalBriefFactsPayload = JSON.stringify(existing.criticalBriefFacts);
             }
           }
         } catch (error) {
@@ -326,6 +336,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       payload.append("userPath", userPath);
       if (priorSidesSummary) payload.append("priorSidesSummary", priorSidesSummary);
       if (priorBriefSummary) payload.append("priorBriefSummary", priorBriefSummary);
+      if (criticalBriefFactsPayload) payload.append("criticalBriefFactsPayload", criticalBriefFactsPayload);
 
       const endpoint = mode === "sides"
         ? "/api/auditions/analyzeSides"
@@ -395,6 +406,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     analysisType: mode,
     sidesPerformanceMap: mode === "sides" ? resultData : null,
     briefPerformanceMap: mode === "brief" ? resultData : null,
+    criticalBriefFacts: resultData?.criticalBriefFacts ?? null,
     hasSides: mode === "sides",
     hasBrief: mode === "brief",
     createdAt: serverTimestamp(),
@@ -406,20 +418,31 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
    * Merges updated audition metadata (project/role/deadline/timezone/castingDirectorName)
    * with the new performance map so enrichment saves keep the full doc in sync.
    */
-  const buildMergeUpdate = (existing: Record<string, unknown>) => ({
-    ...existing,
-    // Keep metadata in sync with any edits made during enrichment
-    project: formData.project.trim(),
-    role: formData.role.trim(),
-    deadline: formData.deadline || null,
-    auditionTimezone: formData.auditionTimezone || null,
-    actorLocalDeadline: localDeadlineStr,
-    castingDirectorName: formData.castingDirectorName?.trim() || null,
-    // Merge the newly generated performance map
-    ...(mode === "sides"
-      ? { sidesPerformanceMap: resultData, hasSides: true }
-      : { briefPerformanceMap: resultData, hasBrief: true }),
-  });
+  const buildMergeUpdate = (existing: Record<string, unknown>) => {
+    // Critical brief facts come from the brief analysis. On brief saves we overwrite
+    // with the freshly generated facts; on sides saves we preserve whatever was
+    // stored previously so a later sides re-run never erases brief-derived facts.
+    const existingFacts =
+      (existing as { criticalBriefFacts?: CriticalBriefFact[] | null }).criticalBriefFacts ?? null;
+    const nextCriticalBriefFacts =
+      mode === "brief" ? resultData?.criticalBriefFacts ?? null : existingFacts;
+
+    return {
+      ...existing,
+      // Keep metadata in sync with any edits made during enrichment
+      project: formData.project.trim(),
+      role: formData.role.trim(),
+      deadline: formData.deadline || null,
+      auditionTimezone: formData.auditionTimezone || null,
+      actorLocalDeadline: localDeadlineStr,
+      castingDirectorName: formData.castingDirectorName?.trim() || null,
+      criticalBriefFacts: nextCriticalBriefFacts,
+      // Merge the newly generated performance map
+      ...(mode === "sides"
+        ? { sidesPerformanceMap: resultData, hasSides: true }
+        : { briefPerformanceMap: resultData, hasBrief: true }),
+    };
+  };
 
   /**
    * Returns the id of an existing audition matching project+role+analysisType, or null.
@@ -780,44 +803,12 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                      <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
                    </div>
 
-                   {/* Intro Block */}
-                   {resultData?.intro && (
-                     <div className="mb-10 p-6 bg-gray-50 border-l-4 border-black break-inside-avoid">
-                       <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic prose-p:leading-relaxed">
-                         <ReactMarkdown>{resultData.intro}</ReactMarkdown>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* Sections Loop */}
-                   <div className="space-y-10">
-                     {resultData?.sections?.map((sec: PerformanceSection, idx: number) => (
-                       <div key={idx} className="break-inside-avoid">
-                         <h3 className="text-2xl font-bold text-black border-b border-gray-300 pb-2 mb-4">
-                           {sec.title}
-                         </h3>
-                         <ul className="space-y-4">
-                           {sec.items.map((item: string, i: number) => (
-                             <li key={i} className="flex items-start text-black">
-                               <span className="mr-4 text-black font-bold text-lg">•</span>
-                               <div className="prose max-w-none prose-p:text-black prose-strong:text-black prose-p:m-0 prose-p:leading-relaxed">
-                                 <ReactMarkdown>{item}</ReactMarkdown>
-                               </div>
-                             </li>
-                           ))}
-                         </ul>
-                       </div>
-                     ))}
-                   </div>
-
-                   {/* Final Block */}
-                   {resultData?.outro && (
-                     <div className="mt-12 pt-8 border-t border-black text-center break-inside-avoid">
-                       <div className="prose max-w-none prose-p:text-black prose-strong:text-black italic">
-                         <ReactMarkdown>{resultData.outro}</ReactMarkdown>
-                       </div>
-                     </div>
-                   )}
+                    <PerformanceMapPrintBlock
+                      data={resultData}
+                      heading={null}
+                      accentColor="black"
+                      keyPrefix="wizard"
+                    />
                  </div>
                </div>
 

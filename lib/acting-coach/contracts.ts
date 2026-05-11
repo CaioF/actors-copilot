@@ -23,7 +23,9 @@ export interface CoachPromptInput {
     content: string;
   }>;
   auditions?: AuditionSummary[];
-  auditionFullData?: Record<string, unknown>;
+  auditionFullData?: Record<string, unknown> & {
+    criticalBriefFacts?: import("@/lib/audition-types").CriticalBriefFact[] | null;
+  };
   currentFocus?: {
     sessionFocus: string | null;
     stepIndex: number;

@@ -13,6 +13,11 @@ interface PerformanceMap {
     items: string[];
   }[];
   outro: string;
+  criticalBriefFacts?: {
+    label: string;
+    value: string;
+    importance: "critical" | "important";
+  }[] | null;
 }
 
 /**
@@ -177,10 +182,10 @@ export async function POST(request: Request) {
 
     const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
 
-    const model = getGenerativeModel(ai, { 
-      model: "gemini-3.1-pro-preview", 
-      systemInstruction: { role: "user", parts: [{ text: BRIEF_ANALYSIS_PROMPT }] }, 
-      generationConfig: { 
+    const model = getGenerativeModel(ai, {
+      model: "gemini-3.1-pro-preview",
+      systemInstruction: { role: "user", parts: [{ text: BRIEF_ANALYSIS_PROMPT }] },
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
           type: SchemaType.OBJECT,
@@ -197,10 +202,22 @@ export async function POST(request: Request) {
                 required: ["title", "items"]
               }
             },
-            outro: { type: SchemaType.STRING }
+            outro: { type: SchemaType.STRING },
+            criticalBriefFacts: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  label: { type: SchemaType.STRING },
+                  value: { type: SchemaType.STRING },
+                  importance: { type: SchemaType.STRING }
+                },
+                required: ["label", "value", "importance"]
+              }
+            }
           },
           required: ["intro", "sections", "outro"]
-        } 
+        }
       }
     });
 
@@ -233,8 +250,10 @@ export async function POST(request: Request) {
       <casting_brief>
       ${briefText}
       </casting_brief>
-      
+
       ${priorSidesSummary ? `\n<prior_sides_analysis>\n${priorSidesSummary}\n</prior_sides_analysis>` : ""}
+
+      REMINDER: In addition to the chronological workflow sections, extract any director- or casting-supplied character facts that are critical for performance but may be absent from the sides into the dedicated "criticalBriefFacts" output field, labeling each fact with an importance of "critical" or "important". These critical brief facts must be preserved verbatim so they survive into downstream sides analysis and coaching.
     `;
 
     // 7. EXECUTE AI INFERENCE AND PARSE RESPONSE

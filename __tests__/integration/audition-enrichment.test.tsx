@@ -442,6 +442,65 @@ describe("Brief → Sides enrichment integration", () => {
     expect(capturedPrompt).toContain(priorBrief);
   });
 
+  it("analyzeSides with criticalBriefFactsPayload injects both prior_brief_analysis and critical_brief_facts into prompt", async () => {
+    let capturedPrompt = "";
+    mockedGetGenerativeModel.mockImplementation((_ai, _config) => ({
+      generateContent: jest.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          response: { text: () => JSON.stringify(sidesResult) },
+        });
+      }),
+    }));
+
+    const facts = [
+      { label: "Character Age", value: "Late 30s", importance: "critical" },
+      { label: "Accent", value: "RP English", importance: "important" },
+    ];
+    const formData = {
+      userPath: "user123_TestActor",
+      sidesText: "There's rosemary, that's for remembrance.",
+      priorBriefSummary: "Ophelia is characterized by her gentle and naive nature.",
+      criticalBriefFactsPayload: JSON.stringify(facts),
+    };
+    const request = buildMockRequest("Bearer valid_token", formData);
+
+    const response = await analyzeSides(request);
+
+    expect(response.status).toBe(200);
+    expect(capturedPrompt).toContain("<prior_brief_analysis>");
+    expect(capturedPrompt).toContain("<critical_brief_facts>");
+    expect(capturedPrompt).toContain("[CRITICAL] Character Age: Late 30s");
+    expect(capturedPrompt).toContain("[IMPORTANT] Accent: RP English");
+  });
+
+  it("analyzeSides with criticalBriefFactsPayload but no priorBriefSummary still injects critical_brief_facts", async () => {
+    let capturedPrompt = "";
+    mockedGetGenerativeModel.mockImplementation((_ai, _config) => ({
+      generateContent: jest.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          response: { text: () => JSON.stringify(sidesResult) },
+        });
+      }),
+    }));
+
+    const facts = [{ label: "Director Note", value: "Play it dry, no sentiment", importance: "critical" }];
+    const formData = {
+      userPath: "user123_TestActor",
+      sidesText: "There's rosemary, that's for remembrance.",
+      criticalBriefFactsPayload: JSON.stringify(facts),
+    };
+    const request = buildMockRequest("Bearer valid_token", formData);
+
+    const response = await analyzeSides(request);
+
+    expect(response.status).toBe(200);
+    expect(capturedPrompt).not.toContain("<prior_brief_analysis>");
+    expect(capturedPrompt).toContain("<critical_brief_facts>");
+    expect(capturedPrompt).toContain("[CRITICAL] Director Note: Play it dry, no sentiment");
+  });
+
   it("both directions respect 1500-char truncation boundary", async () => {
     let sidesPrompt = "";
     let briefPrompt = "";

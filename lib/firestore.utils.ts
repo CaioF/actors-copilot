@@ -1,5 +1,5 @@
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getApp } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getDb } from '@/lib/firebase';
 import { logger } from '@/lib/logger';
 
 /**
@@ -20,7 +20,7 @@ export async function saveRawMessageToFirestore(
     }
 ): Promise<void> {
     try {
-        const db = getFirestore(getApp());
+        const db = getDb();
         const chatLogsRef = collection(db, 'users', userId, 'chatLogs');
         
         await addDoc(chatLogsRef, {
@@ -29,6 +29,34 @@ export async function saveRawMessageToFirestore(
         });
     } catch (error) {
         logger.error({ err: error, msg: 'Error saving message to Firestore' });
+        throw error;
+    }
+}
+
+export async function getHasSeenIntroVideo(userId: string): Promise<boolean> {
+    try {
+        const db = getDb();
+        const docRef = doc(db, "actorProfiles", userId);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+            return false;
+        }
+
+        return docSnap.data().hasSeenIntroVideo === true;
+    } catch (error) {
+        logger.error({ err: error, msg: "Error getting intro video seen status" });
+        throw error;
+    }
+}
+
+export async function markHasSeenIntroVideo(userId: string): Promise<void> {
+    try {
+        const db = getDb();
+        const docRef = doc(db, "actorProfiles", userId);
+        await setDoc(docRef, { hasSeenIntroVideo: true }, { merge: true });
+    } catch (error) {
+        logger.error({ err: error, msg: "Error marking intro video as seen" });
         throw error;
     }
 }
