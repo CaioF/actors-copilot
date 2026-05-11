@@ -333,6 +333,75 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
   });
 
+  it("appends criticalBriefFactsPayload to fetch body when existing audition doc has criticalBriefFacts (sides enrichment)", async () => {
+    const existingFacts = [
+      { label: "Character Age", value: "Late 30s", importance: "critical" },
+    ];
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: null,
+        auditionTimezone: null,
+        actorLocalDeadline: null,
+        castingDirectorName: null,
+        sidesPerformanceMap: null,
+        briefPerformanceMap: {
+          intro: "Brief intro",
+          sections: [{ title: "Checklist", items: ["Do the prep"] }],
+          outro: "Brief outro",
+        },
+        criticalBriefFacts: existingFacts,
+        hasSides: false,
+        hasBrief: true,
+        analysisType: "brief",
+        createdAt: "OLD_TS",
+        status: "completed",
+      }),
+    });
+
+    await goToGeneratedResult("sides", generatedSidesResult, "audition-sides");
+
+    // The second fetch call is to /api/auditions/analyzeSides
+    const sidesCall = mockFetch.mock.calls[1];
+    const body = sidesCall[1].body as FormData;
+    expect(body.get("criticalBriefFactsPayload")).toBe(JSON.stringify(existingFacts));
+  });
+
+  it("does not append criticalBriefFactsPayload when existing audition has no criticalBriefFacts (sides enrichment)", async () => {
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: null,
+        auditionTimezone: null,
+        actorLocalDeadline: null,
+        castingDirectorName: null,
+        sidesPerformanceMap: null,
+        briefPerformanceMap: {
+          intro: "Brief intro",
+          sections: [{ title: "Checklist", items: ["Do the prep"] }],
+          outro: "Brief outro",
+        },
+        criticalBriefFacts: null,
+        hasSides: false,
+        hasBrief: true,
+        analysisType: "brief",
+        createdAt: "OLD_TS",
+        status: "completed",
+      }),
+    });
+
+    await goToGeneratedResult("sides", generatedSidesResult, "audition-sides");
+
+    const sidesCall = mockFetch.mock.calls[1];
+    const body = sidesCall[1].body as FormData;
+    expect(body.get("criticalBriefFactsPayload")).toBeNull();
+  });
+
   it("uses updateDoc and preserves existing sidesPerformanceMap when saving a brief enrichment", async () => {
     const existingSidesMap = {
       intro: "Existing sides intro",
@@ -480,6 +549,143 @@ describe("AuditionWizard enrichment (Task 3)", () => {
 
     rerender(<AuditionWizard mode="brief" auditionId="test-id" />);
     expect(screen.getByText("Basics")).toBeInTheDocument();
+  });
+
+  it("persists criticalBriefFacts at top level when saving a new brief audition with them", async () => {
+    const briefResultWithFacts = {
+      intro: "Brief intro",
+      sections: [{ title: "Checklist", items: ["Do the prep"] }],
+      outro: "Brief outro",
+      criticalBriefFacts: [
+        { label: "Character Age", value: "Late 30s", importance: "critical" },
+        { label: "Accent", value: "Northern English", importance: "important" },
+      ],
+    };
+
+    await goToGeneratedResult("brief", briefResultWithFacts);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(firestoreModule.addDoc).toHaveBeenCalledWith(
+      { id: "auditions-ref" },
+      expect.objectContaining({
+        briefPerformanceMap: briefResultWithFacts,
+        criticalBriefFacts: [
+          { label: "Character Age", value: "Late 30s", importance: "critical" },
+          { label: "Accent", value: "Northern English", importance: "important" },
+        ],
+      })
+    );
+  });
+
+  it("writes criticalBriefFacts from brief result into updated doc on brief enrichment", async () => {
+    const existingSidesMap = {
+      intro: "Existing sides intro",
+      sections: [{ title: "Existing Objective", items: ["Hold on tighter"] }],
+      outro: "Existing sides outro",
+    };
+    const briefResultWithFacts = {
+      intro: "Brief intro",
+      sections: [{ title: "Checklist", items: ["Do the prep"] }],
+      outro: "Brief outro",
+      criticalBriefFacts: [{ label: "Director Style", value: "Method-oriented", importance: "critical" }],
+    };
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: null,
+        auditionTimezone: null,
+        actorLocalDeadline: null,
+        castingDirectorName: null,
+        sidesPerformanceMap: existingSidesMap,
+        briefPerformanceMap: null,
+        criticalBriefFacts: null,
+        hasSides: true,
+        hasBrief: false,
+        analysisType: "sides",
+        createdAt: "OLD_TS",
+        status: "completed",
+      }),
+    });
+
+    await goToGeneratedResult("brief", briefResultWithFacts, "audition-brief");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.updateDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
+      { path: "users/user123_Actor/auditions/audition-brief" },
+      expect.objectContaining({
+        briefPerformanceMap: briefResultWithFacts,
+        criticalBriefFacts: [{ label: "Director Style", value: "Method-oriented", importance: "critical" }],
+        sidesPerformanceMap: existingSidesMap,
+        hasBrief: true,
+      })
+    );
+  });
+
+  it("preserves existing criticalBriefFacts when saving a sides enrichment over an existing brief doc", async () => {
+    const existingFacts = [{ label: "Character Age", value: "Late 30s", importance: "critical" }];
+    const existingBriefMap = {
+      intro: "Existing brief intro",
+      sections: [{ title: "Existing Checklist", items: ["Know the brief"] }],
+      outro: "Existing brief outro",
+    };
+
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        project: "Hamlet",
+        role: "Ophelia",
+        deadline: null,
+        auditionTimezone: null,
+        actorLocalDeadline: null,
+        castingDirectorName: null,
+        sidesPerformanceMap: null,
+        briefPerformanceMap: existingBriefMap,
+        criticalBriefFacts: existingFacts,
+        hasSides: false,
+        hasBrief: true,
+        analysisType: "brief",
+        createdAt: "OLD_TS",
+        status: "completed",
+      }),
+    });
+
+    await goToGeneratedResult("sides", generatedSidesResult, "audition-sides");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.updateDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
+      { path: "users/user123_Actor/auditions/audition-sides" },
+      expect.objectContaining({
+        sidesPerformanceMap: generatedSidesResult,
+        briefPerformanceMap: existingBriefMap,
+        // criticalBriefFacts from the existing doc must be preserved, not overwritten
+        criticalBriefFacts: existingFacts,
+        hasSides: true,
+      })
+    );
   });
 });
 

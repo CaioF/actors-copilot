@@ -13,6 +13,7 @@ import { StepResultSides } from "@/components/auditions/step/step-result"
 import { StepResultBrief } from "@/components/auditions/step/step-result-brief"
 import { PerformanceMapPrintBlock } from "@/components/auditions/step/performance-map-print-block"
 import { calculateLocalDeadline } from "@/lib/time-utils"
+import type { CriticalBriefFact } from "@/lib/audition-types"
 
 interface PerformanceSection {
   title: string;
@@ -34,6 +35,7 @@ interface AuditionData {
   performanceMap?: PerformanceMap;
   sidesPerformanceMap?: PerformanceMap | null;
   briefPerformanceMap?: PerformanceMap | null;
+  criticalBriefFacts?: CriticalBriefFact[] | null;
   hasSides?: boolean;
   hasBrief?: boolean;
   analysisType?: "sides" | "brief";
@@ -250,7 +252,10 @@ export default function AuditionDetailView() {
                 </div>
                 {auditionData.sidesPerformanceMap && (
                   <StepResultSides
-                    data={auditionData.sidesPerformanceMap}
+                    data={{
+                      ...auditionData.sidesPerformanceMap,
+                      criticalBriefFacts: auditionData.criticalBriefFacts ?? undefined,
+                    }}
                     onCoachClick={() =>
                       router.push(
                         `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides`
@@ -275,7 +280,10 @@ export default function AuditionDetailView() {
               </div>
             ) : auditionData.hasSides && auditionData.sidesPerformanceMap ? (
               <StepResultSides
-                data={auditionData.sidesPerformanceMap}
+                data={{
+                  ...auditionData.sidesPerformanceMap,
+                  criticalBriefFacts: auditionData.criticalBriefFacts ?? undefined,
+                }}
                 onCoachClick={() =>
                   router.push(
                     `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides`
@@ -372,6 +380,7 @@ export default function AuditionDetailView() {
                   heading="SIDES ANALYSIS"
                   accentColor="#FF7316"
                   keyPrefix="sides"
+                  criticalFacts={auditionData.criticalBriefFacts ?? null}
                 />
                 <PerformanceMapPrintBlock
                   data={auditionData.briefPerformanceMap}
@@ -386,6 +395,7 @@ export default function AuditionDetailView() {
                 heading="SIDES ANALYSIS"
                 accentColor="#FF7316"
                 keyPrefix="sides"
+                criticalFacts={auditionData.criticalBriefFacts ?? null}
               />
             ) : auditionData.hasBrief && auditionData.briefPerformanceMap ? (
               <PerformanceMapPrintBlock
@@ -393,6 +403,7 @@ export default function AuditionDetailView() {
                 heading="BRIEF ANALYSIS"
                 accentColor="#E8721A"
                 keyPrefix="brief"
+                criticalFacts={auditionData.criticalBriefFacts ?? null}
               />
             ) : auditionData.performanceMap ? (
               <PerformanceMapPrintBlock

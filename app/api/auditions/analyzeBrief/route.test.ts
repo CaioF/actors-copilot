@@ -568,5 +568,105 @@ describe("POST /api/auditions/analyzeBrief", () => {
       expect(response.status).toBe(200);
       expect(capturedPrompt).toContain("You are coaching Actor");
     });
+
+    it("should return criticalBriefFacts when AI response includes them", async () => {
+      // Arrange
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockResolvedValue({
+          response: {
+            text: () =>
+              JSON.stringify({
+                intro: "Mocked Brief Analysis Introduction",
+                sections: [{ title: "World Building", items: ["Tone is gritty", "Pacing is fast"] }],
+                outro: "Mocked Brief Analysis Outro",
+                criticalBriefFacts: [
+                  { label: "Character Age", value: "Late 30s", importance: "critical" },
+                  { label: "Director Style", value: "Method-oriented", importance: "important" },
+                ],
+              }),
+          },
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective with a heart of gold.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+      const payload = await response.json();
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(payload.data.criticalBriefFacts).toEqual([
+        { label: "Character Age", value: "Late 30s", importance: "critical" },
+        { label: "Director Style", value: "Method-oriented", importance: "important" },
+      ]);
+    });
+
+    it("should succeed with response missing criticalBriefFacts (backward compat)", async () => {
+      // Arrange
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockResolvedValue({
+          response: {
+            text: () =>
+              JSON.stringify({
+                intro: "Mocked Brief Analysis Introduction",
+                sections: [{ title: "World Building", items: ["Tone is gritty"] }],
+                outro: "Mocked Brief Analysis Outro",
+              }),
+          },
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      const response = await POST(request);
+      const payload = await response.json();
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(payload.data.intro).toBe("Mocked Brief Analysis Introduction");
+      expect(payload.data.criticalBriefFacts).toBeUndefined();
+    });
+
+    it("should include extraction instruction for critical brief facts in the prompt", async () => {
+      // Arrange
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked Brief Analysis Introduction",
+                  sections: [{ title: "World Building", items: ["Tone is gritty"] }],
+                  outro: "Mocked Brief Analysis Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        briefText: "Character is a cynical detective.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      // Act
+      await POST(request);
+
+      // Assert
+      expect(capturedPrompt).toContain("critical brief facts");
+    });
   });
 });

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Printer, Trash2, Save, CalendarDays, User as UserIcon } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import ReactMarkdown from "react-markdown";
-import { AuditionFormData, initialAuditionData, AuditionStep } from "@/lib/audition-types";
+import { AuditionFormData, initialAuditionData, AuditionStep, CriticalBriefFact } from "@/lib/audition-types";
 import { Stepper } from "./stepper";
 import { StepBasics } from "./step/step-basic";
 import { StepUpload } from "./step/step-upload";
@@ -39,6 +39,7 @@ interface AuditionAnalysisResult {
   intro?: string;
   sections: PerformanceSection[];
   outro?: string;
+  criticalBriefFacts?: CriticalBriefFact[];
 }
 
 interface AuditionWizardProps {
@@ -239,6 +240,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
       let priorSidesSummary = "";
       let priorBriefSummary = "";
+      let criticalBriefFactsPayload = "";
 
       if (auditionId) {
         try {
@@ -249,6 +251,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
             const existing = docSnap.data() as {
               sidesPerformanceMap?: AuditionAnalysisResult | null;
               briefPerformanceMap?: AuditionAnalysisResult | null;
+              criticalBriefFacts?: CriticalBriefFact[] | null;
             };
 
             const complementaryMap = mode === "brief"
@@ -283,6 +286,13 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
               } else {
                 priorBriefSummary = summaryText;
               }
+            }
+
+            // When generating sides for an audition that already has brief-derived
+            // critical facts, send them through their own non-lossy structured channel
+            // so they survive into the sides prompt and resulting analysis.
+            if (mode === "sides" && existing.criticalBriefFacts && existing.criticalBriefFacts.length > 0) {
+              criticalBriefFactsPayload = JSON.stringify(existing.criticalBriefFacts);
             }
           }
         } catch (error) {
@@ -326,6 +336,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       payload.append("userPath", userPath);
       if (priorSidesSummary) payload.append("priorSidesSummary", priorSidesSummary);
       if (priorBriefSummary) payload.append("priorBriefSummary", priorBriefSummary);
+      if (criticalBriefFactsPayload) payload.append("criticalBriefFactsPayload", criticalBriefFactsPayload);
 
       const endpoint = mode === "sides"
         ? "/api/auditions/analyzeSides"
@@ -395,6 +406,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     analysisType: mode,
     sidesPerformanceMap: mode === "sides" ? resultData : null,
     briefPerformanceMap: mode === "brief" ? resultData : null,
+    criticalBriefFacts: resultData?.criticalBriefFacts ?? null,
     hasSides: mode === "sides",
     hasBrief: mode === "brief",
     createdAt: serverTimestamp(),
@@ -406,20 +418,31 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
    * Merges updated audition metadata (project/role/deadline/timezone/castingDirectorName)
    * with the new performance map so enrichment saves keep the full doc in sync.
    */
-  const buildMergeUpdate = (existing: Record<string, unknown>) => ({
-    ...existing,
-    // Keep metadata in sync with any edits made during enrichment
-    project: formData.project.trim(),
-    role: formData.role.trim(),
-    deadline: formData.deadline || null,
-    auditionTimezone: formData.auditionTimezone || null,
-    actorLocalDeadline: localDeadlineStr,
-    castingDirectorName: formData.castingDirectorName?.trim() || null,
-    // Merge the newly generated performance map
-    ...(mode === "sides"
-      ? { sidesPerformanceMap: resultData, hasSides: true }
-      : { briefPerformanceMap: resultData, hasBrief: true }),
-  });
+  const buildMergeUpdate = (existing: Record<string, unknown>) => {
+    // Critical brief facts come from the brief analysis. On brief saves we overwrite
+    // with the freshly generated facts; on sides saves we preserve whatever was
+    // stored previously so a later sides re-run never erases brief-derived facts.
+    const existingFacts =
+      (existing as { criticalBriefFacts?: CriticalBriefFact[] | null }).criticalBriefFacts ?? null;
+    const nextCriticalBriefFacts =
+      mode === "brief" ? resultData?.criticalBriefFacts ?? null : existingFacts;
+
+    return {
+      ...existing,
+      // Keep metadata in sync with any edits made during enrichment
+      project: formData.project.trim(),
+      role: formData.role.trim(),
+      deadline: formData.deadline || null,
+      auditionTimezone: formData.auditionTimezone || null,
+      actorLocalDeadline: localDeadlineStr,
+      castingDirectorName: formData.castingDirectorName?.trim() || null,
+      criticalBriefFacts: nextCriticalBriefFacts,
+      // Merge the newly generated performance map
+      ...(mode === "sides"
+        ? { sidesPerformanceMap: resultData, hasSides: true }
+        : { briefPerformanceMap: resultData, hasBrief: true }),
+    };
+  };
 
   /**
    * Returns the id of an existing audition matching project+role+analysisType, or null.
@@ -779,6 +802,23 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                      <p className="text-xl text-gray-800 mt-2">{formData.role || "Character Role"}</p>
                      <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
                    </div>
+
+                   {/* Critical Brief Facts Block */}
+                   {resultData?.criticalBriefFacts && resultData.criticalBriefFacts.length > 0 && (
+                     <div className="mb-10 p-6 border-2 border-black break-inside-avoid">
+                       <h2 className="text-xl font-bold text-black mb-3 uppercase tracking-wide">
+                         Critical Facts from the Casting Brief
+                       </h2>
+                       <ul className="space-y-2">
+                         {resultData.criticalBriefFacts.map((fact, i) => (
+                           <li key={i} className="text-black text-[15px]">
+                             <span className="font-bold uppercase text-xs mr-2">[{fact.importance}]</span>
+                             <span className="font-semibold">{fact.label}:</span> {fact.value}
+                           </li>
+                         ))}
+                       </ul>
+                     </div>
+                   )}
 
                    {/* Intro Block */}
                    {resultData?.intro && (

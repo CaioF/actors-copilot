@@ -51,7 +51,22 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     sections.push(`Phase: ${currentFocus.phase ?? "(none)"}`);
   }
 
-  // 5. Current Audition Focus (Performance Map Integration)
+  // 5. Critical Brief Facts (non-negotiable director/casting-supplied character data).
+  //    Placed before the map rendering so the coach sees these as the highest-priority
+  //    constraints when reasoning about the audition. Tolerates undefined/null/empty array.
+  const criticalBriefFacts = auditionFullData?.criticalBriefFacts;
+  if (criticalBriefFacts?.length) {
+    const factLines = criticalBriefFacts
+      .filter((f) => f.label && f.value)
+      .map((f) => `- ${f.label}: ${f.value} (${f.importance})`);
+    if (factLines.length > 0) {
+      sections.push(
+        `# CRITICAL BRIEF FACTS\nThe casting brief surfaced the following non-negotiable facts. Honor them in every recommendation, even if the sides do not mention them:\n${factLines.join("\n")}`
+      );
+    }
+  }
+
+  // 6. Current Audition Focus (Performance Map Integration)
   if (auditionFullData) {
     type PerformanceMap = {
       intro?: string;

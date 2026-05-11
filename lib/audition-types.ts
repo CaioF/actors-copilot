@@ -1,7 +1,7 @@
 /**
  * Types for the Audition flow, including form data structure and step definitions.
  * @module
- * @exports AuditionStep, AuditionFormData, initialAuditionData, AuditionDocument, PerformanceMap
+ * @exports AuditionStep, AuditionFormData, initialAuditionData, AuditionDocument, PerformanceMap, CriticalBriefFact, BriefAnalysisResult
  */
 
 export type AuditionStep = 1 | 2 | 3 | 4 | 5; // 5 is the generating state
@@ -17,6 +17,20 @@ export interface PerformanceMap {
   outro?: string;
 }
 
+export interface CriticalBriefFact {
+  label: string;
+  value: string;
+  importance: "critical" | "important";
+}
+
+// Brief analyze API returns the existing PerformanceMap shape with an optional
+// structured criticalBriefFacts channel carried alongside intro/sections/outro.
+// The wizard extracts criticalBriefFacts to its own top-level field on the
+// audition document — it is not stored inside briefPerformanceMap.
+export interface BriefAnalysisResult extends PerformanceMap {
+  criticalBriefFacts?: CriticalBriefFact[];
+}
+
 export interface AuditionDocument {
   project: string;
   role: string;
@@ -27,6 +41,7 @@ export interface AuditionDocument {
   performanceMap?: PerformanceMap | null;
   sidesPerformanceMap?: PerformanceMap | null;
   briefPerformanceMap?: PerformanceMap | null;
+  criticalBriefFacts?: CriticalBriefFact[] | null;
   hasSides?: boolean;
   hasBrief?: boolean;
   analysisType?: "sides" | "brief";

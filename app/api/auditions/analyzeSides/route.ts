@@ -5,6 +5,7 @@ import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } f
 import { auth, db } from "@/lib/firebase.admin";
 import { logger } from '@/lib/logger';
 import { auditionFormDataSchema } from "@/lib/schemas/audition";
+import type { CriticalBriefFact } from "@/lib/audition-types";
 
 interface PerformanceMap {
   intro: string;
@@ -13,7 +14,33 @@ interface PerformanceMap {
     items: string[];
   }[];
   outro: string;
+  criticalBriefFacts?: CriticalBriefFact[];
 }
+
+/**
+ * Parses a JSON-serialized CriticalBriefFact[] payload from the request form data.
+ * Returns an empty array for any malformed input — this is additive enrichment, so
+ * a bad payload must never fail the whole sides analysis.
+ */
+const parseCriticalBriefFactsPayload = (raw: string): CriticalBriefFact[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (fact): fact is CriticalBriefFact =>
+        typeof fact === "object" &&
+        fact !== null &&
+        typeof (fact as CriticalBriefFact).label === "string" &&
+        typeof (fact as CriticalBriefFact).value === "string" &&
+        ((fact as CriticalBriefFact).importance === "critical" ||
+          (fact as CriticalBriefFact).importance === "important")
+    );
+  } catch (error) {
+    logger.warn({ err: error, msg: "Failed to parse criticalBriefFactsPayload; ignoring." });
+    return [];
+  }
+};
 
 /**
  * Safely extracts raw text content from a PDF buffer using pdf2json.
@@ -89,6 +116,7 @@ export async function POST(request: Request) {
       castingDirectorName: (formData.get("castingDirectorName") as string | null) ?? undefined,
       priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
       priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
+      criticalBriefFactsPayload: (formData.get("criticalBriefFactsPayload") as string | null) ?? undefined,
     };
 
     const parseResult = auditionFormDataSchema.safeParse(textFields);
@@ -110,6 +138,7 @@ export async function POST(request: Request) {
     const auditionTimezone = validated.auditionTimezone ?? null;
     const castingDirectorName = (validated.castingDirectorName ?? "").trim();
     const priorBriefSummary = (validated.priorBriefSummary ?? "").substring(0, 1500).trim();
+    const criticalBriefFacts = parseCriticalBriefFactsPayload(validated.criticalBriefFactsPayload ?? "");
 
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
       logger.warn({
@@ -188,10 +217,22 @@ export async function POST(request: Request) {
                 required: ["title", "items"]
               }
             },
-            outro: { type: SchemaType.STRING }
+            outro: { type: SchemaType.STRING },
+            criticalBriefFacts: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  label: { type: SchemaType.STRING },
+                  value: { type: SchemaType.STRING },
+                  importance: { type: SchemaType.STRING }
+                },
+                required: ["label", "value", "importance"]
+              }
+            }
           },
           required: ["intro", "sections", "outro"]
-        } 
+        }
       }
     });
 
@@ -225,6 +266,10 @@ export async function POST(request: Request) {
       </audition_sides>
       
       ${priorBriefSummary ? `\n<prior_brief_analysis>\n${priorBriefSummary}\n</prior_brief_analysis>` : ""}
+
+      ${criticalBriefFacts.length > 0 ? `\n<critical_brief_facts>\nThe casting brief explicitly surfaced the following critical facts. They are non-negotiable and must be honored verbatim even if absent from the sides. Weave each one into the appropriate section AND echo them in the dedicated "criticalBriefFacts" output array exactly as given (do not summarize, rephrase, or drop any).\n${criticalBriefFacts
+        .map((fact) => `- [${fact.importance.toUpperCase()}] ${fact.label}: ${fact.value}`)
+        .join("\n")}\n</critical_brief_facts>` : ""}
 
       CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
     `;

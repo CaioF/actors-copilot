@@ -409,7 +409,118 @@ describe("POST /api/auditions/analyzeSides", () => {
       expect(summaryOnly.trim().length).toBeLessThanOrEqual(1500);
     });
 
-   
+    it("should inject criticalBriefFactsPayload into the prompt as a structured critical_brief_facts block", async () => {
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked AI Introduction",
+                  sections: [{ title: "Mocked Beat", items: ["Tactic 1"] }],
+                  outro: "Mocked AI Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const facts = [
+        { label: "Character Age", value: "Late 30s", importance: "critical" },
+        { label: "Director Style", value: "Method-oriented", importance: "important" },
+      ];
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+        criticalBriefFactsPayload: JSON.stringify(facts),
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).toContain("<critical_brief_facts>");
+      expect(capturedPrompt).toContain("[CRITICAL] Character Age: Late 30s");
+      expect(capturedPrompt).toContain("[IMPORTANT] Director Style: Method-oriented");
+    });
+
+    it("should omit critical_brief_facts block when criticalBriefFactsPayload is absent", async () => {
+      let capturedPrompt = "";
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockImplementation((prompt: string) => {
+          capturedPrompt = prompt;
+          return Promise.resolve({
+            response: {
+              text: () =>
+                JSON.stringify({
+                  intro: "Mocked AI Introduction",
+                  sections: [{ title: "Mocked Beat", items: ["Tactic 1"] }],
+                  outro: "Mocked AI Outro",
+                }),
+            },
+          });
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(capturedPrompt).not.toContain("<critical_brief_facts>");
+    });
+
+    it("should ignore malformed criticalBriefFactsPayload without failing the request", async () => {
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+        criticalBriefFactsPayload: "{not valid json",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+    });
+
+    it("should accept criticalBriefFacts in the AI response and return them unchanged", async () => {
+      mockedGetGenerativeModel.mockReturnValueOnce({
+        generateContent: jest.fn().mockResolvedValue({
+          response: {
+            text: () =>
+              JSON.stringify({
+                intro: "Mocked AI Introduction",
+                sections: [{ title: "Mocked Beat", items: ["Tactic 1"] }],
+                outro: "Mocked AI Outro",
+                criticalBriefFacts: [
+                  { label: "Character Age", value: "Late 30s", importance: "critical" },
+                ],
+              }),
+          },
+        }),
+      });
+
+      const formData = {
+        userPath: "user123_ValidActor",
+        sidesText: "To be, or not to be.",
+      };
+      const request = buildMockRequest("Bearer valid_token", formData);
+
+      const response = await POST(request);
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.data.criticalBriefFacts).toEqual([
+        { label: "Character Age", value: "Late 30s", importance: "critical" },
+      ]);
+    });
+
     it("should use 'Actor' in prompt when actorName is empty string (proving || not ??)", async () => {
       // Arrange
       let capturedPrompt = "";

@@ -39,4 +39,8 @@ export const auditionFormDataSchema = z.object({
   castingDirectorName: z.string().max(150).optional(),
   priorSidesSummary: enrichmentField,
   priorBriefSummary: enrichmentField,
+  // Structured JSON-serialized CriticalBriefFact[] payload. Optional and additive — when
+  // present it travels alongside priorBriefSummary into the Sides prompt as a dedicated,
+  // non-truncated channel. Stored as a string here because the request body is FormData.
+  criticalBriefFactsPayload: z.string().max(10000).optional().default(""),
 });
