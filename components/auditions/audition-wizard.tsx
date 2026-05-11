@@ -808,7 +808,6 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                       heading={null}
                       accentColor="black"
                       keyPrefix="wizard"
-                      criticalFacts={resultData?.criticalBriefFacts ?? null}
                     />
                  </div>
                </div>

@@ -12,6 +12,7 @@ interface PerformanceMap {
   intro?: string;
   sections: PerformanceSection[];
   outro?: string;
+  criticalBriefFacts?: CriticalBriefFact[] | null;
 }
 
 interface PerformanceMapPrintBlockProps {
@@ -41,6 +42,7 @@ export function PerformanceMapPrintBlock({
   criticalFacts = null,
 }: PerformanceMapPrintBlockProps) {
   if (!data) return null;
+  const resolvedCriticalFacts = criticalFacts ?? data.criticalBriefFacts ?? null;
 
   return (
     <div className="mb-12">
@@ -50,7 +52,7 @@ export function PerformanceMapPrintBlock({
         </div>
       )}
 
-      {criticalFacts && criticalFacts.length > 0 && (
+      {resolvedCriticalFacts && resolvedCriticalFacts.length > 0 && (
         <div
           className="mb-10 p-6 border-2 break-inside-avoid"
           style={{ borderColor: accentColor }}
@@ -59,7 +61,7 @@ export function PerformanceMapPrintBlock({
             Critical Facts from the Casting Brief
           </h3>
           <ul className="space-y-2">
-            {criticalFacts.map((fact, i) => (
+            {resolvedCriticalFacts.map((fact, i) => (
               <li
                 key={`${keyPrefix}-fact-${i}`}
                 className="text-black text-[15px]"
