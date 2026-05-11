@@ -16,7 +16,7 @@ export function IntroVideoModal({ onClose }: IntroVideoModalProps) {
           ✕
         </button>
         <video
-          src="/video/INTRO_VIDEO.MP4"
+          src="https://firebasestorage.googleapis.com/v0/b/actors-copilot-app.firebasestorage.app/o/INTRO_VIDEO.MP4?alt=media"
           controls
           autoPlay
           data-testid="intro-video-modal"
