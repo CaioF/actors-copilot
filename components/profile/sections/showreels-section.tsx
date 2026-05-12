@@ -4,10 +4,13 @@ import { useFormContext, useFieldArray } from "react-hook-form";
 import { Trash2 } from "lucide-react";
 import { ActorProfile } from "@/lib/profile-types";
 import { VideoDropzone } from "./VideoDropzone";
+import { deleteShowreelFile } from "@/lib/showreels/storage";
+import { logger } from "@/lib/logger";
 
 /**
- * Form section for managing actor showreels with title and URL for each entry.
- * Supports adding and removing multiple showreel entries.
+ * Form section for managing actor showreels.
+ * Orchestrates the relationship between the UI fields, client-side storage cleanup,
+ * and the automated thumbnail extraction/upload process.
  */
 export function ShowreelsSection() {
   const { register, control } = useFormContext<ActorProfile>();
@@ -16,8 +19,37 @@ export function ShowreelsSection() {
     name: "showreels",
   });
 
-  const handleUploadSuccess = (url: string, fileName: string) => {
-    append({ title: fileName, url: url });
+  /**
+   * Ingests successful upload payloads from VideoDropzone.
+   * Synchronizes the newly created Storage assets with the React Hook Form state.
+   */
+  const handleUploadSuccess = (url: string, fileName: string, thumbnailUrl: string | null) => {
+    append({ 
+      title: fileName, 
+      url: url, 
+      thumbnailUrl: thumbnailUrl || "" 
+    });
+  };
+
+  /**
+   * Handles the removal of a showreel entry.
+   * Triggers a fire-and-forget storage deletion to clean up binary assets (video + thumbnail)
+   * before mutating the form state.
+   */
+  const handleRemove = (index: number) => {
+    const field = fields[index];
+    
+    // Trigger infrastructure cleanup without blocking UI state mutation
+    if (field.url) {
+      deleteShowreelFile({ 
+        url: field.url, 
+        thumbnailUrl: field.thumbnailUrl 
+      }).catch((err) => {
+        logger.error({ err, msg: "Background storage cleanup failed during showreel removal" });
+      });
+    }
+
+    remove(index);
   };
 
   return (
@@ -27,6 +59,12 @@ export function ShowreelsSection() {
       <div className="space-y-3">
         {fields.map((field, index) => (
           <div key={field.id} className="flex items-center gap-3">
+            {/* Hidden field to ensure thumbnailUrl is included in the auto-save payload */}
+            <input 
+              type="hidden" 
+              {...register(`showreels.${index}.thumbnailUrl`)} 
+            />
+            
             <input
               {...register(`showreels.${index}.title`)}
               type="text"
@@ -41,7 +79,7 @@ export function ShowreelsSection() {
             />
             <button
               type="button"
-              onClick={() => remove(index)}
+              onClick={() => handleRemove(index)}
               className="flex-shrink-0 p-2 text-[#6B6B6B] transition-colors hover:text-[#C45A3C]"
             >
               <Trash2 className="h-4 w-4" />
@@ -52,7 +90,7 @@ export function ShowreelsSection() {
 
       <button
         type="button"
-        onClick={() => append({ title: "", url: "" })}
+        onClick={() => append({ title: "", url: "", thumbnailUrl: "" })}
         className="text-sm font-medium text-[#E8721A] transition-colors hover:text-[#E8721A]/80"
       >
         + Add Showreel
