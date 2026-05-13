@@ -388,6 +388,18 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       credits: synthesizedData.credits?.length > 0 ? synthesizedData.credits : imdbExtracted.credits,
       showreels: synthesizedData.showreels?.length > 0 ? synthesizedData.showreels : imdbExtracted.showreels,
       additionalPhotos: synthesizedData.additionalPhotos?.length > 0 ? synthesizedData.additionalPhotos : [],
+      playingAgeMin: synthesizedData.playingAgeMin || null,
+      playingAgeMax: synthesizedData.playingAgeMax || null,
+      eyeColour: synthesizedData.eyeColour || '',
+      hairColour: synthesizedData.hairColour || '',
+      ethnicity: synthesizedData.ethnicity || '',
+      training: synthesizedData.training?.length > 0 ? synthesizedData.training : [],
+      externalProfiles: synthesizedData.externalProfiles || {},
+
+      agencyName: synthesizedData.agencyName || '',
+      agencyWebsite: synthesizedData.agencyWebsite || '',
+      agencyEmail: synthesizedData.agencyEmail || '',
+      agencyPhone: synthesizedData.agencyPhone || '',
     };
 
     log.info({ fullName: finalData.fullName, creditsCount: finalData.credits.length, msg: 'Autofill completed successfully' });

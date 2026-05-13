@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/context/AuthContext"
-import { collection, getDocs, doc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, writeBatch, deleteDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { logger } from '@/lib/logger';
 
@@ -79,6 +79,8 @@ export default function SettingsPage() {
 
   const [isDeletingChat, setIsDeletingChat] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const [isDeletingProfile, setIsDeletingProfile] = useState(false);
 
   // Reference for the hidden file input
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -385,6 +387,46 @@ export default function SettingsPage() {
     }
   };
 
+  /**
+   * Permanently deletes the actor's master profile from Firestore,
+   * allowing the user to start from scratch.
+   * @returns void (side effects: deletes Firestore document and shows alert)
+   * @async
+   */
+  /**
+   * Performs a hard-reset of the actor's public profile data.
+   * Targets the isolated 'actorProfiles' collection, leaving DNA and internal state intact.
+   * Utilizes the application's global toast system for non-blocking feedback.
+   */
+  const handleDeleteProfile = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (!user) return;
+
+    // Safety lock for destructive actions
+    const confirmFinal = window.confirm("Are you absolutely sure? This will erase your public profile (bio, credits, physical details) to start from scratch.");
+    if (!confirmFinal) return;
+
+    setIsDeletingProfile(true);
+    
+    try {
+      const db = getDb();
+      
+      // Target the exact canonical path for the Public Profile
+      const profileRef = doc(db, "actorProfiles", user.uid);
+      
+      await deleteDoc(profileRef);
+
+      // Essential reload to clear React Hook Form and local state caching
+      setTimeout(() => window.location.reload(), 1500);
+
+    } catch (error) {
+      logger.error({ err: error, msg: 'Failure during public profile hard-reset' });
+      alert("Failed to reset profile. Please try again.");
+    } finally {
+      setIsDeletingProfile(false);
+    }
+  };
+
   return (
     <main className="flex flex-1 flex-col">
       <DashboardHeader title="Settings" />
@@ -555,13 +597,45 @@ export default function SettingsPage() {
                 </AlertDialogContent>
               </AlertDialog>
 
+              {/*DELETE PROFILE*/}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[#E8DFD0]">
+                    <Trash2 className="h-4 w-4 text-[#C45A3C]" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#C45A3C]">Delete profile</p>
+                      <p className="text-xs text-[#6B6B6B]">Permanently erase your actor profile to start from scratch</p>
+                    </div>
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-[#F0E8DC] border-[#C7C0B5]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-title text-[#2C3328]">Delete Profile</AlertDialogTitle>
+                    <AlertDialogDescription className="text-[#6B6B6B]">
+                      This will permanently delete your public profile data (bio, credits, physical details, etc.). This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0]">Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDeleteProfile}
+                      disabled={isDeletingProfile}
+                      className="bg-[#C45A3C] text-[#ffffff] hover:bg-[#C45A3C]/90"
+                    >
+                      {isDeletingProfile ? "Deleting..." : "Delete Profile"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              {/* DELETE PROFILE */}
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[#E8DFD0]">
                     <Trash2 className="h-4 w-4 text-[#C45A3C]" />
                     <div>
                       <p className="text-sm font-semibold text-[#C45A3C]">Delete account</p>
-                      <p className="text-xs text-[#6B6B6B]">Permanently delete your account and all data</p>
+                      <p className="text-xs text-[#6B6B6B]">Permanently delete all your data. You'll have to start everything from scratch.</p>
                     </div>
                   </button>
                 </AlertDialogTrigger>
@@ -569,7 +643,7 @@ export default function SettingsPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="font-title text-[#2C3328]">Delete Account</AlertDialogTitle>
                     <AlertDialogDescription className="text-[#6B6B6B]">
-                      This will permanently delete your account and all associated data. This action cannot be undone.
+                      This will permanently delete all your data. You will not lose access to your account but will lose all your information. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

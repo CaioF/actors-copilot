@@ -122,4 +122,20 @@ export interface SynthesizedProfile {
     credits: Credit[];
     showreels: Showreel[];
     additionalPhotos?: string[];
+    playingAgeMin?: number | null;
+    playingAgeMax?: number | null;
+    eyeColour?: string;
+    hairColour?: string;
+    ethnicity?: string;
+    training?: {
+        category: 'television' | 'feature_film' | 'stage' | 'commercial' | 'further';
+        institution: string;
+        qualification: string;
+        years: string;
+    }[];
+    externalProfiles?: Record<string, string>;
+    agencyName?: string;
+    agencyEmail?: string;
+    agencyWebsite?: string;
+    agencyPhone?: string;
 }

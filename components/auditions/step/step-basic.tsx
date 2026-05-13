@@ -8,6 +8,7 @@ interface StepBasicsProps {
   data: AuditionFormData;
   updateData: (data: Partial<AuditionFormData>) => void;
   mode: "sides" | "brief";
+  isStandaloneScene?: boolean;
 }
 
 // Defines the available project categories to drive specialized prompting and assessment logic.
@@ -38,25 +39,27 @@ const projectTypes = [
  * Employs conditional rendering based on the operational context ("sides" vs "brief") 
  * to streamline user experience and prevent data entry fatigue.
  */
-export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
+export function StepBasics({ data, updateData, mode, isStandaloneScene }: StepBasicsProps) {
   // Evaluates the current mode to determine the visibility of specific form fields.
   const isSidesMode = mode === "sides";
 
   return (
     <div className="rounded-3xl font-sans bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
       
-      {/* Header Section */}
+      {/* Header Section: Dynamically adapted for Scene Study vs Audition pipelines */}
       <div className="mb-12">
         <div className="inline-flex items-center px-3 py-1 mb-4 rounded-full bg-[#FF7316]/10 border border-[#FF7316]/30 text-[#FF7316] text-xs font-bold tracking-wide uppercase">
-          {isSidesMode ? "Sides Analysis" : "Casting Brief Checklist"}
+          {isStandaloneScene ? "Scene Study" : isSidesMode ? "Sides Analysis" : "Casting Brief Checklist"}
         </div>
         <h2 className="text-2xl font-title font-medium text-[#EADDCE]">
-          Tell us about the {isSidesMode ? "audition!" : "project!"}
+          Tell us about the {isStandaloneScene ? "scene!" : isSidesMode ? "audition!" : "project!"}
         </h2>
          <p className="text-[#a9a9a9] mt-2 text-sm">
-            {isSidesMode 
-              ? "Analyze your script sides to map out your performance." 
-              : "Analyze the casting brief to build your character foundation."}
+            {isStandaloneScene
+              ? "Analyze your monologue or scene to map out your performance."
+              : isSidesMode 
+                ? "Analyze your script sides to map out your performance." 
+                : "Analyze the casting brief to build your character foundation."}
           </p>
       </div>
 
@@ -127,7 +130,7 @@ export function StepBasics({ data, updateData, mode }: StepBasicsProps) {
         {/* Project Name Input: Universally required */}
         <div>
           <label htmlFor="project" className="block text-sm font-medium text-[#B7BCB6] mb-3">
-            Project/Production
+            {isStandaloneScene ? "Play / Movie / Source Material" : "Project/Production"}
           </label>
           <input
             id="project"

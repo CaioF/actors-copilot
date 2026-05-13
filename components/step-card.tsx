@@ -45,9 +45,21 @@ export function StepCard({
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl">
       {/* Header */}
       <div className={`${headerBg} px-6 py-5 text-center`}>
-        <p className={`text-sm font-semibold uppercase tracking-wide ${headerText}`}>
-          Step {stepNumber}
-        </p>
+        {stepNumber === 1 && (
+          <p className={`text-sm font-semibold uppercase tracking-wide ${headerText}`}>
+            Start here
+          </p>
+        )}
+        {stepNumber === 2 && (
+          <p className={`text-sm font-semibold uppercase tracking-wide ${headerText}`}>
+            FULL AUDITION
+          </p>
+        )}
+        {stepNumber === 3 && (
+          <p className={`text-sm font-semibold uppercase tracking-wide ${headerText}`}>
+            INDEPENDENT STUDY
+          </p>
+        )}
         <h3 className={`mt-1 font-title text-xl font-bold ${headerText}`}>{title}</h3>
       </div>
 
