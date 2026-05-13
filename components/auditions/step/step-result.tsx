@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Hourglass, Brain, Lock, MapPin, AlertTriangle } from "lucide-react";
+import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Split, Hourglass, Brain, Lock, MapPin, AlertTriangle } from "lucide-react";
 import React from "react";
 import type { CriticalBriefFact } from "@/lib/audition-types";
 
@@ -24,30 +24,21 @@ interface StepResultProps {
 export function StepResultSides({ data, onCoachClick }: StepResultProps) {
   
   const [activeSection, setActiveSection] = useState("section-objective");
+  //  Backward Compatibility & Conditional Hydration
+  // Legacy breakdowns have 20 sections. New multi-scene breakdowns have 21.
+  const isLegacySchema = data?.sections && data.sections.length === 20;
   const hasFullSections = data?.sections && data.sections.length >= 20;
   
-  useEffect(() => {
-    if (!hasFullSections) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: "-20% 0px -60% 0px" } 
-    );
+  // Check if we have the 21st section AND if it contains actual content (not the N/A fallback)
+  const hasInBetweenSection = data?.sections?.length >= 21;
+  const showInBetween = hasInBetweenSection && !data.sections[13]?.items[0]?.includes("N/A");
 
-    const sections = document.querySelectorAll('div[id^="section-"]');
-    sections.forEach((s) => observer.observe(s));
-
-    return () => observer.disconnect();
-  }, []);
-
-  if (!data || !data.sections) return null;
+  // We use an offset pointer. If it's a new 21-section format, everything after 
+  // index 13 shifts by +1. If it's legacy, the offset is 0, keeping old data safe.
+  const offset = hasInBetweenSection ? 1 : 0;
 
   const s = data.sections;
+  if (!data || !data.sections) return null;
 
   const renderMarkdown = (text: string) => (
     <div className="prose prose-slate max-w-none prose-p:m-0 prose-p:inline prose-strong:font-semibold prose-strong:text-gray-900">
@@ -76,6 +67,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
     { id: "section-tactics", icon: Shield, label: "Tactics & Obstacles" },
     { id: "section-why-now", icon: Clock, label: "The Stakes" },
     { id: "section-moment", icon: Hourglass, label: "The Moment" },
+    ...(showInBetween ? [{ id: "section-in-between", icon: Split, label: "The In-Between" }] : []),
     { id: "section-monologue", icon: Brain, label: "Inner Monologue" },
     { id: "section-secret", icon: Lock, label: "The Secret" },
     { id: "section-physical", icon: MapPin, label: "Physicality & Setting" },
@@ -312,6 +304,20 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               </div>
             </div>
 
+            {/*CONDITIONAL SECTION: The In-Between */}
+            {showInBetween && (
+              <div id="section-in-between" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <Split className="text-[#FF7316]" size={24} />
+                  <h3 className="text-xl font-bold text-gray-900">The In-Between</h3>
+                </div>
+                <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
+                  {/* Always lives at index 13 on the new schema */}
+                  {s[13].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+                </div>
+              </div>
+            )}
+
             {/* 14. Inner Monologue */}
             <div id="section-monologue" className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
               <div className="flex items-center gap-3 mb-4">
@@ -319,7 +325,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
                 <h3 className="text-xl font-bold text-gray-900">Inner Monologue</h3>
               </div>
               <ul className="space-y-3">
-                {s[13].items.map((item, i) => (
+                {s[13+offset].items.map((item, i) => (
                   <li key={i} className="flex gap-3 items-start text-gray-700 text-[15px]">
                     <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
                     {renderMarkdown(item)}
@@ -335,7 +341,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
                 <h3 className="text-xl font-bold text-gray-900">The Secret</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
-                {s[14].items.map((item, i) => (
+                {s[14+offset].items.map((item, i) => (
                   <div key={i} className="p-5 bg-[#FDECE2]/40 border border-[#FDECE2] rounded-xl italic">
                     {renderMarkdown(item)}
                   </div>
@@ -350,7 +356,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
                 <h3 className="text-xl font-bold text-gray-900">Physicality & Setting</h3>
               </div>
               <ul className="space-y-3">
-                {s[15].items.map((item, i) => (
+                {s[15+offset].items.map((item, i) => (
                   <li key={i} className="flex gap-3 items-start text-gray-700 text-[15px]">
                     <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
                     {renderMarkdown(item)}
@@ -366,7 +372,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
                 <h3 className="text-xl font-bold text-gray-900">Coach Notes</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
-                {s[16].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
+                {s[16+offset].items.map((item, i) => <div key={i}>{renderMarkdown(item)}</div>)}
               </div>
             </div>
 
@@ -377,7 +383,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
                 <h3 className="text-xl font-bold text-gray-900">Self-Tape Plan</h3>
               </div>
               <ul className="space-y-4">
-                {s[17].items.map((item, i) => (
+                {s[17+offset].items.map((item, i) => (
                   <li key={i} className="flex gap-3 items-start">
                     <div
                       aria-hidden="true"
@@ -398,7 +404,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
                 <h3 className="text-xl font-bold text-gray-900">The Bold Choice</h3>
               </div>
               <div className="space-y-4 text-gray-700 text-[15px] leading-relaxed">
-                {s[18].items.map((item, i) => (
+                {s[18+offset].items.map((item, i) => (
                   <div key={i} className="p-5 bg-[#FDECE2]/50 border border-[#FDECE2] rounded-xl">
                     {renderMarkdown(item)}
                   </div>
@@ -415,7 +421,7 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
               <div>
                 <h4 className="font-bold text-gray-900 mb-3 text-sm tracking-tight">Suggested reservoirs to access for this role</h4>
                 <div className="flex flex-wrap gap-2.5">
-                  {s[19].items.map((item, i) => {
+                  {s[19+offset].items.map((item, i) => {
                      const isShortTag = item.length < 30 && !item.includes(':');
                      if (isShortTag) {
                        return (

@@ -236,11 +236,24 @@ export default function ProfilePage() {
    * @param autofillData - Partial actor profile data from IMDB autofill
    * @returns void (side effects: resets form with merged data and triggers debouncedSave)
    */
-  const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) => {
+const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) => {
     const currentValues = methods.getValues();
 
-    // Start from ALL current values so no existing user-entered data is wiped.
-    // Only fill a field with autofill data when the current value is empty/missing.
+    /**
+     * Deep Merge Strategy for External Profiles
+     * Ensures AI-discovered links supplement (rather than overwrite) existing user data.
+     */
+    const mergedExternalProfiles = { ...(currentValues.externalProfiles || {}) };
+    if (autofillData.externalProfiles) {
+      Object.keys(autofillData.externalProfiles).forEach((key) => {
+        const k = key as keyof typeof mergedExternalProfiles;
+        // Only inject AI data if the user hasn't already provided a link for this platform
+        if (!mergedExternalProfiles[k] && autofillData.externalProfiles![k]) {
+          mergedExternalProfiles[k] = autofillData.externalProfiles![k];
+        }
+      });
+    }
+
     const merged: Partial<ActorProfile> = {
       ...currentValues,
       // String fields: keep current non-empty value, else use autofill
@@ -254,6 +267,23 @@ export default function ProfilePage() {
       timezone: currentValues.timezone || autofillData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       gender: currentValues.gender || autofillData.gender || '',
       awardsCallout: currentValues.awardsCallout || autofillData.awardsCallout || '',
+      
+      // Extended Physical Details
+      playingAgeMin: currentValues.playingAgeMin || autofillData.playingAgeMin || null,
+      playingAgeMax: currentValues.playingAgeMax || autofillData.playingAgeMax || null,
+      eyeColour: currentValues.eyeColour || autofillData.eyeColour || '',
+      hairColour: currentValues.hairColour || autofillData.hairColour || '',
+      ethnicity: currentValues.ethnicity || autofillData.ethnicity || '',
+
+      // Agency Data
+      agencyName: currentValues.agencyName || autofillData.agencyName || '',
+      agencyWebsite: currentValues.agencyWebsite || autofillData.agencyWebsite || '',
+      agencyEmail: currentValues.agencyEmail || autofillData.agencyEmail || '',
+      agencyPhone: currentValues.agencyPhone || autofillData.agencyPhone || '',
+
+      // External Profiles (Deep Merged)
+      externalProfiles: mergedExternalProfiles as any,
+
       // Array fields: keep current non-empty array, else use autofill; ensure defaults
       credits: (currentValues.credits && currentValues.credits.length > 0)
         ? currentValues.credits
@@ -270,7 +300,9 @@ export default function ProfilePage() {
       skillsAndAccents: (currentValues.skillsAndAccents && currentValues.skillsAndAccents.length > 0)
         ? currentValues.skillsAndAccents
         : (autofillData.skillsAndAccents ?? []),
-      training: currentValues.training ?? autofillData.training ?? [],
+      training: (currentValues.training && currentValues.training.length > 0)
+        ? currentValues.training
+        : (autofillData.training ?? []),
       appearance: currentValues.appearance ?? autofillData.appearance ?? [],
       workPermits: currentValues.workPermits ?? autofillData.workPermits ?? [],
     };

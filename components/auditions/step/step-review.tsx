@@ -31,19 +31,57 @@ export function StepReview({ data, mode }: StepReviewProps) {
           <h3 className="text-[#FF7316] font-medium text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Basics
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div>
-              <p className="text-[#B7BCB6] text-xs mb-1 flex items-center gap-1"><Film className="w-3 h-3"/> Project</p>
-              <p className="font-medium text-lg">{data.project || <span className="text-[#B7BCB6]/50 italic">Not provided</span>}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            <div className="flex items-center gap-3">
+              <Film className="w-5 h-5 text-[#FF7316]" />
+              <div className="flex flex-col">
+                <span className="text-xs text-[#B7BCB6] uppercase tracking-wider">Project</span>
+                {/* * SENIOR FIX: CSS-driven text transformation. 
+                 * Protects against JS runtime errors on nullish values and enforces strict 
+                 * separation of concerns between data state and UI presentation. 
+                 */}
+                <span className="font-medium text-lg uppercase">{data.project}</span>
+              </div>
             </div>
-            <div>
-              <p className="text-[#B7BCB6] text-xs mb-1 flex items-center gap-1"><User className="w-3 h-3"/> Role</p>
-              <p className="font-medium text-lg">{data.role || <span className="text-[#B7BCB6]/50 italic">Not provided</span>}</p>
+
+            <div className="flex items-center gap-3">
+              <User className="w-5 h-5 text-[#FF7316]" />
+              <div className="flex flex-col">
+                <span className="text-xs text-[#B7BCB6] uppercase tracking-wider">Role</span>
+                {/* SENIOR FIX: Consistent CSS-driven uppercase rendering */}
+                <span className="font-medium text-lg uppercase">{data.role}</span>
+              </div>
             </div>
-            <div>
-              <p className="text-[#B7BCB6] text-xs mb-1 flex items-center gap-1"><Calendar className="w-3 h-3"/> Deadline</p>
-              <p className="font-medium text-lg">{data.deadline || <span className="text-[#B7BCB6]/50 italic">No deadline</span>}</p>
-            </div>
+
+            {data.deadline && (
+              (() => {
+                /**
+                 * SENIOR FIX: Resilient DateTime Splitting.
+                 * Safely parses the raw deadline string (handling 'T' or space delimiters)
+                 * to isolate the time component for UI spacing, strictly respecting the 
+                 * existing AuditionFormData schema without requiring type changes.
+                 */
+                const parts = data.deadline.includes("T") ? data.deadline.split("T") : data.deadline.split(" ");
+                const datePart = parts[0];
+                const timePart = parts.length > 1 ? parts.slice(1).join(" ") : null;
+
+                return (
+                  <div className="flex items-center gap-3 md:col-span-2 lg:col-span-1">
+                    <Calendar className="w-5 h-5 text-[#FF7316]" />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#B7BCB6] uppercase tracking-wider">Deadline</span>
+                      <span className="font-medium text-lg flex items-center gap-2 uppercase">
+                        <span>{datePart}</span>
+                        {timePart && (
+                          <span className="text-[#B7BCB6]">at {timePart}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
           </div>
         </div>
 

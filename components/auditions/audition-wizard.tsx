@@ -65,12 +65,15 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   } | null>(null);
   const { toast } = useToast();
 
+  const isStandaloneScene = mode === "sides" && !auditionId;
+
   // --- PRINTING SETUP ---
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrintDocument = useReactToPrint({
     contentRef: printRef, // points to our hidden template
     documentTitle: formData.project ? `${formData.project}_Breakdown` : "Audition_Breakdown",
   });
+  
 
   // --- AUTHENTICATION LISTENER ---
   useEffect(() => {
@@ -636,9 +639,10 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
      
       {currentStep === 1 && (
         <div className="flex flex-col flex-1">
-          <StepBasics data={formData} updateData={updateFormData} mode={mode} />
+          {/* Injecting the context flag to adapt internal copy */}
+          <StepBasics data={formData} updateData={updateFormData} mode={mode} isStandaloneScene={isStandaloneScene} />
           
-          {/*  Next button */}
+          {/* Next button */}
           <div className="flex justify-end mt-12 mb-8">
             <button 
               type="button"

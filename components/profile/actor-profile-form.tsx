@@ -92,7 +92,7 @@ export function ActorProfileForm({ onSave, saveStatus }: ActorProfileFormProps) 
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#E8721A] px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-[#E8721A]/90 disabled:opacity-70"
       >
         <Save className="h-4 w-4" />
-        {saveStatus === "saving" ? "Saving..." : "Save & Preview Profile"}
+        {saveStatus === "saving" ? "Saving..." : "Save Profile"}
       </button>
     </div>
   );

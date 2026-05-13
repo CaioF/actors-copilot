@@ -459,6 +459,7 @@ function buildStructuredCastingData(
         "@type": "VideoObject",
         name: s.title,
         url: s.url,
+        ...(s.thumbnailUrl && { thumbnailUrl: s.thumbnailUrl }),
       }));
   }
 
