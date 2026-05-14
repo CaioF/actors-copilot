@@ -65,9 +65,9 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={2}
           title="Audition Breakdown"
-          description={"Got a new audition? Always start here. Upload the casting brief to extract critical requirements like deadlines, slate instructions, and tone. Once analyzed, you can easily attach your sides to generate a character breakdown that perfectly aligns with the director's vision."}
+          description={"Got a new audition? Always start here. Upload the casting brief to extract critical requirements like deadlines, slate instructions, and tone. Once saved to your Auditions List, you can seamlessly attach your sides to generate a character breakdown that perfectly aligns with the director's vision.."}
           link="/auditions/new/brief"
-          ctaLabel="Upload Casting Brief"
+          ctaLabel="Upload Casting Brief and Sides"
           ctaIcon={Sparkles}
           variant="orange"
           bodyVariant="dark"

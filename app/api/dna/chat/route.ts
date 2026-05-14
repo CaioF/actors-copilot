@@ -100,6 +100,12 @@ export async function POST(request: Request) {
         
         const isResumeSessionNew = content.includes("Start something new");
 
+        /**
+         * System flag to detect the very first response in the Identity section.
+         * Used to enforce the completion of the 3-part baseline question.
+         */
+        const isFirstIdentityResponse = currentSection === 'identity' && (!previouslyAsked || previouslyAsked.length === 0);
+
         let dynamicCommand = "";
         if (isEndSession) {
             dynamicCommand = `[SYSTEM OVERRIDE: INITIATE GROUNDING PROTOCOL]
@@ -150,8 +156,17 @@ export async function POST(request: Request) {
             2. DROP THE PAST: Completely abandon whatever specific memory or theme was being discussed before the break. Do not reference it.
             3. FRESH START: Look at your provided "Follow-up Routes" in the system instructions. Pick a completely NEW, unexplored route and ask a fresh Socratic question to open a new angle of psychological exploration.`;
         }
+
+        else if (isFirstIdentityResponse) {
+            dynamicCommand = `[SYSTEM OVERRIDE: BASELINE GATEKEEPER]
+            The user is currently responding to your initial 3-part baseline question: 1. Age, 2. Location, 3. Elevator pitch.
+            
+            CRITICAL DIRECTIVES:
+            1. Analyze their input. Did they explicitly provide ALL THREE pieces of information?
+            2. MISSING INFO: If they missed any of the three, your ONLY task this turn is to warmly acknowledge what they did share, and directly ask them to fill in the missing piece(s) before moving forward. (e.g., "I love that pitch, but you forgot to tell me your age and where you're based!")
+            3. ALL GOOD: If they successfully answered all three, proceed normally. Choose a "Follow-up Route" to start challenging the mask they presented in their elevator pitch.`;
         
-        else {
+        } else {
             dynamicCommand = `[MOMENTUM CHECK]
             Continue the Socratic extraction naturally. Ask ONE follow-up question. However, if you feel the current specific memory is fully explored, do not hesitate to pivot to a new Route.`;
         }

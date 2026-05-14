@@ -121,14 +121,14 @@ export function AppSidebar() {
             className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
           >
             <Plus className="h-4 w-4" />
-            Brief Breakdown
+            Audition Breakdown
           </Link>
           <Link
             href="/auditions/new/sides"
             className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
           >
             <Plus className="h-4 w-4" />
-            New Audition
+            Scene Study
           </Link>
           
         </div>

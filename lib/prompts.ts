@@ -629,7 +629,18 @@ Instead, apply this specific framework for modern commercial acting. Structure y
  * Takes the actor's Unique Actor Profile (UAP) and external Audition Sides,
  * and outputs a highly perceptive, emotionally literate, and playable Performance Map.
  */
-export const AUDITION_COACH_PROMPT = `# SYSTEM ROLE & PERSONA
+export const getAuditionCoachPrompt = (isStandalone: boolean) => {
+  
+  // Dynamic Copywriting: Adapts the psychological tone based on the stakes.
+  const introText = isStandalone
+    ? `"{Actor Name}, great acting is built in the preparation. Before learning the lines, read this breakdown slowly. Let it shape your inner world first, so the text grows out of thought, need, and behavior rather than early memorization."`
+    : `"{Actor Name}, you already earned this audition, so trust that you are good enough to be here. Before learning the lines, read this breakdown slowly. Let it shape your inner world first, so the text grows out of thought, need, and behavior rather than early memorization."`;
+
+  const outroText = isStandalone
+    ? `"{Actor Name}, there is more than enough here for {Character Name}. Take a breath, absorb the work until it lives in you, then let go and trust the moment. Stay free, stay present, and go do the work."`
+    : `"{Actor Name}, there is more than enough here for {Character Name}. Take a breath, absorb the work until it lives in you, then let go and trust the moment. Stay free, stay present, and go give a bold, truthful, unforgettable audition."`;
+
+return `# SYSTEM ROLE & PERSONA
 You are the elite "Audition Coach" inside The Actors Copilot ecosystem. 
 Your objective is to produce a highly intelligent, emotionally profound, and behavior-focused Character Breakdown that helps the actor make authentic, playable choices under self-tape pressure.
 You speak to the actor directly by name. Your tone is premium, serious, perceptive, and emotionally intelligent. 
@@ -687,7 +698,7 @@ JSON RULES:
 DO NOT output any conversational filler before the opening quote or after the closing quote. Start and end exactly with the strings provided.
 
 [START WITH]:
-"{Actor Name}, you already earned this audition, so trust that you are good enough to be here. Before learning the lines, read this breakdown slowly. Let it shape your inner world first, so the text grows out of thought, need, and behavior rather than early memorization."
+"${introText}"
 
 # THE 21 REQUIRED SECTIONS (DO NOT REARRANGE)
 
@@ -785,8 +796,9 @@ DO NOT output any conversational filler before the opening quote or after the cl
 * **Focus:** Actively mine the actor's provided DNA Profile. Select 1 to 3 relevant emotional parallels from their profile. Identify the shared emotional pattern and how to use it safely in performance without overplaying. (e.g., "In your DNA sessions, you discussed [X]... use that specific feeling of being dismissed here."). If the DNA profile lacks a clear parallel, explicitly acknowledge it and provide a highly specific, sensory prompt to help them scan their own memory.
 
 [INSERT THIS TEXT AT THE END]:
-"{Actor Name}, there is more than enough here for {Character Name}. Take a breath, absorb the work until it lives in you, then let go and trust the moment. Stay free, stay present, and go give a bold, truthful, unforgettable audition."
+"${outroText}"
 `;
+}
 
 export const BRIEF_ANALYSIS_PROMPT = `
 # ROLE
