@@ -164,12 +164,13 @@ export default function AuditionDetailView() {
             </button>
           )}
 
+          {/* Prominent 'Attach Sides' CTA to ensure high visibility in the header controls */}
           {auditionData.hasBrief && !auditionData.hasSides && (
             <button
               onClick={() => router.push(`/auditions/new/sides?enrichAuditionId=${auditionId}`)}
-              className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-4 py-2 rounded-full font-medium transition-colors text-sm"
+              className="flex items-center gap-2 bg-[#E8721A] text-white hover:bg-[#D66A18] px-6 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-base"
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-5 h-5" />
               Attach Sides
             </button>
           )}
