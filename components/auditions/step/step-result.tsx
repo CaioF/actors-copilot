@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Split, Hourglass, Brain, Lock, MapPin, AlertTriangle } from "lucide-react";
+import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Split, Hourglass, Brain, Lock, MapPin, AlertTriangle, RefreshCcw } from "lucide-react";
 import React from "react";
 import type { CriticalBriefFact } from "@/lib/audition-types";
 
@@ -19,9 +19,10 @@ interface StepResultProps {
     criticalBriefFacts?: CriticalBriefFact[];
   };
   onCoachClick?: () => void;
+  onRegenerateClick?: () => void;
 }
 
-export function StepResultSides({ data, onCoachClick }: StepResultProps) {
+export function StepResultSides({ data, onCoachClick, onRegenerateClick }: StepResultProps) {
   
   const [activeSection, setActiveSection] = useState("section-objective");
   //  Backward Compatibility & Conditional Hydration
@@ -446,17 +447,37 @@ export function StepResultSides({ data, onCoachClick }: StepResultProps) {
           </div>
         )}
 
-        {onCoachClick && (
-          <div className="mt-2">
-            <button
-              onClick={onCoachClick}
-              className="w-full rounded-full bg-[#E8721A] py-4 text-base font-semibold text-white transition-colors hover:bg-[#d66a18]"
-            >
-              Take this to my Coach →
-            </button>
-            <p className="mt-2 text-center text-sm text-[#6B6B6B]">
-              Open a coaching session with this breakdown pre-loaded
-            </p>
+        {(onCoachClick || onRegenerateClick) && (
+          <div className="mt-8 flex flex-col gap-4">
+            
+            {onRegenerateClick && (
+              <div>
+                <button
+                  onClick={onRegenerateClick}
+                  className="w-full flex items-center justify-center gap-2 rounded-full border-2 border-[#E8721A] bg-white py-4 text-base font-semibold text-[#E8721A] transition-colors hover:bg-[#FFF1E8]"
+                >
+                  <RefreshCcw className="w-5 h-5" />
+                  Generate Alternative Take
+                </button>
+                <p className="mt-2 text-center text-sm text-[#6B6B6B]">
+                  Not feeling this approach? Let the AI spin a completely opposing creative direction.
+                </p>
+              </div>
+            )}
+
+            {onCoachClick && (
+              <div>
+                <button
+                  onClick={onCoachClick}
+                  className="w-full flex items-center justify-center gap-2 rounded-full bg-[#E8721A] py-4 text-base font-semibold text-white transition-colors hover:bg-[#d66a18]"
+                >
+                  Take this to my Coach →
+                </button>
+                <p className="mt-2 text-center text-sm text-[#6B6B6B]">
+                  Open a coaching session with this breakdown pre-loaded
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

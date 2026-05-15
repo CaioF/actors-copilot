@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Printer, Trash2, Save, CalendarDays, User as UserIcon } from "lucide-react";
+import { Printer, Trash2, Save, CalendarDays, User as UserIcon , RefreshCcw} from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { AuditionFormData, initialAuditionData, AuditionStep, CriticalBriefFact } from "@/lib/audition-types";
 import { Stepper } from "./stepper";
@@ -190,7 +190,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
    * Step 1: Smart-checks the DNA Vault and updates the Master Profile if needed.
    * Step 2: Generates the character breakdown via API.
    */
-  const handleGenerate = async () => {
+  const handleGenerate = async (isRegeneration: boolean = false) => {
     // Pre-flight: if anything required is missing, bounce back to the right
     // step with a clear explanation BEFORE we kick the user into the long
     // generation spinner only to fail with a vague API error.
@@ -205,7 +205,9 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       return;
     }
 
-    setCurrentStep(4);
+    if (!isRegeneration) {
+        setCurrentStep(4);
+    }
     setIsGenerating(true);
 
     const actorTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -340,6 +342,19 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       if (priorSidesSummary) payload.append("priorSidesSummary", priorSidesSummary);
       if (priorBriefSummary) payload.append("priorBriefSummary", priorBriefSummary);
       if (criticalBriefFactsPayload) payload.append("criticalBriefFactsPayload", criticalBriefFactsPayload);
+
+      if (isRegeneration && resultData) {
+        // We stringify the critical sections to give the AI context of what to avoid/oppose
+        const briefPreviousTake = resultData.sections
+            .map(s => `${s.title}: ${s.items.join(" ")}`)
+            .join("\n")
+            .substring(0, 2000); // Keep it within reasonable token limits
+            
+        payload.append("previousTake", briefPreviousTake);
+      }
+
+      const isStandaloneScene = mode === "sides" && !auditionId;
+      payload.append("isStandalone", isStandaloneScene.toString());
 
       const endpoint = mode === "sides"
         ? "/api/auditions/analyzeSides"
@@ -660,10 +675,10 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
         <div className="flex flex-col flex-1">
           
           <StepUpload 
-            title={mode === "sides" ? "Upload Sides" : "Upload Character Brief"}
+            title={mode === "sides" ? "Upload Sides" : "Upload Casting Brief"}
             description={mode === "sides" 
               ? "Upload the script pages (Sides) for this audition." 
-              : "Upload the casting breakdown, character description, or director's notes."}
+              : "Upload the casting brief document, agency email content, character description, or director's notes."}
             file={mode === "sides" ? formData.sidesFile : formData.briefFile}
             text={mode === "sides" ? formData.sidesText : formData.briefText}
             onFileChange={(file) => mode === "sides" 
@@ -696,7 +711,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
               Back to edit
             </button>
             <button
-              onClick={handleGenerate}
+              onClick={() => handleGenerate(false)}
               disabled={!canGenerate}
               title={canGenerate ? undefined : "Fill in project, role, and either upload or paste your content first."}
               className="bg-[#FF7316] hover:bg-[#E66814] text-white px-10 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 disabled:bg-[#C7C0B5] disabled:hover:bg-[#C7C0B5] disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
@@ -732,11 +747,11 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                {/* --- FIGMA-ALIGNED HEADER --- */}
                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 w-full border-b border-[#D0D4D0]/50 pb-6">
                  <div>
-                   <h1 className="text-[32px] font-title text-[#2C3328] leading-tight mb-1">
+                   <h1 className="text-[32px] font-title text-[#2C3328] leading-tight mb-1 uppercase">
                      {formData.role || "character breakdown"}
                    </h1>
-                   <p className="text-[#646A64] text-[15px] mb-3">
-                     Lead · {formData.project || "Audition Project"} 
+                   <p className="text-[#646A64] text-[15px] mb-3 uppercase">
+                     {formData.project || "Audition Project"} 
                    </p>
                  </div>
 
@@ -750,6 +765,18 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                      <Trash2 className="w-4 h-4" />
                      Delete
                    </button>
+                   {/* Alternative Take — only available for sides analysis where regeneration is implemented */}
+                   {mode === "sides" && (
+                     <button
+                       type="button"
+                       onClick={() => handleGenerate(true)}
+                       className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#FF7316] text-[#FF7316] text-sm font-medium hover:bg-[#FFF1E8] transition-colors"
+                       title="Generate an opposing creative choice"
+                     >
+                       <RefreshCcw className="w-4 h-4" />
+                       Alternative Take
+                     </button>
+                   )}
                    {/* Print Action */}
                    <button 
                      onClick={handlePrintDocument}
@@ -792,9 +819,9 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
                {/* --- MAIN UI RENDERER --- */}
                {mode === "sides" ? (
-                <StepResultSides data={resultData} onCoachClick={handleCoachClick} />
+                <StepResultSides data={resultData} onCoachClick={handleCoachClick} onRegenerateClick={() => handleGenerate(true)}/>
               ) : (
-                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} onCoachClick={handleCoachClick} />
+                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} />
               )}
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">
@@ -802,8 +829,8 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                    
                    {/* Header */}
                    <div className="border-b-2 border-black pb-4 mb-8">
-                     <h1 className="text-4xl font-bold text-black">{formData.project || "Audition Project"}</h1>
-                     <p className="text-xl text-gray-800 mt-2">{formData.role || "Character Role"}</p>
+                     <h1 className="text-4xl font-bold uppercase text-black">{formData.project || "Audition Project"}</h1>
+                     <p className="text-xl text-gray-800 uppercase mt-2">{formData.role || "Character Role"}</p>
                      <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest font-sans">The Actors Copilot • AI Performance Map</p>
                    </div>
 
@@ -830,7 +857,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
             </AlertDialogTitle>
             <AlertDialogDescription className="text-[#6B6B6B] space-y-2">
               <span className="block">
-                We found an existing audition for <span className="font-semibold text-[#2C3328]">&quot;{formData.project}&quot;</span> as <span className="font-semibold text-[#2C3328]">&quot;{formData.role}&quot;</span> that already has a <span className="font-semibold">{mode}</span> breakdown.
+                We found an existing audition for <span className="font-semibold uppercase text-[#2C3328]">&quot;{formData.project}&quot;</span> as <span className="font-semibold uppercase text-[#2C3328]">&quot;{formData.role}&quot;</span> that already has a <span className="font-semibold">{mode}</span> breakdown.
               </span>
               <span className="block">
                 The cleanest move is to <span className="font-semibold text-[#2C3328]">enrich the existing audition</span> with this {dupOtherMode === mode ? mode : dupOtherMode} — it keeps everything in one place and your coach will see both maps together.

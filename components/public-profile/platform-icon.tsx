@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { 
   Instagram, 
   Linkedin, 
   Globe, 
   Video, 
+  Facebook,
   Star, 
   Clapperboard, 
   UserCircle, 
@@ -15,9 +17,6 @@ import {
 } from "lucide-react";
 import type { ExternalProfileKey } from "@/lib/profile-types";
 
-/**
- * Enterprise-grade mapping of platform names for accessibility and tooltips.
- */
 const PLATFORM_LABELS: Partial<Record<ExternalProfileKey, string>> = {
   imdb: "IMDb",
   spotlight: "Spotlight",
@@ -41,14 +40,14 @@ const PLATFORM_LABELS: Partial<Record<ExternalProfileKey, string>> = {
   personalWebsite: "Website",
   instagram: "Instagram",
   linkedin: "LinkedIn",
+  facebook: "Facebook",
 };
 
 /**
- * Mapping table for platform-specific icons.
- * Uses logical visual metaphors for industry-specific platforms 
- * while maintaining brand-accurate icons for social/professional networks.
+ * Fallback mapping table. 
+ * Used only if the dynamic official brand icon fails to load.
  */
-const ICON_MAP: Record<string, React.ElementType> = {
+const FALLBACK_ICON_MAP: Record<string, React.ElementType> = {
   imdb: Clapperboard,
   instagram: Instagram,
   linkedin: Linkedin,
@@ -71,39 +70,61 @@ const ICON_MAP: Record<string, React.ElementType> = {
   alternativaTeatral: Film,
   castingNetworksSa: Users,
   starQuality: Star,
+  facebook: Facebook,
 };
 
 interface PlatformIconProps {
-  /** The unique key of the external platform defined in profile-types.ts */
   platformKey: ExternalProfileKey;
-  /** The destination URL for the profile link */
   url: string;
 }
 
-/**
- * Renders a specialized icon button for an external actor profile.
- * Automatically resolves the correct visual icon based on the platform key 
- * and handles URL normalization.
- * * @component
- * @param {PlatformIconProps} props - The properties for the component.
- * @returns {JSX.Element} A stylized link containing the representative platform icon.
- */
 export function PlatformIcon({ platformKey, url }: PlatformIconProps) {
+  const [imageError, setImageError] = useState(false);
   const label = PLATFORM_LABELS[platformKey] || platformKey;
   
-  // Resolve the component with a fallback to a generic link icon
-  const IconComponent = ICON_MAP[platformKey] || ExternalLink;
+  // URL normalization
+  const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+  
+  // Extract hostname safely for dynamic resolution
+  let hostname = "";
+  try {
+    hostname = new URL(fullUrl).hostname;
+  } catch (e) {
+    console.warn(`Invalid URL provided for ${platformKey}: ${url}`);
+  }
+
+  // Fallback to our previous semantic mapping
+  const FallbackIcon = FALLBACK_ICON_MAP[platformKey] || ExternalLink;
+
+  /**
+   * SENIOR FIX: Enterprise Favicon Resolution
+   * Dynamically fetches the official brand icon (64px size for crispness on Retina displays).
+   */
+  const officialBrandIconUrl = hostname 
+    ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=64` 
+    : null;
 
   return (
     <a
-      href={url.startsWith("http") ? url : `https://${url}`}
+      href={fullUrl}
       target="_blank"
       rel="noopener noreferrer"
       title={label}
       aria-label={`Visit ${label} profile`}
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E8DFD0] text-[#494E3E] transition-all hover:bg-[#FF751F] hover:text-white"
+      // Added 'group' to handle hover animations on child elements
+      className="group flex h-9 w-9 items-center justify-center rounded-full bg-[#E8DFD0] text-[#494E3E] transition-all hover:bg-[#FF751F] hover:text-white"
     >
-      <IconComponent className="h-4 w-4" />
+      {!imageError && officialBrandIconUrl ? (
+        <img 
+          src={officialBrandIconUrl} 
+          alt={`${label} logo`}
+          // Removed the 'text-white' dependency since it's an image, and added a scale-up on hover
+          className="h-4 w-4 object-contain transition-transform duration-200 group-hover:scale-110"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <FallbackIcon className="h-4 w-4" />
+      )}
       <span className="sr-only">{label}</span>
     </a>
   );

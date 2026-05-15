@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import PDFParser from "pdf2json";
 import mammoth from "mammoth";
-import { AUDITION_COACH_PROMPT, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
+import { getAuditionCoachPrompt, COMMERCIAL_MODE_PROMPT, THEATHER_MODE_PROMPT } from "@/lib/prompts";
 import { auth, db } from "@/lib/firebase.admin";
 import { logger } from '@/lib/logger';
 import { auditionFormDataSchema } from "@/lib/schemas/audition";
@@ -117,6 +117,8 @@ export async function POST(request: Request) {
       priorSidesSummary: (formData.get("priorSidesSummary") as string | null) ?? undefined,
       priorBriefSummary: (formData.get("priorBriefSummary") as string | null) ?? undefined,
       criticalBriefFactsPayload: (formData.get("criticalBriefFactsPayload") as string | null) ?? undefined,
+      previousTake: (formData.get("previousTake") as string | null) ?? undefined, 
+      isStandalone: (formData.get("isStandalone") as string | null) ?? "false",
     };
 
     const parseResult = auditionFormDataSchema.safeParse(textFields);
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
     const castingDirectorName = (validated.castingDirectorName ?? "").trim();
     const priorBriefSummary = (validated.priorBriefSummary ?? "").substring(0, 1500).trim();
     const criticalBriefFacts = parseCriticalBriefFactsPayload(validated.criticalBriefFactsPayload ?? "");
+    const previousTake = validated.previousTake ?? "";
 
     if (!userPath || !userPath.startsWith(`${authenticatedUserId}_`)) {
       logger.warn({
@@ -197,9 +200,11 @@ export async function POST(request: Request) {
 
     const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
 
+    const isStandalone = validated.isStandalone === "true";
+
     const model = getGenerativeModel(ai, { 
       model: "gemini-3.1-pro-preview", 
-      systemInstruction: { role: "user", parts: [{ text: AUDITION_COACH_PROMPT }] },
+      systemInstruction: { role: "user", parts: [{ text: getAuditionCoachPrompt(isStandalone) }] },
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: {
@@ -236,6 +241,21 @@ export async function POST(request: Request) {
       }
     });
 
+    let previousTakePrompt = "";
+    
+    if (previousTake) {
+      previousTakePrompt = `
+      <alternative_take_instruction>
+      CRITICAL PIVOT REQUIRED: The actor already generated a breakdown but requested a COMPLETELY ALTERNATIVE, OPPOSING creative direction. 
+      
+      Here is the summary of their previous take:
+      ${previousTake}
+      
+      INSTRUCTION: Analyze the previous take and completely flip the creative approach. If the previous take was highly emotional, desperate, and loud, make this one cold, calculating, and subdued (or vice-versa). The scene objective might remain the same, but the TACTICS, INNER MONOLOGUE, and THE BOLD CHOICE must contrast sharply. Give the actor a fresh, unexpected perspective. Do not explicitly state "Unlike the previous take" in your output; simply deliver the new performance map naturally.
+      </alternative_take_instruction>
+      `;
+    }
+
     // 6. COMPILE PAYLOAD FOR AI
     const prompt = `
       You are coaching ${actorName}. 
@@ -270,6 +290,8 @@ export async function POST(request: Request) {
       ${criticalBriefFacts.length > 0 ? `\n<critical_brief_facts>\nThe casting brief explicitly surfaced the following critical facts. They are non-negotiable and must be honored verbatim even if absent from the sides. Weave each one into the appropriate section AND echo them in the dedicated "criticalBriefFacts" output array exactly as given (do not summarize, rephrase, or drop any).\n${criticalBriefFacts
         .map((fact) => `- [${fact.importance.toUpperCase()}] ${fact.label}: ${fact.value}`)
         .join("\n")}\n</critical_brief_facts>` : ""}
+
+        ${previousTakePrompt}
 
       CRITICAL: Do not summarize. Write expansive, multi-paragraph analyses for every section. If a section allows it, explicitly name a trait from the actor's DNA and explain how it alters their tactics here.
     `;

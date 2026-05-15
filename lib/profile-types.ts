@@ -46,6 +46,7 @@ export const EXTERNAL_PROFILE_FIELDS = [
   { key: "personalWebsite", label: "Personal Website URL", placeholder: "https://" },
   { key: "instagram", label: "Instagram Handle", placeholder: "@handle" },
   { key: "linkedin", label: "LinkedIn URL", placeholder: "https://" },
+  { key: "facebook", label: "Facebook URL", placeholder: "https://facebook.com/..." },
 ] as const;
 
 export type ExternalProfileKey = (typeof EXTERNAL_PROFILE_FIELDS)[number]["key"];
@@ -97,6 +98,7 @@ const externalProfilesSchema = z.object({
   personalWebsite: z.string(),
   instagram: z.string(),
   linkedin: z.string(),
+  facebook: z.string().optional().default("")
 });
 
 export const actorProfileSchema = z.object({
@@ -211,6 +213,7 @@ export const defaultActorProfile: ActorProfile = {
     personalWebsite: "",
     instagram: "",
     linkedin: "",
+    facebook: "",
   },
   skillsAndAccents: [],
   cvUrl: null,

@@ -43,4 +43,6 @@ export const auditionFormDataSchema = z.object({
   // present it travels alongside priorBriefSummary into the Sides prompt as a dedicated,
   // non-truncated channel. Stored as a string here because the request body is FormData.
   criticalBriefFactsPayload: z.string().max(10000).optional().default(""),
+  previousTake: z.string().max(5000).optional(),
+  isStandalone: z.enum(["true", "false"]).optional(),
 });
