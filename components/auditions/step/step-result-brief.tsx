@@ -26,7 +26,6 @@ interface StepResultProps {
     outro?: string;
   };
   localDeadlineStr?: string | null;
-  onCoachClick?: () => void;
 }
 
 /**
@@ -47,7 +46,7 @@ const getSectionIcon = (title: string, index: number) => {
   return fallbacks[index % fallbacks.length];
 };
 
-export function StepResultBrief({ data, localDeadlineStr, onCoachClick }: StepResultProps) {
+export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
   const [activeSection, setActiveSection] = useState("section-0");
 
   useEffect(() => {

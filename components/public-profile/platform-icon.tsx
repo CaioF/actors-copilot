@@ -70,6 +70,7 @@ const FALLBACK_ICON_MAP: Record<string, React.ElementType> = {
   alternativaTeatral: Film,
   castingNetworksSa: Users,
   starQuality: Star,
+  facebook: Facebook,
 };
 
 interface PlatformIconProps {

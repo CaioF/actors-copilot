@@ -698,7 +698,7 @@ JSON RULES:
 DO NOT output any conversational filler before the opening quote or after the closing quote. Start and end exactly with the strings provided.
 
 [START WITH]:
-"${introText}"
+${introText}
 
 # THE 21 REQUIRED SECTIONS (DO NOT REARRANGE)
 
@@ -796,7 +796,7 @@ DO NOT output any conversational filler before the opening quote or after the cl
 * **Focus:** Actively mine the actor's provided DNA Profile. Select 1 to 3 relevant emotional parallels from their profile. Identify the shared emotional pattern and how to use it safely in performance without overplaying. (e.g., "In your DNA sessions, you discussed [X]... use that specific feeling of being dismissed here."). If the DNA profile lacks a clear parallel, explicitly acknowledge it and provide a highly specific, sensory prompt to help them scan their own memory.
 
 [INSERT THIS TEXT AT THE END]:
-"${outroText}"
+${outroText}
 `;
 }
 

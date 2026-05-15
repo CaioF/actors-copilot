@@ -765,15 +765,18 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                      <Trash2 className="w-4 h-4" />
                      Delete
                    </button>
-                   <button 
-                     type="button"
-                     onClick={() => handleGenerate(true)}
-                     className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#FF7316] text-[#FF7316] text-sm font-medium hover:bg-[#FFF1E8] transition-colors"
-                     title="Generate an opposing creative choice"
-                   >
-                     <RefreshCcw className="w-4 h-4" />
-                     Alternative Take
-                   </button>
+                   {/* Alternative Take — only available for sides analysis where regeneration is implemented */}
+                   {mode === "sides" && (
+                     <button
+                       type="button"
+                       onClick={() => handleGenerate(true)}
+                       className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#FF7316] text-[#FF7316] text-sm font-medium hover:bg-[#FFF1E8] transition-colors"
+                       title="Generate an opposing creative choice"
+                     >
+                       <RefreshCcw className="w-4 h-4" />
+                       Alternative Take
+                     </button>
+                   )}
                    {/* Print Action */}
                    <button 
                      onClick={handlePrintDocument}
@@ -818,7 +821,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                {mode === "sides" ? (
                 <StepResultSides data={resultData} onCoachClick={handleCoachClick} onRegenerateClick={() => handleGenerate(true)}/>
               ) : (
-                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} onCoachClick={handleCoachClick} />
+                <StepResultBrief data={resultData} localDeadlineStr={localDeadlineStr} />
               )}
                {/* --- HIDDEN PRINT TEMPLATE --- */}
                <div className="hidden">

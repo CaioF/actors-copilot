@@ -98,7 +98,7 @@ const externalProfilesSchema = z.object({
   personalWebsite: z.string(),
   instagram: z.string(),
   linkedin: z.string(),
-  facebook: z.string()
+  facebook: z.string().optional().default("")
 });
 
 export const actorProfileSchema = z.object({
