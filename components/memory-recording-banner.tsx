@@ -158,7 +158,7 @@ export function MemoryRecordingBanner() {
             Memory Recording
           </h3>
           <p className="text-[#B7BCB6] text-sm max-w-2xl leading-relaxed">
-            When something surfaces, record it while it’s still fresh. Stay close to the details — what you saw, heard, smelt, touched, or tasted. The more vivid and specific the memory, the more truthfully it can live in your work.
+            When something surfaces, record it while it’s still fresh. Stay close to the details — what you saw, heard, smelt, touched, or tasted. The more vivid and specific the memory, the more truthfully it&nbsp;can&nbsp;live&nbsp;in&nbsp;your&nbsp;work.
           </p>
         </div>
       </div>

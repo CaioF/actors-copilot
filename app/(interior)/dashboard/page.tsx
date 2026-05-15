@@ -55,7 +55,7 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={1}
           title="Personal DNA Upload"
-          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future audition analyses will become."}
+          description={"Build the foundation of your craft. Through guided conversation across 12 distinct sections, the Copilot learns your emotional anchors, lived experiences, strengths, and patterns—creating a Personal DNA Vault that makes your choices specific and truthful. This is not about oversharing; it's about identifying what's usable. Speak freely and share as much detail as possible in every session. The deeper the system understands you across these 12 areas, the sharper and more highly personalized your future\u00A0audition\u00A0analyses\u00A0will\u00A0become."}
           link="/chat"
           ctaLabel="Start building your DNA with the identity section"
           ctaIcon={Dna}
@@ -65,7 +65,7 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={2}
           title="Audition Breakdown"
-          description={"Got a new audition? Always start here. Upload the casting brief to extract critical requirements like deadlines, slate instructions, and tone. Once saved to your Auditions List, you can seamlessly attach your sides to generate a character breakdown that perfectly aligns with the director's vision."}
+          description={"Got a new audition? Always start here. Upload the casting brief to extract critical requirements like deadlines, slate instructions, and tone. Once saved to your Auditions List, you can seamlessly attach your sides to generate a character breakdown that perfectly\u00A0aligns\u00A0with\u00A0the\u00A0director's\u00A0vision."}
           link="/auditions/new/brief"
           ctaLabel="Upload Casting Brief and Sides"
           ctaIcon={Sparkles}
@@ -75,7 +75,7 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={3}
           title="Working on a scene?"
-          description="Training a monologue or class scene without a casting brief? Upload your script here to bypass audition logistics. We'll jump straight into generating a playable character breakdown mapped to your Actor DNA—giving you clear objectives, beats, and tactics."
+          description={"Training a monologue or class scene without a casting brief? Upload your script here to bypass audition logistics. We'll jump straight into generating a playable character breakdown mapped to your Actor DNA—giving you\u00A0clear\u00A0objectives,\u00A0beats,\u00A0and\u00A0tactics."}
           link="/auditions/new/sides"
           ctaLabel="Start Scene Study"
           ctaIcon={Monitor}

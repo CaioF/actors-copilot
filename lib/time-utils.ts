@@ -15,7 +15,7 @@ export function calculateLocalDeadline(
     return formatInTimeZone(
       dateInProjectTZ, 
       actorTimezone, 
-      "PPpp"
+      "PP, p z"
     );
   } catch (error) {
     logger.error({ err: error, msg: 'Error calculating local deadline' });

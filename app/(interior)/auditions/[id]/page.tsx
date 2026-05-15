@@ -270,11 +270,7 @@ export default function AuditionDetailView() {
                   <StepResultBrief
                     data={auditionData.briefPerformanceMap}
                     localDeadlineStr={localDeadlineStr}
-                    onCoachClick={() =>
-                      router.push(
-                        `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=brief`
-                      )
-                    }
+                    
                   />
                 )}
               </div>
@@ -294,11 +290,7 @@ export default function AuditionDetailView() {
               <StepResultBrief
                 data={auditionData.briefPerformanceMap}
                 localDeadlineStr={localDeadlineStr}
-                onCoachClick={() =>
-                  router.push(
-                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=brief`
-                  )
-                }
+                
               />
             ) : auditionData.performanceMap ? (
               // Defensive: hasNewSchema is true but neither hasSides/hasBrief produced a card
@@ -306,11 +298,7 @@ export default function AuditionDetailView() {
               currentAnalysisType === "brief" ? (
                 <StepResultBrief
                   data={auditionData.performanceMap}
-                  onCoachClick={() =>
-                    router.push(
-                      `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=brief`
-                    )
-                  }
+                  
                 />
               ) : (
                 <StepResultSides
@@ -329,11 +317,7 @@ export default function AuditionDetailView() {
             currentAnalysisType === "brief" ? (
               <StepResultBrief
                 data={auditionData.performanceMap}
-                onCoachClick={() =>
-                  router.push(
-                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=brief`
-                  )
-                }
+                
               />
             ) : (
               <StepResultSides
