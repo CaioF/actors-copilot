@@ -21,14 +21,38 @@ function isFirebaseError(error: unknown): error is FirebaseError {
 }
 
 export default function LoginPage() {
-    const { loginWithGoogle, loginWithEmail, signupWithEmail, loading } = useAuth();
+    const { loginWithGoogle, loginWithEmail, signupWithEmail, sendPasswordReset, loading } = useAuth();
 
     const [errorMsg, setErrorMsg] = useState('');
+    const [infoMsg, setInfoMsg] = useState('');
+    const [resetLoading, setResetLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
+    const handlePasswordReset = async () => {
+        setErrorMsg('');
+        setInfoMsg('');
+
+        if (!email) {
+            setErrorMsg('Please enter your email above, then click "Forgot password?" again.');
+            return;
+        }
+
+        setResetLoading(true);
+        try {
+            await sendPasswordReset(email);
+            setInfoMsg(`If an account exists for ${email}, a password reset email has been sent.`);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Could not send reset email. Please try again.';
+            setErrorMsg(message);
+        } finally {
+            setResetLoading(false);
+        }
+    }
+
     const handleLogin = async () => {
         setErrorMsg('');
+        setInfoMsg('');
         try {
             await loginWithGoogle();
         } catch (error: unknown) { 
@@ -47,6 +71,7 @@ export default function LoginPage() {
     const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg('');
+        setInfoMsg('');
         
         if (!email || !password) {
             setErrorMsg('Please enter both email and password.');
@@ -175,7 +200,7 @@ export default function LoginPage() {
                             />
                         </div>
 
-                        <button 
+                        <button
                             type="submit"
                             disabled={loading}
                             className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-3.5 px-4 flex items-center justify-center font-medium transition-colors disabled:opacity-70 mt-2"
@@ -186,6 +211,17 @@ export default function LoginPage() {
                                 "Continue"
                             )}
                         </button>
+
+                        <div className="text-center pt-1">
+                            <button
+                                type="button"
+                                onClick={handlePasswordReset}
+                                disabled={resetLoading || loading}
+                                className="text-sm text-primary hover:underline disabled:opacity-60"
+                            >
+                                {resetLoading ? 'Sending reset email...' : 'Forgot password?'}
+                            </button>
+                        </div>
                     </form>
 
                     <div className="relative flex items-center py-4">
@@ -204,6 +240,12 @@ export default function LoginPage() {
                             Continue with Google
                         </button>
                     </div>
+
+                    {infoMsg && (
+                        <p className="text-sm text-center font-medium text-[#2C3328] animate-in fade-in slide-in-from-top-2">
+                            {infoMsg}
+                        </p>
+                    )}
 
                     {errorMsg && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">

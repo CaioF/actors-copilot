@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
 import { logger } from '@/lib/logger';
 
@@ -22,6 +22,7 @@ interface AuthContextType {
     loginWithGoogle: () => Promise<void>;
     loginWithEmail: (email: string, password: string) => Promise<void>;
     signupWithEmail: (email: string, password: string) => Promise<void>;
+    sendPasswordReset: (email: string) => Promise<void>;
     logout: () => Promise<void>;
 }
 
@@ -215,6 +216,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     /**
+     * Sends a Firebase password reset email to the provided address.
+     * To avoid leaking which addresses are registered, this wrapper treats
+     * Firebase's `auth/user-not-found` error as a successful no-op.
+     *
+     * @param {string} email - The email address to send the reset link to.
+     * @throws {Error} Throws if the email is malformed or another reset request
+     * error occurs. `auth/user-not-found` is intentionally treated as success.
+     */
+    const sendPasswordReset = async (email: string) => {
+        try {
+            await sendPasswordResetEmail(auth, email);
+        } catch (error: unknown) {
+            if (isFirebaseError(error)) {
+                if (error.code === 'auth/invalid-email') {
+                    throw new Error("Please enter a valid email address.", { cause: error });
+                }
+                if (error.code === 'auth/user-not-found') {
+                    return;
+                }
+            }
+            logger.error({ err: error, msg: 'Password reset error' });
+            throw error;
+        }
+    };
+
+    /**
      * Terminates the user's session by signing out of Firebase and requesting
      * the backend to destroy the secure HTTP-only session cookie.
      *
@@ -276,7 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
 
     return (
-        <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, loginWithEmail, signupWithEmail }}>
+        <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, loginWithEmail, signupWithEmail, sendPasswordReset }}>
             {children}
         </AuthContext.Provider>
     );
