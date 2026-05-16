@@ -90,6 +90,6 @@ describe("StepResultSides — Critical Brief Facts block", () => {
     );
     // intro renders as a div without role, so it should come after the facts block
     expect(factsIdx).toBeGreaterThanOrEqual(0);
-    expect(factsIdx).toBe(0); // first child in the left column
+    expect(factsIdx).toBe(1); // first child in the left column
   });
 });

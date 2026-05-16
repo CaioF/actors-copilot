@@ -102,19 +102,13 @@ export function AppSidebar() {
         </Link>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions*/} 
       <div className="px-4 pb-4">
         <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
           Quick Actions
         </p>
         <div className="flex flex-col gap-2">
-          <Link
-            href="/chat"
-            className="flex items-center gap-2 rounded-lg border border-[#F5F0E8]/20 bg-[#F5F0E8]/10 px-4 py-2.5 text-sm font-medium text-[#F5F0E8] transition-colors hover:bg-[#F5F0E8]/15"
-          >
-            <Sparkles className="h-4 w-4" />
-            New DNA Session
-          </Link>
+          
           
           <Link
             href="/auditions/new/brief"
@@ -132,7 +126,7 @@ export function AppSidebar() {
           </Link>
           
         </div>
-      </div>
+      </div> 
 
       {/* Menu */}
       <div className="flex-1 px-4">
@@ -181,7 +175,7 @@ export function AppSidebar() {
             Upgrade to Bussiness Class to unlock more features
           </p>
           <a 
-            href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout?coupon_code=UPGRADE19" 
+            href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout?coupon_code=UPGRADEBUSINESS" 
             target="_blank" 
             rel="noopener noreferrer"
             className="mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"

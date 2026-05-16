@@ -10,7 +10,8 @@ import {
   Users, 
   Info,
   CheckCircle2,
-  Wallet
+  Wallet,
+  Save
 } from "lucide-react";
 import React from "react";
 
@@ -26,6 +27,11 @@ interface StepResultProps {
     outro?: string;
   };
   localDeadlineStr?: string | null;
+  /**
+   * Callback function triggered when the user clicks the "Save Output" button.
+   * If undefined, the component assumes a read-only state and hides the CTA.
+   */
+  onSave?: () => void;
 }
 
 /**
@@ -46,7 +52,7 @@ const getSectionIcon = (title: string, index: number) => {
   return fallbacks[index % fallbacks.length];
 };
 
-export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
+export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultProps) {
   const [activeSection, setActiveSection] = useState("section-0");
 
   useEffect(() => {
@@ -98,6 +104,12 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
       {/* LEFT COLUMN: MAIN CONTENT */}
       <div className="space-y-6">
         
+        {/* Top Instructional Notice Banner */}
+        <div className="flex items-center gap-3 px-5 py-4 bg-[#FCFAF7] border border-gray-200/60 rounded-2xl shadow-sm text-sm text-gray-600 font-medium">
+          <Info size={18} className="text-[#FF7316] shrink-0" />
+          <span>Read the breakdown and attach sides above.</span>
+        </div>
+        
         {/* Intro Block: Data Parsing & Header UI */}
         {data.intro && (
           <div className="rounded-2xl bg-white shadow-sm p-6 sm:p-8 border border-gray-200/60 mb-6">
@@ -114,10 +126,7 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
                   "Type",
                 ];
                 
-                // Sanitize input by stripping markdown wrappers.
                 const cleaned = data.intro.replace(/\*\*/g, "").replace(/__/g, "");
-                
-                // Construct a dynamic RegExp to capture known labels.
                 const labelGroup = LABELS.map((l) => l.replace(/ /g, "\\s+")).join("|");
                 const splitter = new RegExp(`(${labelGroup})\\s*[:\\-—]\\s*`, "gi");
                 const parts = cleaned.split(splitter);
@@ -130,18 +139,14 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
                   );
                 }
 
-                // Preserves any structural text that preceded the first matched label.
                 const prelude = parts[0]?.trim();
-
                 const items: Array<{ label: string; value: string }> = [];
+                
                 for (let i = 1; i < parts.length; i += 2) {
                   const rawLabel = (parts[i] || "").trim();
                   let rawValue = (parts[i + 1] || "").replace(/^[.\s]+|[.\s]+$/g, "").trim();
                   
-                  // TARGETED REGEX REPLACEMENT: 
-                  // Intercepts strict ISO 8601 datetime strings (e.g., "2026-05-06T10:00") 
-                  // and explicitly swaps the "T" separator with a space to enhance human readability,
-                  // while protecting standard text blocks from unintended alterations.
+                  // Enhances human readability for ISO 8601 datetime strings
                   rawValue = rawValue.replace(/\b(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}(?::\d{2})?)\b/g, "$1 $2");
 
                   if (!rawLabel || !rawValue) continue;
@@ -187,7 +192,6 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
           const sectionId = `section-${idx}`;
           const SectionIcon = getSectionIcon(section.title, idx);
           
-          // Sanitizes titles by omitting prefixed enumeration from the AI model (e.g., "1. ").
           const cleanTitle = section.title.replace(/^(\d+\.|Phase \d+:)\s*/i, '');
 
           return (
@@ -199,7 +203,6 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
               
               <div className="space-y-4">
                 {section.items.map((item, i) => {
-                  // Advanced string parser to handle key-value pairs rendered dynamically.
                   const splitIndex = item.indexOf(':');
                   const isKeyValPair = splitIndex !== -1 && splitIndex < 60; 
                   
@@ -235,6 +238,21 @@ export function StepResultBrief({ data, localDeadlineStr }: StepResultProps) {
             <div className="prose prose-slate max-w-none prose-p:italic prose-p:m-0 text-sm">
               <ReactMarkdown>{data.outro}</ReactMarkdown>
             </div>
+          </div>
+        )}
+
+        {/* Primary Call-to-Action: Save Output */}
+        {/* Conditionally rendered: Mounts only if an onSave handler is provided, preventing display in read-only views. */}
+        {onSave && (
+          <div className="mt-10 pt-6 flex justify-center w-full border-t border-gray-200/60">
+            <button
+              onClick={onSave}
+              className="group flex items-center justify-center gap-3 w-full sm:w-auto px-12 py-4 bg-[#FF7316] hover:bg-[#e66613] text-white text-lg font-bold rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-[#FF7316]/30"
+              aria-label="Save Breakdown Output"
+            >
+              <Save size={24} className="group-hover:scale-110 transition-transform duration-300" />
+              <span>Save Output</span>
+            </button>
           </div>
         )}
 

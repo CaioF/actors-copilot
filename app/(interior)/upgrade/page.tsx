@@ -15,7 +15,7 @@ export default function UpgradePage() {
           Back to Dashboard
         </Link>
         <a 
-          href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout" 
+          href="https://the-actors-copilot.mykajabi.com/offers/mXz4mWzF?coupon_code=UPGRADEBUSINESS" 
           className="px-6 py-3 bg-[#FF7316] text-white font-medium rounded-full hover:bg-[#E5630F] shadow-md transition-all"
         >
           Upgrade to Business Class

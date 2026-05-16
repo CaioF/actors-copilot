@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Users, Clock, Split, Hourglass, Brain, Lock, MapPin, AlertTriangle, RefreshCcw } from "lucide-react";
+import { Target, Eye, User, Heart, Key, Shield, MessageCircle, Video, Dna, Flame, Info, Users, Clock, Split, Hourglass, Brain, Lock, MapPin, AlertTriangle, RefreshCcw } from "lucide-react";
 import React from "react";
 import type { CriticalBriefFact } from "@/lib/audition-types";
 
@@ -83,6 +83,13 @@ export function StepResultSides({ data, onCoachClick, onRegenerateClick }: StepR
       
       {/* LEFT COLUMN: MAIN CONTENT */}
       <div className="space-y-6">
+
+        {/* Top Instructional Notice Banner */}
+        {/* Positioned at the absolute top of the content flow to immediately orient the user before processing details. */}
+        <div className="flex items-center gap-3 px-5 py-4 bg-[#FCFAF7] border border-gray-200/60 rounded-2xl shadow-sm text-sm text-gray-600 font-medium">
+          <Info size={18} className="text-[#FF7316] shrink-0" />
+          <span>Read the generated breakdown. If you don't like it or want </span>
+        </div>
 
         {/* CRITICAL BRIEF FACTS — director/casting-supplied non-negotiables that must be honored
             even if they are not present in the sides text. Rendered prominently above the
