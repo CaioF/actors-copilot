@@ -57,7 +57,7 @@ export function StepReview({ data, mode }: StepReviewProps) {
             {data.deadline && (
               (() => {
                 /**
-                 * SENIOR FIX: Resilient DateTime Splitting.
+                 * Resilient DateTime Splitting.
                  * Safely parses the raw deadline string (handling 'T' or space delimiters)
                  * to isolate the time component for UI spacing, strictly respecting the 
                  * existing AuditionFormData schema without requiring type changes.
@@ -77,6 +77,12 @@ export function StepReview({ data, mode }: StepReviewProps) {
                           <span className="text-[#B7BCB6]">at {timePart}</span>
                         )}
                       </span>
+                      {/* NOVO: Exibe a timezone selecionada logo abaixo do horário */}
+                      {data.auditionTimezone && (
+                        <span className="text-[11px] text-[#B7BCB6]/70 uppercase tracking-widest mt-0.5">
+                          {data.auditionTimezone.replace(/_/g, " ")}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

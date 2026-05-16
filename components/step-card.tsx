@@ -1,10 +1,11 @@
 import type { LucideIcon } from "lucide-react"
 import Link from "next/link"
+import { ReactNode } from "react"
 
 interface StepCardProps {
   stepNumber: number
   title: string
-  description: string
+  description: ReactNode
   link: string
   ctaLabel: string
   ctaIcon: LucideIcon
@@ -14,16 +15,6 @@ interface StepCardProps {
 
 /**
  * A card component that displays a step in a multi-step process or guide.
- *
- * @param props - The component props
- * @param props.stepNumber - The step number to display in the header
- * @param props.title - The title of the step
- * @param props.description - The description text for the step
- * @param props.link - The URL the CTA button links to
- * @param props.ctaLabel - The label text for the CTA button
- * @param props.ctaIcon - The Lucide icon component for the CTA button
- * @param props.variant - Color variant affecting header and accent colors ("olive" | "orange")
- * @param props.bodyVariant - Optional body background variant ("dark" | "sage"), defaults to "dark"
  */
 export function StepCard({
   stepNumber,
@@ -42,7 +33,7 @@ export function StepCard({
   const bodyText = bodyVariant === "sage" ? "text-[#2C3328]" : "text-[#F5F0E8]/85"
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl">
+    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl shadow-lg border border-[#B7BCB6]/10">
       {/* Header */}
       <div className={`${headerBg} px-6 py-5 text-center`}>
         {stepNumber === 1 && (
@@ -65,19 +56,19 @@ export function StepCard({
 
       {/* Body */}
       <div className={`${bodyBg} flex flex-1 flex-col px-6 py-8`}>
-        <p className={`flex-1 text-center text-sm leading-relaxed ${bodyText}`}>
+        
+        <div className={`text-left text-sm leading-relaxed ${bodyText}`}>
           {description}
-        </p>
+        </div>
 
-        {/* CTA Button */}
+        <div className="flex-grow min-h-6" />
+
+        {/* CTA Button - Agora fixo no fundo. */}
         <Link href={link}
-           className="mt-8 flex w-full items-center justify-center gap-2 rounded-full border border-[#2C3328]/15 bg-[#F5F0E8] px-6 py-3 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8DFD0]">
-          
+           className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-[#2C3328]/15 bg-[#F5F0E8] px-6 py-3 text-sm font-medium text-[#2C3328] transition-all hover:bg-[#E8DFD0] active:scale-95 text-center shadow-md">
             <Icon className="h-4 w-4" />
             {ctaLabel}
-          
         </Link>
-        
       </div>
     </div>
   )

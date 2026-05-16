@@ -244,36 +244,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * Subscribes to Firebase authentication state changes to keep the local React state synchronized.
      * Automatically cleans up the listener when the component unmounts.
      */
-    useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        if (currentUser) {
-            try {
-                // Buscamos os dados da sessão atual (que vêm do seu JWT no cookie)
-                const response = await fetch('/api/auth/callback', { method: 'GET' });
+//     useEffect(() => {
+//     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+//         if (currentUser) {
+//             try {
+//                 // Buscamos os dados da sessão atual (que vêm do seu JWT no cookie)
+//                 const response = await fetch('/api/auth/callback', { method: 'GET' });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    // Mesclamos o usuário do Firebase com as ofertas do nosso banco/JWT
-                    const userWithOffers: AppUser = Object.assign(currentUser, { 
-                        offers: data.offers || [] 
-                    });
-                    setUser(userWithOffers);
-                } else {
-                    setUser(currentUser as AppUser);
+//                 if (response.ok) {
+//                     const data = await response.json();
+//                     // Mesclamos o usuário do Firebase com as ofertas do nosso banco/JWT
+//                     const userWithOffers: AppUser = Object.assign(currentUser, { 
+//                         offers: data.offers || [] 
+//                     });
+//                     setUser(userWithOffers);
+//                 } else {
+//                     setUser(currentUser as AppUser);
+//                 }
+//             } catch (err) {
+//                 logger.error({ err, msg: "Failed to hydrate session offers" });
+//                 setUser(currentUser as AppUser);
+//             }
+//         } else {
+//             setUser(null);
+//         }
+//         setLoading(false);
+//     });
+    
+//     return () => unsubscribe();
+// }, [auth]);
+    
+/**
+     * Subscribes to Firebase authentication state changes to keep the local React state synchronized.
+     * Automatically cleans up the listener when the component unmounts.
+     */
+    /**
+     * Subscribes to Firebase authentication state changes to keep the local React state synchronized.
+     * Automatically cleans up the listener when the component unmounts.
+     */
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                try {
+                    // Buscamos os dados da sessão atual
+                    const response = await fetch('/api/auth/callback', { method: 'GET' });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Mesclamos o usuário do Firebase com as ofertas. Se não vier nada, garante um array vazio.
+                        const userWithOffers: AppUser = Object.assign(currentUser, { 
+                            offers: data.offers || [] 
+                        });
+                        setUser(userWithOffers);
+                    } else {
+                        // Utilizando o logger oficial da aplicação
+                        logger.error({ 
+                            err: new Error(`HTTP ${response.status}: ${response.statusText}`), 
+                            msg: "[AuthContext] Falha no GET /api/auth/callback." 
+                        });
+                        
+                        // FIX: Garante que offers seja pelo menos [], nunca undefined
+                        const fallbackUser: AppUser = Object.assign(currentUser, { offers: [] });
+                        setUser(fallbackUser);
+                    }
+                } catch (err) {
+                    logger.error({ err, msg: "[AuthContext] Erro fatal ao buscar ofertas na API" });
+                    
+                    // FIX: Garante que offers seja pelo menos [], nunca undefined
+                    const fallbackUser: AppUser = Object.assign(currentUser, { offers: [] });
+                    setUser(fallbackUser);
                 }
-            } catch (err) {
-                logger.error({ err, msg: "Failed to hydrate session offers" });
-                setUser(currentUser as AppUser);
+            } else {
+                setUser(null);
             }
-        } else {
-            setUser(null);
-        }
-        setLoading(false);
-    });
-    
-    return () => unsubscribe();
-}, [auth]);
-    
+            setLoading(false);
+        });
+        
+        return () => unsubscribe();
+    }, [auth]);
 
     return (
         <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, loginWithEmail, signupWithEmail }}>

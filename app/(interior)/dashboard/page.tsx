@@ -65,7 +65,30 @@ export default function DashboardPage() {
         <StepCard
           stepNumber={2}
           title="Audition Breakdown"
-          description={"Got a new audition? Always start here. Upload the casting brief to extract critical requirements like deadlines, slate instructions, and tone. Once saved to your Auditions List, you can seamlessly attach your sides to generate a character breakdown that perfectly\u00A0aligns\u00A0with\u00A0the\u00A0director's\u00A0vision."}
+          description={
+    <div style={{ textAlign: 'left' }}> {/* Alinhado à esquerda costuma ler melhor para listas, mas tire o estilo se preferir centralizado */}
+      <p>Got an audition? Start here.</p>
+      <p>This is where your audition prep begins.</p>
+      <p>Upload your casting brief email first, then attach your character sides. The Actors Copilot will pull out the key audition instructions, then build a clear character breakdown you can take into the room, onto tape, or to your coach.</p>
+      
+      <p><strong>Step 1: </strong>
+      Upload your casting brief email and generate your brief breakdown.</p>
+      
+      <p><strong>Step 2: </strong>
+      Save the output.</p>
+      
+      <p><strong>Step 3: </strong>
+      Reopen the saved audition and attach your character sides.</p>
+      
+      <p><strong>Step 4: </strong>
+      Generate your character breakdown, then save the output again.</p>
+      
+      <p>You’ll then find the full audition breakdown in your Audition Tracker.</p>
+      <p>Need another angle? Use Alternative Take to explore a different version of the breakdown before you save. If you’re on Business Class, you can also take it to your 24/7 Acting Coach.</p>
+      
+      <p>Now go smash it.</p>
+    </div>
+  }
           link="/auditions/new/brief"
           ctaLabel="Upload Casting Brief and Sides"
           ctaIcon={Sparkles}

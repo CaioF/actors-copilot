@@ -88,7 +88,7 @@ export function StepResultSides({ data, onCoachClick, onRegenerateClick }: StepR
         {/* Positioned at the absolute top of the content flow to immediately orient the user before processing details. */}
         <div className="flex items-center gap-3 px-5 py-4 bg-[#FCFAF7] border border-gray-200/60 rounded-2xl shadow-sm text-sm text-gray-600 font-medium">
           <Info size={18} className="text-[#FF7316] shrink-0" />
-          <span>Read the generated breakdown. If you don't like it or want </span>
+          <span>Read the generated breakdown. If you don't like it or want another approach, feel free to push Alternative Take above.</span>
         </div>
 
         {/* CRITICAL BRIEF FACTS — director/casting-supplied non-negotiables that must be honored

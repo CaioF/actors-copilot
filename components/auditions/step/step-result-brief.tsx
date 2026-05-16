@@ -105,7 +105,7 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
       <div className="space-y-6">
         
         {/* Top Instructional Notice Banner */}
-        <div className="flex items-center gap-3 px-5 py-4 bg-[#FCFAF7] border border-gray-200/60 rounded-2xl shadow-sm text-sm text-gray-600 font-medium">
+        <div className="flex items-center gap-3 px-5 py-4 bg-[#ffe3b9] border border-gray-200/60 rounded-2xl shadow-sm text-md text-gray-600 font-medium">
           <Info size={18} className="text-[#FF7316] shrink-0" />
           <span>Read the breakdown and attach sides above.</span>
         </div>

@@ -59,7 +59,7 @@ export function StepBasics({ data, updateData, mode, isStandaloneScene }: StepBa
               ? "Analyze your monologue or scene to map out your performance."
               : isSidesMode 
                 ? "Analyze your script sides to map out your performance." 
-                : "Analyze the casting brief to build your character foundation."}
+                : ""}
           </p>
       </div>
 
