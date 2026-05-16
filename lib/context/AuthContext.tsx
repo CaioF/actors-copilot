@@ -217,11 +217,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     /**
      * Sends a Firebase password reset email to the provided address.
-     * If no account exists for the email, Firebase silently no-ops to avoid
-     * leaking which addresses are registered.
+     * To avoid leaking which addresses are registered, this wrapper treats
+     * Firebase's `auth/user-not-found` error as a successful no-op.
      *
      * @param {string} email - The email address to send the reset link to.
-     * @throws {Error} Throws if the email is malformed or the request fails.
+     * @throws {Error} Throws if the email is malformed or another reset request
+     * error occurs. `auth/user-not-found` is intentionally treated as success.
      */
     const sendPasswordReset = async (email: string) => {
         try {
