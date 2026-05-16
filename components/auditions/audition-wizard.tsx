@@ -675,10 +675,10 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
         <div className="flex flex-col flex-1">
           
           <StepUpload 
-            title={mode === "sides" ? "Upload Sides" : "Upload Casting Brief"}
+            title={mode === "sides" ? "Upload Sides" : "Upload Casting Brief Email"}
             description={mode === "sides" 
               ? "Upload the script pages (Sides) for this audition." 
-              : "Upload the casting brief document, agency email content, character description, or director's notes."}
+              : ""}
             file={mode === "sides" ? formData.sidesFile : formData.briefFile}
             text={mode === "sides" ? formData.sidesText : formData.briefText}
             onFileChange={(file) => mode === "sides" 
