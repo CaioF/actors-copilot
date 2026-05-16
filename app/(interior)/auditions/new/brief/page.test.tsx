@@ -29,7 +29,7 @@ describe("new brief page", () => {
 
     render(page);
 
-    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("New Brief Breakdown");
+    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("New Casting Brief Breakdown");
     expect(screen.getByTestId("wizard-props")).toHaveTextContent("brief:audition-456");
     expect(mockWizard).toHaveBeenCalledWith(expect.objectContaining({ mode: "brief", auditionId: "audition-456" }));
   });

@@ -249,7 +249,7 @@ describe("AuditionDetailView regression (legacy single-analysis)", () => {
     render(<AuditionDetailView />);
 
     await waitFor(() => {
-      expect(screen.getByText(/attach sides/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /attach sides/i })).toBeInTheDocument();
     });
   });
 

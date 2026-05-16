@@ -102,7 +102,7 @@ export function AppSidebar() {
         </Link>
       </div>
 
-      {/* Quick Actions
+      {/* Quick Actions*/} 
       <div className="px-4 pb-4">
         <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
           Quick Actions
@@ -126,7 +126,7 @@ export function AppSidebar() {
           </Link>
           
         </div>
-      </div> */}
+      </div> 
 
       {/* Menu */}
       <div className="flex-1 px-4">

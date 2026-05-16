@@ -290,7 +290,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    fireEvent.change(screen.getByPlaceholderText(/paste your script or character details here/i), {
+    fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
       target: { value: mode === "sides" ? "Hamlet sides text" : "Casting brief body" },
     });
 
@@ -720,7 +720,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     // Step 2: paste content so the new pre-flight validation lets Generate Breakdown fire.
-    fireEvent.change(screen.getByPlaceholderText(/paste your script or character details here/i), {
+    fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
       target: { value: mode === "sides" ? "Hamlet sides text" : "Casting brief body" },
     });
 
@@ -910,7 +910,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
       });
 
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
-      fireEvent.change(screen.getByPlaceholderText(/paste your script or character details here/i), {
+      fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
         target: { value: "Sides text" },
       });
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -1068,7 +1068,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
       });
 
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
-      fireEvent.change(screen.getByPlaceholderText(/paste your script or character details here/i), {
+      fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
         target: { value: "Sides text" },
       });
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
