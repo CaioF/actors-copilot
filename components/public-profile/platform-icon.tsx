@@ -73,6 +73,13 @@ const FALLBACK_ICON_MAP: Record<string, React.ElementType> = {
   facebook: Facebook,
 };
 
+/**
+ * Custom static icons mapping.
+ */
+const CUSTOM_STATIC_ICONS: Partial<Record<ExternalProfileKey, string>> = {
+  spotlight: "/star.png", 
+};
+
 interface PlatformIconProps {
   platformKey: ExternalProfileKey;
   url: string;
@@ -96,13 +103,16 @@ export function PlatformIcon({ platformKey, url }: PlatformIconProps) {
   // Fallback to our previous semantic mapping
   const FallbackIcon = FALLBACK_ICON_MAP[platformKey] || ExternalLink;
 
+  // Verifica se temos uma logo estática definida para essa plataforma
+  const staticIconUrl = CUSTOM_STATIC_ICONS[platformKey];
+
   /**
    * SENIOR FIX: Enterprise Favicon Resolution
-   * Dynamically fetches the official brand icon (64px size for crispness on Retina displays).
+   * Se existir uma logo estática (ex: Spotlight), usa ela. Se não, tenta buscar no Google.
    */
-  const officialBrandIconUrl = hostname 
+  const iconSourceUrl = staticIconUrl || (hostname 
     ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=64` 
-    : null;
+    : null);
 
   return (
     <a
@@ -111,14 +121,12 @@ export function PlatformIcon({ platformKey, url }: PlatformIconProps) {
       rel="noopener noreferrer"
       title={label}
       aria-label={`Visit ${label} profile`}
-      // Added 'group' to handle hover animations on child elements
       className="group flex h-9 w-9 items-center justify-center rounded-full bg-[#E8DFD0] text-[#494E3E] transition-all hover:bg-[#FF751F] hover:text-white"
     >
-      {!imageError && officialBrandIconUrl ? (
+      {!imageError && iconSourceUrl ? (
         <img 
-          src={officialBrandIconUrl} 
+          src={iconSourceUrl} 
           alt={`${label} logo`}
-          // Removed the 'text-white' dependency since it's an image, and added a scale-up on hover
           className="h-4 w-4 object-contain transition-transform duration-200 group-hover:scale-110"
           onError={() => setImageError(true)}
         />

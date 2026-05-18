@@ -10,16 +10,16 @@ export default function UpgradePage() {
         You need the Business Class plan to access the AI Acting Coach and the deep Profile Analysis. Upgrade now to unlock your full potential!
       </p>
       
-      <div className="flex gap-4">
+      <div className="flex gap-4 px-6 py-3 bg-[#FF7316] text-white font-medium rounded-full hover:bg-[#E5630F] shadow-md transition-all">
         <Link href="/dashboard" className="px-6 py-3 border border-[#C7C0B5] rounded-full text-[#646A64] hover:bg-[#E8DFD0] transition-colors">
           Back to Dashboard
         </Link>
-        <a 
+        {/* <a 
           href="https://the-actors-copilot.mykajabi.com/offers/mXz4mWzF?coupon_code=UPGRADEBUSINESS" 
           className="px-6 py-3 bg-[#FF7316] text-white font-medium rounded-full hover:bg-[#E5630F] shadow-md transition-all"
         >
           Upgrade to Business Class
-        </a>
+        </a> */}
       </div>
     </div>
   );

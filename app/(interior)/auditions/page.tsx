@@ -253,7 +253,7 @@ export default function AuditionsPage() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <DashboardHeader title="Auditions List" />
+      <DashboardHeader title="Audition Tracker" />
 
       {/* --- EDIT MODAL OVERLAY --- */}
       {editingAudition && (
@@ -429,10 +429,10 @@ export default function AuditionsPage() {
                     {audition.analysisType}
                   </span>
                 </div>
-                <h3 className="font-title text-xl font-bold text-white truncate group-hover:text-[#E8721A] transition-colors">
+                <h3 className="font-title text-xl font-bold text-white truncate uppercase group-hover:text-[#E8721A] transition-colors">
                   {audition.project}
                 </h3>
-                <p className="mt-1 text-sm text-[#F5F0E8]/70 truncate">{audition.role}</p>
+                <p className="mt-1 text-sm text-[#F5F0E8]/70 uppercase truncate">{audition.role}</p>
               </div>
 
               {/* Bottom Action Row */}
@@ -446,10 +446,13 @@ export default function AuditionsPage() {
                 <div className="flex items-center gap-1 z-10">
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleView(audition.id); }}
-                    className="p-2 text-[#F5F0E8]/40 hover:text-white transition-colors rounded-full hover:bg-white/10"
+                    className="p-2 flex flex-col items-center justify-center gap-1 text-[#F5F0E8]/40 hover:text-white transition-colors rounded-full hover:bg-white/10"
                     title="View Breakdown"
                   >
                     <Eye className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">
+                      open
+                    </span>
                   </button>
 
                   <button 

@@ -29,7 +29,7 @@ describe("new sides page", () => {
 
     render(page);
 
-    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("New character breakdown");
+    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("New Character Breakdown");
     expect(screen.getByTestId("wizard-props")).toHaveTextContent("sides:audition-123");
     expect(mockWizard).toHaveBeenCalledWith(expect.objectContaining({ mode: "sides", auditionId: "audition-123" }));
   });
