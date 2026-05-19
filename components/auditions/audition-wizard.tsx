@@ -344,6 +344,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       if (criticalBriefFactsPayload) payload.append("criticalBriefFactsPayload", criticalBriefFactsPayload);
 
       if (isRegeneration && resultData) {
+        await savePreviousTake();
         // We stringify the critical sections to give the AI context of what to avoid/oppose
         const briefPreviousTake = resultData.sections
             .map(s => `${s.title}: ${s.items.join(" ")}`)
@@ -408,6 +409,34 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
       : "Actor";
     return `${currentUser.uid}_${firstName}`;
+  };
+
+  /**
+   * Saves the current resultData (previous take) as V1 before generating a new alternative.
+   */
+  const savePreviousTake = async () => {
+    const userPath = getUserPath();
+    if (!userPath || !resultData) return;
+
+    try {
+      const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
+      const v1ProjectName = `${formData.project.trim()} V1`;
+
+      const previousDoc = {
+        ...newAuditionDoc(),
+        project: v1ProjectName,
+      };
+
+      await addDoc(auditionsRef, previousDoc);
+
+      toast({
+        title: "Previous take saved",
+        description: `Your previous take was automatically saved as '${v1ProjectName}'.`,
+      });
+    } catch (error) {
+      logger.error({ err: error, msg: 'Error saving previous take before regeneration' });
+      // Falhar aqui não deve bloquear a geração do novo take, então não damos throw
+    }
   };
 
   // Trimmed project/role so the values stored in Firestore match exactly what the
