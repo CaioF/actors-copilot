@@ -3,7 +3,7 @@ import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 
 /**
  * Constructs the final prompt string for the Acting Coach AI by aggregating system instructions,
- * the actor's specific identity and context, relevant vector database excerpts, and conversation history.
+ * the actor's specific identity and context, optional reference excerpts, and conversation history.
  * * This version includes session focus and audition-specific performance maps to ensure
  * high-context coaching responses.
  *
@@ -162,7 +162,7 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     sections.push(`# ACTOR'S AUDITIONS\n${auditionLines.join("\n")}`);
   }
 
-  // 7. Vector Database Retrieval (RAG)
+  // 7. Reference material
   if (excerpts.length > 0) {
     const excerptSection = excerpts
       .map((excerpt: RetrievedExcerpt) => {
@@ -171,6 +171,10 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
       .join("\n\n");
 
     sections.push(`# METHODOLOGY REFERENCE MATERIAL\nUse the following acting methodology excerpts to ground your coaching advice:\n\n${excerptSection}`);
+  } else {
+    sections.push(
+      "# NO REFERENCE MATERIAL\nNo acting-library reference material is available for this turn. Answer from general acting craft and the actor/audition context provided above. Do not invent source books, quotes, citation numbers, or library references."
+    );
   }
 
   // 8. Conversation History

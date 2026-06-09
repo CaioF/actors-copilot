@@ -153,12 +153,24 @@ describe("buildCoachPrompt", () => {
       expect(prompt).toContain("Sanford Meisner on Acting");
     });
 
-    it("omits excerpt section entirely when excerpts array is empty", () => {
+    it("includes no-reference guidance when excerpts array is empty", () => {
       const prompt = buildCoachPrompt({
         excerpts: [],
         question: "Test question?",
       });
       expect(prompt).not.toContain("# METHODOLOGY REFERENCE MATERIAL");
+      expect(prompt).toContain("# NO REFERENCE MATERIAL");
+      expect(prompt).toContain("No acting-library reference material is available for this turn.");
+      expect(prompt).toContain("Do not invent source books, quotes, citation numbers, or library references.");
+    });
+
+    it("does not include no-reference guidance when excerpts are provided", () => {
+      const prompt = buildCoachPrompt({
+        excerpts,
+        question: "Test question?",
+      });
+      expect(prompt).toContain("# METHODOLOGY REFERENCE MATERIAL");
+      expect(prompt).not.toContain("# NO REFERENCE MATERIAL");
     });
 
     it("maintains excerpt ordering from input", () => {

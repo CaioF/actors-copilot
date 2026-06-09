@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import { createChildLogger, logger } from "@/lib/logger";
-import {
-  retrieveCoachContext,
-  type PineconeIndex,
-} from "@/lib/acting-coach/application/retrieve-coach-context";
 import { getUserAuditionsSummary, getAuditionFullData } from "@/lib/acting-coach/application/get-audition-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
-import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
-import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
-import { getActingCoachConfig } from "@/lib/acting-coach/infrastructure/config";
 import type { AuditionSummary } from "@/lib/acting-coach/contracts";
 import { documentToPromptPart, validateDocumentPayload } from "@/lib/document-processing";
 
@@ -80,26 +73,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const config = getActingCoachConfig();
-    const pineconeInferenceClient = createPineconeInferenceClient({ apiKey: config.pineconeApiKey });
-    const pineconeRawIndex = createPineconeClient().index(config.pineconeIndexName);
-    const pineconeIndex = (config.pineconeNamespace ? pineconeRawIndex.namespace(config.pineconeNamespace) : pineconeRawIndex) as unknown as PineconeIndex;
-
-    let excerpts;
-    try {
-      excerpts = await retrieveCoachContext(content, config.embeddingModel, { topK: 5 }, { pineconeInferenceClient, pineconeIndex });
-    } catch (err) {
-      log.error({ err }, "Retrieval failed");
-      return NextResponse.json({ error: "Failed to retrieve context" }, { status: 500 });
-    }
-
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
 
     const promptText = buildCoachPrompt({
       actorName: firstName,
       actorBaseline,
       actorProfile,
-      excerpts,
+      excerpts: [],
       question: content,
       history: historyToInclude,
       auditions: auditionSummaries,
@@ -123,7 +103,6 @@ export async function POST(request: Request) {
       promptParts.push(docPart.part);
     }
 
-    let replyText = "";
     try {
       const result = await coachModel.generateContent(promptParts);
       const rawText = result.response.text();
@@ -132,7 +111,7 @@ export async function POST(request: Request) {
       try {
         const cleanJson = rawText.replace(/```json|```/g, "").trim();
         parsedResponse = JSON.parse(cleanJson);
-      } catch (e) {
+      } catch {
         parsedResponse = { reply: rawText };
       }
 

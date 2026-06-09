@@ -1,10 +1,7 @@
 import { POST } from "./route";
 import { auth } from "@/lib/firebase.admin";
-import { retrieveCoachContext } from "@/lib/acting-coach/application/retrieve-coach-context";
 import { buildCoachPrompt } from "@/lib/acting-coach/build-coach-prompt";
 import { getUserAuditionsSummary, getAuditionFullData } from "@/lib/acting-coach/application/get-audition-context";
-import { createPineconeInferenceClient } from "@/lib/acting-coach/infrastructure/pinecone-inference-client";
-import { createPineconeClient } from "@/lib/acting-coach/infrastructure/create-pinecone-client";
 
 // --- Global Mocks ---
 jest.mock("@/lib/firebase.admin", () => ({
@@ -31,10 +28,6 @@ jest.mock("@/lib/logger", () => ({
   }),
 }));
 
-jest.mock("@/lib/acting-coach/application/retrieve-coach-context", () => ({
-  retrieveCoachContext: jest.fn(),
-}));
-
 jest.mock("@/lib/acting-coach/build-coach-prompt", () => ({
   buildCoachPrompt: jest.fn(),
 }));
@@ -42,26 +35,6 @@ jest.mock("@/lib/acting-coach/build-coach-prompt", () => ({
 jest.mock("@/lib/acting-coach/application/get-audition-context", () => ({
   getUserAuditionsSummary: jest.fn(),
   getAuditionFullData: jest.fn(),
-}));
-
-jest.mock("@/lib/acting-coach/infrastructure/pinecone-inference-client", () => ({
-  createPineconeInferenceClient: jest.fn(),
-}));
-
-jest.mock("@/lib/acting-coach/infrastructure/create-pinecone-client", () => ({
-  createPineconeClient: jest.fn(),
-}));
-
-jest.mock("@/lib/acting-coach/infrastructure/config", () => ({
-  getActingCoachConfig: jest.fn().mockReturnValue({
-    embeddingModel: "llama-text-embed-v2",
-    embeddingDimension: 1024,
-    generationModel: "gemini-2.0-flash",
-    corpusDir: "/test/corpus",
-    pineconeApiKey: "test-api-key",
-    pineconeIndexName: "test-index",
-    pineconeNamespace: "",
-  }),
 }));
 
 // --- New Firebase AI Mocks ---
@@ -73,7 +46,7 @@ jest.mock("@/lib/firebase", () => ({
 
 jest.mock("firebase/ai", () => {
   class MockVertexAIBackend {
-    constructor(location: string) {}
+    constructor(_location: string) {}
   }
   return {
     getAI: jest.fn(),
@@ -140,26 +113,6 @@ describe("Coach Chat Route", () => {
       },
     });
 
-    (createPineconeInferenceClient as jest.Mock).mockReturnValue({
-      embed: jest.fn().mockResolvedValue([new Array(1024).fill(0.1)]),
-    });
-    (createPineconeClient as jest.Mock).mockReturnValue({
-      index: jest.fn().mockReturnValue({
-        namespace: jest.fn().mockReturnValue({
-          query: jest.fn(),
-        }),
-      }),
-    });
-
-    (retrieveCoachContext as jest.Mock).mockResolvedValue([
-      {
-        citationNumber: 1,
-        sourceBook: "Test Book",
-        excerptText: "Test excerpt text",
-        score: 0.95,
-      },
-    ]);
-
     (buildCoachPrompt as jest.Mock).mockReturnValue("Test composed prompt");
   });
 
@@ -215,11 +168,58 @@ describe("Coach Chat Route", () => {
 
     expect(res.status).toBe(200);
     expect(data.aiData.coach_reply).toBe("Test coach reply");
+    expect(buildCoachPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        excerpts: [],
+        question: "Test question about acting",
+      })
+    );
 
     // Verify Firebase AI was called with the composed prompt
     expect(mockGenerateContent).toHaveBeenCalledWith([
       { text: "Test composed prompt" }
     ]);
+  });
+
+  it("generates a coach response without retrieval", async () => {
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: "test-uid" });
+
+    const req = new Request("http://localhost/api/coach/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer valid-token",
+      },
+      body: JSON.stringify({
+        content: "Help me with the role",
+        currentFocus: {
+          sessionFocus: "Build the character objective",
+          stepIndex: 2,
+          mode: "guided",
+          phase: "objective",
+        },
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(buildCoachPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorName: "Test",
+        actorBaseline: expect.stringContaining("Test actor baseline summary"),
+        actorProfile: expect.stringContaining("Existing bio"),
+        excerpts: [],
+        question: "Help me with the role",
+        currentFocus: expect.objectContaining({
+          sessionFocus: "Build the character objective",
+          stepIndex: 2,
+          mode: "guided",
+          phase: "objective",
+        }),
+      })
+    );
+    expect(mockGenerateContent).toHaveBeenCalledWith([{ text: "Test composed prompt" }]);
   });
 
   // --- Document Validation Tests (Task 4) ---
