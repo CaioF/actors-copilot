@@ -23,9 +23,6 @@ describe("createGenerationModel", () => {
       embeddingDimension: 768,
       generationModel: "gemini-2.0-flash",
       corpusDir: "/corpus",
-      pineconeApiKey: "test-key",
-      pineconeIndexName: "test-index",
-      pineconeNamespace: "",
     };
 
     jest.isolateModules(() => {
@@ -55,9 +52,6 @@ describe("createGenerationModel", () => {
       embeddingDimension: 768,
       generationModel: "gemini-2.0-flash",
       corpusDir: "/corpus",
-      pineconeApiKey: "test-key",
-      pineconeIndexName: "test-index",
-      pineconeNamespace: "",
     };
 
     jest.isolateModules(() => {
@@ -85,9 +79,6 @@ describe("createGenerationModel", () => {
       embeddingDimension: 768,
       generationModel: "gemini-2.0-flash",
       corpusDir: "/corpus",
-      pineconeApiKey: "test-key",
-      pineconeIndexName: "test-index",
-      pineconeNamespace: "",
     };
 
     jest.isolateModules(() => {
@@ -127,9 +118,6 @@ describe("createGenerationModel", () => {
       embeddingDimension: 768,
       generationModel: "gemini-2.0-flash",
       corpusDir: "/corpus",
-      pineconeApiKey: "test-key",
-      pineconeIndexName: "test-index",
-      pineconeNamespace: "",
     };
 
     jest.isolateModules(() => {
@@ -163,9 +151,6 @@ describe("createGenerationModel", () => {
       embeddingDimension: 768,
       generationModel: "gemini-2.0-flash",
       corpusDir: "/corpus",
-      pineconeApiKey: "test-key",
-      pineconeIndexName: "test-index",
-      pineconeNamespace: "",
     };
 
     jest.isolateModules(() => {

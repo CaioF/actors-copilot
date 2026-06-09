@@ -1235,24 +1235,22 @@ The Acting Coach (`/acting-coach`) is a free-form conversational AI assistant gr
 │  1. Verify Firebase ID token → userPath                    │
 │  2. Load actor baseline from Firestore                    │
 │  3. Load audition summaries (project, role, date)          │
-│  4. Embed question via Pinecone Inference API              │
-│  5. Query Pinecone for top-K similar chunks              │
-│  6. Compose prompt with baseline + excerpts + history + currentFocus │
-│  7. Generate structured JSON reply via Vertex AI Gemini   │
-│  8. Parse JSON envelope → return { aiData: { coach_reply, session_focus, step_index, mode, phase } } │
+│  4. Load full audition context if auditionId is provided   │
+│  5. Compose prompt with baseline + no-reference guidance + history + currentFocus │
+│  6. Generate structured JSON reply via Vertex AI Gemini   │
+│  7. Parse JSON envelope → return { aiData: { coach_reply, session_focus, step_index, mode, phase } } │
 └─────────────────────────────────────────────────────────────┘
                              │
-               ┌─────────────┼─────────────┐
-               ▼             ▼             ▼
-┌─────────────────────┐  ┌──────────────┐  ┌──────────────────────┐
-│  Pinecone           │  │ Google Gemini │  │ Firebase Firestore  │
-│  (Vector Store)    │  │ (Generation)  │  │ (Profile + Auditions)│
-│                     │  │              │  │                      │
-│  • llama-text-embed│  │ gemini-2.0-  │  │ users/{userPath}/   │
-│    -v2 (1024 dims)  │  │ flash        │  │   profile/master   │
-│  • field_map:      │  │              │  │   /auditions/{id}   │
-│    {"text": "text"} │  │              │  │                      │
-└─────────────────────┘  └──────────────┘  └──────────────────────┘
+               ┌─────────────┴─────────────┐
+               ▼                           ▼
+        ┌──────────────┐          ┌──────────────────────┐
+        │ Google Gemini │          │ Firebase Firestore   │
+        │ (Generation)  │          │ (Profile + Auditions)│
+        │              │          │                      │
+        │ gemini-3.1-  │          │ users/{userPath}/    │
+        │ pro-preview  │          │   profile/master     │
+        │              │          │   /auditions/{id}    │
+        └──────────────┘          └──────────────────────┘
 ```
 
 ### Key Files
@@ -1260,9 +1258,7 @@ The Acting Coach (`/acting-coach`) is a free-form conversational AI assistant gr
 | File | Purpose |
 |------|---------|
 | `app/api/coach/chat/route.ts` | HTTP endpoint — auth, orchestration, logging |
-| `lib/acting-coach/application/retrieve-coach-context.ts` | Embed question, query Pinecone, map results |
-| `lib/acting-coach/infrastructure/pinecone-inference-client.ts` | Wraps `pinecone.inference.embed()` |
-| `lib/acting-coach/build-coach-prompt.ts` | Composes prompt from baseline, excerpts, history, audition context |
+| `lib/acting-coach/build-coach-prompt.ts` | Composes prompt from baseline, no-reference guidance, history, audition context |
 | `lib/acting-coach/application/get-audition-context.ts` | Reads audition summaries from Firestore |
 | `lib/prompts.ts` | `ACTING_COACH_SYSTEM_PROMPT` — coach persona and methodology |
 | `hooks/use-acting-coach.ts` | Client hook — message state, sendMessage, startNewSession, clearSessionFocus, Firestore persistence |
@@ -1291,9 +1287,9 @@ The coach prompt (`buildCoachPrompt`) assembles these sections in order:
 # ACTOR'S AUDITIONS
 {project} — {role} ({id}) per audition
 
-# REFERENCE MATERIAL
-"excerpt text"
-... (up to 5 excerpts, extracted verbatim — no citation markers or source labels)
+# NO REFERENCE MATERIAL
+Gemini-only guidance: answer from general acting craft and actor/audition context;
+do not invent source books, quotes, citation numbers, or library references.
 
 # CONVERSATION HISTORY
 Actor: message
@@ -1317,18 +1313,13 @@ Phase: {phase}
 
 | Variable | Description |
 |----------|-------------|
-| `ACTING_COACH_EMBEDDING_MODEL` | Pinecone embedding model (e.g., `llama-text-embed-v2`) |
-| `ACTING_COACH_EMBEDDING_DIMENSION` | Vector dimension (1024 for `llama-text-embed-v2`) |
 | `ACTING_COACH_GENERATION_MODEL` | Gemini model (e.g., `gemini-2.0-flash`) |
-| `PINECONE_API_KEY` | Pinecone API key |
-| `PINECONE_INDEX_NAME` | Pinecone index name |
-| `PINECONE_NAMESPACE` | Optional namespace (defaults to `__default__`) |
-| `GOOGLE_CLOUD_PROJECT` | GCP project (required for Vertex AI Gemini — not used for embeddings) |
+| `GOOGLE_CLOUD_PROJECT` | GCP project (may be required by other Vertex AI features) |
 | `GOOGLE_CLOUD_LOCATION` | GCP location (e.g., `us-central1`) |
 
-### Corpus Ingestion
+### Legacy Corpus Ingestion
 
-The acting library corpus is ingested using the Python script at `scripts/python/ingest_acting_library.py`.
+The Acting Coach chat route no longer uses Pinecone or runtime corpus retrieval. The old Python ingestion script at `scripts/python/ingest_acting_library.py` is retained as legacy tooling only.
 
 **Prerequisites:**
 1. Create a Pinecone index with:
@@ -1376,15 +1367,13 @@ useActingCoach.sendMessage()
 POST /api/coach/chat { content, history, auditionId, currentFocus }
     ↓
 1. verifyIdToken → userPath
-2. getActingCoachConfig()
-3. getUserAuditionsSummary(userPath, db)
+2. getUserAuditionsSummary(userPath, db)
    (gracefully degrades if Firestore unavailable)
-4. createPineconeInferenceClient → embed([question])
-5. pineconeIndex.query({ vector, topK: 5 })
-6. buildCoachPrompt({ actorBaseline, excerpts, history, auditionSummaries, currentFocus })
-7. createGenerationModel({ responseMimeType: "application/json", responseSchema }) → generateContent(prompt)
-8. Parse JSON envelope → defensive fallback on malformed JSON
-9. return { aiData: { coach_reply, session_focus, step_index, mode, phase } }
+3. getAuditionFullData(userPath, auditionId, db) when auditionId is provided
+4. buildCoachPrompt({ actorBaseline, excerpts: [], history, auditionSummaries, currentFocus })
+5. Gemini generateContent(prompt)
+6. Parse JSON envelope → defensive fallback on malformed JSON
+7. return { aiData: { coach_reply, session_focus, step_index, mode, phase } }
     ↓
 useActingCoach writes assistant message + updates session doc (lastActiveAt, messageCount, focus fields)
     ↓
