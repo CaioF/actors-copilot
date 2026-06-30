@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Image from "next/image"
+import Image from "next/image";
 import {
   LayoutDashboard,
   MessageCircle,
@@ -40,6 +40,9 @@ interface FirebaseTimestamp {
 /**
  * Type guard to safely identify a Firebase Timestamp object at runtime.
  * Eliminates the need for 'any' or forced assertions.
+ *
+ * @param {unknown} value - The runtime object value under test.
+ * @returns {value is FirebaseTimestamp} Boolean indicating contract match.
  */
 const isFirebaseTimestamp = (value: unknown): value is FirebaseTimestamp => {
   return (
@@ -53,6 +56,9 @@ const isFirebaseTimestamp = (value: unknown): value is FirebaseTimestamp => {
 /**
  * Normalizes mixed date payloads (Firebase Timestamps, ISO strings, JS Dates) 
  * into a safe, native JavaScript Date object.
+ *
+ * @param {unknown} dateValue - The incoming polymorphic date variant.
+ * @returns {Date | null} Parsed deterministic JavaScript Date object or null.
  */
 const normalizeDate = (dateValue: unknown): Date | null => {
   if (!dateValue) return null;
@@ -70,6 +76,13 @@ const normalizeDate = (dateValue: unknown): Date | null => {
   return null;
 };
 
+/**
+ * Component representing the graphical progress loop for individual core identity areas.
+ *
+ * @component
+ * @param {SectionProgressRingProps} props - Structural presentation parameters.
+ * @returns {JSX.Element} The rendered progress SVG ring boundary.
+ */
 function SectionProgressRing({ current, total, isCompleted, sectionId, themesCovered = [] }: SectionProgressRingProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const size = 16;
@@ -126,8 +139,6 @@ function SectionProgressRing({ current, total, isCompleted, sectionId, themesCov
   );
 
   const tooltipId = `theme-tooltip-${sectionId}`;
-
-  
 
   return (
     <div
@@ -192,7 +203,7 @@ const menuItems = [
   { label: "Auditions", href: "/auditions", icon: Monitor },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
-]
+];
 
 interface ChatSidebarProps {
   session: DNASession | null;
@@ -200,30 +211,30 @@ interface ChatSidebarProps {
   onSectionClick: (sectionId: string) => void;
 }
 
-
 /**
- * ChatSidebar Component
- * Renders the chat interface sidebar with session info, DNA sections navigation,
- * progress bar, menu items, and premium plan upgrade section.
- * @param session - The current DNA session data or null
- * @param activeSection - The ID of the currently active DNA section
- * @param onSectionClick - Callback when a DNA section is clicked
+ * ChatSidebar Component.
+ * Renders the chat interface navigation layer with responsive side constraints,
+ * synchronizing state with user subscription entitlements native to Stripe.
+ *
+ * @component
+ * @param {ChatSidebarProps} props - The operational layout properties.
+ * @returns {JSX.Element} Extended operational sidebar layout wrapper.
  */
 export function ChatSidebar({
   session,
   activeSection,
   onSectionClick,
 }: ChatSidebarProps) {
-
   const pathname = usePathname();
   const { isOpen, setIsOpen } = useSidebar();
+  const { user, loading } = useAuth();
+  const [billingLoading, setBillingLoading] = useState<boolean>(false);
 
-  const {user } = useAuth();
+  /**
+   * Evaluates corporate entitlement tier metrics native to the modern Stripe ecosystem.
+   */
+  const isBusinessClass = user?.tier === 'business';
 
-  const businessId = process.env.NEXT_PUBLIC_KAJABI_BUSINESS_ID || "";
-  const isBusinessClass = !!(user?.offers?.includes(businessId));
-
-  // Auto-close mobile drawer on route change
   useEffect(() => {
     setIsOpen(false);
   }, [pathname, setIsOpen]);
@@ -244,10 +255,44 @@ export function ChatSidebar({
     };
   }, [session?.lastActiveAt]);
 
+  /**
+   * Dispatches asynchronous secure routing configurations. Sets dynamic parameters 
+   * to either invoke Stripe Hosted Checkout sessions or the customer self-service portal.
+   *
+   * @async
+   * @throws {Error} Logs underlying operational failure states within the network stream.
+   * @returns {Promise<void>}
+   */
+  const handleBillingAction = async (): Promise<void> => {
+    if (billingLoading) return;
+    setBillingLoading(true);
+
+    try {
+      const endpoint = isBusinessClass ? '/api/billing/portal' : '/api/billing/checkout';
+      const body = isBusinessClass ? undefined : JSON.stringify({ tier: 'business' });
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error('❌ Billing operational endpoint transition failed:', data.error);
+      }
+    } catch (err) {
+      console.error('❌ Fatal error dispatching frontend billing redirect sequence:', err);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   return (
     <>
-      {/* Backdrop (mobile only, when open) */}
       {isOpen && (
         <button
           type="button"
@@ -264,7 +309,6 @@ export function ChatSidebar({
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        {/* Mobile close button */}
         <button
           type="button"
           onClick={() => setIsOpen(false)}
@@ -274,133 +318,129 @@ export function ChatSidebar({
           <X className="h-4 w-4" />
         </button>
 
-        {/* Logo */}
         <div className="flex items-center justify-center px-5 pt-6 pb-5">
-        {/* We wrap the image in a Link so clicking the logo goes home.
-            Added a slight hover scale effect for interactivity */}
-        <Link href="/dashboard" className="block transition-transform hover:scale-105">
-          <Image
-            src="/logo.png"
-            alt="The Actors Copilot"
-            width={100}
-            height={100}
-            className="object-contain" // Ensures the image doesn't stretch or distort
-            priority // Tells Next.js to load this immediately since it's above the fold
-          />
-        </Link>
-      </div>
-
-      <div className="mx-5 mb-4 border-t border-[#F5F0E8]/10" />
-
-      {/* Session Info */}
-      <div className="px-5 pb-2">
-        <h3 className="mt-3 font-title text-base italic leading-snug text-[#E8721A]">
-          Continue your discovery
-        </h3>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#F5F0E8]/60">
-          Last session: {formattedLastActive} 
-        </p>
-      </div>
-
-      {/* DNA Sections */}
-      <div className="px-5 flex-1 overflow-y-auto custom-scrollbar pb-3">
-        <div className="mb-2 flex items-center gap-1.5">
-          <Dna className="h-3.5 w-3.5 text-[#F5F0E8]/50" />
-          <span className="text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
-            DNA Sections
-          </span>
+          <Link href="/dashboard" className="block transition-transform hover:scale-105">
+            <Image
+              src="/logo.png"
+              alt="The Actors Copilot"
+              width={100}
+              height={100}
+              className="object-contain"
+              priority
+            />
+          </Link>
         </div>
-        <nav className="flex flex-col gap-0.5 pl-1">
-          {DNA_SECTIONS.map((section) => {
-            const isCompleted = session?.completedSections?.includes(section.id);
-            const extractionCount = session?.sectionHqCounts?.[section.id] ?? 0;
 
-            return (
-              <button
-                key={section.id}
-                onClick={() => onSectionClick(section.id)}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
-                  activeSection === section.id
-                    ? "font-medium text-[#E8721A]"
-                    : "text-[#F5F0E8]/70 hover:text-[#F5F0E8]"
-                )}
-              >
-                <SectionProgressRing
-                  current={extractionCount}
-                  total={HQ_EXTRACTIONS_FOR_COMPLETION}
-                  isCompleted={isCompleted ?? false}
-                  sectionId={section.id}
-                  themesCovered={session?.sectionThemes?.[section.id]}
-                />
-                <span className="flex-1">{section.label}</span>
-              </button>
-            )
-          }
-          
-          )}
-        </nav>
-      </div>
+        <div className="mx-5 mb-4 border-t border-[#F5F0E8]/10" />
 
-      {/* Progress Bar */}
-      <div className="px-5 pb-5 flex-shrink-0">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#2C3328]">
-          <div
-            className="h-full rounded-full bg-[#E8721A] transition-all duration-500"
-            style={{ width: `${session?.progress ?? 10}%` }}
-          />
-        </div>
-        <p className="mt-1.5 text-[11px] text-[#F5F0E8]/60">
-          Progress: {session?.progress ?? 10}%
-        </p>
-      </div>
-
-      {/* Menu */}
-      <div className="shrink-0 px-4">
-        <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
-          Menu
-        </p>
-        <nav className="flex flex-col gap-1">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-[#E8721A]/15 text-[#E8721A]"
-                    : "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Premium Plan */}
-      {!isBusinessClass && (
-      <div className="p-4">
-        <div className="rounded-xl bg-[#2C3328] p-4">
-          <h4 className="font-title text-lg font-bold text-[#F5F0E8]">Business Class</h4>
-          <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
-            Upgrade to Business Class to unlock more features
+        <div className="px-5 pb-2">
+          <h3 className="mt-3 font-title text-base italic leading-snug text-[#E8721A]">
+            Continue your discovery
+          </h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#F5F0E8]/60">
+            Last session: {formattedLastActive} 
           </p>
-          <a 
-            href="https://the-actors-copilot.mykajabi.com/offers/mXz4mWzF?coupon_code=UPGRADEBUSINESS" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
-          >
-            Upgrade
-          </a>
         </div>
-      </div>
-      )}
+
+        <div className="px-5 flex-1 overflow-y-auto custom-scrollbar pb-3">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Dna className="h-3.5 w-3.5 text-[#F5F0E8]/50" />
+            <span className="text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
+              DNA Sections
+            </span>
+          </div>
+          <nav className="flex flex-col gap-0.5 pl-1">
+            {DNA_SECTIONS.map((section) => {
+              const isCompleted = session?.completedSections?.includes(section.id);
+              const extractionCount = session?.sectionHqCounts?.[section.id] ?? 0;
+
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => onSectionClick(section.id)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
+                    activeSection === section.id
+                      ? "font-medium text-[#E8721A]"
+                      : "text-[#F5F0E8]/70 hover:text-[#F5F0E8]"
+                  )}
+                >
+                  <SectionProgressRing
+                    current={extractionCount}
+                    total={HQ_EXTRACTIONS_FOR_COMPLETION}
+                    isCompleted={isCompleted ?? false}
+                    sectionId={section.id}
+                    themesCovered={session?.sectionThemes?.[section.id]}
+                  />
+                  <span className="flex-1">{section.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="px-5 pb-5 flex-shrink-0">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#2C3328]">
+            <div
+              className="h-full rounded-full bg-[#E8721A] transition-all duration-500"
+              style={{ width: `${session?.progress ?? 10}%` }}
+            />
+          </div>
+          <p className="mt-1.5 text-[11px] text-[#F5F0E8]/60">
+            Progress: {session?.progress ?? 10}%
+          </p>
+        </div>
+
+        <div className="shrink-0 px-4">
+          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
+            Menu
+          </p>
+          <nav className="flex flex-col gap-1">
+            {menuItems.map((item) => {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-[#E8721A]/15 text-[#E8721A]"
+                      : "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {!loading && (
+          <div className="p-4 mt-auto">
+            <div className="rounded-xl bg-[#2C3328] p-4">
+              <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
+                {isBusinessClass ? "Premium Account" : "Business Class"}
+              </h4>
+              <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
+                {isBusinessClass 
+                  ? "Manage your account, billing details, and invoices in the secure customer portal." 
+                  : "Upgrade to Business Class for the full coaching and profile analysis experience."}
+              </p>
+              <button 
+                onClick={handleBillingAction}
+                disabled={billingLoading}
+                className={cn(
+                  "mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-all hover:bg-[#E8721A] hover:text-white active:scale-95 disabled:opacity-50",
+                  billingLoading && "cursor-wait"
+                )}
+              >
+                {billingLoading ? "Loading..." : isBusinessClass ? "Manage Subscription" : "Upgrade"}
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );

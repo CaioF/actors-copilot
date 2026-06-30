@@ -28,7 +28,7 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 
 | Category | Technology | Version |
 |----------|------------|---------|
-| **Framework** | Next.js | 16.1.6 |
+| **Framework** | Next.js (App Router) | 16.1.6 |
 | **UI Library** | React | 19.2.4 |
 | **Language** | TypeScript | 5.x |
 | **Styling** | Tailwind CSS | 4.2.0 |
@@ -37,9 +37,10 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 | **State Management** | React Context + Custom Hooks | - |
 | **Auth** | Firebase Auth | 11.3.0 |
 | **Database** | Firebase Firestore | 11.3.0 |
+| **Billing & Webhooks** | Stripe SDK (`stripe`) | Latest |
 | **AI** | Google Gemini (@google/genai) | 1.48.0 |
 | **Forms** | React Hook Form + Zod | 7.54.1 / 3.24.1 |
-| **JWT** | jose | 6.2.1 |
+| **JWT & Encryption** | jose | 6.2.1 |
 | **Icons** | Lucide React | 0.564.0 |
 | **Package Manager** | pnpm | - |
 | **Testing** | Jest | 30.3.0 |
@@ -52,27 +53,29 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Browser Client                           │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ React 19    │  │ Next.js App  │  │ Firebase Auth     │   │
-│  │ Components  │  │ Router       │  │ (Google/Email)    │   │
-│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+│  │ React 19    │  │ Next.js App  │  │ Firebase Auth    │   │
+│  │ Components  │  │ Router       │  │ (Google/Email)   │   │
+│  └─────────────┘  └──────────────┘  └──────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Next.js Server                            │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ Route       │  │ API Routes   │  │ Firebase Admin   │   │
-│  │ Handlers    │  │ /api/dna/*   │  │ (Server-side)    │   │
-│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+│                   Next.js Server / Edge                     │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+│  │ Encrypted   │  │ API Routes   │  │ Firebase Admin   │    │
+│  │ Middleware  │  │ /api/billing │  │ (Server-side)    │    │
+│  └─────────────┘  └──────────────┘  └──────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              ▼                           ▼
-┌─────────────────────────┐  ┌─────────────────────────┐
-│   Firebase Firestore    │  │   Google Gemini AI      │
-│   (User Data Storage)   │  │   (Vertex AI)            │
-└─────────────────────────┘  └─────────────────────────┘
+          │                │                       │
+          ▼                ▼                       ▼
+┌────────────────────┐ ┌───────────────────┐ ┌────────────────┐
+│   Stripe Gateway   │ │Firebase Firestore │ │Google Gemini AI│
+│ (Checkout/Portals) │ │(User Data Models) │ │(Vertex AI SDK) │
+└────────────────────┘ └───────────────────┘ └────────────────┘
+│
+
+└───────── Webhook Events (Async) ───────┘
 ```
 
 ### Key Pages
@@ -80,16 +83,17 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 | Route | Purpose |
 |-------|---------|
 | `/` | Landing page |
-| `/login` | Public authentication |
-| `/dashboard` | Main authenticated hub |
-| `/chat` | Standalone AI chat |
+| `/login` | Public authentication gate |
+| `/dashboard` | Main authenticated core ecosystem hub |
+| `/upgrade` | Dynamic subscription tier acquisition funnel |
+| `/chat` | Standalone AI conversation pipeline |
 | `/personal-dna` | Actor personality/profile builder entry |
 | `/profile` | Actor's professional profile form |
 | `/auditions` | Audition management list |
 | `/auditions/new` | Multi-step audition wizard |
 | `/auditions/[id]` | Audition detail view |
-| `/settings` | User settings & account management |
-| `/acting-coach` | AI Acting Coach with RAG-powered responses |
+| `/settings` | User settings, core faturamento & billing details |
+| `/acting-coach` | AI Acting Coach with conversation history & focus tracking |
 
 ---
 
@@ -106,15 +110,21 @@ actors-copilot/
 │   │   ├── dashboard/page.tsx   # Dashboard
 │   │   ├── personal-dna/page.tsx
 │   │   ├── profile/
-│   │   │   └── page.tsx         # Actor profile (244 lines)
+│   │   │   └── page.tsx         # Actor profile
+│   │   ├── upgrade/             # Billing tiers UI
 │   │   ├── settings/page.tsx
 │   │   └── layout.tsx           # Authenticated layout
 │   ├── api/                     # Route Handlers
 │   │    auditions/
 │   │   │   ├── analyzeSides/    # Extracts performance notes from script pages
 │   │   │   └── analyzeBrief/    # Extracts chronological workflows from casting notes
-│   │   ├── auth/callback/
-│   │   ├── auth/logout/
+│   │   ├── auth/callback/       # Dynamic session sync gateway
+│   │   ├── auth/logout/         # Revokes cryptographic cookies
+│   │   ├── billing/             # Stripe billing infrastructure
+│   │   │   ├── checkout/        # Orchestrates checkout redirection targets
+│   │   │   └── portal/          # Emits self-service portal links
+│   │   ├── webhooks/            # Automated Stripe ledger syncing
+│   │   │   └── stripe/          # Secure event signature verification endpoint
 │   │   └── dna/
 │   │       ├── baseline/
 │   │       ├── chat/
@@ -125,41 +135,21 @@ actors-copilot/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
-│   ├── ui/                      # 56 shadcn/ui components
+│   ├── ui/                      # shadcn/ui primitives
 │   ├── auditions/               # Audition wizard components
-│   |   ├── audition-wizard.tsx  # Multi-step wizard container
-│   └── step/                    # Wizard steps
-│       ├── step-upload.tsx      # File upload (PDF/DOCX)
-│       ├── step-basic.tsx       # Project/role info
-│       ├── step-review.tsx      # Review before submission
-│       ├── step-generating.tsx  # AI processing state
-│       ├── step-result.tsx      # V1 Results display (Sides)
-│       └── step-result-brief.tsx # Dynamic AI JSON renderer (Briefs)
-│   ├── profile/                  # Profile page components
-│   │   ├── profile-header.tsx
-│   │   ├── actor-profile-form.tsx
-│   │   ├── profile-live-preview.tsx
-│   │   └── sections/           # 11 form sections
-│   ├── chat-input.tsx
-│   ├── chat-messages.tsx
-│   ├── ai-thinking-block.tsx
-│   ├── app-sidebar.tsx         # Sidebar navigation
+│   ├── app-sidebar.tsx         # Interactive navigation layout with Stripe links
+│   ├── chat-sidebar.tsx         # DNA tracking drawer with tier-aware control gates
 │   └── ...
 ├── lib/
 │   ├── context/
-│   │   ├── AuthContext.tsx     # Firebase auth + Kajabi
+│   │   ├── AuthContext.tsx     # Extended Firebase authentication + Stripe state hydration
 │   │   └── ProtectedRoute.tsx
-│   ├── firebase.ts             # Client SDK
-│   ├── firebase.admin.ts       # Server SDK
-│   ├── prompts.ts              # AI prompt templates
-│   ├── questions.ts            # Question bank
-│   ├── profile-types.ts        # ActorProfile schema
+│   ├── billing.ts              # Tier-to-Price matrix mapping and crypto signatures
+│   ├── stripe.ts               # Singleton instantiation configuration wrapper
+│   ├── firebase.ts             # Client SDK Core
+│   ├── firebase.admin.ts       # Server SDK Core
 │   └── ...
-├── hooks/
-│   ├── use-chat.ts             # Chat state management (545 lines)
-│   ├── use-mobile.ts
-│   ├── use-toast.ts
-│   └── use-loading-text.ts     # Loading text hook
+├── proxy.ts                     # Tier-Based Access Control Edge Middleware
 └── firestore.rules
 ```
 
@@ -224,12 +214,15 @@ components/
 
 ## API & Backend Routes
 
-### Authentication
+### Authentication & Billing Services
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/auth/callback` | POST | Firebase token verification + Kajabi purchase validation + JWT session cookie |
-| `/api/auth/logout` | POST | Destroy session cookie |
+| `/api/auth/callback` | POST / GET | Token exchange, active Firestore entitlement sync, and secure JWT payload mapping |
+| `/api/auth/logout` | POST | Explicit server-side session cookies destruction |
+| `/api/billing/checkout` | POST | Provisions secure ephemeral Stripe hosted checkout links for target tiers |
+| `/api/billing/portal` | POST | Authorizes self-service subscription management portals for active customers |
+| `/api/webhooks/stripe` | POST | Stream interceptor with cryptographic signature verification for state mutation syncs |
 
 ### DNA (Personal DNA Extraction)
 
@@ -619,32 +612,33 @@ The system uses a dynamic injection architecture for Casting Briefs. `BRIEF_ANAL
 ### Authentication Flow
 
 ```
-1. User logs in via:
-   ├── Google OAuth (Firebase popup)
-   └── Email/Password (Firebase)
+1. User authenticates via client-side provider:
+├── Google OAuth (Firebase Popup)
+└── Email/Password Form (Firebase Client)
 
-2. Firebase returns ID token → sent to /api/auth/callback
+2.Client signs ID Token → Dispatched to /api/auth/callback
 
-3. Backend verifies Firebase token
-   └── Checks Kajabi purchase via API
+3.Backend validates state against Firebase Admin SDK
+  └── Fetches active customer billing records from Firestore
 
-4. If valid: JWT signed → HTTP-only cookie set
-   └── Redirect to /dashboard
+4.If contract resolves: Cryptographic JWT signed via 'jose'
+  └── Injects platform_session HTTP-Only cookie with tier metadata
+  └── Programmatic router navigation to /dashboard
 
-5. API requests: Bearer token (Firebase ID token) in header
-   └── Server verifies → checks userPath ownership → processes
+5.Edge Middleware Gateway validation: Intercepts requests via proxy.ts
+  └── Decrypts platform_session -> Evaluates tier ('free' | 'economy' | 'business')
+  └── Enforces real-time protection boundaries across restricted sub-paths
 
-6. Logout: Cookie deleted + Firebase signOut
+6.Session Termination: Cookie deleted + Firebase explicit signOut execution
 ```
-
-### JWT Session Cookie
+### Secure JWT Session Cookie
 
 ```typescript
-cookieStore.set('kajabi_session', token, {
-    httpOnly: true,           // XSS protection
-    secure: true,             // HTTPS-only
-    sameSite: 'strict',       // CSRF protection
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+cookieStore.set('platform_session', token, {
+    httpOnly: true,           // mitigates cross-site scripting (XSS) attacks
+    secure: true,             // mandates TLS/HTTPS transmission
+    sameSite: 'strict',       // strict CSRF protection barrier
+    maxAge: 60 * 60 * 24 * 7, // 7-day complete lifecycle threshold
     path: '/',
 });
 ```
@@ -653,21 +647,20 @@ cookieStore.set('kajabi_session', token, {
 
 | Feature | Location | Implementation |
 |---------|----------|---------------|
-| HTTP-only Cookies | `callback/route.ts:71` | Prevents XSS token theft |
+| HTTP-only Cookies | `callback/route.ts:71` | Complete protection against JavaScript token exfiltration |
 | SameSite=Strict | `callback/route.ts:73` | CSRF protection |
-| JWT Expiration | `callback/route.ts:65` | 24-hour tokens |
-| User Path Validation | `analyze/route.ts:112` | Prevents unauthorized access |
-| File Validation | `analyze/route.ts:73-109` | MIME whitelist, 20MB limit |
+| Tier-Based Access Control | `proxy.ts` | Low-latency Edge runtime route-guard enforcement |
+| Cryptographic Verification | `webhooks/stripe/route.ts` | Stripe signature header matching validation using webhook secret |
 
 ### Environment Variables (Security Sensitive)
 
 | Variable | Purpose |
 |----------|---------|
-| `FIREBASE_PRIVATE_KEY` | Firebase Admin SDK |
-| `FIREBASE_CLIENT_EMAIL` | Firebase Admin SDK |
-| `KAJABI_CLIENT_ID` | Kajabi API auth |
-| `KAJABI_CLIENT_SECRET` | Kajabi API auth |
-| `JWT_SECRET` | Session JWT signing |
+| `FIREBASE_PRIVATE_KEY` | Server-side Firebase Admin authentication profile initialization |
+| `FIREBASE_CLIENT_EMAIL` | Server-side Firebase Admin identification channel mapping |
+| `STRIPE_SECRET_KEY` | Authenticates outgoing server calls toward the Stripe API ledger |
+| `STRIPE_WEBHOOK_SECRET` | Verifies incoming webhook authenticity payloads at the gateway |
+| `JWT_SECRET` | Symmetric key target for signing and verifying server-issued cookies |
 
 ### Known Security Considerations
 

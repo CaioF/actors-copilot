@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
 import { useAuth } from "@/lib/context/AuthContext";
 import { useSidebar } from "@/lib/context/SidebarContext";
-import { useEffect } from "react";
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import Image from "next/image"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard,
   MessageCircle,
@@ -16,8 +16,8 @@ import {
   User,
   BookOpen,
   X,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * Navigation schema definition.
@@ -30,66 +30,91 @@ const menuItems = [
   { label: "Auditions", href: "/auditions", icon: Monitor },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
-]
+];
 
 /**
- * AppSidebar Component
- * * Serves as the primary navigation layout for the application.
- * Integrates directly with AuthContext for session state and SidebarContext 
- * for responsive mobile drawer management.
+ * AppSidebar Component.
+ * Serves as the primary global application navigation drawer structure.
+ * Integrates asynchronously with modern Stripe entitlements to switch billing interfaces.
+ *
+ * @component
+ * @returns {JSX.Element} The rendered global sidebar layer.
  */
 export function AppSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
   const router = useRouter();
   const { logout, user, loading } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
+  const [billingLoading, setBillingLoading] = useState<boolean>(false);
 
   /**
-   * Enterprise Tier Validation
-   * Resolves the required product identifier from environment variables to prevent hardcoding.
-   * Evaluates the current user's entitlement payload to determine premium access state.
+   * Evaluates corporate entitlement tier metrics native to the modern Stripe ecosystem.
    */
-  const businessId = process.env.NEXT_PUBLIC_KAJABI_BUSINESS_ID || "";
-  const isBusinessClass = !!(user?.offers?.includes(businessId));
+  const isBusinessClass = user?.tier === "business";
 
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Sidebar Auth Trace]:", {
+        isLoading: loading,
+        hasUser: !!user,
+        currentTier: user?.tier || "free",
+        isBusinessClassResolved: isBusinessClass,
+      });
+    }
+  }, [user, loading, isBusinessClass]);
 
-/**
- * Technical Debugging Telemetry
- * Temporary execution trace to inspect the authentication payload and environmental variables.
- * Inspect this in your browser's Developer Tools (F12) console.
- */
-useEffect(() => {
-  if (process.env.NODE_ENV === "development") {
-    console.log("[Sidebar Auth Trace]:", {
-      isLoading: loading,
-      hasUser: !!user,
-      userOffers: user?.offers || [],
-      expectedBusinessId: businessId,
-      isBusinessClassResolved: isBusinessClass
-    });
-  }
-}, [user, loading, businessId, isBusinessClass]);
-
-  /**
-   * Route Transition Listener
-   * Automatically dismisses the mobile navigation drawer upon successful route navigation
-   * to prevent state staleness and improve mobile UX flow.
-   */
   useEffect(() => {
     setIsOpen(false);
   }, [pathname, setIsOpen]);
 
   /**
-   * Session Termination Handler
    * Invokes the authentication provider's logout protocol.
+   *
+   * @async
+   * @returns {Promise<void>}
    */
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     await logout();
-  }
+  };
+
+  /**
+   * Dispatches asynchronous secure routing configurations. Sets dynamic parameters 
+   * to either invoke Stripe Hosted Checkout sessions or the customer self-service portal.
+   *
+   * @async
+   * @throws {Error} Logs underlying operational failure states within the network stream.
+   * @returns {Promise<void>}
+   */
+  const handleBillingAction = async (): Promise<void> => {
+    if (billingLoading) return;
+    setBillingLoading(true);
+
+    try {
+      const endpoint = isBusinessClass ? "/api/billing/portal" : "/api/billing/checkout";
+      const body = isBusinessClass ? undefined : JSON.stringify({ tier: "business" });
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("Billing operational endpoint transition failed:", data.error);
+      }
+    } catch (err) {
+      console.error("Fatal error dispatching frontend billing redirect sequence:", err);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   return (
     <>
-      {/* Mobile Overlay: Focus trap and backdrop dismissal for drawer UI */}
       {isOpen && (
         <button
           type="button"
@@ -99,7 +124,6 @@ useEffect(() => {
         />
       )}
 
-      {/* Primary Sidebar Navigation Container */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex h-full w-[220px] transform flex-col bg-[#3D4A3C] text-[#F5F0E8] shadow-xl transition-transform duration-200",
@@ -107,7 +131,6 @@ useEffect(() => {
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        {/* Mobile Dismiss Action */}
         <button
           type="button"
           onClick={() => setIsOpen(false)}
@@ -117,7 +140,6 @@ useEffect(() => {
           <X className="h-4 w-4" />
         </button>
 
-        {/* Branding & Root Navigation Anchor */}
         <div className="flex items-center justify-center px-5 pt-6 pb-5">
           <Link href="/dashboard" className="block transition-transform hover:scale-105">
             <Image 
@@ -131,7 +153,6 @@ useEffect(() => {
           </Link>
         </div>
 
-        {/* Primary Action Buttons (Workflow Triggers) */} 
         <div className="px-4 pb-4">
           <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
             Quick Actions
@@ -154,14 +175,13 @@ useEffect(() => {
           </div>
         </div> 
 
-        {/* Global Navigation Matrix */}
         <div className="flex-1 px-4">
           <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
             Menu
           </p>
           <nav className="flex flex-col gap-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
@@ -176,10 +196,9 @@ useEffect(() => {
                   <item.icon className="h-4 w-4" />
                   {item.label}
                 </Link>
-              )
+              );
             })}
             
-            {/* Session Termination Action */}
             <button 
               onClick={handleLogout}
               className={cn(
@@ -193,30 +212,31 @@ useEffect(() => {
           </nav>
         </div>
 
-        {/* * Tier-Based Upsell Section
- * Conditionally rendered strictly for standard-tier users once authentication loading settles.
- * Suppressed automatically if 'Business Class' entitlement is resolved in user payload.
- */}
-
-{!loading && !isBusinessClass && (
-  <div className="p-4">
-    <div className="rounded-xl bg-[#2C3328] p-4">
-      <h4 className="font-title text-lg font-bold text-[#F5F0E8]">Business Class</h4>
-      <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
-        Upgrade to Business Class to unlock more features
-      </p>
-      <a 
-        href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout?coupon_code=UPGRADEBUSINESS" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
-      >
-        Upgrade
-      </a>
-    </div>
-  </div>
-)}
+        {!loading && (
+          <div className="p-4">
+            <div className="rounded-xl bg-[#2C3328] p-4">
+              <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
+                {isBusinessClass ? "Premium Account" : "Business Class"}
+              </h4>
+              <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
+                {isBusinessClass 
+                  ? "Manage your account, billing details, and invoices in the secure customer portal." 
+                  : "Upgrade to Business Class for the full coaching and profile analysis experience."}
+              </p>
+              <button 
+                onClick={handleBillingAction}
+                disabled={billingLoading}
+                className={cn(
+                  "mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-all hover:bg-[#E8721A] hover:text-white active:scale-95 disabled:opacity-50",
+                  billingLoading && "cursor-wait"
+                )}
+              >
+                {billingLoading ? "Loading..." : isBusinessClass ? "Manage Subscription" : "Upgrade"}
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
     </>
-  )
+  );
 }

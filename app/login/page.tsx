@@ -34,14 +34,14 @@ export default function LoginPage() {
         setInfoMsg('');
 
         if (!email) {
-            setErrorMsg('Please enter your email above, then click "Forgot password?" again.');
+            setErrorMsg('Please enter your email address above, then try again.');
             return;
         }
 
         setResetLoading(true);
         try {
             await sendPasswordReset(email);
-            setInfoMsg(`If an account exists for ${email}, a password reset email has been sent.`);
+            setInfoMsg(`If an account exists for ${email}, a password reset link has been sent.`);
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Could not send reset email. Please try again.';
             setErrorMsg(message);
@@ -74,7 +74,7 @@ export default function LoginPage() {
         setInfoMsg('');
         
         if (!email || !password) {
-            setErrorMsg('Please enter both email and password.');
+            setErrorMsg('Please enter your email address and password to continue.');
             return;
         }
 
@@ -93,12 +93,11 @@ export default function LoginPage() {
                     const signupErrorCode = signupError.cause?.code || signupError.code;
 
                     if (signupErrorCode === 'auth/email-already-in-use') {
-                        // Se falhou ao criar porque o e-mail JÁ EXISTE, então o erro original de fato era SENHA INCORRETA.
-                        setErrorMsg('Invalid email or password.');
+                        setErrorMsg('The email address or password is incorrect. Please try again.');
                     } else if (signupErrorCode === 'auth/weak-password') {
-                        setErrorMsg('Password should be at least 6 characters.');
+                        setErrorMsg('Please choose a password with at least 6 characters.');
                     } else {
-                        setErrorMsg(signupError.message || 'An error occurred during authentication.');
+                        setErrorMsg(signupError.message || 'We could not complete sign-in. Please try again.');
                     }
                 }
             } else {
@@ -177,8 +176,8 @@ export default function LoginPage() {
                     
                     <form onSubmit={handleEmailAuth} className="space-y-4 pt-4">
                         <div>
-                            <label className="text-m font-medium text-foreground mb-1 block"> Email</label> 
-                            <p className="text-sm text-muted-foreground" >Type in the same email you used in Kajabi</p>
+                            <label className="text-m font-medium text-foreground mb-1 block">Email</label>
+                            <p className="text-sm text-muted-foreground">Use the email address associated with your account.</p>
                             <input 
                                 type="email" 
                                 value={email}
