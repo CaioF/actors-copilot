@@ -1,160 +1,218 @@
-import { POST } from './route';
-import { auth } from '@/lib/firebase.admin';
-import { cookies } from 'next/headers';
-import { SignJWT } from 'jose';
+import { POST, GET } from './route';
+import { auth, db } from '@/lib/firebase.admin';
+import { setPlatformSession, getPlatformSession } from '@/lib/session';
+import { NextRequest } from 'next/server';
 
-// --- DEPENDENCY MOCKS ---
+// --- STABLE DEPENDENCY MOCKS ---
 
 jest.mock('@/lib/firebase.admin', () => ({
-    auth: { verifyIdToken: jest.fn() },
+    auth: {
+        verifyIdToken: jest.fn(),
+    },
+    db: {
+        doc: jest.fn(),
+    },
 }));
 
-jest.mock('next/headers', () => ({
-    cookies: jest.fn(),
+jest.mock('@/lib/session', () => ({
+    setPlatformSession: jest.fn(),
+    getPlatformSession: jest.fn(),
 }));
 
-jest.mock('jose', () => ({
-    SignJWT: jest.fn().mockImplementation(() => ({
-        setProtectedHeader: jest.fn().mockReturnThis(),
-        setIssuedAt: jest.fn().mockReturnThis(),
-        setExpirationTime: jest.fn().mockReturnThis(),
-        setSubject: jest.fn().mockReturnThis(),
-        setIssuer: jest.fn().mockReturnThis(),
-        setAudience: jest.fn().mockReturnThis(),
-        sign: jest.fn().mockResolvedValue('fake_signed_jwt_token'),
-    })),
-}));
-
-global.fetch = jest.fn();
-
-describe('Authentication POST Route (Kajabi Verification)', () => {
-    let mockCookieSet: jest.Mock;
-
+describe('Authentication Callback Route Handlers (Stripe & Firestore Integration)', () => {
+    
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    describe('POST /api/auth/callback', () => {
         
-        // Setup default healthy environment variables
-        process.env.JWT_SECRET = 'test_secret_key_123';
-        process.env.KAJABI_CLIENT_ID = 'test_client';
-        process.env.KAJABI_CLIENT_SECRET = 'test_secret';
-        process.env.KAJABI_REQUIRED_OFFER_ID = '12345';
-        process.env.KAJABI_ECONOMY_OFFER_ID = '67890'; 
+        /**
+         * Test suite validating robust guard behavior on missing identity parameters.
+         */
+        it('returns 400 Bad Request if the idToken parameter is missing from the payload', async () => {
+            const req = new Request('http://localhost/api/auth/callback', {
+                method: 'POST',
+                body: JSON.stringify({}),
+            }) as NextRequest; 
 
-        // Setup mock cookie store
-        mockCookieSet = jest.fn();
-        (cookies as jest.Mock).mockResolvedValue({ set: mockCookieSet });
-    });
+            const res = await POST(req);
+            const data = await res.json();
 
-    /**
-     * TEST SUITE 1: Basic Input Validation
-     */
-    it('returns 401 Unauthorized if the Authorization header is missing', async () => {
-        const req = new Request('http://localhost/api/auth/callback', { method: 'POST' });
-        const res = await POST(req);
-        const data = await res.json();
-
-        expect(res.status).toBe(401);
-        expect(data.error).toBe('Token not found or invalid');
-    });
-
-    /**
-     * TEST SUITE 2: System Configuration Failures
-     */
-    it('returns 500 if Kajabi environment variables are missing', async () => {
-        delete process.env.KAJABI_CLIENT_ID;
-        (auth.verifyIdToken as jest.Mock).mockResolvedValue({ email: 'actor@example.com' });
-
-        const req = new Request('http://localhost/api/auth/callback', {
-            method: 'POST',
-            headers: new Headers({ 'Authorization': 'Bearer valid-firebase-token' }),
+            expect(res.status).toBe(400);
+            expect(data.error).toBe('Missing Identity ID Token');
         });
 
-        const res = await POST(req);
-        const data = await res.json();
+        /**
+         * Test suite validating enforcement of specific claims requirements on token signatures.
+         */
+        it('returns 400 Bad Request if the verified token structure lacks a valid email claim', async () => {
+            (auth.verifyIdToken as jest.Mock).mockResolvedValue({
+                uid: 'user_123',
+                // Explicitly missing email field target
+            });
 
-        expect(res.status).toBe(500);
-        expect(data.error).toBe('System configuration error. Please contact support.');
-    });
+            const req = new Request('http://localhost/api/auth/callback', {
+                method: 'POST',
+                body: JSON.stringify({ idToken: 'mock_firebase_id_token' }),
+            }) as NextRequest; 
 
-    it('returns 500 if JWT_SECRET is missing during session creation', async () => {
-        delete process.env.JWT_SECRET;
-        (auth.verifyIdToken as jest.Mock).mockResolvedValue({ email: 'actor@example.com' });
+            const res = await POST(req);
+            const data = await res.json();
 
-        // Mock a fully successful Kajabi flow
-        (global.fetch as jest.Mock)
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'k_token' }) }) // 1. Token
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'u1', attributes: { email: 'actor@example.com' }, relationships: { offers: { links: { self: 'offers_url' } } } }] }) }) // 2. User
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: '12345' }] }) }); // 3. Offers
-
-        const req = new Request('http://localhost/api/auth/callback', {
-            method: 'POST',
-            headers: new Headers({ 'Authorization': 'Bearer valid-firebase-token' }),
+            expect(res.status).toBe(400);
+            expect(data.error).toBe('Identity Token lacks a valid email claim');
         });
 
-        const res = await POST(req);
-        const data = await res.json();
+        /**
+         * Test suite verifying safe fallback initialization parameters for newly registered users without records.
+         */
+        it('defaults to free tier and canceled status if no pre-existing billing document is found in firestore', async () => {
+            const mockUid = 'new_actor_999';
+            const mockEmail = 'new_actor@example.com';
 
-        expect(res.status).toBe(500);
-        expect(data.error).toBe('Internal Configuration Error');
-    });
+            (auth.verifyIdToken as jest.Mock).mockResolvedValue({
+                uid: mockUid,
+                email: mockEmail,
+            });
 
-    /**
-     * TEST SUITE 3: Kajabi Business Logic & Rejections
-     */
-    it('returns 403 if the user exists but does not have the required offer', async () => {
-        (auth.verifyIdToken as jest.Mock).mockResolvedValue({ email: 'actor@example.com' });
+            // Mock firestore reference tracking returning false for .exists check
+            const mockGet = jest.fn().mockResolvedValue({
+                exists: false,
+                data: () => null,
+            });
+            (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
 
-        (global.fetch as jest.Mock)
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'k_token' }) }) // 1. Token
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'u1', attributes: { email: 'actor@example.com' }, relationships: { offers: { links: { self: 'offers_url' } } } }] }) }) // 2. User
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'WRONG_OFFER_999' }] }) }); // 3. Offers (Missing 12345)
+            const req = new Request('http://localhost/api/auth/callback', {
+                method: 'POST',
+                body: JSON.stringify({ idToken: 'mock_firebase_id_token' }),
+            }) as NextRequest;
 
-        const req = new Request('http://localhost/api/auth/callback', {
-            method: 'POST',
-            headers: new Headers({ 'Authorization': 'Bearer valid-firebase-token' }),
+            const res = await POST(req);
+            const data = await res.json();
+
+            // 1. Verify endpoint processing contract
+            expect(res.status).toBe(200);
+            expect(data.success).toBe(true);
+            expect(data.user).toEqual({
+                uid: mockUid,
+                email: mockEmail,
+                tier: 'free',
+                subscriptionStatus: 'canceled',
+            });
+
+            // 2. Validate targeted document reference mapping pathing
+            expect(db.doc).toHaveBeenCalledWith(`users/${mockUid}/billing/current`);
+
+            // 3. Confirm downstream session context configuration invocation
+            expect(setPlatformSession).toHaveBeenCalledWith({
+                uid: mockUid,
+                email: mockEmail,
+                tier: 'free',
+                subscriptionStatus: 'canceled',
+                stripeCustomerId: undefined,
+                stripeSubscriptionId: undefined,
+                stripePriceId: undefined,
+                currentPeriodEnd: undefined,
+            });
         });
 
-        const res = await POST(req);
-        const data = await res.json();
+        /**
+         * Test suite confirming high-performance operational pathing under existing paying tiers.
+         */
+        it('resolves subscription parameters correctly and commits metadata into signed cookies context on success', async () => {
+            const mockUid = 'premium_actor_777';
+            const mockEmail = 'premium@example.com';
+            const mockBillingDocData = {
+                tier: 'business',
+                status: 'active',
+                customerId: 'cus_stripe123',
+                subscriptionId: 'sub_123456',
+                priceId: 'price_premium_id',
+                currentPeriodEnd: 1800000000,
+            };
 
-        expect(res.status).toBe(403);
-        expect(data.error).toBe("You don't have the required 'The Actor's Copilot' offer. Please check your purchase history.");
+            (auth.verifyIdToken as jest.Mock).mockResolvedValue({
+                uid: mockUid,
+                email: mockEmail,
+            });
+
+            const mockGet = jest.fn().mockResolvedValue({
+                exists: true,
+                data: () => mockBillingDocData,
+            });
+            (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
+
+            const req = new Request('http://localhost/api/auth/callback', {
+                method: 'POST',
+                body: JSON.stringify({ idToken: 'mock_firebase_id_token' }),
+            }) as NextRequest;
+
+            const res = await POST(req);
+            const data = await res.json();
+
+            expect(res.status).toBe(200);
+            expect(data.success).toBe(true);
+            expect(data.user).toEqual({
+                uid: mockUid,
+                email: mockEmail,
+                tier: 'business',
+                subscriptionStatus: 'active',
+            });
+
+            expect(setPlatformSession).toHaveBeenCalledWith({
+                uid: mockUid,
+                email: mockEmail,
+                tier: 'business',
+                subscriptionStatus: 'active',
+                stripeCustomerId: mockBillingDocData.customerId,
+                stripeSubscriptionId: mockBillingDocData.subscriptionId,
+                stripePriceId: mockBillingDocData.priceId,
+                currentPeriodEnd: mockBillingDocData.currentPeriodEnd,
+            });
+        });
     });
 
-    /**
-     * TEST SUITE 4: The Happy Path (Complete Success)
-     */
-    it('returns 200, signs JWT, and sets HTTP-only cookie on complete success', async () => {
-        (auth.verifyIdToken as jest.Mock).mockResolvedValue({ email: 'actor@example.com' });
+    describe('GET /api/auth/callback', () => {
+        
+        /**
+         * Test suite verifying blocking responses if a client hits entitlement verification without an active cookie.
+         */
+        it('returns 401 Unauthorized if the active platform session is null or unauthenticated', async () => {
+            (getPlatformSession as jest.Mock).mockResolvedValue(null);
 
-        // Mock the exact sequence of successful Kajabi API calls
-        (global.fetch as jest.Mock)
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'k_token' }) }) // 1. Token
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'u1', attributes: { email: 'actor@example.com' }, relationships: { offers: { links: { self: 'offers_url' } } } }] }) }) // 2. User
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: '12345' }] }) }); // 3. Offers
+            const res = await GET();
+            const data = await res.json();
 
-        const req = new Request('http://localhost/api/auth/callback', {
-            method: 'POST',
-            headers: new Headers({ 'Authorization': 'Bearer valid-firebase-token' }),
+            expect(res.status).toBe(401);
+            expect(data.authenticated).toBe(false);
+            expect(data.tier).toBe('free');
         });
 
-        const res = await POST(req);
-        const data = await res.json();
+        /**
+         * Test suite verifying successful runtime metadata translation to frontend hydration structures.
+         */
+        it('returns 200 containing explicit profile parameters if a valid signed session exists', async () => {
+            const mockSessionPayload = {
+                uid: 'actor_456',
+                email: 'actor@example.com',
+                tier: 'economy',
+                subscriptionStatus: 'active',
+                stripeCustomerId: 'cus_economy456',
+            };
 
-        // 1. Check response status and payload
-        expect(res.status).toBe(200);
-        expect(data.success).toBe(true);
-        expect(data.redirectUrl).toBe('/dashboard');
+            (getPlatformSession as jest.Mock).mockResolvedValue(mockSessionPayload);
 
-        // 2. Verify the cookie was actually set with the correct security parameters
-        expect(mockCookieSet).toHaveBeenCalledWith(
-            'kajabi_session',
-            'fake_signed_jwt_token',
-            expect.objectContaining({
-                httpOnly: true,
-                sameSite: 'strict',
-                path: '/',
-            })
-        );
+            const res = await GET();
+            const data = await res.json();
+
+            expect(res.status).toBe(200);
+            expect(data).toEqual({
+                authenticated: true,
+                tier: 'economy',
+                subscriptionStatus: 'active',
+                stripeCustomerId: 'cus_economy456',
+            });
+        });
     });
 });

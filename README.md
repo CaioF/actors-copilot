@@ -775,15 +775,6 @@ FIREBASE_CLIENT_EMAIL
 FIREBASE_PRIVATE_KEY
 ```
 
-**Kajabi Integration:**
-```
-KAJABI_CLIENT_ID
-KAJABI_CLIENT_SECRET
-NEXT_PUBLIC_KAJABI_REDIRECT_URI
-NEXT_PUBLIC_KAJABI_DOMAIN
-KAJABI_REQUIRED_OFFER_ID
-```
-
 **Session:**
 ```
 JWT_SECRET
@@ -819,7 +810,7 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 | `app/api/dna/synthesize/route.ts` | 123 | Master Profile synthesis |
 | `app/api/dna/baseline/route.ts` | 283 | Document upload + extraction |
 | `app/api/auditions/analyze/route.ts` | 255 | Audition coaching |
-| `app/api/auth/callback/route.ts` | 183 | Auth + Kajabi verification |
+| `app/api/auth/callback/route.ts` | 183 | Auth + Stripe entitlement hydration |
 | `components/app-sidebar.tsx` | ~130 | Sidebar navigation |
 | `lib/prompts.ts` | 1203 | All AI prompts |
 | `lib/questions.ts` | 386 | Question bank |
@@ -835,8 +826,7 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 - Add Zod schema validation for env vars at build time
 - Implement rate limiting on auth endpoints
-- Cache Kajabi access token
-- Add retry mechanism for Kajabi API timeouts
+- Add retry handling for Stripe webhook retries
 - Migrate AI execution to server-side (security improvement)
 - Implement JWT blacklisting on logout
 
