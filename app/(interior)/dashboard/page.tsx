@@ -9,6 +9,7 @@ import { HistoryUploadModal } from "@/components/history-upload-modal";
 import { IntroVideoModal } from "@/components/intro-video-modal";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getHasSeenIntroVideo, markHasSeenIntroVideo } from "@/lib/firestore.utils";
+import { useRouter, useSearchParams } from 'next/navigation';
 
 /**
  * Main dashboard page showing the self-tape copilot workflow.
@@ -20,6 +21,16 @@ export default function DashboardPage() {
   const [isIntroVideoOpen, setIsIntroVideoOpen] = useState(false);
   const { user, loading } = useAuth();
   const checkedIntroUserIdRef = useRef<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+
+  useEffect(() => {
+    if (sessionId) {
+      router.refresh();
+      router.replace('/dashboard');
+    }
+  }, [sessionId, router]);
 
   useEffect(() => {
     if (loading || !user || checkedIntroUserIdRef.current === user.uid) return;

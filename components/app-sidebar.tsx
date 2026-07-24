@@ -214,7 +214,7 @@ export function AppSidebar() {
 
         {!loading && (
           <div className="p-4">
-            <div className="rounded-xl bg-[#2C3328] p-4">
+            <div className="rounded-xl bg-[#ECD4B3] p-4">
               <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
                 {isBusinessClass ? "Premium Account" : "Business Class"}
               </h4>

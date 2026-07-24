@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/webhooks/stripe
  * Inbound secure webhook gateway processing automated lifecycle hooks from Stripe.
- * * @param {NextRequest} req - The streaming HTTP request payload Context.
+ * 
+ * @param {NextRequest} req - The streaming HTTP request payload Context.
  * @returns {Promise<NextResponse>} Standard transaction compliance confirmation signature.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -34,10 +35,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         switch (event.type) {
             case 'checkout.session.completed': {
                 const session = event.data.object as Stripe.Checkout.Session;
-                const platformUserId = session.metadata?.platformUserId;
-                
+                let platformUserId = session.client_reference_id || session.metadata?.platformUserId;
+                const customerEmail = session.customer_details?.email || session.metadata?.originalEmail;
+
+                // Fallback: If no platformUserId exists, lookup user by email (Migration Flow)
+                if (!platformUserId && customerEmail) {
+                    const userSnap = await db.collection('users')
+                        .where('email', '==', customerEmail.toLowerCase().trim())
+                        .limit(1)
+                        .get();
+
+                    if (!userSnap.empty) {
+                        platformUserId = userSnap.docs[0].id;
+                    }
+                }
+
                 if (!platformUserId) {
-                    logger.warn(`Checkout Completed Event lacks platformUserId metadata. Session ID: ${session.id}`);
+                    logger.warn(`Checkout Completed Event lacks platformUserId metadata and matching email user record. Session ID: ${session.id}`);
                     break;
                 }
 
@@ -49,7 +63,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     priceId = lineItems[0].price?.id;
                 }
 
-                const tier = mapStripePriceToTier(priceId);
+                const tier = session.metadata?.targetTier || mapStripePriceToTier(priceId);
+                const isMigrationFlow = session.metadata?.flow === 'subscriber_migration';
 
                 await db.doc(`users/${platformUserId}/billing/current`).set({
                     customerId: session.customer as string,
@@ -57,9 +72,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     priceId: priceId || null,
                     tier,
                     status: 'active',
+                    migrationSource: isMigrationFlow ? 'kajabi' : null,
+                    migratedAt: isMigrationFlow ? new Date().toISOString() : null,
                     updatedAt: new Date().toISOString(),
                 }, { merge: true });
 
+                logger.info(`Successfully mapped subscription for user ${platformUserId} (Migration: ${isMigrationFlow})`);
                 break;
             }
 

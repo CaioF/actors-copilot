@@ -95,6 +95,15 @@ describe('Edge Middleware Gating Proxy Route Interceptor', () => {
             expect(res.status).toBe(200);
             expect(res.headers.get('x-middleware-next')).toBe('1');
         });
+
+        it('allows the Stripe billing success callback route to bypass auth gating', async () => {
+            const req = new NextRequest('http://localhost/api/billing/success?session_id=cs_test_123');
+
+            const res = await proxy(req);
+
+            expect(res.status).toBe(200);
+            expect(res.headers.get('x-middleware-next')).toBe('1');
+        });
     });
 
 

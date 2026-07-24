@@ -70,6 +70,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: stripeCustomerId,
+            client_reference_id: uid,
             mode: 'subscription',
             payment_method_types: ['card'],
             billing_address_collection: 'required',
@@ -79,8 +80,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     quantity: 1,
                 },
             ],
-            success_url: `${returnUrl}?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${returnUrl}?checkout_status=cancelled`,
+            success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/billing/cancelled`,
             metadata: {
                 platformUserId: uid,
                 targetTier: tier,
