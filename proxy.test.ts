@@ -7,6 +7,10 @@ jest.mock('./lib/session', () => ({
     decryptSession: jest.fn(),
 }));
 
+jest.mock('jose', () => ({
+    jwtVerify: jest.fn(),
+}));
+
 describe('Edge Middleware Gating Proxy Route Interceptor', () => {
     const originalEnv = process.env;
 

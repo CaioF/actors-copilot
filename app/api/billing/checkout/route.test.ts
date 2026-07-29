@@ -147,6 +147,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         // 2. Validate Stripe Session Creation parameters match strict design criteria [cite: 36, 91]
         expect(stripe.checkout.sessions.create).toHaveBeenCalledWith({
             customer: 'cus_historical_888',
+            client_reference_id: mockUid,
             mode: 'subscription',
             payment_method_types: ['card'],
             billing_address_collection: 'required',
@@ -156,8 +157,8 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                     quantity: 1,
                 },
             ],
-            success_url: 'http://localhost:3000/dashboard?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url: 'http://localhost:3000/dashboard?checkout_status=cancelled',
+            success_url: 'http://localhost:3000/api/billing/success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url: 'http://localhost:3000/api/billing/cancelled',
             metadata: {
                 platformUserId: mockUid,
                 targetTier: 'economy',

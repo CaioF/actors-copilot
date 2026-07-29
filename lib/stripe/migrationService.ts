@@ -107,7 +107,6 @@ export async function createMigrationCheckoutSession({
       ],
       subscription_data: {
         trial_end: trialEndUnixTimestamp,
-        proration_behavior: 'none',
         metadata: {
           migrationSource: 'kajabi',
           originalEmail: email,
