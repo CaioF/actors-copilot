@@ -18,7 +18,7 @@ export default function InteriorLayout({
 }) {
   return (
     <SidebarProvider>
-      <div className="flex h-screen bg-[#F0E8DC]">
+      <div className="flex h-screen bg-background transition-colors">
 
         <ProtectedRoute>
           <AppSidebar />

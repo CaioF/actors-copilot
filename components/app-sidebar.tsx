@@ -126,7 +126,7 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex h-full w-[220px] transform flex-col bg-[#3D4A3C] text-[#F5F0E8] shadow-xl transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-40 flex h-full w-55 transform flex-col bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200 dark:text-sidebar-foreground",
           "md:relative md:z-auto md:h-screen md:translate-x-0 md:shadow-none",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
@@ -135,7 +135,7 @@ export function AppSidebar() {
           type="button"
           onClick={() => setIsOpen(false)}
           aria-label="Close menu"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-[#F5F0E8]/70 transition-colors hover:bg-[#F5F0E8]/10 hover:text-[#F5F0E8] md:hidden"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
         >
           <X className="h-4 w-4" />
         </button>
@@ -154,20 +154,20 @@ export function AppSidebar() {
         </div>
 
         <div className="px-4 pb-4">
-          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
+          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-sidebar-foreground/50">
             Quick Actions
           </p>
           <div className="flex flex-col gap-2">
             <Link
               href="/auditions/new/brief"
-              className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
               Audition Breakdown
             </Link>
             <Link
               href="/auditions/new/sides"
-              className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
               Scene Study
@@ -189,8 +189,8 @@ export function AppSidebar() {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-[#E8721A]/15 text-[#E8721A]"
-                      : "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
+                      ? "bg-primary/15 text-primary"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -203,7 +203,7 @@ export function AppSidebar() {
               onClick={handleLogout}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
+                "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               )}
             >
               <LogOut className="h-5 w-5" /> 
@@ -212,30 +212,7 @@ export function AppSidebar() {
           </nav>
         </div>
 
-        {!loading && (
-          <div className="p-4">
-            <div className="rounded-xl bg-[#ECD4B3] p-4">
-              <h4 className="font-title text-lg font-bold text-[#F5F0E8]">
-                {isBusinessClass ? "Premium Account" : "Business Class"}
-              </h4>
-              <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
-                {isBusinessClass 
-                  ? "Manage your account, billing details, and invoices in the secure customer portal." 
-                  : "Upgrade to Business Class for the full coaching and profile analysis experience."}
-              </p>
-              <button 
-                onClick={handleBillingAction}
-                disabled={billingLoading}
-                className={cn(
-                  "mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-all hover:bg-[#E8721A] hover:text-white active:scale-95 disabled:opacity-50",
-                  billingLoading && "cursor-wait"
-                )}
-              >
-                {billingLoading ? "Loading..." : isBusinessClass ? "Manage Subscription" : "Upgrade"}
-              </button>
-            </div>
-          </div>
-        )}
+        
       </aside>
     </>
   );

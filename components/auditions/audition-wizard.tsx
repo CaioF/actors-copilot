@@ -753,7 +753,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
       {/* STEP 4: LOADING OR RESULT */}
       {currentStep === 4 && (
-        <div className={`flex-1 flex flex-col w-full h-full ${!isGenerating && resultData ? 'bg-[#F5EFE6] -mx-4 md:-mx-8 px-4 md:px-8 py-8 min-h-screen' : ''}`}>
+        <div className={`flex-1 flex flex-col w-full h-full ${!isGenerating && resultData ? 'bg-background text-foreground transition-colors -mx-4 md:-mx-8 px-4 md:px-8 py-8 min-h-screen' : ''}`}>
           {isGenerating ? (
             <div className="flex flex-col flex-1 animate-in fade-in duration-500">
               {/* Dark loading card */}

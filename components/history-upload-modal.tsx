@@ -84,11 +84,11 @@ export function HistoryUploadModal({ onClose, onSuccess }: HistoryUploadModalPro
 
 return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[#424842]">
+      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-card shadow-2xl border border-border transition-colors">
         
         <button 
           onClick={onClose}
-          className="absolute top-6 right-6 text-[#B7BCB6] hover:text-white"
+          className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"
         >
           ✕
         </button>
@@ -96,18 +96,18 @@ return (
         {/* RENDERIZAÇÃO CONDICIONAL: Tela de Sucesso ou Tela de Upload */}
         {isSuccess ? (
           <div className="flex flex-col items-center justify-center p-12 py-24 text-center animate-in fade-in zoom-in duration-500">
-            <div className="bg-[#FF7316]/20 p-5 rounded-full mb-6">
-              <CheckCircle2 className="w-16 h-16 text-[#FF7316]" />
+            <div className="bg-primary/20 p-5 rounded-full mb-6">
+              <CheckCircle2 className="w-16 h-16 text-primary" />
             </div>
-            <h2 className="text-3xl font-title font-medium text-[#EADDCE] mb-4">
+            <h2 className="text-3xl font-title font-medium text-card-foreground mb-4">
               Baseline Saved & Analyzed!
             </h2>
-            <p className="text-[#B7BCB6] text-lg max-w-lg mx-auto mb-10 leading-relaxed">
+            <p className="text-muted-foreground text-lg max-w-lg mx-auto mb-10 leading-relaxed">
               The Coach has successfully extracted the core patterns from your history and updated your Personal DNA Vault. You are ready to dive deeper.
             </p>
             <button 
               onClick={onSuccess} // Isso vai fechar o modal através da Dashboard
-              className="px-10 py-3 rounded-full bg-[#FF7316] text-white font-medium hover:bg-[#FF7316]/90 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#FF7316]/20"
+              className="px-10 py-3 rounded-full bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20"
             >
               Done
             </button>
@@ -123,17 +123,17 @@ return (
               onTextChange={setText}
             />
 
-            <div className="p-8 pt-0 flex justify-end gap-4 bg-[#424842] rounded-b-3xl">
+            <div className="p-8 pt-0 flex justify-end gap-4 bg-card rounded-b-3xl transition-colors">
               <button 
                 onClick={onClose}
-                className="px-6 py-2 rounded-full text-[#EADDCE] hover:bg-white/10 transition-colors"
+                className="px-6 py-2 rounded-full text-card-foreground hover:bg-muted/30 transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSubmit}
                 disabled={isSubmitting || (!text && !file)}
-                className="px-8 py-2 rounded-full bg-[#FF7316] text-white font-medium hover:bg-[#FF7316]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center min-w-[160px]"
+                className="px-8 py-2 rounded-full bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center min-w-40"
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">

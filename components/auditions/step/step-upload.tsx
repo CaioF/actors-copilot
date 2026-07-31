@@ -16,7 +16,7 @@ interface StepUploadProps {
 /**
  * StepUpload Component
  * Renders a file upload zone with drag-and-drop support and text input fallback.
- * Used for uploading sides and character briefs in the audition wizard.
+ * Uses semantic CSS tokens for light/dark mode design consistency.
  * @param title - Section title
  * @param description - Section description
  * @param file - Currently selected file or null
@@ -29,7 +29,6 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Previne o comportamento padrão do navegador de abrir o arquivo
   /**
    * Handles drag-over event to indicate a valid drop zone.
    * @param e - DragEvent from the drag operation
@@ -98,33 +97,32 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
           description: `We only read PDFs and Word documents (.docx). You selected a ${selectedFile.type || "file"} called "${selectedFile.name}". Convert it to PDF or paste the text into the box below.`,
         });
       }
-      // Reset the input so the same file can be re-selected after rejection
       e.target.value = "";
     }
   };
 
   return (
-    <div className="rounded-3xl font-sans bg-[#424842] shadow-2xl p-8 sm:p-12 text-[#EADDCE] w-full max-w-6xl mx-auto">
+    <div className="rounded-3xl bg-card text-card-foreground border border-border shadow-sm p-6 sm:p-10 w-full max-w-5xl mx-auto transition-colors">
       
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-2xl font-title font-medium text-[#EADDCE] mb-3">{title}</h2>
-        <p className="text-[#B7BCB6] text-sm">{description}</p>
+        <h2 className="text-2xl sm:text-3xl font-title font-bold text-foreground mb-2">{title}</h2>
+        <p className="text-muted-foreground text-xs sm:text-sm">{description}</p>
       </div>
 
       <div className="space-y-8">
         
-        {/* ZONA DE DRAG & DROP */}
+        {/* Drag & Drop Upload Zone */}
         {!file ? (
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+            className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center cursor-pointer transition-all duration-200
               ${isDragging 
-                ? "border-[#FF7316] bg-[#FF7316]/10" 
-                : "border-[#B7BCB6]/40 hover:border-[#FF7316]/60 hover:bg-[#2C3328]/20"
+                ? "border-primary bg-primary/10" 
+                : "border-border bg-card hover:border-primary/60 hover:bg-muted/40"
               }
             `}
           >
@@ -135,32 +133,32 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
               ref={fileInputRef}
               onChange={handleFileSelect}
             />
-            <div className="bg-[#EADDCE] p-4 rounded-full mb-4">
-              <UploadCloud className="w-8 h-8 text-[#424842]" />
+            <div className="bg-primary/10 p-4 rounded-full mb-3 text-primary">
+              <UploadCloud className="w-7 h-7" />
             </div>
-            <p className="text-[#EADDCE] font-medium mb-1">
-              Click to upload <span className="text-[#B7BCB6] font-normal">or drag and drop</span>
+            <p className="text-foreground font-semibold text-sm mb-1">
+              Click to upload <span className="text-muted-foreground font-normal">or drag and drop</span>
             </p>
-            <p className="text-[#B7BCB6] text-xs">PDF or DOCX (max. 20MB)</p>
+            <p className="text-muted-foreground text-xs">PDF or DOCX (max. 20MB)</p>
           </div>
         ) : (
-          /* ARQUIVO SELECIONADO (PREVIEW) */
-          <div className="border border-[#B7BCB6]/30 bg-[#2C3328]/30 rounded-2xl p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4 text-[#EADDCE]">
-              <div className="bg-[#FF7316]/20 p-3 rounded-lg text-[#FF7316]">
-                <FileText className="w-6 h-6" />
+          /* Selected File Preview Badge */
+          <div className="border border-border bg-muted/30 rounded-2xl p-4 sm:p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-3 rounded-xl text-primary">
+                <FileText className="w-5 h-5" />
               </div>
               <div>
-                <p className="font-medium truncate max-w-[200px] sm:max-w-md">{file.name}</p>
-                <p className="text-xs text-[#B7BCB6]">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <p className="font-semibold text-sm text-foreground truncate max-w-[200px] sm:max-w-md">{file.name}</p>
+                <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
             </div>
             <button 
               onClick={(e) => {
-                e.stopPropagation(); // Evita abrir o seletor novamente
+                e.stopPropagation();
                 onFileChange(null);
               }}
-              className="text-[#B7BCB6] hover:text-[#FF7316] p-2 transition-colors"
+              className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-muted transition-colors"
               title="Remove file"
             >
               <X className="w-5 h-5" />
@@ -168,20 +166,20 @@ export function StepUpload({ title, description, file, text, onFileChange, onTex
           </div>
         )}
 
-        {/* DIVISOR */}
+        {/* Divider */}
         <div className="flex items-center gap-4">
-          <div className="flex-1 h-[1px] bg-[#B7BCB6]/20"></div>
-          <span className="text-[#B7BCB6] text-xs font-medium uppercase tracking-wider">or paste text</span>
-          <div className="flex-1 h-[1px] bg-[#B7BCB6]/20"></div>
+          <div className="flex-1 h-[1px] bg-border" />
+          <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">or paste text</span>
+          <div className="flex-1 h-[1px] bg-border" />
         </div>
 
-        {/* text area */}
+        {/* Textarea Fallback */}
         <div>
           <textarea
             value={text}
             onChange={(e) => onTextChange(e.target.value)}
             placeholder="Paste your details here..."
-            className="w-full bg-[#EADDCE] rounded-xl px-5 py-4 text-[#2C3328] placeholder:text-[#2C3328]/50 focus:outline-none focus:ring-2 focus:ring-[#FF7316] transition-all min-h-[160px] resize-y"
+            className="w-full rounded-2xl bg-card border border-border p-4 sm:p-5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all min-h-[160px] resize-y"
           />
         </div>
 

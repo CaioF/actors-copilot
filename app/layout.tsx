@@ -5,9 +5,10 @@ import './globals.css'
 import { AuthProvider } from '@/lib/context/AuthContext'
 import { PostHogProvider } from '@/lib/analytics/posthog-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const antonio = Antonio({ subsets: ['latin'], variable: '--font-antonio' })
-const inter = Inter({   subsets: ['latin'],   variable: '--font-inter',})
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: 'The Actors Copilot - Self Tape Copilot',
@@ -27,15 +28,17 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${antonio.variable}`} >
-        <AuthProvider>
-          <PostHogProvider>
-            {children}
-            <Toaster />
-            <Analytics />
-          </PostHogProvider>
-        </AuthProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${antonio.variable}`}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <AuthProvider>
+            <PostHogProvider>
+              {children}
+              <Toaster />
+              <Analytics />
+            </PostHogProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

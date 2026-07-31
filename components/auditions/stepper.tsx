@@ -33,7 +33,7 @@ export function Stepper({ currentStep }: StepperProps) {
                   ${
                     isActive || isCompleted
                       ? "bg-[#FF7316] text-white"
-                      : "bg-[#D9D9D9] text-white/50 border border-white/20"
+                      : "bg-white text-[#FF7316] border border-white/80"
                   }
                 `}
               >
