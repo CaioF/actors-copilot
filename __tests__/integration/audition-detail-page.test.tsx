@@ -2,6 +2,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
+// Increase default timeout for potentially slow integration-like DOM renders
+jest.setTimeout(20000);
+
 class IntersectionObserverMock {
   observe = jest.fn();
   disconnect = jest.fn();

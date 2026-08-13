@@ -118,7 +118,7 @@ export function StepResultSides({ data, onCoachClick, onRegenerateClick }: StepR
     <div className="w-full grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8 items-start mt-6 pb-12 font-sans relative">
       
       {/* LEFT COLUMN: MAIN CONTENT */}
-      <div className="space-y-4">
+      <div className="space-y-6">
 
         {/* Top Instructional Notice Banner */}
         <div className="flex items-center gap-3 px-5 py-4 bg-card border border-border rounded-2xl shadow-sm text-xs sm:text-sm text-muted-foreground font-medium">
