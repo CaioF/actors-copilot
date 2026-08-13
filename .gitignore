@@ -57,3 +57,5 @@ scripts/python/venv/
 .plans/
 package-lock.json
 *.bak
+subscriptions.private.csv
+scripts/migration_links.private.json

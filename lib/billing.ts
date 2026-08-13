@@ -17,6 +17,8 @@ export type SubscriptionStatus =
   | 'past_due'
   | 'unpaid';
 
+export type BillingCycle = 'monthly' | 'annual';
+
 /**
  * Represents the structure of the billing document stored in Firestore 
  * at the path: `users/{uid}/billing/current` or mapped from user data.
@@ -45,6 +47,8 @@ export interface PlatformSessionPayload {
 // Runtime environment validation for operational integrity
 const economyPriceId = process.env.STRIPE_ECONOMY_PRICE_ID;
 const businessPriceId = process.env.STRIPE_BUSINESS_PRICE_ID;
+const economyAnnualPriceId = process.env.STRIPE_ECONOMY_ANNUAL_PRICE_ID;
+const businessAnnualPriceId = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 if (!economyPriceId || !businessPriceId) {
@@ -61,11 +65,23 @@ if (!webhookSecret) {
  * @returns {string} The corresponding Stripe Price ID.
  * @throws {Error} If an unsupported or invalid tier is provided.
  */
-export function getStripePriceIdForTier(tier: SubscriptionTier): string {
+export function getStripePriceIdForTier(tier: SubscriptionTier, billingCycle: BillingCycle = 'monthly'): string {
   switch (tier) {
     case 'economy':
+      if (billingCycle === 'annual') {
+        if (!economyAnnualPriceId) {
+          throw new Error('Missing STRIPE_ECONOMY_ANNUAL_PRICE_ID for annual billing cycle.');
+        }
+        return economyAnnualPriceId;
+      }
       return economyPriceId as string;
     case 'business':
+      if (billingCycle === 'annual') {
+        if (!businessAnnualPriceId) {
+          throw new Error('Missing STRIPE_BUSINESS_ANNUAL_PRICE_ID for annual billing cycle.');
+        }
+        return businessAnnualPriceId;
+      }
       return businessPriceId as string;
     case 'free':
       throw new Error('The "free" tier does not map to a Stripe Price ID.');
@@ -86,9 +102,10 @@ export function mapStripePriceToTier(priceId: string | undefined): SubscriptionT
 
   switch (priceId) {
     case economyPriceId:
+    case economyAnnualPriceId:
       return 'economy';
-    case 'price_economy_yearly_placeholder': // Reserved for future scalability if needed
     case businessPriceId:
+    case businessAnnualPriceId:
       return 'business';
     default:
       // Graceful degradation: log unexpected price IDs but default to free to protect UX

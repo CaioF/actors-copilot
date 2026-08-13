@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
 import { logger } from '@/lib/logger';
-import { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
+import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
 
 /**
  * Extends the default Firebase User to include modern Stripe billing context attributes.

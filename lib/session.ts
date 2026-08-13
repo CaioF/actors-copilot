@@ -18,10 +18,10 @@ export interface PlatformSession {
 }
 
 const SESSION_COOKIE_NAME = 'platform_session';
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET_KEY || process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  throw new Error('❌ CRITICAL: JWT_SECRET_KEY is missing from environment variables.');
+  throw new Error('❌ CRITICAL: JWT_SECRET_KEY or JWT_SECRET is missing from environment variables.');
 }
 
 const encodedSecret = new TextEncoder().encode(JWT_SECRET);

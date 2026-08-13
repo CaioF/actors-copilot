@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
+import { stripe } from '@/lib/stripe';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,10 +58,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
                 const subscriptionId = typeof session.subscription === 'string' ? session.subscription : undefined;
                 let priceId: string | undefined;
-
-                const lineItems = session.line_items?.data || [];
-                if (lineItems.length > 0) {
-                    priceId = lineItems[0].price?.id;
+                if (subscriptionId) {
+                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                    priceId = subscription.items.data[0]?.price?.id;
+                }
+                if (!priceId) {
+                    const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+                    priceId = lineItems.data[0]?.price?.id;
                 }
 
                 const tier = session.metadata?.targetTier || mapStripePriceToTier(priceId);
@@ -103,7 +107,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 const tier = mapStripePriceToTier(priceId);
                 const status = subscription.status;
 
-                const currentPeriodEnd = firstItem?.current_period_end ?? Math.floor(Date.now() / 1000);
+                const subscriptionWithPeriod = subscription as Stripe.Subscription & { current_period_end?: number };
+                const currentPeriodEnd = subscriptionWithPeriod.current_period_end ?? firstItem?.current_period_end ?? Math.floor(Date.now() / 1000);
 
                 await billingDoc.ref.set({
                     subscriptionId: subscription.id,

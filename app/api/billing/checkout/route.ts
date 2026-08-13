@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { stripe } from '@/lib/stripe';
 import { db } from '@/lib/firebase.admin';
-import { getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
+import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
 import { logger } from '@/lib/logger';
 
 /**
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         const { uid, email } = session;
         const body = await req.json();
-        const { tier }: { tier: SubscriptionTier } = body;
+        const { tier, billingCycle }: { tier: SubscriptionTier; billingCycle?: BillingCycle } = body;
+        const selectedBillingCycle: BillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
 
         if (!tier || (tier !== 'economy' && tier !== 'business')) {
             return NextResponse.json({ error: 'Invalid or unsupported subscription tier specified' }, { status: 400 });
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // 2. Resolve the official Stripe Price ID corresponding to the requested tier
         let priceId: string;
         try {
-            priceId = getStripePriceIdForTier(tier);
+            priceId = getStripePriceIdForTier(tier, selectedBillingCycle);
         } catch (tierError) {
             return NextResponse.json({ error: (tierError as Error).message }, { status: 400 });
         }
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         // 5. Construct the external checkout session posture with programmatic success and cancel parameters
-        const returnUrl = process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL || 'http://localhost:3000/dashboard';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: stripeCustomerId,
@@ -80,11 +81,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     quantity: 1,
                 },
             ],
-            success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/billing/cancelled`,
+            success_url: `${appUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${appUrl}/api/billing/cancelled`,
             metadata: {
                 platformUserId: uid,
                 targetTier: tier,
+                billingCycle: selectedBillingCycle,
             },
         });
 
