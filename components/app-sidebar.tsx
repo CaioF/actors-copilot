@@ -2,119 +2,69 @@
 
 import { useAuth } from "@/lib/context/AuthContext";
 import { useSidebar } from "@/lib/context/SidebarContext";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  LayoutDashboard,
-  MessageCircle,
-  Monitor,
-  Settings,
-  Plus,
-  LogOut,
-  User,
+  Home,
+  Sparkles,
   BookOpen,
+  Mic,
+  User,
+  Dna,
+  Star,
+  Moon,
+  HelpCircle,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Plus,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/**
- * Navigation schema definition.
- * Centralized configuration for the primary sidebar routing elements.
- */
-const menuItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
+// Menu principal do topo (baseado no design)
+const mainMenuItems = [
+  { label: "Dashboard", href: "/dashboard", icon: Home },
+  { label: "Personal DNA", href: "/chat", icon: Sparkles },
   { label: "Acting Coach", href: "/acting-coach", icon: BookOpen },
-  { label: "Auditions", href: "/auditions", icon: Monitor },
+  { label: "Auditions", href: "/auditions", icon: Mic },
   { label: "Profile", href: "/profile", icon: User },
+  { label: "DNA Vault", href: "/dna-vault", icon: Dna },
+];
+
+// Menu inferior (baseado no design)
+const bottomMenuItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-/**
- * AppSidebar Component.
- * Serves as the primary global application navigation drawer structure.
- * Integrates asynchronously with modern Stripe entitlements to switch billing interfaces.
- *
- * @component
- * @returns {JSX.Element} The rendered global sidebar layer.
- */
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, user, loading } = useAuth();
+  const { logout, user } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
-  const [billingLoading, setBillingLoading] = useState<boolean>(false);
 
-  /**
-   * Evaluates corporate entitlement tier metrics native to the modern Stripe ecosystem.
-   */
   const isBusinessClass = user?.tier === "business";
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[Sidebar Auth Trace]:", {
-        isLoading: loading,
-        hasUser: !!user,
-        currentTier: user?.tier || "free",
-        isBusinessClassResolved: isBusinessClass,
-      });
-    }
-  }, [user, loading, isBusinessClass]);
 
   useEffect(() => {
     setIsOpen(false);
   }, [pathname, setIsOpen]);
 
-  /**
-   * Invokes the authentication provider's logout protocol.
-   *
-   * @async
-   * @returns {Promise<void>}
-   */
   const handleLogout = async (): Promise<void> => {
     await logout();
   };
 
   /**
-   * Dispatches asynchronous secure routing configurations. Sets dynamic parameters 
-   * to either invoke Stripe Hosted Checkout sessions or the customer self-service portal.
-   *
-   * @async
-   * @throws {Error} Logs underlying operational failure states within the network stream.
-   * @returns {Promise<void>}
+   * Redireciona o usuário para a página de upgrade do plano.
    */
-  const handleBillingAction = async (): Promise<void> => {
-    if (billingLoading) return;
-    setBillingLoading(true);
-
-    try {
-      const endpoint = isBusinessClass ? "/api/billing/portal" : "/api/billing/checkout";
-      const body = isBusinessClass ? undefined : JSON.stringify({ tier: "business" });
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error("Billing operational endpoint transition failed:", data.error);
-      }
-    } catch (err) {
-      console.error("Fatal error dispatching frontend billing redirect sequence:", err);
-    } finally {
-      setBillingLoading(false);
-    }
+  const handleBillingAction = (): void => {
+    router.push("/upgrade");
   };
 
   return (
     <>
+      {/* Overlay Mobile */}
       {isOpen && (
         <button
           type="button"
@@ -124,95 +74,140 @@ export function AppSidebar() {
         />
       )}
 
+      {/* Sidebar Container */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex h-full w-55 transform flex-col bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200 dark:text-sidebar-foreground",
+          "fixed inset-y-0 left-0 z-40 flex h-full w-64 transform flex-col bg-[#2A3B31] text-[#E8E6E3] shadow-xl transition-transform duration-200 select-none",
           "md:relative md:z-auto md:h-screen md:translate-x-0 md:shadow-none",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
+        {/* Botão Fechar Mobile */}
         <button
           type="button"
           onClick={() => setIsOpen(false)}
           aria-label="Close menu"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:bg-white/10 md:hidden"
         >
           <X className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center justify-center px-5 pt-6 pb-5">
+        {/* Logo Header */}
+        <div className="flex items-center justify-center px-6 pt-8 pb-6">
           <Link href="/dashboard" className="block transition-transform hover:scale-105">
-            <Image 
-              src="/logo.png" 
-              alt="The Actors Copilot" 
-              width={100} 
-              height={100} 
-              className="object-contain" 
-              priority 
+            <Image
+              src="/logo.png"
+              alt="The Actors Copilot"
+              width={140}
+              height={140}
+              className="object-contain"
+              priority
             />
           </Link>
         </div>
 
-        <div className="px-4 pb-4">
-          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-sidebar-foreground/50">
-            Quick Actions
-          </p>
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/auditions/new/brief"
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              <Plus className="h-4 w-4" />
-              Audition Breakdown
-            </Link>
-            <Link
-              href="/auditions/new/sides"
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              <Plus className="h-4 w-4" />
-              Scene Study
-            </Link>
+        <div className="flex-1 overflow-y-auto px-5 scrollbar-none">
+          {/* Quick Actions (Mantidas conforme o código original) */}
+          <div className="mb-6">
+            <p className="mb-3 text-[11px] font-semibold tracking-wider text-white/40 uppercase">
+              Quick Actions
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/auditions/new/brief"
+                className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
+              >
+                <Plus className="h-4 w-4" />
+                Audition Breakdown
+              </Link>
+              <Link
+                href="/auditions/new/sides"
+                className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
+              >
+                <Plus className="h-4 w-4" />
+                Scene Study
+              </Link>
+            </div>
           </div>
-        </div> 
 
-        <div className="flex-1 px-4">
-          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
-            Menu
-          </p>
-          <nav className="flex flex-col gap-1">
-            {menuItems.map((item) => {
+          {/* Nav Menu */}
+          <div>
+            <p className="mb-3 text-[11px] font-semibold tracking-wider text-white/40 uppercase">
+              MENU
+            </p>
+            <nav className="flex flex-col gap-1.5">
+              {mainMenuItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "text-white font-semibold"
+                        : "text-white/70 hover:text-white"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Divisor */}
+          <div className="my-5 border-t border-white/10" />
+
+          {/* Ações de Plano & Dark Mode */}
+          <div className="flex flex-col gap-2">
+            {/* Upgrade Plan Button (Redireciona para /upgrade) */}
+            <button
+              onClick={handleBillingAction}
+              className="flex w-full items-center justify-between rounded-xl border border-[#B36B22] bg-[#3B3A2C]/60 px-3.5 py-3 text-sm font-medium text-white transition-all hover:bg-[#3B3A2C]"
+            >
+              <div className="flex items-center gap-3">
+                <Star className="h-4 w-4 text-white shrink-0" />
+                <span>{isBusinessClass ? "Manage Plan" : "Upgrade Plan"}</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-white/70 shrink-0" />
+            </button>
+          </div>
+
+          {/* Divisor */}
+          <div className="my-5 border-t border-white/10" />
+
+          {/* Suporte, Configurações & Logout */}
+          <nav className="flex flex-col gap-1.5 pb-6">
+            {bottomMenuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    "flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary/15 text-primary"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      ? "text-white font-semibold"
+                      : "text-white/70 hover:text-white"
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span>{item.label}</span>
                 </Link>
               );
             })}
-            
-            <button 
+
+            <button
               onClick={handleLogout}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )}
+              className="flex w-full items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium text-white/70 transition-colors hover:text-white"
             >
-              <LogOut className="h-5 w-5" /> 
-              <span>Logout</span> 
+              <LogOut className="h-4 w-4 shrink-0" />
+              <span>Logout</span>
             </button>
           </nav>
         </div>
-
-        
       </aside>
     </>
   );

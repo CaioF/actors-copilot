@@ -1132,7 +1132,7 @@ describe("AuditionWizard enrichment prefill (Task 7)", () => {
       expect(screen.getByPlaceholderText("e.g., The Morning Show Season 5")).toHaveValue("Hamlet");
       expect(screen.getByPlaceholderText("e.g., Dr. Sarah Chen")).toHaveValue("Ophelia");
       expect(screen.getByDisplayValue("2026-06-15T14:00")).toBeInTheDocument();
-      expect(screen.getByLabelText(/audition timezone/i)).toHaveValue("America/Los_Angeles");
+      expect(screen.getByRole("combobox")).toHaveValue("America/Los_Angeles");
       expect(screen.getByDisplayValue("Nina Gold")).toBeInTheDocument();
     });
   });

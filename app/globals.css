@@ -49,7 +49,7 @@
 .dark {
   --background: #111513;
   --foreground: #F0F4EF;
-  --card: #1C221F;
+  --card: #1c221e;
   --card-foreground: #F0F4EF;
   --popover: #111827;
   --popover-foreground: #F8FAFC;
@@ -71,7 +71,7 @@
   --chart-3: #7C2D12;
   --chart-4: #334155;
   --chart-5: #475569;
-  --sidebar-bg: #161B18;
+  --sidebar-bg: #1C221F;
   --sidebar-foreground: #B5C0B3;
   --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-border: rgba(255, 255, 255, 0.08);

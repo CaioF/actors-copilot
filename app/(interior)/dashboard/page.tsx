@@ -67,7 +67,7 @@ export default function DashboardPage() {
         <section className="relative overflow-hidden min-h-105 rounded-2xl bg-neutral-900 text-white ">
           <div className="absolute inset-0 z-0">
             <Image
-              src="image1.png"
+              src="/image1.png"
               alt="The Actors Copilot Background"
               fill
               className="object-cover object-center opacity-40"
@@ -101,7 +101,7 @@ export default function DashboardPage() {
           <div className="group rounded-2xl bg-card border border-border overflow-hidden shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
             <div className="relative h-48 w-full bg-neutral-800">
               <Image
-                src="image2.png"
+                src="/image2.png"
                 alt="Personal DNA Upload"
                 fill
                 className="object-cover"
@@ -136,7 +136,7 @@ export default function DashboardPage() {
           <div className="group rounded-2xl bg-card border border-border overflow-hidden shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
             <div className="relative h-48 w-full bg-neutral-800">
               <Image
-                src="image3.png"
+                src="/image3.png"
                 alt="Audition Breakdown"
                 fill
                 className="object-cover"
@@ -173,7 +173,7 @@ export default function DashboardPage() {
           <div className="group rounded-2xl bg-card border border-border overflow-hidden shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
             <div className="relative h-48 w-full bg-neutral-800">
               <Image
-                src="image4.png"
+                src="/image4.png"
                 alt="Independent Study"
                 fill
                 className="object-cover"
