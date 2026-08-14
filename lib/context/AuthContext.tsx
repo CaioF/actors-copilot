@@ -4,12 +4,15 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
 import { logger } from '@/lib/logger';
+import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
 
 /**
- * Extends the default Firebase User to include custom Kajabi offer claims.
+ * Extends the default Firebase User to include modern Stripe billing context attributes.
  */
 export interface AppUser extends User {
-    offers?: string[]; 
+    tier?: SubscriptionTier;
+    subscriptionStatus?: SubscriptionStatus;
+    stripeCustomerId?: string;
 }
 
 /**
@@ -17,7 +20,7 @@ export interface AppUser extends User {
  * @interface AuthContextType
  */
 interface AuthContextType {
-    user: AppUser | null; // The authenticated Firebase user object, or null if unauthenticated.
+    user: AppUser | null; // The authenticated Firebase user object containing billing metadata, or null if unauthenticated.
     loading: boolean; // Indicates if the authentication state is currently being resolved.
     loginWithGoogle: () => Promise<void>;
     loginWithEmail: (email: string, password: string) => Promise<void>;
@@ -26,14 +29,13 @@ interface AuthContextType {
     logout: () => Promise<void>;
 }
 
-// TODO: defining more specific error types for better error handling and user feedback in the UI, especially for common authentication issues like network errors, invalid credentials, or account conflicts.
 interface FirebaseError {
   code: string;
   message: string;
 }
 
 /**
- * Type Guard to identify firebase errors
+ * Type Guard to identify firebase errors.
  */
 function isFirebaseError(error: unknown): error is FirebaseError {
   return (
@@ -43,7 +45,6 @@ function isFirebaseError(error: unknown): error is FirebaseError {
     typeof (error as Record<string, unknown>).code === 'string'
   );
 }
-
 
 /**
  * React Context for managing global authentication state.
@@ -62,7 +63,6 @@ const googleProvider = new GoogleAuthProvider();
  * @returns {JSX.Element} The authentication context provider.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-
     const app = getApp();
     const auth = getAuth(app);
     
@@ -73,43 +73,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     /**
      * Initiates the Google OAuth login flow via Firebase pop-up.
      * Upon successful Firebase authentication, it securely exchanges the Firebase ID token
-     * with the backend to validate Kajabi access and issue a secure HTTP-only session cookie.
+     * with the backend to validate subscription state and issue a secure platform session cookie.
      *
      * @throws {Error} Throws an error if backend validation fails to propagate UI feedback.
      * @returns {Promise<void>}
      */
     const loginWithGoogle = async () => {
         setLoading(true);
-        // TODO: Implement a timeout mechanism for the backend verification request to prevent infinite loading states on slow networks.
         try {
-            // Trigger Firebase Google sign-in pop-up
             const result = await signInWithPopup(auth, googleProvider);
-            
-            // Retrieve the short-lived Firebase ID token
             const idToken = await result.user.getIdToken();
             
-            // Authenticate with the backend API to verify Kajabi purchases and set the JWT session
             const response = await fetch('/api/auth/callback', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${idToken}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ idToken })
             }); 
 
             const data = await response.json();
             
             if (!response.ok) {
-                // Revert Firebase auth state if the backend rejects the user
                 await signOut(auth);
-                throw new Error(data.error || "Failed to log in to Kajabi");
+                throw new Error(data.error || "Failed to establish platform billing session");
             }
 
-            // The POST callback response does not hydrate offer data; rely on the
-            // existing auth/user hydration path to populate `offers` later.
             setUser(result.user as AppUser);
-
-            // Redirect to the protected dashboard upon successful session creation
             window.location.href = "/dashboard"; 
 
         } catch (error: unknown) {
@@ -117,15 +107,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
                     return; 
                 }
-                
                 if (error.code === 'auth/account-exists-with-different-credential') {
                     throw new Error("This email is already registered. Please log in using the Email/Password form.", { cause: error });
                 }
             }
 
-            logger.error({ err: error, msg: 'Failed to log in' });
+            logger.error({ err: error, msg: 'Failed to log in with Google OAuth' });
             throw error;
-           
         } finally {
             setLoading(false);
         }
@@ -145,21 +133,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             const response = await fetch('/api/auth/callback', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken })
             });
 
             const data = await response.json();
             
             if (!response.ok) {
-                
                 await signOut(auth);
-                throw new Error(data.error || "Failed to establish secure session.");
+                throw new Error(data.error || "Failed to establish platform billing session.");
             }
 
-            // The POST callback response does not hydrate offer data; rely on the
-            // existing auth/user hydration path to populate `offers` later.
             setUser(result.user as AppUser);
-
             window.location.href = "/dashboard"; 
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -170,7 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             logger.error({ err: error, msg: 'Login Error' });
             throw error;
-
         } finally {
             setLoading(false);
         }
@@ -190,17 +174,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             const response = await fetch('/api/auth/callback', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken })
             });
             
             const data = await response.json();
 
             if (!response.ok) {
                 await signOut(auth);
-                throw new Error(data.error || "Failed to establish secure session.");
+                throw new Error(data.error || "Failed to establish platform registration session.");
             }
-            const userWithOffers: AppUser = Object.assign(result.user, { offers: data.offers });
-            setUser(userWithOffers);
+
+            const userWithBilling: AppUser = Object.assign(result.user, { 
+                tier: data.user?.tier || 'free',
+                subscriptionStatus: data.user?.subscriptionStatus || 'canceled'
+            });
+
+            setUser(userWithBilling);
             window.location.href = "/dashboard"; 
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -217,12 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     /**
      * Sends a Firebase password reset email to the provided address.
-     * To avoid leaking which addresses are registered, this wrapper treats
-     * Firebase's `auth/user-not-found` error as a successful no-op.
-     *
      * @param {string} email - The email address to send the reset link to.
-     * @throws {Error} Throws if the email is malformed or another reset request
-     * error occurs. `auth/user-not-found` is intentionally treated as success.
      */
     const sendPasswordReset = async (email: string) => {
         try {
@@ -243,102 +228,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     /**
      * Terminates the user's session by signing out of Firebase and requesting
-     * the backend to destroy the secure HTTP-only session cookie.
+     * the backend to destroy active secure session tokens.
      *
      * @returns {Promise<void>}
      */
     const logout = async () => {
         setLoading(true);
-        // TODO: Add telemetry or analytics tracking here to monitor user session durations and logout events.
         try {
             await signOut(auth);
-            // Note: Firebase's onAuthStateChanged listener will automatically detect this and update the local user state to null.
-            
-            // Invalidate the backend session cookie
             await fetch('/api/auth/logout', {
                 method: 'POST',
             });
-            
             window.location.href = "/login"; 
         } catch (error: unknown) {
             logger.error({ err: error, msg: 'Error signing out' });
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     /**
      * Subscribes to Firebase authentication state changes to keep the local React state synchronized.
-     * Automatically cleans up the listener when the component unmounts.
-     */
-//     useEffect(() => {
-//     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-//         if (currentUser) {
-//             try {
-//                 // Buscamos os dados da sessão atual (que vêm do seu JWT no cookie)
-//                 const response = await fetch('/api/auth/callback', { method: 'GET' });
-                
-//                 if (response.ok) {
-//                     const data = await response.json();
-//                     // Mesclamos o usuário do Firebase com as ofertas do nosso banco/JWT
-//                     const userWithOffers: AppUser = Object.assign(currentUser, { 
-//                         offers: data.offers || [] 
-//                     });
-//                     setUser(userWithOffers);
-//                 } else {
-//                     setUser(currentUser as AppUser);
-//                 }
-//             } catch (err) {
-//                 logger.error({ err, msg: "Failed to hydrate session offers" });
-//                 setUser(currentUser as AppUser);
-//             }
-//         } else {
-//             setUser(null);
-//         }
-//         setLoading(false);
-//     });
-    
-//     return () => unsubscribe();
-// }, [auth]);
-    
-/**
-     * Subscribes to Firebase authentication state changes to keep the local React state synchronized.
-     * Automatically cleans up the listener when the component unmounts.
-     */
-    /**
-     * Subscribes to Firebase authentication state changes to keep the local React state synchronized.
-     * Automatically cleans up the listener when the component unmounts.
+     * Hydrates user entitlement structures with properties returned from the secure token engine.
      */
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 try {
-                    // Buscamos os dados da sessão atual
                     const response = await fetch('/api/auth/callback', { method: 'GET' });
                     
                     if (response.ok) {
                         const data = await response.json();
-                        // Mesclamos o usuário do Firebase com as ofertas. Se não vier nada, garante um array vazio.
-                        const userWithOffers: AppUser = Object.assign(currentUser, { 
-                            offers: data.offers || [] 
+                        
+                        // CORRIGIDO: Asserção de tipo sênior para alinhar as strings da API com as tipagens estritas do domínio
+                        const userWithBilling: AppUser = Object.assign(currentUser, { 
+                            tier: data.tier as SubscriptionTier,
+                            subscriptionStatus: data.subscriptionStatus as SubscriptionStatus,
+                            stripeCustomerId: data.stripeCustomerId as string | undefined
                         });
-                        setUser(userWithOffers);
+                        setUser(userWithBilling);
                     } else {
-                        // Utilizando o logger oficial da aplicação
                         logger.error({ 
                             err: new Error(`HTTP ${response.status}: ${response.statusText}`), 
-                            msg: "[AuthContext] Falha no GET /api/auth/callback." 
+                            msg: "[AuthContext] Failed sync inside entitlement route handler context." 
                         });
                         
-                        // FIX: Garante que offers seja pelo menos [], nunca undefined
-                        const fallbackUser: AppUser = Object.assign(currentUser, { offers: [] });
+                        const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: 'canceled' as SubscriptionStatus });
                         setUser(fallbackUser);
                     }
                 } catch (err) {
-                    logger.error({ err, msg: "[AuthContext] Erro fatal ao buscar ofertas na API" });
-                    
-                    // FIX: Garante que offers seja pelo menos [], nunca undefined
-                    const fallbackUser: AppUser = Object.assign(currentUser, { offers: [] });
+                    logger.error({ err, msg: "[AuthContext] Fatal runtime crash during subscription metadata synchronization" });
+                    const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: 'canceled' as SubscriptionStatus });
                     setUser(fallbackUser);
                 }
             } else {

@@ -3,6 +3,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  }),
+  useSearchParams: () => ({
+    get: jest.fn().mockReturnValue(null),
+  }),
+}));
+
 jest.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ title }: { title: string }) => (
     <div data-testid="dashboard-header">{title}</div>

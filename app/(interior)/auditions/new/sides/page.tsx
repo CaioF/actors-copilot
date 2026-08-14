@@ -15,7 +15,7 @@ export default async function NewAuditionPage({ searchParams }: PageProps) {
   const enrichAuditionId = params.enrichAuditionId;
 
   return (
-    <main className="flex flex-1 flex-col h-full bg-[#F5F0E8]">
+    <main className="flex flex-1 flex-col h-full bg-background text-foreground transition-colors">
       <DashboardHeader title="New Character Breakdown" />
       
       {/* Container rolável para o Wizard */}

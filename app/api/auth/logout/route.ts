@@ -1,24 +1,15 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
+import { deletePlatformSession } from '@/lib/session';
 
 /**
- * Handles user logout by destroying the secure HTTP-only session cookie.
- * This server-side action is strictly required because client-side JavaScript 
- * is blocked from accessing or deleting httpOnly cookies to prevent XSS attacks.
+ * Clears the active platform session cookie during logout.
  *
- * @returns {Promise<NextResponse>} A JSON response confirming the session termination or an error status.
+ * @returns A JSON response confirming the session termination or reporting an error.
  */
-export async function POST() {
+export async function POST(): Promise<NextResponse> {
     try {
-        // TODO: Implement an event logger or analytics tracking here to monitor user logout frequencies.
-        // TODO: If transitioning to stateful sessions or token blacklisting in the future, add logic here to invalidate the JWT in Redis/Database.
-        
-        const cookieStore = await cookies();
-        
-        // Destroys the session cookie, effectively logging the user out on the backend
-        cookieStore.delete('kajabi_session');
-        
+        await deletePlatformSession();
         return NextResponse.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
         logger.error({ err: error, msg: 'Error during logout' });

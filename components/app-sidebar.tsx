@@ -1,95 +1,70 @@
-"use client"
+"use client";
 
 import { useAuth } from "@/lib/context/AuthContext";
 import { useSidebar } from "@/lib/context/SidebarContext";
 import { useEffect } from "react";
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import Image from "next/image"
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
-  LayoutDashboard,
-  MessageCircle,
-  Monitor,
-  Settings,
-  Plus,
-  LogOut,
-  User,
+  Home,
+  Sparkles,
   BookOpen,
+  Mic,
+  User,
+  Dna,
+  Star,
+  Moon,
+  HelpCircle,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Plus,
   X,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-/**
- * Navigation schema definition.
- * Centralized configuration for the primary sidebar routing elements.
- */
-const menuItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Personal DNA", href: "/chat", icon: MessageCircle },
+// Menu principal do topo (baseado no design)
+const mainMenuItems = [
+  { label: "Dashboard", href: "/dashboard", icon: Home },
+  { label: "Personal DNA", href: "/chat", icon: Sparkles },
   { label: "Acting Coach", href: "/acting-coach", icon: BookOpen },
-  { label: "Auditions", href: "/auditions", icon: Monitor },
+  { label: "Auditions", href: "/auditions", icon: Mic },
   { label: "Profile", href: "/profile", icon: User },
-  { label: "Settings", href: "/settings", icon: Settings },
-]
+  { label: "DNA Vault", href: "/dna-vault", icon: Dna },
+];
 
-/**
- * AppSidebar Component
- * * Serves as the primary navigation layout for the application.
- * Integrates directly with AuthContext for session state and SidebarContext 
- * for responsive mobile drawer management.
- */
+// Menu inferior (baseado no design)
+const bottomMenuItems = [
+  { label: "Settings", href: "/settings", icon: Settings },
+];
+
 export function AppSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
   const router = useRouter();
-  const { logout, user, loading } = useAuth();
+  const { logout, user } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
 
-  /**
-   * Enterprise Tier Validation
-   * Resolves the required product identifier from environment variables to prevent hardcoding.
-   * Evaluates the current user's entitlement payload to determine premium access state.
-   */
-  const businessId = process.env.NEXT_PUBLIC_KAJABI_BUSINESS_ID || "";
-  const isBusinessClass = !!(user?.offers?.includes(businessId));
+  const isBusinessClass = user?.tier === "business";
 
-
-/**
- * Technical Debugging Telemetry
- * Temporary execution trace to inspect the authentication payload and environmental variables.
- * Inspect this in your browser's Developer Tools (F12) console.
- */
-useEffect(() => {
-  if (process.env.NODE_ENV === "development") {
-    console.log("[Sidebar Auth Trace]:", {
-      isLoading: loading,
-      hasUser: !!user,
-      userOffers: user?.offers || [],
-      expectedBusinessId: businessId,
-      isBusinessClassResolved: isBusinessClass
-    });
-  }
-}, [user, loading, businessId, isBusinessClass]);
-
-  /**
-   * Route Transition Listener
-   * Automatically dismisses the mobile navigation drawer upon successful route navigation
-   * to prevent state staleness and improve mobile UX flow.
-   */
   useEffect(() => {
     setIsOpen(false);
   }, [pathname, setIsOpen]);
 
-  /**
-   * Session Termination Handler
-   * Invokes the authentication provider's logout protocol.
-   */
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     await logout();
-  }
+  };
+
+  /**
+   * Redireciona o usuário para a página de upgrade do plano.
+   */
+  const handleBillingAction = (): void => {
+    router.push("/upgrade");
+  };
 
   return (
     <>
-      {/* Mobile Overlay: Focus trap and backdrop dismissal for drawer UI */}
+      {/* Overlay Mobile */}
       {isOpen && (
         <button
           type="button"
@@ -99,124 +74,141 @@ useEffect(() => {
         />
       )}
 
-      {/* Primary Sidebar Navigation Container */}
+      {/* Sidebar Container */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex h-full w-[220px] transform flex-col bg-[#3D4A3C] text-[#F5F0E8] shadow-xl transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-40 flex h-full w-64 transform flex-col bg-[#2A3B31] text-[#E8E6E3] shadow-xl transition-transform duration-200 select-none",
           "md:relative md:z-auto md:h-screen md:translate-x-0 md:shadow-none",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        {/* Mobile Dismiss Action */}
+        {/* Botão Fechar Mobile */}
         <button
           type="button"
           onClick={() => setIsOpen(false)}
           aria-label="Close menu"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-[#F5F0E8]/70 transition-colors hover:bg-[#F5F0E8]/10 hover:text-[#F5F0E8] md:hidden"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:bg-white/10 md:hidden"
         >
           <X className="h-4 w-4" />
         </button>
 
-        {/* Branding & Root Navigation Anchor */}
-        <div className="flex items-center justify-center px-5 pt-6 pb-5">
+        {/* Logo Header */}
+        <div className="flex items-center justify-center px-6 pt-8 pb-6">
           <Link href="/dashboard" className="block transition-transform hover:scale-105">
-            <Image 
-              src="/logo.png" 
-              alt="The Actors Copilot" 
-              width={100} 
-              height={100} 
-              className="object-contain" 
-              priority 
+            <Image
+              src="/logo.png"
+              alt="The Actors Copilot"
+              width={140}
+              height={140}
+              className="object-contain"
+              priority
             />
           </Link>
         </div>
 
-        {/* Primary Action Buttons (Workflow Triggers) */} 
-        <div className="px-4 pb-4">
-          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
-            Quick Actions
-          </p>
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/auditions/new/brief"
-              className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
-            >
-              <Plus className="h-4 w-4" />
-              Audition Breakdown
-            </Link>
-            <Link
-              href="/auditions/new/sides"
-              className="flex items-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
-            >
-              <Plus className="h-4 w-4" />
-              Scene Study
-            </Link>
+        <div className="flex-1 overflow-y-auto px-5 scrollbar-none">
+          {/* Quick Actions (Mantidas conforme o código original) */}
+          <div className="mb-6">
+            <p className="mb-3 text-[11px] font-semibold tracking-wider text-white/40 uppercase">
+              Quick Actions
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/auditions/new/brief"
+                className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
+              >
+                <Plus className="h-4 w-4" />
+                Audition Breakdown
+              </Link>
+              <Link
+                href="/auditions/new/sides"
+                className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
+              >
+                <Plus className="h-4 w-4" />
+                Scene Study
+              </Link>
+            </div>
           </div>
-        </div> 
 
-        {/* Global Navigation Matrix */}
-        <div className="flex-1 px-4">
-          <p className="mb-2 px-1 text-[10px] uppercase tracking-widest text-[#F5F0E8]/50">
-            Menu
-          </p>
-          <nav className="flex flex-col gap-1">
-            {menuItems.map((item) => {
-              const isActive = pathname === item.href
+          {/* Nav Menu */}
+          <div>
+            <p className="mb-3 text-[11px] font-semibold tracking-wider text-white/40 uppercase">
+              MENU
+            </p>
+            <nav className="flex flex-col gap-1.5">
+              {mainMenuItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "text-white font-semibold"
+                        : "text-white/70 hover:text-white"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Divisor */}
+          <div className="my-5 border-t border-white/10" />
+
+          {/* Ações de Plano & Dark Mode */}
+          <div className="flex flex-col gap-2">
+            {/* Upgrade Plan Button (Redireciona para /upgrade) */}
+            <button
+              onClick={handleBillingAction}
+              className="flex w-full items-center justify-between rounded-xl border border-[#B36B22] bg-[#3B3A2C]/60 px-3.5 py-3 text-sm font-medium text-white transition-all hover:bg-[#3B3A2C]"
+            >
+              <div className="flex items-center gap-3">
+                <Star className="h-4 w-4 text-white shrink-0" />
+                <span>{isBusinessClass ? "Manage Plan" : "Upgrade Plan"}</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-white/70 shrink-0" />
+            </button>
+          </div>
+
+          {/* Divisor */}
+          <div className="my-5 border-t border-white/10" />
+
+          {/* Suporte, Configurações & Logout */}
+          <nav className="flex flex-col gap-1.5 pb-6">
+            {bottomMenuItems.map((item) => {
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    "flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-[#E8721A]/15 text-[#E8721A]"
-                      : "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
+                      ? "text-white font-semibold"
+                      : "text-white/70 hover:text-white"
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span>{item.label}</span>
                 </Link>
-              )
+              );
             })}
-            
-            {/* Session Termination Action */}
-            <button 
+
+            <button
               onClick={handleLogout}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                "text-[#F5F0E8]/70 hover:bg-[#F5F0E8]/5 hover:text-[#F5F0E8]"
-              )}
+              className="flex w-full items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium text-white/70 transition-colors hover:text-white"
             >
-              <LogOut className="h-5 w-5" /> 
-              <span>Logout</span> 
+              <LogOut className="h-4 w-4 shrink-0" />
+              <span>Logout</span>
             </button>
           </nav>
         </div>
-
-        {/* * Tier-Based Upsell Section
- * Conditionally rendered strictly for standard-tier users once authentication loading settles.
- * Suppressed automatically if 'Business Class' entitlement is resolved in user payload.
- */}
-
-{!loading && !isBusinessClass && (
-  <div className="p-4">
-    <div className="rounded-xl bg-[#2C3328] p-4">
-      <h4 className="font-title text-lg font-bold text-[#F5F0E8]">Business Class</h4>
-      <p className="mt-1 text-xs leading-relaxed text-[#F5F0E8]/50">
-        Upgrade to Business Class to unlock more features
-      </p>
-      <a 
-        href="https://the-actors-copilot.mykajabi.com/offers/92T6p3kD/checkout?coupon_code=UPGRADEBUSINESS" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="mt-3 block w-full text-center rounded-lg bg-[#ECD4B3] py-2.5 text-sm font-medium text-[#2C3328] transition-colors hover:bg-[#E8721A]/90"
-      >
-        Upgrade
-      </a>
-    </div>
-  </div>
-)}
       </aside>
     </>
-  )
+  );
 }

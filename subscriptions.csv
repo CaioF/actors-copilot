@@ -1,0 +1,4 @@
+Kajabi Subscription ID,Setup Up Fee,Amount,Currency,Interval,Type,Status,Trial Ends On,Canceled On,Next Payment Date,Customer ID,Customer Name,Customer Email,Offer ID,Offer Title,Provider,Provider ID,Created At,Coupon Used
+1000000001,,£19.00,GBP,Month,Subscription,Active,,,"Aug 7, 2026",2000000001,Sample Customer One,sample.one@example.com,2151111366,The Actors Copilot Economy Class,Kajabi Payments,981201,"Apr 28, 2026",
+1000000002,,£19.00,GBP,Month,Subscription,Canceled,,"Jun 22, 2026",,2000000002,Sample Customer Two,sample.two@example.com,2151111366,The Actors Copilot Economy Class,Kajabi Payments,981201,"May 1, 2026",
+1000000003,,£19.00,GBP,Month,Subscription,Active,,,"Aug 21, 2026",2000000003,Sample Customer Three,sample.three@example.com,2151111366,The Actors Copilot Economy Class,Kajabi Payments,981201,"Jul 21, 2026",

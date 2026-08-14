@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Paperclip, AudioLines, SendHorizontal, Square, Loader2, Mic, X, Dna, RefreshCw } from "lucide-react"; 
+import { Paperclip, SendHorizontal, Square, Loader2, Mic, X, Dna, RefreshCw } from "lucide-react"; 
 import { getAuth } from "firebase/auth";
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 
 /**
  * Standardized payload for attached documents.
@@ -19,7 +19,7 @@ export interface AttachedDocument {
  */
 export interface SessionMessage {
   id: string;
-  role: 'user' | 'assistant' | 'coach' | 'system';
+  role: "user" | "assistant" | "coach" | "system";
   content: string;
 }
 
@@ -35,16 +35,16 @@ interface ChatInputProps {
 }
 
 const DNA_RESERVOIRS = [
-  { title: "Early Childhood / Home", desc: "Safety, belonging, firsts wounds." },
-  { title: "School / Authority", desc: "Rules, powers, being seen or invisible" },
-  { title: "Identity / Self-Story", desc: "Who you believe you are" },
-  { title: "Friendship / Belonging", desc: "Acceptance, exclusion, loyalty" },
-  { title: "Romance / Intimacy", desc: "Desire, vulnerability, attachment" },
-  { title: "Loss / Grief", desc: "What you've had to let go" },
-  { title: "Ambition / Drive", desc: "What you're reaching for" },
-  { title: "Shame / Secret Self", desc: "What you hide why" },
-  { title: "Joy / Play", desc: "When you're most alive" },
-  { title: "Conflict / Anger", desc: "What makes you fight" }
+  { title: "Early Childhood / Home", desc: "Safety, belonging, first wounds." },
+  { title: "School / Authority", desc: "Rules, power, being seen or invisible." },
+  { title: "Identity / Self-Story", desc: "Who you believe you are." },
+  { title: "Friendship / Belonging", desc: "Acceptance, exclusion, loyalty." },
+  { title: "Romance / Intimacy", desc: "Desire, vulnerability, attachment." },
+  { title: "Loss / Grief", desc: "What you've had to let go." },
+  { title: "Ambition / Drive", desc: "What you're reaching for." },
+  { title: "Shame / Secret Self", desc: "What you hide and why." },
+  { title: "Joy / Play", desc: "When you're most alive." },
+  { title: "Conflict / Anger", desc: "What makes you fight." }
 ];
 
 function VoiceWaveform() {
@@ -53,20 +53,26 @@ function VoiceWaveform() {
       {[...Array(5)].map((_, i) => (
         <div
           key={i}
-          className="w-1 bg-[#E8721A] rounded-full animate-bounce"
+          className="w-1 bg-primary rounded-full animate-bounce"
           style={{
             height: "16px",
             animationDuration: `${0.6 + i * 0.1}s`,
           }}
         />
       ))}
-      <span className="ml-3 text-sm font-medium text-[#6B6B6B] animate-pulse">
+      <span className="ml-3 text-sm font-medium text-muted-foreground animate-pulse">
         Listening...
       </span>
     </div>
   );
 }
 
+/**
+ * ChatInput Component.
+ * Responsive, themed input control bar supporting voice recording, file attachments, and DNA Vault shortcuts.
+ * @param {ChatInputProps} props - Component property settings
+ * @returns {JSX.Element} Rendered ChatInput container
+ */
 export function ChatInput({ 
   onSend, 
   isLoading, 
@@ -87,9 +93,6 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dnaMenuRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Handles closing the DNA popover when clicking outside of it.
-   */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dnaMenuRef.current && !dnaMenuRef.current.contains(event.target as Node)) {
@@ -100,10 +103,6 @@ export function ChatInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDnaOpen]);
 
-  /**
-   * Extracts psychological data from the current session history via API.
-   * Filters the last 15 messages to prevent payload bloat.
-   */
   const handleUpdateDna = async () => {
     if (!messages || messages.length === 0) return;
 
@@ -114,17 +113,16 @@ export function ChatInput({
 
       if (!idToken) throw new Error("User not authenticated.");
 
-      // For performance, we analyze a sliding window of the most recent messages
       const messagesToAnalyze = messages.slice(-15).map(msg => ({
         role: msg.role,
         content: msg.content
       }));
 
-      const response = await fetch('/api/coach/updateDna', {
-        method: 'POST',
+      const response = await fetch("/api/coach/updateDna", {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json'
+          "Authorization": `Bearer ${idToken}`,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ 
           sessionId: sessionId,
@@ -138,34 +136,30 @@ export function ChatInput({
 
       const data = await response.json();
       logger.info({ msg: "DNA Vault updated successfully", data });
-      // TODO: Implement UI Toast Notification for success here.
-      
     } catch (error) {
-      logger.error({ err: error, msg: 'Error updating DNA Vault' });
-      // TODO: Implement UI Toast Notification for error here.
+      logger.error({ err: error, msg: "Error updating DNA Vault" });
     } finally {
       setIsUpdatingDna(false);
     }
   };
 
-  // ... (Keep existing handleFileUpload, triggerFileSelect, removeDocument, Textarea height useEffect, Focus useEffect) ...
   const inferMimeType = (file: File): string => {
     if (file.type) return file.type;
-    const ext = file.name.toLowerCase().split('.').pop() ?? '';
+    const ext = file.name.toLowerCase().split(".").pop() ?? "";
     switch (ext) {
-      case 'md':
-      case 'markdown':
-        return 'text/markdown';
-      case 'rtf':
-        return 'application/rtf';
-      case 'txt':
-        return 'text/plain';
-      case 'pdf':
-        return 'application/pdf';
-      case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case "md":
+      case "markdown":
+        return "text/markdown";
+      case "rtf":
+        return "application/rtf";
+      case "txt":
+        return "text/plain";
+      case "pdf":
+        return "application/pdf";
+      case "docx":
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
       default:
-        return '';
+        return "";
     }
   };
 
@@ -173,14 +167,14 @@ export function ChatInput({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    event.target.value = '';
+    event.target.value = "";
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
 
     reader.onload = () => {
       const base64String = reader.result as string;
-      const base64Data = base64String.split(',')[1];
+      const base64Data = base64String.split(",")[1];
 
       setPendingDocument({
         data: base64Data,
@@ -243,21 +237,21 @@ export function ChatInput({
 
       mediaRecorder.onstop = async () => {
         setIsTranscribing(true);
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
-          const base64data = (reader.result as string).split(',')[1];
+          const base64data = (reader.result as string).split(",")[1];
           try {
             const auth = getAuth();
             const idToken = await auth.currentUser?.getIdToken();
 
-            const response = await fetch('/api/dna/transcribe/chat', {
-              method: 'POST',
+            const response = await fetch("/api/dna/transcribe/chat", {
+              method: "POST",
               headers: {
-                'Authorization': `Bearer ${idToken}`,
-                'Content-Type': 'application/json'
+                "Authorization": `Bearer ${idToken}`,
+                "Content-Type": "application/json"
               },
               body: JSON.stringify({ audioBase64: base64data, mimeType: audioBlob.type })
             });
@@ -268,7 +262,7 @@ export function ChatInput({
                setTimeout(() => inputRef.current?.focus(), 10);
             }
           } catch (error) {
-            logger.error({ err: error, msg: 'Transcription error' });
+            logger.error({ err: error, msg: "Transcription error" });
           } finally {
             setIsTranscribing(false);
           }
@@ -278,7 +272,7 @@ export function ChatInput({
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
-      logger.error({ err: error, msg: 'Mic access denied' });
+      logger.error({ err: error, msg: "Mic access denied" });
     }
   };
 
@@ -298,8 +292,8 @@ export function ChatInput({
   };
 
   return (
-    <div className="flex justify-center px-8 pb-3 pt-2">
-      <div className="flex w-full max-w-2xl items-end gap-2 rounded-3xl border border-[#C7C0B5]/60 bg-[#F0E8DC] px-4 py-2 shadow-sm transition-all">
+    <div className="flex justify-center px-4 sm:px-8 pb-3 pt-2 bg-background">
+      <div className="flex w-full max-w-2xl items-end gap-2 rounded-3xl border border-border bg-card px-4 py-2 shadow-sm transition-all">
         
         <input 
           type="file" 
@@ -309,9 +303,10 @@ export function ChatInput({
           accept=".pdf,.txt,.doc,.docx,.rtf,.md,.markdown"
         />
 
+        {/* Attach File Button */}
         <button
           onClick={triggerFileSelect} 
-          className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#6B6B6B] transition-colors hover:bg-[#E8DFD0] hover:text-[#2C3328]"
+          className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Attach file"
           type="button"
           disabled={isRecording || isTranscribing || !!pendingDocument} 
@@ -321,13 +316,13 @@ export function ChatInput({
 
         <div className="flex-1 overflow-hidden flex flex-col justify-end">
           {pendingDocument && (
-            <div className="flex items-center gap-2 mb-1 mt-1 bg-[#E8DFD0] px-2.5 py-1 rounded-md w-fit border border-[#C7C0B5]/50">
-              <span className="text-xs text-[#2C3328] font-semibold truncate max-w-[100px]">
+            <div className="flex items-center gap-2 mb-1 mt-1 bg-muted px-2.5 py-1 rounded-md w-fit border border-border">
+              <span className="text-xs text-foreground font-semibold truncate max-w-[120px]">
                 {pendingDocument.name}
               </span>
               <button 
                 onClick={removeDocument} 
-                className="text-[#6B6B6B] hover:text-red-500 transition-colors"
+                className="text-muted-foreground hover:text-destructive transition-colors"
                 aria-label="Remove attachment"
               >
                 <X size={14} />
@@ -346,7 +341,7 @@ export function ChatInput({
               rows={1}
               placeholder={isTranscribing ? "Transcribing..." : placeholder ?? "Ask me anything..."}
               disabled={isLoading || isTranscribing}
-              className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-[#2C3328] outline-none placeholder:text-[#6B6B6B]/60 disabled:opacity-50"
+              className="max-h-[150px] min-h-[24px] w-full resize-none bg-transparent py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-50"
             />
           )}
         </div>
@@ -357,8 +352,8 @@ export function ChatInput({
             onClick={() => setIsDnaOpen((prev) => !prev)}
             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors mr-1 ${
               isDnaOpen 
-                ? "bg-[#E8DFD0] text-[#2C3328]" 
-                : "text-[#6B6B6B] hover:bg-[#E8DFD0] hover:text-[#2C3328]"
+                ? "bg-muted text-foreground" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
             type="button"
             aria-label="DNA Reservoirs"
@@ -367,15 +362,14 @@ export function ChatInput({
           </button>
 
           {isDnaOpen && (
-            <div className="absolute bottom-[calc(100%+24px)] right-[-20px] sm:right-0 z-50 w-[85vw] max-w-[480px] rounded-2xl border border-[#E8DFD0] bg-[#F9F7F2] p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute bottom-[calc(100%+24px)] right-[-20px] sm:right-0 z-50 w-[85vw] max-w-[480px] rounded-2xl border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               
-              {/* Refactored Header Layout */}
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[#2C3328] font-semibold">Your DNA Reservoirs</h3>
+                <h3 className="text-foreground font-semibold">Your DNA Reservoirs</h3>
                 <button 
                   onClick={handleUpdateDna}
                   disabled={isUpdatingDna || messages.length === 0}
-                  className="flex items-center gap-1.5 rounded-full bg-[#E8DFD0] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#C7C0B5] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Update DNA Vault based on current session"
                 >
                   {isUpdatingDna ? (
@@ -387,7 +381,7 @@ export function ChatInput({
                 </button>
               </div>
 
-              <div className="h-[1px] w-full bg-[#E8DFD0] mb-4"></div>
+              <div className="h-[1px] w-full bg-border mb-4" />
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                 {DNA_RESERVOIRS.map((item, index) => (
@@ -396,10 +390,10 @@ export function ChatInput({
                     className="flex flex-col cursor-pointer group"
                     onClick={() => setIsDnaOpen(false)}
                   >
-                    <span className="text-sm font-medium text-[#2C3328] group-hover:text-[#E8721A] transition-colors">
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                       {item.title}
                     </span>
-                    <span className="text-xs text-[#6B6B6B] mt-0.5">
+                    <span className="text-xs text-muted-foreground mt-0.5">
                       {item.desc}
                     </span>
                   </div>
@@ -409,27 +403,28 @@ export function ChatInput({
           )}
         </div>
 
+        {/* Main Action Button (Mic / Send / Stop) */}
         <button
           onClick={handleMainAction}
           disabled={isLoading && !isRecording && !isTranscribing}
           className={`mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
             isRecording
-              ? "animate-pulse bg-red-500 text-white"
+              ? "animate-pulse bg-destructive text-destructive-foreground"
               : isTranscribing
-              ? "bg-[#E8721A]/70 text-white cursor-not-allowed"
-              : "bg-[#E8721A] text-white hover:bg-[#E8721A]/90"
+              ? "bg-primary/70 text-primary-foreground cursor-not-allowed"
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
           }`}
           aria-label={isRecording ? "Stop recording" : value.trim() ? "Send message" : "Start recording"}
           type="button"
         >
           {isTranscribing ? (
-            <Loader2 size={20} className="animate-spin text-white" />
+            <Loader2 size={20} className="animate-spin text-primary-foreground" />
           ) : isRecording ? (
-            <Square size={16} className="fill-current text-white" />
+            <Square size={16} className="fill-current text-destructive-foreground" />
           ) : value.trim().length > 0 ? (
-            <SendHorizontal size={20} className="text-white" />
+            <SendHorizontal size={20} className="text-primary-foreground" />
           ) : (
-            <Mic size={20} className="text-white" />
+            <Mic size={20} className="text-primary-foreground" />
           )}
         </button>
       </div>

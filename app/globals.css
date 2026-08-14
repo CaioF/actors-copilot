@@ -3,26 +3,26 @@
 
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
+@variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #F0E8DC;
-  --foreground: #2C3328;
-  --card: #3D4A3C;
-  --card-foreground: #F5F0E8;
+  --background: #f6ecda;
+  --foreground: #2A3328;
+  --card: #FFFFFF;
+  --card-foreground: #2A3328;
   --popover: #ffffff;
   --popover-foreground: #2C3328;
-  --primary: #E8721A;
-  --primary-foreground: #2C3328;
+  --primary: #EE6312;
+  --primary-foreground: #FFFFFF;
   --secondary: #4A5548;
   --secondary-foreground: #F5F0E8;
   --muted: #E8DFD0;
-  --muted-foreground: #6B6B6B;
+  --muted-foreground: #5C6659;
   --accent: #D4DDD6;
   --accent-foreground: #2C3328;
   --destructive: #C45A3C;
   --destructive-foreground: #ffffff;
-  --border: #C7C0B5;
+  --border: #DDD6CA;
   --input: #E8DFD0;
   --ring: #E8721A;
   --chart-1: #E8721A;
@@ -31,6 +31,7 @@
   --chart-4: #D4DDD6;
   --chart-5: #E8DFD0;
   --radius: 0.75rem;
+
   --sidebar-bg: #3D4A3C;
   --sidebar-foreground: #F5F0E8;
   --sidebar-primary: #E8721A;
@@ -39,9 +40,48 @@
   --sidebar-accent-foreground: #F5F0E8;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-ring: #E8721A;
+
   --danger: #8B5E3C;
   --danger-foreground: #F5F0E8;
   --danger-text: #C45A3C;
+}
+
+.dark {
+  --background: #111513;
+  --foreground: #F0F4EF;
+  --card: #1c221e;
+  --card-foreground: #F0F4EF;
+  --popover: #111827;
+  --popover-foreground: #F8FAFC;
+  --primary: #F06A1C;
+  --primary-foreground: #FFFFFF;
+  --secondary: #94A3B8;
+  --secondary-foreground: #E2E8F0;
+  --muted: #242B27;
+  --muted-foreground: #9AA597;
+  --accent: #111827;
+  --accent-foreground: #E2E8F0;
+  --destructive: #FB923C;
+  --destructive-foreground: #ffffff;
+  --border: #2B332E;
+  --input: #1F2937;
+  --ring: #FB923C;
+  --chart-1: #FB923C;
+  --chart-2: #334155;
+  --chart-3: #7C2D12;
+  --chart-4: #334155;
+  --chart-5: #475569;
+  --sidebar-bg: #1C221F;
+  --sidebar-foreground: #B5C0B3;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-primary: #FB923C;
+  --sidebar-primary-foreground: #111827;
+  --sidebar-accent-foreground: #E2E8F0;
+  --sidebar-ring: #FB923C;
+  --danger: #F97316;
+  --danger-foreground: #F8FAFC;
+  --danger-text: #FB923C;
 }
 
 @theme inline {

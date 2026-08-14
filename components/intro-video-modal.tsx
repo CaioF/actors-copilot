@@ -25,7 +25,7 @@ export function IntroVideoModal({ onClose }: IntroVideoModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="intro-video-modal-title"
-        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[#424842]"
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-card text-card-foreground transition-colors"
       >
         <h2 id="intro-video-modal-title" className="sr-only">
           Intro video
@@ -34,7 +34,7 @@ export function IntroVideoModal({ onClose }: IntroVideoModalProps) {
           ref={closeButtonRef}
           onClick={onClose}
           aria-label="Close intro video"
-          className="absolute top-6 right-6 text-[#B7BCB6] hover:text-white"
+          className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"
         >
           ✕
         </button>

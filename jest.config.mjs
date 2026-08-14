@@ -11,6 +11,8 @@ const config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  transformIgnorePatterns: ['/node_modules/(?!(jose)/)'],
 };
 
 export default createJestConfig(config);

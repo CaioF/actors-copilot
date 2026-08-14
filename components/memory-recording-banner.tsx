@@ -148,16 +148,16 @@ export function MemoryRecordingBanner() {
   };
 
   return (
-    <div className="mx-8 mt-4 bg-[#3D4A3C] rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-xl border border-[#B7BCB6]/10">
+    <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
       <div className="flex gap-4 items-center">
         <div className="bg-[#FF7316]/20 p-4 rounded-full shrink-0 hidden sm:flex">
           <Mic className="w-6 h-6 text-[#ff6600]" />
         </div>
         <div>
-          <h3 className="text-[#EADDCE] text-xl font-medium font-title mb-1.5">
+          <h3 className="text-foreground text-xl font-bold font-title">
             Memory Recording
           </h3>
-          <p className="text-[#B7BCB6] text-sm max-w-2xl leading-relaxed">
+          <p className="text-muted-foreground text-sm max-w-4xl leading-relaxed mt-1">
             When something surfaces, record it while it’s still fresh. Stay close to the details — what you saw, heard, smelt, touched, or tasted. The more vivid and specific the memory, the more truthfully it&nbsp;can&nbsp;live&nbsp;in&nbsp;your&nbsp;work.
           </p>
         </div>

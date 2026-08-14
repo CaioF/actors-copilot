@@ -1,256 +1,96 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { auth } from '@/lib/firebase.admin';
-import { jwtVerify, SignJWT } from 'jose';
-import { logger, createChildLogger } from '@/lib/logger';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth, db } from '@/lib/firebase.admin';
+import { setPlatformSession, getPlatformSession } from '@/lib/session';
+import { UserBilling, SubscriptionStatus } from '@/lib/billing';
 
-interface KajabiContact {
-  id: string;
-  attributes: {
-    email: string;
-    [key: string]: unknown; 
-  };
-  relationships: {
-    offers?: {
-      links: {
-        self: string;
-      };
-    };
-  };
-}
+/**
+ * Validates the Firebase identity token, hydrates entitlement details from Firestore, and issues the active platform session.
+ *
+ * @param req - The incoming Next.js API request context.
+ * @returns A JSON response with the updated entitlement state and session cookie.
+ */
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    const { idToken } = await req.json();
 
-interface KajabiOffer {
-  id: string | number;
-  attributes?: {
-    name?: string;
-  };
-}
+    if (!idToken) {
+      return NextResponse.json({ error: 'Missing Identity ID Token' }, { status: 400 });
+    }
 
-interface KajabiTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
+    // 1. Verify the authenticity of the Firebase Identity Token using your auth instance
+    const decodedToken = await auth.verifyIdToken(idToken); // Corrigido para "auth"
+    const { uid, email } = decodedToken;
+
+    if (!email) {
+      return NextResponse.json({ error: 'Identity Token lacks a valid email claim' }, { status: 400 });
+    }
+
+    let tier: 'free' | 'economy' | 'business' = 'free';
+    let subscriptionStatus: SubscriptionStatus = 'canceled';
+    let stripeCustomerId: string | undefined;
+    let stripeSubscriptionId: string | undefined;
+    let stripePriceId: string | undefined;
+    let currentPeriodEnd: number | undefined;
+
+    const billingDocRef = db.doc(`users/${uid}/billing/current`);
+    const billingDoc = await billingDocRef.get();
+
+    if (billingDoc.exists) {
+      const billingData = billingDoc.data() as Omit<UserBilling, 'uid'>;
+      tier = billingData.tier || 'free';
+      subscriptionStatus = billingData.status || 'canceled';
+      stripeCustomerId = billingData.customerId;
+      stripeSubscriptionId = billingData.subscriptionId;
+      stripePriceId = billingData.priceId;
+      currentPeriodEnd = billingData.currentPeriodEnd;
+    }
+
+    // 3. Serialize and commit entitlement metadata into the secure platform session.
+    await setPlatformSession({
+      uid,
+      email,
+      tier,
+      subscriptionStatus,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      stripePriceId,
+      currentPeriodEnd,
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      user: { uid, email, tier, subscriptionStatus } 
+    }, { status: 200 });
+
+  } catch (error) {
+    console.error('❌ Authentication verification callback execution failed:', error);
+    return NextResponse.json({ error: 'Internal Server Error during identity hydration' }, { status: 500 });
+  }
 }
 
 /**
- * Authenticates a user via Firebase, verifies their Kajabi access, 
- * and establishes a secure session by issuing an HTTP-only JWT cookie.
+ * Returns the current platform entitlement context from the active session cookie.
  *
- * @param {Request} request - The incoming HTTP request containing the Firebase Bearer token.
- * @returns {Promise<NextResponse>} A JSON response indicating success with a redirect URL, or an error status and message.
+ * @returns A JSON response describing the current authentication state and entitlement tier.
  */
-export async function POST(request: Request) {
-    const log = createChildLogger({ route: 'auth-callback' });
-    // TODO: Implement rate limiting (e.g., Upstash Redis) to prevent brute-force attacks on this endpoint.
-    try {
-        const authHeader = request.headers.get('Authorization');
+export async function GET(): Promise<NextResponse> {
+  try {
+    const session = await getPlatformSession();
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            log.warn({ msg: 'Missing or invalid Authorization header' });
-            return NextResponse.json({ error: 'Token not found or invalid' }, { status: 401 });
-        }
-
-        const idToken = authHeader.split('Bearer ')[1];
-
-        // Decode the Firebase token to extract the email for Kajabi validation
-        const decodedToken = await auth.verifyIdToken(idToken);
-        const userEmail = decodedToken.email;
-
-        if (!userEmail) {
-            log.warn({ msg: 'Email not found in token' });
-            return NextResponse.json({ error: 'Email not found in token' }, { status: 400 });
-        }
-        
-        const hasAccess = await verifyKajabiPurchase(userEmail);
-        
-        if (!hasAccess.success) {
-            // Forward the exact Kajabi validation error message to the frontend
-            log.error({ email: userEmail, message: hasAccess.message, msg: 'Kajabi validation failed' });
-            
-            // Check if it's an actual env configuration error vs a user access denial
-            const isConfigError = hasAccess.message?.includes("System configuration error");
-            const statusCode = isConfigError ? 500 : 403;
-
-            return NextResponse.json(  
-                { error: hasAccess.message || 'Access denied by Kajabi validation.' },  
-                { status: statusCode }  
-            );  
-        }
-
-        // Cryptographically sign a new JWT containing the user's email to establish a session
-        if (!process.env.JWT_SECRET) {
-            log.error({ msg: 'JWT_SECRET not configured' });
-            return NextResponse.json({ error: 'Internal Configuration Error' }, { status: 500 });
-        }
-
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'fallback_secret_for_dev');
-        
-        // Define standard claims for defense-in-depth security
-        const issuer = 'kajabi-auth-callback';
-        const audience = 'kajabi-dashboard';
-
-        const token = await new SignJWT({ email: userEmail, offers: hasAccess.offers })
-            .setProtectedHeader({ alg: 'HS256' })
-            .setIssuer(issuer)
-            .setAudience(audience)
-            .setSubject(decodedToken.uid)
-            .setExpirationTime('24h')
-            .sign(secret);
-
-        // Store the signed JWT in a secure, HTTP-only cookie
-        const cookieStore = await cookies();
-        cookieStore.set('kajabi_session', token, {
-            httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'strict', 
-            maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
-            path: '/', 
-        });
-
-        log.info({ email: userEmail, msg: 'Authentication successful' });
-        return NextResponse.json({ success: true, redirectUrl: '/dashboard' }, { status: 200 });
-
-    }catch (error: unknown) {
-        log.error({ err: error, msg: 'Authentication error' });
-        
-        const message = error instanceof Error ? error.message : 'Internal Server Error';
-        return NextResponse.json({ error: message }, { status: 500 });
-    }
-} 
-
-/**
- * Validates the user's purchase history against the Kajabi API using Client Credentials.
- *
- * @param {string} email - The user's authenticated email address from Firebase.
- * @returns {Promise<{ success: boolean; message?: string }>} An object containing the verification result and an optional user-facing error message.
- */
-async function verifyKajabiPurchase(email: string): Promise<{ success: boolean; message?: string; offers?: string[] }> {
-    // TODO: Implement an LRU cache or Redis for the Kajabi access token to avoid requesting a new OAuth token on every login.
-    // TODO: Consider adding a retry mechanism for Kajabi API timeouts to improve reliability.
-
-    const clientId = process.env.KAJABI_CLIENT_ID;
-    const clientSecret = process.env.KAJABI_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-        return { success: false, message: "System configuration error. Please contact support." };
+    if (!session) {
+      return NextResponse.json({ authenticated: false, tier: 'free' }, { status: 401 });
     }
 
-    try {
-        const tokenResponse = await fetch('https://api.kajabi.com/v1/oauth/token',{
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                grant_type: 'client_credentials',
-                client_id: clientId,
-                client_secret: clientSecret,
-            })
-        });
+    // Returns structural modern entitlement mapping data needed by frontend hydration engines [cite: 26]
+    return NextResponse.json({
+      authenticated: true,
+      tier: session.tier,
+      subscriptionStatus: session.subscriptionStatus,
+      stripeCustomerId: session.stripeCustomerId,
+    }, { status: 200 });
 
-        if (!tokenResponse.ok) return { success: false, message: "Failed to connect to Kajabi validation server." };
-
-        const tokenData = (await tokenResponse.json()) as KajabiTokenResponse;
-        const accessToken = tokenData.access_token;
-
-        const userResponse = await fetch(`https://api.kajabi.com/v1/contacts?email=${encodeURIComponent(email)}`, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            }
-        });
-
-        if (!userResponse.ok) return { success: false, message: "Failed to fetch user data from Kajabi." };
-            
-        const userData = (await userResponse.json()) as { data: KajabiContact[] };
-        if (!userData || !userData.data || userData.data.length === 0 ) {
-            return { success: false, message: "We couldn't find a Kajabi account with this email. Please use the exact email you used to purchase." };
-        }
-
-        const userInKajabi = userData.data.find(
-            (contato: KajabiContact) => contato.attributes.email === email
-        );
-
-        if (!userInKajabi) {
-            return { success: false, message: "Email not found in our members list. Are you using the right Google Account?" };
-        }
-
-        const offerUrl = userInKajabi.relationships.offers?.links.self;
-
-        if (!offerUrl) {
-            return { success: false, message: "Your account was found, but you don't have any active purchases." };
-        }
-
-        const offersResponse = await fetch(offerUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            }
-        });
-
-        if (!offersResponse.ok) return { success: false, message: "Failed to verify your active offers." }; 
-
-        const offersData = (await offersResponse.json()) as { data: KajabiOffer[] };
-        if (!offersData.data || offersData.data.length === 0) {
-            return { success: false, message: "You don't have any active offers in your account." };
-        }
-
-        const businessOfferIdsString = process.env.KAJABI_REQUIRED_OFFER_ID;
-        const economyOfferIdString = process.env.KAJABI_ECONOMY_OFFER_ID;
-        
-        if (!businessOfferIdsString || !economyOfferIdString) {
-            return { success: false, message: "System configuration error. Missing offer IDs. Please contact support." };
-        }
-
-        const acceptedOfferIds = [
-            ...businessOfferIdsString.split(',').map(id => id.trim()),
-            ...economyOfferIdString.split(',').map(id => id.trim())
-        ].filter(Boolean); 
-        
-        const userMatchedOffers = offersData.data
-            .map((offer: KajabiOffer) => String(offer.id))
-            .filter((id: string) => acceptedOfferIds.includes(id));
-
-        if (userMatchedOffers.length === 0) {
-            return { success: false, message: "You don't have the required 'The Actor's Copilot' offer. Please check your purchase history." };
-        }
-        
-        return { success: true, message: "Purchase verified successfully.", offers: userMatchedOffers };
-
-    } catch (error) {
-        logger.error({ err: error, email, msg: 'Error verifying Kajabi purchase' });
-        return { success: false, message: "An unexpected error occurred during validation. Please try again." };
-    }
-}
-
-export async function GET() {
-    try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get('kajabi_session')?.value;
-
-        if (!token) {
-            return NextResponse.json({ offers: [] }, { status: 401 });
-        }
-
-        const jwtSecret = process.env.JWT_SECRET;
-        const jwtIssuer = process.env.JWT_ISSUER;
-        const jwtAudience = process.env.JWT_AUDIENCE;
-
-        if (!jwtSecret || !jwtIssuer || !jwtAudience) {
-            logger.error({ msg: 'Missing JWT verification configuration in auth callback GET handler' });
-            return NextResponse.json({ offers: [] }, { status: 500 });
-        }
-
-        const secret = new TextEncoder().encode(jwtSecret);
-        const { payload } = await jwtVerify(token, secret, {
-            algorithms: ['HS256'],
-            issuer: jwtIssuer,
-            audience: jwtAudience,
-        });
-
-        return NextResponse.json({ offers: payload.offers || [] });
-    } catch (error) {
-        return NextResponse.json({ offers: [] }, { status: 401 });
-    }
+  } catch (error) {
+    console.error('❌ Failed to retrieve runtime entitlement session context:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }
