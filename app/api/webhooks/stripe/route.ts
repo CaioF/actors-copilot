@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import type { DocumentReference } from 'firebase-admin/firestore';
 import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
@@ -36,7 +37,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 let platformUserId = session.client_reference_id || session.metadata?.platformUserId;
                 const customerEmail = session.customer_details?.email || session.metadata?.originalEmail;
 
-                // Fallback: If no platformUserId exists, lookup user by email (Migration Flow)
                 if (!platformUserId && customerEmail) {
                     const userSnap = await db.collection('users')
                         .where('email', '==', customerEmail.toLowerCase().trim())
@@ -94,16 +94,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     .limit(1)
                     .get();
 
-                let billingRef: ReturnType<typeof db.doc> | null = null;
+                let billingRef: DocumentReference | null = null;
 
-                // Se já existe o mapping pelo customerId no Firestore:
                 if (!billingQuery.empty) {
                     billingRef = billingQuery.docs[0].ref;
                 } else {
-                    // Fallback 1: Metadata direto da subscription
                     let platformUserId = subscription.metadata?.platformUserId;
 
-                    // Fallback 2: Buscar customer no Stripe para pegar metadata ou e-mail
                     if (!platformUserId) {
                         const customer = await stripe.customers.retrieve(customerId);
                         
