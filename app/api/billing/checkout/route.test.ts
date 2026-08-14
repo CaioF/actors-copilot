@@ -162,6 +162,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
             metadata: {
                 platformUserId: mockUid,
                 targetTier: 'economy',
+                billingCycle: 'monthly',
             },
         });
 
