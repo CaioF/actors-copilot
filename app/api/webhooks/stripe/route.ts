@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import type { DocumentReference } from 'firebase-admin/firestore';
 import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
@@ -10,9 +11,6 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/webhooks/stripe
  * Inbound secure webhook gateway processing automated lifecycle hooks from Stripe.
- * 
- * @param {NextRequest} req - The streaming HTTP request payload Context.
- * @returns {Promise<NextResponse>} Standard transaction compliance confirmation signature.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
@@ -39,7 +37,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 let platformUserId = session.client_reference_id || session.metadata?.platformUserId;
                 const customerEmail = session.customer_details?.email || session.metadata?.originalEmail;
 
-                // Fallback: If no platformUserId exists, lookup user by email (Migration Flow)
                 if (!platformUserId && customerEmail) {
                     const userSnap = await db.collection('users')
                         .where('email', '==', customerEmail.toLowerCase().trim())
@@ -85,6 +82,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 break;
             }
 
+            case 'customer.subscription.created':
             case 'customer.subscription.updated':
             case 'customer.subscription.deleted': {
                 const subscription = event.data.object as Stripe.Subscription;
@@ -96,12 +94,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     .limit(1)
                     .get();
 
-                if (billingQuery.empty) {
-                    logger.warn(`Received subscription update hook for unmapped Stripe Customer ID: ${customerId}`);
+                let billingRef: DocumentReference | null = null;
+
+                if (!billingQuery.empty) {
+                    billingRef = billingQuery.docs[0].ref;
+                } else {
+                    let platformUserId = subscription.metadata?.platformUserId;
+
+                    if (!platformUserId) {
+                        const customer = await stripe.customers.retrieve(customerId);
+                        
+                        if (!customer.deleted) {
+                            platformUserId = customer.metadata?.platformUserId;
+                            const customerEmail = customer.email;
+
+                            if (!platformUserId && customerEmail) {
+                                const userSnap = await db.collection('users')
+                                    .where('email', '==', customerEmail.toLowerCase().trim())
+                                    .limit(1)
+                                    .get();
+
+                                if (!userSnap.empty) {
+                                    platformUserId = userSnap.docs[0].id;
+                                }
+                            }
+                        }
+                    }
+
+                    if (platformUserId) {
+                        billingRef = db.doc(`users/${platformUserId}/billing/current`);
+                    }
+                }
+
+                if (!billingRef) {
+                    logger.warn(`Received subscription hook for unmapped Stripe Customer ID: ${customerId}`);
                     break;
                 }
 
-                const billingDoc = billingQuery.docs[0];
                 const firstItem = subscription.items.data[0];
                 const priceId = firstItem?.price.id;
                 const tier = mapStripePriceToTier(priceId);
@@ -110,7 +139,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 const subscriptionWithPeriod = subscription as Stripe.Subscription & { current_period_end?: number };
                 const currentPeriodEnd = subscriptionWithPeriod.current_period_end ?? firstItem?.current_period_end ?? Math.floor(Date.now() / 1000);
 
-                await billingDoc.ref.set({
+                await billingRef.set({
+                    customerId,
                     subscriptionId: subscription.id,
                     priceId,
                     tier: status === 'canceled' || status === 'unpaid' ? 'free' : tier,
@@ -120,6 +150,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     updatedAt: new Date().toISOString(),
                 }, { merge: true });
 
+                logger.info(`Successfully synchronized subscription status '${status}' for doc: ${billingRef.path}`);
                 break;
             }
 

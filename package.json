@@ -113,8 +113,11 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "@firebase/util",
+      "core-js",
+      "esbuild",
       "protobufjs",
-      "sharp"
+      "sharp",
+      "unrs-resolver"
     ]
   }
 }

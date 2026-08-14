@@ -2,8 +2,24 @@ import { POST } from './route';
 import { NextRequest } from 'next/server';
 import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
+import { stripe } from '@/lib/stripe';
 
 // LAYER MOCKS 
+jest.mock('@/lib/stripe', () => ({
+  stripe: {
+    subscriptions: {
+      retrieve: jest.fn(),
+    },
+    checkout: {
+      sessions: {
+        listLineItems: jest.fn(),
+      },
+    },
+    customers: {
+      retrieve: jest.fn(),
+    },
+  },
+}));
 
 jest.mock('@/lib/billing', () => ({
     verifyStripeWebhookEvent: jest.fn(),
@@ -29,6 +45,18 @@ jest.mock('@/lib/logger', () => ({
 describe('Stripe Inbound Webhook Gateway Route Handler', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+
+        (stripe.subscriptions.retrieve as jest.Mock).mockResolvedValue({
+            items: { data: [{ price: { id: 'price_premium_id' } }] },
+        });
+        (stripe.checkout.sessions.listLineItems as jest.Mock).mockResolvedValue({
+            data: [{ price: { id: 'price_premium_id' } }],
+        });
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({
+            deleted: false,
+            metadata: { platformUserId: 'actor_uid_777' },
+            email: 'actor@example.com',
+        });
     });
 
     /**
