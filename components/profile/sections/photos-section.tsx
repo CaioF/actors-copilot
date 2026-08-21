@@ -103,24 +103,24 @@ export function PhotosSection() {
 
   return (
     <div className="space-y-5">
-      <h3 className="text-base font-semibold text-[#2C3328]">Photos</h3>
+      <h3 className="text-base font-semibold text-foreground font-title">Photos</h3>
 
       {/* Primary Headshot */}
       <div>
-        <p className="mb-2 text-sm font-medium text-[#2C3328]">Primary Headshot</p>
+        <p className="mb-2 text-sm font-medium text-foreground">Primary Headshot</p>
         <div
           onClick={() => headshotInputRef.current?.click()}
-          className="flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-[#C7C0B5] bg-[#F0E9DE] transition-colors hover:border-[#E8721A]"
+          className="flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-muted/40 transition-colors hover:border-primary shadow-sm"
         >
           {uploading === "headshot" ? (
-            <span className="text-xs text-[#6B6B6B]">Uploading...</span>
+            <span className="text-xs text-muted-foreground">Uploading...</span>
           ) : headshot ? (
             <img src={headshot} alt="Headshot" className="h-full w-full object-cover" />
           ) : (
-            <Upload className="h-6 w-6 text-[#6B6B6B]" />
+            <Upload className="h-6 w-6 text-muted-foreground" />
           )}
         </div>
-        <p className="mt-1 text-xs text-[#6B6B6B]">Click or drag & drop</p>
+        <p className="mt-1 text-xs text-muted-foreground">Click or drag & drop</p>
         <input
           ref={headshotInputRef}
           type="file"
@@ -132,12 +132,12 @@ export function PhotosSection() {
 
       {/* Additional Photos */}
       <div>
-        <p className="mb-2 text-sm font-medium text-[#2C3328]">
+        <p className="mb-2 text-sm font-medium text-foreground">
           Additional Photos (up to 10)
         </p>
         <div className="flex flex-wrap gap-3">
           {additionalPhotos.map((url, i) => (
-            <div key={i} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-[#C7C0B5]">
+            <div key={i} className="group relative h-20 w-20 overflow-hidden rounded-xl border border-border shadow-sm">
               <img src={url} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
               <button
                 type="button"
@@ -151,12 +151,12 @@ export function PhotosSection() {
           {additionalPhotos.length < 10 && (
             <div
               onClick={() => additionalInputRef.current?.click()}
-              className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-[#C7C0B5] bg-[#F0E9DE] transition-colors hover:border-[#E8721A]"
+              className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/40 transition-colors hover:border-primary"
             >
               {uploading === "additional" ? (
-                <span className="text-[10px] text-[#6B6B6B]">...</span>
+                <span className="text-[10px] text-muted-foreground">...</span>
               ) : (
-                <Upload className="h-5 w-5 text-[#6B6B6B]" />
+                <Upload className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
           )}

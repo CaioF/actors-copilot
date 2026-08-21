@@ -71,13 +71,13 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
   const isError = state === "error";
 
   return (
-    <div className="rounded-2xl bg-[#3D4A3C] p-5">
+    <div className="rounded-2xl bg-card border border-border text-card-foreground p-5 shadow-sm">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-[#E8721A]" />
+        <Sparkles className="h-5 w-5 text-primary shrink-0" />
         <div>
-          <h3 className="text-sm font-semibold text-white">AI Autofill</h3>
-          <p className="text-xs text-[#C7C7C7]/70">
+          <h3 className="text-sm font-semibold text-foreground font-title">AI Autofill</h3>
+          <p className="text-xs text-muted-foreground">
             Import from your IMDB page and enrich with your DNA
           </p>
         </div>
@@ -92,15 +92,15 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://www.imdb.com/name/nm0000000/"
             disabled={isLoading || isSuccess}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 transition-colors focus:border-[#E8721A] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-xl border border-border bg-input/50 px-3 py-2 text-sm text-foreground placeholder-muted-foreground transition-colors focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         {/* Error message */}
         {isError && (
-          <div className="flex items-start gap-2 rounded-lg bg-red-500/20 p-3">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
-            <p className="text-xs text-red-200">{errorMessage}</p>
+          <div className="flex items-start gap-2 rounded-lg bg-destructive/15 border border-destructive/30 p-3">
+            <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+            <p className="text-xs text-destructive">{errorMessage}</p>
           </div>
         )}
 
@@ -109,7 +109,7 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
           <button
             type="submit"
             disabled={isLoading || isSuccess || !url.trim()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#E8721A] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-[#E8721A]/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
           >
             {isLoading ? (
               <>
@@ -133,7 +133,7 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
             <button
               type="button"
               onClick={handleRetry}
-              className="rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+              className="rounded-full border border-border bg-muted/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               Retry
             </button>
@@ -143,7 +143,7 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
 
       {/* Help text */}
       {!isLoading && !isSuccess && !isError && (
-        <p className="mt-3 text-xs text-[#C7C7C7]/50">
+        <p className="mt-3 text-xs text-muted-foreground">
           Paste your IMDB profile URL to auto-fill your profile with career data enriched by your DNA insights.
         </p>
       )}

@@ -1,27 +1,23 @@
 import React from "react";
 
 interface AttributeRowProps {
-  name: string;
   strength?: number; // 0..1
-  description?: string;
 }
 
-export function AttributeRow({ name, strength = 0, description }: AttributeRowProps) {
+export function AttributeRow({ strength = 0.85 }: AttributeRowProps) {
   const pct = Math.round(strength * 100);
 
   return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <div className="min-w-0">
-        <div className="font-medium text-sm text-card-foreground">{name}</div>
-        {description && <div className="mt-1 text-xs text-muted-foreground truncate">{description}</div>}
+    <div className="flex items-center gap-2.5 w-28 shrink-0">
+      <div className="h-2 flex-1 overflow-hidden rounded-full border border-border/50 bg-muted/60">
+        <div
+          className="h-2 rounded-full bg-gradient-to-r from-primary/80 to-primary transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
       </div>
-
-      <div className="w-32 flex-shrink-0">
-        <div className="h-2 w-full overflow-hidden rounded-full border border-border bg-muted">
-          <div className="h-2 bg-primary" style={{ width: `${pct}%` }} />
-        </div>
-        <div className="mt-1 text-xs text-muted-foreground text-right">{pct}%</div>
-      </div>
+      <span className="text-[11px] font-bold text-primary/90 w-7 text-right tabular-nums">
+        {pct}%
+      </span>
     </div>
   );
 }

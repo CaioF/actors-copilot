@@ -79,6 +79,7 @@ export default function ChatPage() {
           <ChatMessages
             messages={filteredMessages}
             isLoading={isLoading}
+            activeSection={activeSection}
             actorName={actorName}
             streamingContent={streamingContent}
             isInitializing={isInitializing}

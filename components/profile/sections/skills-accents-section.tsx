@@ -35,17 +35,17 @@ export function SkillsAccentsSection() {
 
   return (
     <div className="space-y-5">
-      <h3 className="text-base font-semibold text-[#2C3328]">Skills & Accents</h3>
+      <h3 className="text-base font-semibold text-foreground font-title">Skills & Accents</h3>
 
       {skills.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {skills.map((skill, i) => (
             <span
               key={i}
-              className="flex items-center gap-1.5 rounded-full bg-[#3D4A3C] px-3 py-1.5 text-xs font-medium text-white"
+              className="flex items-center gap-1.5 rounded-full bg-primary/15 border border-primary/30 px-3 py-1.5 text-xs font-semibold text-primary"
             >
               {skill}
-              <button type="button" onClick={() => removeSkill(i)}>
+              <button type="button" onClick={() => removeSkill(i)} className="hover:text-primary/70">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -60,12 +60,12 @@ export function SkillsAccentsSection() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())}
           placeholder="Add a skill and press Enter"
-          className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+          className="flex-1 rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
         />
         <button
           type="button"
           onClick={addSkill}
-          className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4A5548]"
+          className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
         >
           <Plus className="h-3.5 w-3.5" />
           Add

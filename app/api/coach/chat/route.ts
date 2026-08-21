@@ -8,9 +8,12 @@ import { documentToPromptPart, validateDocumentPayload } from "@/lib/document-pr
 const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(request: Request) {
+  const t0 = performance.now();
+  console.log(`[PERF][SERVER] 🚀 POST /api/coach/chat request received at t=0ms`);
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log(`[PERF][SERVER] ❌ Unauthorized request after ${(performance.now() - t0).toFixed(1)}ms`);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -29,48 +32,69 @@ export async function POST(request: Request) {
       }
     }
 
-    const { auth, db } = await import("@/lib/firebase.admin");
+    const tAuthStart = performance.now();
+    const { auth, db, verifyOrDecodeIdToken } = await import("@/lib/firebase.admin");
     const token = authHeader.split("Bearer ")[1];
-    const decodedToken = await auth.verifyIdToken(token);
+    const decodedToken = typeof verifyOrDecodeIdToken === "function"
+      ? await verifyOrDecodeIdToken(token)
+      : await auth.verifyIdToken(token);
 
-    const userRecord = await auth.getUser(decodedToken.uid);
-    const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
+    let rawFirstName = (decodedToken as { name?: string }).name?.split(" ")[0];
+    if (!rawFirstName && auth.getUser) {
+      try {
+        const userRecord = await auth.getUser(decodedToken.uid);
+        if (userRecord?.displayName) {
+          rawFirstName = userRecord.displayName.split(" ")[0];
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    const firstName = (rawFirstName || "Actor").replace(/[^a-zA-Z0-9]/g, "") || "Actor";
     const userPath = `${decodedToken.uid}_${firstName}`;
+    console.log(`[PERF][SERVER] ⏱️ Auth verification completed in ${(performance.now() - tAuthStart).toFixed(1)}ms`);
 
     const log = createChildLogger({ route: "coach/chat", userPath });
 
     const profileRef = db.doc(`users/${userPath}/profile/master`);
-    const profileSnap = await profileRef.get();
+    const actorProfileRef = db.doc(`actorProfiles/${decodedToken.uid}`);
+
+    // Parallelize all context reads (profile, public profile, audition summaries, full audition data)
+    const tContextStart = performance.now();
+    const [profileSnapResult, actorProfileSnapResult, auditionSummariesResult, auditionFullDataResult] = await Promise.allSettled([
+      profileRef.get(),
+      actorProfileRef.get(),
+      getUserAuditionsSummary(userPath, db as any),
+      auditionId && typeof auditionId === "string" 
+        ? getAuditionFullData(userPath, auditionId, db as any)
+        : Promise.resolve(undefined)
+    ]);
+    console.log(`[PERF][SERVER] ⏱️ Parallel context reads completed in ${(performance.now() - tContextStart).toFixed(1)}ms`);
 
     let actorBaseline = "";
-    if (profileSnap.exists) {
-      const profileData = profileSnap.data();
+    if (profileSnapResult.status === "fulfilled" && profileSnapResult.value.exists) {
+      const profileData = profileSnapResult.value.data();
       if (profileData) actorBaseline = JSON.stringify(profileData, null, 2);
     }
 
-    const actorProfileRef = db.doc(`actorProfiles/${decodedToken.uid}`);
-    const actorProfileSnap = await actorProfileRef.get();
     let actorProfile = "";
-    if (actorProfileSnap.exists) {
-      const profileData = actorProfileSnap.data();
+    if (actorProfileSnapResult.status === "fulfilled" && actorProfileSnapResult.value.exists) {
+      const profileData = actorProfileSnapResult.value.data();
       if (profileData) actorProfile = JSON.stringify(profileData, null, 2);
     }
 
     let auditionSummaries: AuditionSummary[] = [];
-    try {
-      auditionSummaries = await getUserAuditionsSummary(userPath, db as any);
-    } catch (err) {
-      log.warn({ err }, "Failed to load audition summaries");
+    if (auditionSummariesResult.status === "fulfilled" && auditionSummariesResult.value) {
+      auditionSummaries = auditionSummariesResult.value;
+    } else if (auditionSummariesResult.status === "rejected") {
+      log.warn({ err: auditionSummariesResult.reason }, "Failed to load audition summaries");
     }
 
     let auditionFullData: Record<string, unknown> | undefined;
-    if (auditionId && typeof auditionId === "string") {
-      try {
-        const data = await getAuditionFullData(userPath, auditionId, db as any);
-        if (data) auditionFullData = data;
-      } catch (err) {
-        log.warn({ err, auditionId }, "Failed to load audition full data");
-      }
+    if (auditionFullDataResult.status === "fulfilled" && auditionFullDataResult.value) {
+      auditionFullData = auditionFullDataResult.value;
+    } else if (auditionFullDataResult.status === "rejected") {
+      log.warn({ err: auditionFullDataResult.reason, auditionId }, "Failed to load audition full data");
     }
 
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
@@ -87,6 +111,7 @@ export async function POST(request: Request) {
       currentFocus: currentFocus ?? null,
     });
 
+    const tModelInitStart = performance.now();
     const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
@@ -103,9 +128,13 @@ export async function POST(request: Request) {
       promptParts.push(docPart.part);
     }
 
+    console.log(`[PERF][SERVER] ⏱️ AI Model & Prompt prepared in ${(performance.now() - tModelInitStart).toFixed(1)}ms. Invoking coachModel generateContent...`);
+
     try {
+      const tCoachStart = performance.now();
       const result = await coachModel.generateContent(promptParts);
       const rawText = result.response.text();
+      console.log(`[PERF][SERVER] ⏱️ Coach model generation completed in ${(performance.now() - tCoachStart).toFixed(1)}ms (Output length: ${rawText.length} chars)`);
 
       let parsedResponse;
       try {

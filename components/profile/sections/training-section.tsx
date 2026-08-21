@@ -28,7 +28,7 @@ export function TrainingSection() {
 
   return (
     <div className="space-y-5">
-      <h3 className="text-base font-semibold text-[#2C3328]">Training</h3>
+      <h3 className="text-base font-semibold text-foreground font-title">Training</h3>
 
       {/* Category Tabs */}
       <div className="flex flex-wrap gap-2">
@@ -43,8 +43,8 @@ export function TrainingSection() {
               className={cn(
                 "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
                 isActive
-                  ? "bg-[#E8721A] text-white"
-                  : "border border-[#C7C0B5] bg-[#F0E9DE] text-[#2C3328]"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                  : "border border-border bg-muted/60 text-foreground hover:bg-muted"
               )}
             >
               {CREDIT_CATEGORY_LABELS[cat]}
@@ -57,29 +57,29 @@ export function TrainingSection() {
       {/* Training Rows */}
       <div className="space-y-3">
         {filteredIndexes.map(({ field, index }) => (
-          <div key={field.id} className="flex items-center gap-2">
+          <div key={field.id} className="flex flex-wrap sm:flex-nowrap items-center gap-2">
             <input
               {...register(`training.${index}.institution`)}
               type="text"
               placeholder="Institution"
-              className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-3 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+              className="flex-1 min-w-[120px] rounded-xl border border-border bg-input/50 py-2.5 px-3 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
             />
             <input
               {...register(`training.${index}.qualification`)}
               type="text"
               placeholder="Qualification/Course attended"
-              className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-3 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+              className="flex-1 min-w-[140px] rounded-xl border border-border bg-input/50 py-2.5 px-3 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
             />
             <input
               {...register(`training.${index}.years`)}
               type="text"
               placeholder="Year(s)"
-              className="w-28 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-3 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+              className="w-28 rounded-xl border border-border bg-input/50 py-2.5 px-3 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
             />
             <button
               type="button"
               onClick={() => remove(index)}
-              className="flex-shrink-0 p-2 text-[#6B6B6B] transition-colors hover:text-[#C45A3C]"
+              className="flex-shrink-0 p-2 text-muted-foreground transition-colors hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -97,7 +97,7 @@ export function TrainingSection() {
             years: "",
           })
         }
-        className="text-sm font-medium text-[#E8721A] transition-colors hover:text-[#E8721A]/80"
+        className="text-sm font-semibold text-primary transition-colors hover:text-primary/80"
       >
         + Add Training
       </button>

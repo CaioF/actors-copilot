@@ -98,22 +98,22 @@ export function PhysicalDetailsSection() {
 
   return (
     <div className="space-y-5">
-      <h3 className="text-base font-semibold text-[#2C3328]">Physical & Professional Details</h3>
+      <h3 className="text-base font-semibold text-foreground font-title">Physical & Professional Details</h3>
 
       {/* Height */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">Height</label>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Height</label>
         <div className="flex items-center gap-2">
           <input
             {...register("height")}
             type="text"
             placeholder={heightUnit === "imperial" ? "5ft 9in" : "175cm"}
-            className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+            className="flex-1 rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
           />
           <button
             type="button"
             onClick={convertHeight}
-            className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4A5548]"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
             {heightUnit === "imperial" ? "ft/in > cm" : "cm > ft/in"}
@@ -123,38 +123,38 @@ export function PhysicalDetailsSection() {
 
       {/* Eye Colour */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">Eye Colour</label>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Eye Colour</label>
         <input
           {...register("eyeColour")}
           type="text"
           placeholder="e.g. Blue"
-          className="w-full rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+          className="w-full rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
         />
       </div>
 
       {/* Hair Colour */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">Hair Colour</label>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Hair Colour</label>
         <input
           {...register("hairColour")}
           type="text"
           placeholder="e.g. Blonde/Medium"
-          className="w-full rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+          className="w-full rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
         />
       </div>
 
       {/* Nationalities */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">Nationalities</label>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Nationalities</label>
         {nationalities.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {nationalities.map((nat, i) => (
               <span
                 key={i}
-                className="flex items-center gap-1 rounded-full bg-[#3D4A3C] px-3 py-1 text-xs font-medium text-white"
+                className="flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-3 py-1 text-xs font-semibold text-primary"
               >
                 {nat}
-                <button type="button" onClick={() => removeNationality(i)}>
+                <button type="button" onClick={() => removeNationality(i)} className="hover:text-primary/70">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -168,12 +168,12 @@ export function PhysicalDetailsSection() {
             onChange={(e) => setNationalityInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addNationality())}
             placeholder="Add Nationality"
-            className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+            className="flex-1 rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
           />
           <button
             type="button"
             onClick={addNationality}
-            className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4A5548]"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
             Add
@@ -183,7 +183,7 @@ export function PhysicalDetailsSection() {
 
       {/* Work Permits */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">Work Permits</label>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Work Permits</label>
         <div className="flex flex-wrap gap-2">
           {WORK_PERMIT_OPTIONS.map((permit) => {
             const isSelected = workPermits.includes(permit);
@@ -195,8 +195,8 @@ export function PhysicalDetailsSection() {
                 className={cn(
                   "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
                   isSelected
-                    ? "bg-[#E8721A] text-white"
-                    : "border border-[#C7C0B5] bg-[#F0E9DE] text-[#2C3328]"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                    : "border border-border bg-muted/60 text-foreground hover:bg-muted"
                 )}
               >
                 {permit}
@@ -208,29 +208,29 @@ export function PhysicalDetailsSection() {
 
       {/* Ethnicity / Heritage */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">
+        <label className="mb-1.5 block text-sm font-medium text-foreground">
           Ethnicity / Heritage (optional)
         </label>
         <input
           {...register("ethnicity")}
           type="text"
           placeholder="ex: Mixed Heritage"
-          className="w-full rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+          className="w-full rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
         />
       </div>
 
       {/* Appearance */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-[#2C3328]">Appearance</label>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Appearance</label>
         {appearance.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {appearance.map((app, i) => (
               <span
                 key={i}
-                className="flex items-center gap-1 rounded-full bg-[#3D4A3C] px-3 py-1 text-xs font-medium text-white"
+                className="flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-3 py-1 text-xs font-semibold text-primary"
               >
                 {app}
-                <button type="button" onClick={() => removeAppearance(i)}>
+                <button type="button" onClick={() => removeAppearance(i)} className="hover:text-primary/70">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -244,12 +244,12 @@ export function PhysicalDetailsSection() {
             onChange={(e) => setAppearanceInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAppearance())}
             placeholder="ex: White Scandinavian"
-            className="flex-1 rounded-lg border border-[#C7C0B5] bg-[#E8DFD0] py-2.5 px-4 text-sm text-[#2C3328] placeholder-[#6B6B6B]/60 outline-none transition-all focus:border-[#E8721A] focus:ring-1 focus:ring-[#E8721A]"
+            className="flex-1 rounded-xl border border-border bg-input/50 py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:bg-background"
           />
           <button
             type="button"
             onClick={addAppearance}
-            className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4A5548]"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
             Add

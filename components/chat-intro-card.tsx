@@ -48,6 +48,28 @@ export function ChatIntroCard({ content }: ChatIntroCardProps) {
           </li>
         </ul>
       </div>
+
+      {/* Baseline Upload & First Question Section */}
+      <div className="mt-8 pt-6 border-t border-border/60 space-y-4 text-sm leading-relaxed">
+        <div>
+          <h4 className="font-semibold text-foreground tracking-wide text-xs uppercase mb-1">
+            Baseline Upload
+          </h4>
+          <p className="text-muted-foreground">
+            If you prefer not to start from absolute zero, you can use the Baseline Upload feature. Submit a written personal history, bio, or past journal entry, and the Copilot will extract your foundation directly from the text to jumpstart your Vault.
+          </p>
+        </div>
+
+        <div className="space-y-3 text-foreground/90">
+          <p>
+            We begin with <span className="font-semibold text-foreground">Identity & Self-Story</span>. This session explores the gap between how you are seen and what is true underneath. We want to understand the traits you are known for, the parts you keep private, and the contradictions that make you who you are. Understanding this gives your later character work more depth, helping you play both the mask a character presents and the truth they keep hidden.
+          </p>
+
+          <p className="font-medium text-foreground bg-muted/40 rounded-xl p-4 border border-border/50">
+            To start, let&apos;s establish the baseline: How old are you, where are you from, and what is the &quot;elevator pitch&quot; you usually use to describe yourself to a stranger?
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
