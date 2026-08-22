@@ -277,7 +277,7 @@ export function parseDnaProfileData(docData: any, vaultDocs: any[] = []): Parsed
   }
 
   // Completion calculation based on coverage across all 4 DNA sections
-  let completion = 0;
+  let completion: number;
   if (typeof docData?.completion === "number" && docData.completion > 0 && docData.completion <= 1) {
     completion = docData.completion;
   } else if (typeof docData?.dnaCompletion === "number" && docData.dnaCompletion > 0 && docData.dnaCompletion <= 1) {
