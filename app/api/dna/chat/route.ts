@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { SECTION_PROMPTS, SYSTEM_PROMPT } from '@/lib/prompts';
 import { createChildLogger } from '@/lib/logger';
 import { logger } from '@/lib/logger';
@@ -7,17 +8,21 @@ import { EXTRACTION_TOOL } from '@/lib/dna/extraction/extraction-tool-schema';
 import { documentToPromptPart, validateDocumentPayload } from '@/lib/document-processing';
 
 /**
- * Handles conversational DNA extraction chat, running dual AI models: one for Socratic
- * questioning and another for silent psychological data extraction from user responses.
+ * Handles conversational DNA extraction chat, running dual AI models:
+ * YAN (Socratic coach) is executed blocking for immediate user response, while
+ * MEMLISTENER (psychological profiler) runs asynchronously in a background worker.
  * @param request - HTTP request with authorization token, chat content, current section,
  *                  actor name, conversation history, and previously asked questions
- * @returns JSON response with AI coach reply and extracted psychological data
+ * @returns JSON response with AI coach reply
  * @async
  */
 export async function POST(request: Request) {
+    const t0 = performance.now();
+    console.log(`[PERF][SERVER] 🚀 POST /api/dna/chat request received at t=0ms`);
     try {
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.log(`[PERF][SERVER] ❌ Unauthorized request (no bearer token) after ${(performance.now() - t0).toFixed(1)}ms`);
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -27,6 +32,7 @@ export async function POST(request: Request) {
         if (document !== undefined) {
             const validation = validateDocumentPayload(document);
             if (!validation.ok) {
+                console.log(`[PERF][SERVER] ❌ Invalid document payload after ${(performance.now() - t0).toFixed(1)}ms`);
                 return NextResponse.json({ error: validation.error }, { status: validation.status });
             }
         }
@@ -38,19 +44,35 @@ export async function POST(request: Request) {
             ? recentQuestions.map((q: string, i: number) => `Prior AI Question: "${q}"`).join('\n') 
             : "No previous questions.";
 
-        const { auth, db } = await import('@/lib/firebase.admin');
+        const tAuthStart = performance.now();
+        const { auth, db, verifyOrDecodeIdToken } = await import('@/lib/firebase.admin');
         const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await auth.verifyIdToken(token);
+        const decodedToken = typeof verifyOrDecodeIdToken === 'function'
+            ? await verifyOrDecodeIdToken(token)
+            : await auth.verifyIdToken(token);
         
-        const userRecord = await auth.getUser(decodedToken.uid);
-        const firstName = userRecord.displayName?.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
+        let rawFirstName = actorName || (decodedToken as { name?: string }).name?.split(" ")[0];
+        if (!rawFirstName && auth.getUser) {
+            try {
+                const userRecord = await auth.getUser(decodedToken.uid);
+                if (userRecord?.displayName) {
+                    rawFirstName = userRecord.displayName.split(" ")[0];
+                }
+            } catch {
+                // Fallback
+            }
+        }
+        const firstName = (rawFirstName || "Actor").replace(/[^a-zA-Z0-9]/g, "") || "Actor";
         const userPath = `${decodedToken.uid}_${firstName}`;
+        console.log(`[PERF][SERVER] ⏱️ Auth verification completed in ${(performance.now() - tAuthStart).toFixed(1)}ms (userPath: ${userPath})`);
 
         const log = createChildLogger({ route: 'dna/chat', userPath, currentSection });
         log.trace({ bodyKeys: Object.keys(body) }, 'Request body received');
 
+        const tProfileStart = performance.now();
         const profileRef = db.doc(`users/${userPath}/profile/master`);
         const profileSnap = await profileRef.get();
+        console.log(`[PERF][SERVER] ⏱️ Master profile read completed in ${(performance.now() - tProfileStart).toFixed(1)}ms`);
         
         let baselineContext = "";
         if (profileSnap.exists) {
@@ -62,48 +84,19 @@ export async function POST(request: Request) {
 
         //PIVOT ENGINE
         const questionCount = previouslyAsked?.length || 0;
-
         const isShort = content.trim().length < 15;
-        // const isMandatoryPivot = questionCount > 0 && questionCount % 15 === 0;
         const isMandatoryPivot = false;
 
-        log.trace({
-            questionCount,
-            isShort,
-            isMandatoryPivot,
-            pivotFlag: pivotFlag === true,
-            contentLength: content.trim().length
-        }, 'Pivot decision variables');
-
-        /**
-         * Flag to determine if a document payload is present in this exact turn.
-         */
         const hasDocumentAttached = document && document.data ? true : false;
-
-        /**
-         * System flag to determine if the user has requested a safe session termination.
-         * We parse the incoming message for the specific command tag dispatched by the UI.
-         */
         const isEndSession = content.includes("Please help me ground myself and close the session.");
 
-        /**
-         * System flag to detect if the actor is utilizing a UI shortcut to bypass 
-         * the current prompt. Used to prevent unnecessary extraction model execution.
-         */
         const skipPhrases = [
             "Pass", 
             "Change the subject, next question", 
         ];
         const isSkipCommand = skipPhrases.includes(content.trim());
-
         const isResumeSessionContinue = content.includes("Pick up where I left off");
-        
         const isResumeSessionNew = content.includes("Start something new");
-
-        /**
-         * System flag to detect the very first response in the Identity section.
-         * Used to enforce the completion of the 3-part baseline question.
-         */
         const isFirstIdentityResponse = currentSection === 'identity' && (!previouslyAsked || previouslyAsked.length === 0);
 
         let dynamicCommand = "";
@@ -116,8 +109,7 @@ export async function POST(request: Request) {
             2. VALIDATION: Acknowledge the emotional work they have done today and validate their effort in exploring these depths.
             3. GROUNDING EXERCISE: Guide the user through a brief, calming grounding technique to help them detach from the character/memory and return to their baseline reality. Provide a simple sensory exercise (e.g., the 5-4-3-2-1 technique or a guided deep breath).
             4. CLOSURE: End with a warm, supportive closing statement indicating that the session is now complete and they are safe to step away from the screen. Keep the tone empathetic, grounded, and professional.`;
-        } else
-        if (isShort && !pivotFlag) {
+        } else if (isShort && !pivotFlag) {
             dynamicCommand = `[User is giving very short input]
             Instigate deeper. The user's latest message is very brief, which may indicate they are holding back or struggling to articulate.
             Ask a follow-up question that encourages them to expand and provide more detail. Do not accept one-word answers. Push for depth and specificity. Explain your reasoning to the user to encourage them to open up.
@@ -146,7 +138,6 @@ export async function POST(request: Request) {
             1. WARM WELCOME: Start with a brief, grounding, and gentle welcome back message to make them feel safe.
             2. CONTEXTUALIZE: Review the conversation history prior to the break.
             3. RESUME SONDAGE: Ask ONE follow-up Socratic question that picks up exactly where the previous deep conversation left off. Maintain the momentum of the prior topic.`;
-            
         } else if (isResumeSessionNew) {
             dynamicCommand = `[SYSTEM OVERRIDE: WELCOME BACK & PIVOT]
             The user has returned to the session after taking a break and specifically requested to start fresh.
@@ -155,9 +146,7 @@ export async function POST(request: Request) {
             1. WARM WELCOME: Start with a brief, grounding, and gentle welcome back message to make them feel safe.
             2. DROP THE PAST: Completely abandon whatever specific memory or theme was being discussed before the break. Do not reference it.
             3. FRESH START: Look at your provided "Follow-up Routes" in the system instructions. Pick a completely NEW, unexplored route and ask a fresh Socratic question to open a new angle of psychological exploration.`;
-        }
-
-        else if (isFirstIdentityResponse) {
+        } else if (isFirstIdentityResponse) {
             dynamicCommand = `[SYSTEM OVERRIDE: BASELINE GATEKEEPER]
             The user is currently responding to your initial 3-part baseline question: 1. Age, 2. Location, 3. Elevator pitch.
             
@@ -165,7 +154,6 @@ export async function POST(request: Request) {
             1. Analyze their input. Did they explicitly provide ALL THREE pieces of information?
             2. MISSING INFO: If they missed any of the three, your ONLY task this turn is to warmly acknowledge what they did share, and directly ask them to fill in the missing piece(s) before moving forward. (e.g., "I love that pitch, but you forgot to tell me your age and where you're based!")
             3. ALL GOOD: If they successfully answered all three, proceed normally. Choose a "Follow-up Route" to start challenging the mask they presented in their elevator pitch.`;
-        
         } else {
             dynamicCommand = `[MOMENTUM CHECK]
             Continue the Socratic extraction naturally. Ask ONE follow-up question. However, if you feel the current specific memory is fully explored, do not hesitate to pivot to a new Route.`;
@@ -196,40 +184,38 @@ export async function POST(request: Request) {
             
             `;
 
-        const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
+        const tModelInitStart = performance.now();
+        const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
         const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
         const aiGlobal = getAI(getFirebaseApp(), { 
             backend: new VertexAIBackend('global') 
         });
         
-        // Mantemos o padrão (us-central1) para o modelo de extração não quebrar
         const aiCentral = getAI(getFirebaseApp(), { 
             backend: new VertexAIBackend() 
         });
         
-        // --- AGENT 1: YAN (Conversacional) ---
+        // --- AGENT 1: YAN (Conversational) ---
         const chatModel = getGenerativeModel(aiGlobal, { 
             model: "gemini-3.1-pro-preview", 
-            
-        } ); 
+        }); 
 
         // --- AGENT 2: MEMLISTENER (Context Extraction) ---
         const extractionModel = getGenerativeModel(aiCentral, {
             model: "gemini-2.5-pro",
             generationConfig: { temperature: 0.1 }, 
-            // // @ts-expect-error
-            // thinkingConfig: { thinkingLevel: "MEDIUM" },
             tools: [EXTRACTION_TOOL],
-        } ); 
+        }); 
 
+        // Cap YAN history to the recent 15 messages for optimal token throughput
+        const historyForYan = history.slice(-15);
 
         const chat = chatModel.startChat({
             systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
-            history: history, 
+            history: historyForYan, 
         });
 
-        // Build the history context for the extraction model to read
         const recentHistoryText = history.slice(-7).map((msg: ChatHistoryMessage) => `${msg.role.toUpperCase()}: ${msg.parts[0].text}`).join('\n');
 
         const promptForExtraction = `
@@ -246,7 +232,6 @@ export async function POST(request: Request) {
             "${content.trim()}"
         `;
 
-        // Primary execution: Always generate the conversational response.
         type PromptPart = { text: string } | { inlineData: { data: string; mimeType: string } };
 
         const promptParts: PromptPart[] = [
@@ -256,67 +241,91 @@ export async function POST(request: Request) {
         if (document && document.data && document.mimeType) {
             const docPart = await documentToPromptPart(document);
             if (!docPart.ok) {
+                console.log(`[PERF][SERVER] ❌ Document processing failed after ${(performance.now() - t0).toFixed(1)}ms`);
                 log.error({ mimeType: document.mimeType }, 'Document processing failed');
                 return NextResponse.json({ error: docPart.error }, { status: docPart.status });
             }
             promptParts.push(docPart.part);
         }
 
-        const chatResult = await chat.sendMessage(promptParts);
+        console.log(`[PERF][SERVER] ⏱️ AI Models & Prompt prepared in ${(performance.now() - tModelInitStart).toFixed(1)}ms. Invoking YAN chat.sendMessage(promptParts)...`);
 
+        // 1. FAST BLOCKING PATH: Generate YAN response immediately (1.5-2.5s)
+        const tYanStart = performance.now();
+        const chatResult = await chat.sendMessage(promptParts);
         const aiResponseText = chatResult.response.text();
-        
-        let extractionsData: ExtractedPsychData | null = null;
-        
-       /**
-         * Declare functionCalls in the outer scope so it can be accessed later by the debug logger. 
-         * Strictly typed to match the Firebase Vertex AI SDK FunctionCall signature to comply with no-any rules.
-         */
-        let functionCalls: { name: string; args: object }[] | undefined = undefined;
-        
-        /**
-         * Secondary execution: Context Extraction
-         * We strictly bypass the extraction model if the user is ending the session
-         * or skipping the question, thereby saving token usage and preventing 
-         * superficial data pollution in the psychological profile.
-         */
-        if (!isEndSession && !isSkipCommand && !isResumeSessionContinue && !isResumeSessionNew) {
-            const extractionResult = await extractionModel.generateContent(promptForExtraction);
-            
-            // Assign to the outer variable instead of using 'const'
-            functionCalls = extractionResult.response.functionCalls(); 
-            
-            if (functionCalls && functionCalls.length > 0) {
-                extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
+        console.log(`[PERF][SERVER] ⏱️ YAN chat.sendMessage completed in ${(performance.now() - tYanStart).toFixed(1)}ms (Output length: ${aiResponseText.length} chars)`);
+
+        // 2. ASYNC BACKGROUND EXTRACTION WORKER: MEMLISTENER runs non-blocking
+        const shouldExtract = !isEndSession && !isSkipCommand && !isResumeSessionContinue && !isResumeSessionNew;
+
+        if (shouldExtract) {
+            const backgroundTask = async () => {
+                const tBgStart = performance.now();
+                console.log(`[PERF][SERVER][BG] ⏱️ Starting MEMLISTENER background extraction...`);
+                try {
+                    const extractionResult = await extractionModel.generateContent(promptForExtraction);
+                    const functionCalls = extractionResult.response.functionCalls();
+                    if (functionCalls && functionCalls.length > 0) {
+                        const extractionsData = functionCalls[0].args as unknown as ExtractedPsychData;
+                        const aiAssessment = extractionsData.progress_assessment;
+                        const isHighQuality =
+                            aiAssessment != null &&
+                            aiAssessment.has_actionable_pattern === true &&
+                            (aiAssessment.depth_score ?? 0) >= 4;
+
+                        if (isHighQuality) {
+                            const updatePayload: Record<string, unknown> = { lastUpdated: FieldValue.serverTimestamp() };
+                            if (extractionsData.new_traits?.length) updatePayload['psychology.traits'] = FieldValue.arrayUnion(...extractionsData.new_traits);
+                            if (extractionsData.defense_mechanisms?.length) updatePayload['psychology.defenseMechanisms'] = FieldValue.arrayUnion(...extractionsData.defense_mechanisms);
+                            if (extractionsData.leaf_snippets?.length) {
+                                const snippetsWithContext = extractionsData.leaf_snippets.map((quote: string) => ({ quote, section: currentSection, timestamp: new Date().toISOString() }));
+                                updatePayload['psychology.leafSnippets'] = FieldValue.arrayUnion(...snippetsWithContext);
+                            }
+                            if (extractionsData.holistic_analysis) updatePayload['psychology.analysisTimeline'] = FieldValue.arrayUnion({ inference: extractionsData.holistic_analysis, section: currentSection, timestamp: new Date().toISOString() });
+                            if (extractionsData.somatic_tells?.length) updatePayload['physicality.somaticTells'] = FieldValue.arrayUnion(...extractionsData.somatic_tells);
+                            if (extractionsData.core_values?.length) updatePayload['psychology.coreValues'] = FieldValue.arrayUnion(...extractionsData.core_values);
+                            if (extractionsData.relational_dynamics?.length) updatePayload['psychology.relationalDynamics'] = FieldValue.arrayUnion(...extractionsData.relational_dynamics);
+                            if (extractionsData.milestones?.length) {
+                                const milestonesWithContext = extractionsData.milestones.map((m: any) => ({ ...m, section: currentSection, discoveredAt: new Date().toISOString() }));
+                                updatePayload['history.milestones'] = FieldValue.arrayUnion(...milestonesWithContext);
+                            }
+                            if (extractionsData.core_wounds_and_fears?.length) updatePayload['acting_fuel.coreWounds'] = FieldValue.arrayUnion(...extractionsData.core_wounds_and_fears);
+                            if (extractionsData.unmet_needs?.length) updatePayload['acting_fuel.unmetNeeds'] = FieldValue.arrayUnion(...extractionsData.unmet_needs);
+                            if (extractionsData.public_masks?.length) updatePayload['acting_fuel.publicMasks'] = FieldValue.arrayUnion(...extractionsData.public_masks);
+                            if (extractionsData.archetype_signals?.length) updatePayload['acting_fuel.archetypes'] = FieldValue.arrayUnion(...extractionsData.archetype_signals);
+                            if (extractionsData.key_entities_and_arenas?.length) updatePayload['history.keyEntities'] = FieldValue.arrayUnion(...extractionsData.key_entities_and_arenas);
+
+                            await profileRef.set(updatePayload, { merge: true });
+                            console.log(`[PERF][SERVER][BG] ✅ MEMLISTENER extraction saved to profile/master in ${(performance.now() - tBgStart).toFixed(1)}ms`);
+                        } else {
+                            console.log(`[PERF][SERVER][BG] ℹ️ MEMLISTENER extraction completed in ${(performance.now() - tBgStart).toFixed(1)}ms (low quality score, skipped profile update)`);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[PERF][SERVER][BG] ❌ MEMLISTENER extraction failed gracefully in ${(performance.now() - tBgStart).toFixed(1)}ms:`, err);
+                }
+            };
+
+            if (typeof after === 'function') {
+                after(backgroundTask);
+            } else {
+                void backgroundTask();
             }
         }
 
-        if (process.env.MEMLISTENER_DEBUG === 'true') {
-            log.trace({
-                hasExtractionData: extractionsData !== null,
-                functionCallCount: functionCalls?.length || 0,
-                uniqueThemeCount: extractionsData?.themes_extracted?.length || 0,
-                hasProgressAssessment: extractionsData?.progress_assessment != null,
-            }, 'MemListener extraction summary');
-        }
-
-        // 7. FIRE-AND-FORGET LOGGING - TEMPORARIAMENTE DESABILITADO PARA DEBUG
-        // saveRawMessageToFirestore(userId, {
-        //     userMessage: content,
-        //     aiResponse: aiResponseText,
-        //     timestamp: new Date().toISOString(),
-        //     section: currentSection
-        // }).catch((err: Error) => console.error("Failed to append to chat log:", err));
+        console.log(`[PERF][SERVER] 🏁 Returning HTTP 200 JSON to client at t=${(performance.now() - t0).toFixed(1)}ms`);
 
         return NextResponse.json({
             aiData: {
                 coach_reply: aiResponseText,
-                extractions: extractionsData 
+                extractions: null 
             },
             selectedQuestions: [aiResponseText] 
         }, { status: 200 });
 
     } catch (error) {
+        console.error(`[PERF][SERVER] ❌ Fatal API Error after ${(performance.now() - t0).toFixed(1)}ms:`, error);
         logger.error({ err: error, msg: 'Secure Chat API Error' });
         return NextResponse.json({ error: 'Failed to generate chat response' }, { status: 500 });
     }

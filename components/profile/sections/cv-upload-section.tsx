@@ -81,7 +81,7 @@ export function CvUploadSection() {
 
   return (
     <div className="space-y-5">
-      <h3 className="text-base font-semibold text-[#2C3328]">CV Upload</h3>
+      <h3 className="text-base font-semibold text-foreground font-title">CV Upload</h3>
 
       {/* Drop Zone */}
       <div
@@ -89,18 +89,18 @@ export function CvUploadSection() {
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 transition-colors shadow-sm ${
           isDragging
-            ? "border-[#E8721A] bg-[#E8721A]/5"
-            : "border-[#C7C0B5] bg-[#F0E9DE]"
+            ? "border-primary bg-primary/10"
+            : "border-border bg-muted/40 hover:border-primary/50"
         }`}
       >
-        <Upload className="mb-3 h-8 w-8 text-[#6B6B6B]" />
-        <p className="text-sm font-medium text-[#2C3328]">
+        <Upload className="mb-3 h-8 w-8 text-primary" />
+        <p className="text-sm font-semibold text-foreground">
           {uploading ? "Uploading..." : "Drag & drop your PDF"}
         </p>
-        <p className="mt-1 text-xs text-[#6B6B6B]">or click to browse</p>
-        <p className="mt-1 text-xs text-[#6B6B6B]">Max file size: 100MB</p>
+        <p className="mt-1 text-xs text-muted-foreground">or click to browse</p>
+        <p className="mt-1 text-xs text-muted-foreground">Max file size: 100MB</p>
       </div>
 
       <input
@@ -113,12 +113,12 @@ export function CvUploadSection() {
 
       {/* Uploaded File Display */}
       {cvFilename && (
-        <div className="flex items-center gap-3 rounded-lg bg-[#F0E9DE] px-4 py-2.5">
-          <span className="flex-1 text-sm text-[#6B6B6B]">{cvFilename}</span>
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/50 px-4 py-3">
+          <span className="flex-1 text-sm font-medium text-foreground">{cvFilename}</span>
           <button
             type="button"
             onClick={removeCv}
-            className="text-[#6B6B6B] transition-colors hover:text-[#C45A3C]"
+            className="text-muted-foreground transition-colors hover:text-destructive"
           >
             <X className="h-4 w-4" />
           </button>

@@ -398,24 +398,29 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         `users/${userPath}/dnaSessions/${sessionId}/messages`
       );
 
+      const t0 = performance.now();
+      console.log(`[PERF][CLIENT] 🚀 sendMessage initiated: "${content.substring(0, 30)}..."`);
       try {
         setIsLoading(true);
         setIsReprocessing(false);
         setStreamingContent("");
 
-        // 1. Persist the sanitized user message to Firestore
-        await addDoc(messagesRef, {
+        // 1 & 2. Concurrently persist sanitized user message to Firestore and fetch message history
+        const tPreStart = performance.now();
+        const userMsgPromise = addDoc(messagesRef, {
           role: "user",
           content: content.trim(),
           timestamp: serverTimestamp(),
           section: currentSection,
           ...(document && { attachmentName: document.name })
         });
-        
-        // 2. Prepare the history payload for the secure backend
-        const currentMessages = await getDocs(
+
+        const historyQueryPromise = getDocs(
           query(messagesRef, orderBy("timestamp", "asc"))
         );
+
+        const [, currentMessages] = await Promise.all([userMsgPromise, historyQueryPromise]);
+        console.log(`[PERF][CLIENT] ⏱️ Pre-API DB operations (addDoc + getDocs history) completed in ${(performance.now() - tPreStart).toFixed(1)}ms`);
 
         // Extract and map the conversation history
         const history = currentMessages.docs
@@ -425,8 +430,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             parts: [{ text: (d.data().content as string) || ""}],
           }));
 
-        // The Gemini API requires strictly alternating 'user' and 'model' roles.
-        const historyWithoutCurrent = history.slice(0, -1);
+        // Cap chat history to the recent 15 messages for optimal payload size and fast token processing
+        const historyWithoutCurrent = history.slice(0, -1).slice(-15);
         const chatHistory: { role: "user" | "model"; parts: { text: string }[] }[] = [];
         let expectedRole = "user"; 
 
@@ -462,11 +467,13 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         let aiAssessment: ProgressAssessment | null = null;
 
         while (attempt < maxAttempts && !success) {
+            const tAttemptStart = performance.now();
             try {
                 if (attempt > 0) {
                     setIsReprocessing(true);
                 }
 
+                console.log(`[PERF][CLIENT] ⏱️ Dispatching POST /api/dna/chat (Attempt ${attempt + 1}/${maxAttempts})...`);
                 // Execute Secure API Call to our Next.js backend
                 const response = await fetch('/api/dna/chat', {
                     method: 'POST',
@@ -484,6 +491,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
                         document: document || undefined,
                     })
                 });
+
+                console.log(`[PERF][CLIENT] ⏱️ POST /api/dna/chat response received in ${(performance.now() - tAttemptStart).toFixed(1)}ms with status ${response.status}`);
 
                 if (!response.ok) {
                     throw new Error(`Server responded with status: ${response.status}`);
@@ -505,15 +514,18 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
             } catch (error) {
                 attempt++;
+                console.error(`[PERF][CLIENT] ❌ API Request attempt ${attempt} failed after ${(performance.now() - tAttemptStart).toFixed(1)}ms:`, error);
                 log.error({ err: error, attempt, msg: 'Failed' });
                 
                 if (attempt < maxAttempts) {
+                    console.log(`[PERF][CLIENT] ⏳ Sleeping 2000ms before retry attempt ${attempt + 1}...`);
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
         }
 
         if (!success) {
+            console.error(`[PERF][CLIENT] ❌ All ${maxAttempts} API attempts failed after ${(performance.now() - t0).toFixed(1)}ms total.`);
             await addDoc(messagesRef, {
                 role: "assistant",
                 content: "I lost my train of thought for a second there. Could you rephrase what you just said?",
@@ -525,14 +537,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             return; 
         }
 
-
-        // 6. Persist only the AI's conversational reply to the visible chat history
-        await addDoc(messagesRef, {
-          role: "assistant",
-          content: aiCoachReply,
-          timestamp: serverTimestamp(),
-          section: currentSection,
-        });
+        console.log(`[PERF][CLIENT] 🏁 Total sendMessage pipeline duration: ${(performance.now() - t0).toFixed(1)}ms`);
 
         // Update local extraction tracker + compute pivotFlag for NEXT message.
         const updatedTracker = updateTracker(
@@ -558,6 +563,8 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
         const REQUIRED_THEMES = 4;
         const HQ_EXTRACTIONS_FOR_COMPLETION = 5;
+
+        let profileWritePromise: Promise<unknown> = Promise.resolve();
 
         if (aiExtractions) {
           totalCount += 1;
@@ -629,7 +636,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             if (aiExtractions.archetype_signals && aiExtractions.archetype_signals?.length > 0) updatePayload['acting_fuel.archetypes'] = arrayUnion(...aiExtractions.archetype_signals);
             if (aiExtractions.key_entities_and_arenas && aiExtractions.key_entities_and_arenas?.length > 0) updatePayload['history.keyEntities'] = arrayUnion(...aiExtractions.key_entities_and_arenas);
             
-            await setDoc(profileRef, updatePayload, { merge: true });
+            profileWritePromise = setDoc(profileRef, updatePayload, { merge: true });
           }
         }
         
@@ -661,7 +668,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
         const sessionRef = doc(getDb(), `users/${userPath}/dnaSessions/${sessionId}`);
         
-        await setDoc(sessionRef, {
+        const sessionWritePromise = setDoc(sessionRef, {
           lastActiveAt: serverTimestamp(),
           totalExtractions: totalCount,
           sectionHqCounts: sectionCounts,
@@ -671,6 +678,17 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           auditionsUnlocked: unlockedAuditions,
           askedQuestions: newAskedQuestions
         }, { merge: true });
+
+        // 6. Persist AI reply to chat history
+        const assistantMsgPromise = addDoc(messagesRef, {
+          role: "assistant",
+          content: aiCoachReply,
+          timestamp: serverTimestamp(),
+          section: currentSection,
+        });
+
+        // Parallelize post-AI response database operations (message write, master profile update, session update)
+        await Promise.all([assistantMsgPromise, profileWritePromise, sessionWritePromise]);
         
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unexpected session error";

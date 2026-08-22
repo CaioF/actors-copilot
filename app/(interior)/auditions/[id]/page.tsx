@@ -115,18 +115,18 @@ export default function AuditionDetailView() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0E8DC]">
-        <Loader2 className="h-10 w-10 animate-spin text-[#E8721A] mb-4" />
-        <p className="font-title text-lg text-[#2C3328] animate-pulse">Loading breakdown...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground transition-colors">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+        <p className="font-title text-lg text-foreground animate-pulse">Loading breakdown...</p>
       </div>
     )
   }
 
   if (error || !auditionData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0E8DC]">
-        <h2 className="text-2xl font-title text-[#2C3328] mb-4">Audition not found</h2>
-        <button onClick={() => router.push("/auditions")} className="text-[#E8721A] hover:underline">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground transition-colors">
+        <h2 className="text-2xl font-title text-foreground mb-4">Audition not found</h2>
+        <button onClick={() => router.push("/auditions")} className="text-primary hover:underline font-medium">
           Return to Auditions List
         </button>
       </div>
@@ -136,13 +136,13 @@ export default function AuditionDetailView() {
   const analysisLabel = currentAnalysisType === "brief" ? "Brief Breakdown" : "Sides Breakdown";
 
   return (
-    <main className="flex-1 bg-[#F0E8DC] min-h-screen p-8">
+    <main className="flex flex-1 flex-col bg-background text-foreground transition-colors min-h-screen p-4 sm:p-8">
 
       {/* HEADER CONTROLS  */}
-      <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3 mb-6 w-full">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-[#6B6B6B] hover:text-[#E8721A] transition-colors font-medium"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to List
@@ -150,14 +150,14 @@ export default function AuditionDetailView() {
 
         <div className="flex items-center gap-3 flex-wrap">
           {/* Breakdown-type badge — capitalized for visual consistency */}
-          <span className="px-3 py-1 rounded-full bg-[#E8721A] text-[11px] text-white uppercase tracking-wider font-semibold">
+          <span className="px-3 py-1 rounded-full bg-primary text-[11px] text-primary-foreground uppercase tracking-wider font-semibold shadow-sm">
             {hasBothAnalyses ? "Sides + Brief" : analysisLabel}
           </span>
 
           {auditionData.hasSides && !auditionData.hasBrief && (
             <button
               onClick={() => router.push(`/auditions/new/brief?enrichAuditionId=${auditionId}`)}
-              className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-4 py-2 rounded-full font-medium transition-colors text-sm"
+              className="flex items-center gap-2 border border-border bg-card text-foreground hover:bg-muted px-4 py-2 rounded-full font-medium transition-colors text-sm shadow-sm"
             >
               <ClipboardList className="w-4 h-4" />
               Attach Brief
@@ -168,7 +168,7 @@ export default function AuditionDetailView() {
           {auditionData.hasBrief && !auditionData.hasSides && (
             <button
               onClick={() => router.push(`/auditions/new/sides?enrichAuditionId=${auditionId}`)}
-              className="flex items-center gap-2 bg-[#E8721A] text-white hover:bg-[#D66A18] px-6 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-base"
+              className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2.5 rounded-full font-bold shadow-md hover:shadow-lg transition-all text-base"
             >
               <BookOpen className="w-5 h-5" />
               Attach Sides
@@ -177,7 +177,7 @@ export default function AuditionDetailView() {
 
           <button
             onClick={handlePrintDocument}
-            className="flex items-center gap-2 border border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0] px-5 py-2 rounded-full font-medium transition-colors text-sm"
+            className="flex items-center gap-2 border border-border bg-card text-foreground hover:bg-muted px-5 py-2 rounded-full font-medium transition-colors text-sm shadow-sm"
           >
             <Printer className="w-4 h-4" />
             Print Breakdown
@@ -185,29 +185,29 @@ export default function AuditionDetailView() {
         </div>
       </div>
 
-      <div className=" max-w-5xl mx-auto">
+      <div className="max-w-5xl mx-auto w-full">
         {/* Title & Tags */}
         <div className="mb-4">
           <div className="flex items-center">
-            <h1 className="text-4xl font-title uppercase text-[#2C3328]">{auditionData.project}</h1>
+            <h1 className="text-4xl font-title uppercase text-foreground">{auditionData.project}</h1>
           </div>
-          <p className="text-xl text-[#E8721A] font-medium uppercase">{auditionData.role}</p>
+          <p className="text-xl text-primary font-semibold uppercase mt-1">{auditionData.role}</p>
 
           {/* Header metadata band — deadline + casting director, visible above BOTH analysis cards */}
           {(localDeadlineStr || auditionData.castingDirectorName) && (
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {localDeadlineStr && (
-                <div className="flex items-center gap-2 rounded-full bg-[#FFF5F0] border border-[#FF7316]/30 px-4 py-2">
-                  <CalendarDays className="text-[#FF7316] w-4 h-4 shrink-0" />
-                  <span className="text-[10px] font-bold text-[#FF7316] uppercase tracking-widest">Your Local Deadline:</span>
-                  <span className="text-[#2C3328] font-semibold text-sm">{localDeadlineStr}</span>
+                <div className="flex items-center gap-2 rounded-full bg-primary/10 border border-primary/30 px-4 py-2">
+                  <CalendarDays className="text-primary w-4 h-4 shrink-0" />
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Your Local Deadline:</span>
+                  <span className="text-foreground font-semibold text-sm">{localDeadlineStr}</span>
                 </div>
               )}
               {auditionData.castingDirectorName && (
-                <div className="flex items-center gap-2 rounded-full bg-white border border-[#C7C0B5] px-4 py-2">
-                  <User className="text-[#6B6B6B] w-4 h-4 shrink-0" />
-                  <span className="text-[10px] font-bold text-[#6B6B6B] uppercase tracking-widest">Casting Director:</span>
-                  <span className="text-[#2C3328] font-medium text-sm">{auditionData.castingDirectorName}</span>
+                <div className="flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 shadow-sm">
+                  <User className="text-muted-foreground w-4 h-4 shrink-0" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Casting Director:</span>
+                  <span className="text-foreground font-medium text-sm">{auditionData.castingDirectorName}</span>
                 </div>
               )}
             </div>
@@ -215,12 +215,12 @@ export default function AuditionDetailView() {
 
           {/* Stale-analysis re-run banner — shown when both maps exist (the older one was generated without context of the newer one). */}
           {hasBothAnalyses && (
-            <div className="mt-4 rounded-2xl bg-[#FFF5F0] border border-[#FF7316]/30 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mt-4 rounded-2xl bg-primary/10 border border-primary/30 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-start gap-3">
-                <RefreshCw className="text-[#FF7316] w-5 h-5 mt-0.5 shrink-0" />
+                <RefreshCw className="text-primary w-5 h-5 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-[#2C3328]">Tighten the integration between your Sides and Brief</p>
-                  <p className="text-xs text-[#6B6B6B] leading-relaxed mt-0.5">
+                  <p className="text-sm font-semibold text-foreground">Tighten the integration between your Sides and Brief</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
                     Whichever of these you uploaded first was generated without the other one as context. Re-upload that material to weave both together — character names, deadlines, and casting notes will line up across both analyses.
                   </p>
                 </div>
@@ -228,13 +228,13 @@ export default function AuditionDetailView() {
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => router.push(`/auditions/new/sides?enrichAuditionId=${auditionId}`)}
-                  className="text-xs font-semibold border border-[#FF7316]/40 text-[#FF7316] hover:bg-[#FFE7D6] px-3 py-2 rounded-full transition-colors"
+                  className="text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/20 px-3 py-2 rounded-full transition-colors"
                 >
                   Re-run Sides
                 </button>
                 <button
                   onClick={() => router.push(`/auditions/new/brief?enrichAuditionId=${auditionId}`)}
-                  className="text-xs font-semibold border border-[#FF7316]/40 text-[#FF7316] hover:bg-[#FFE7D6] px-3 py-2 rounded-full transition-colors"
+                  className="text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/20 px-3 py-2 rounded-full transition-colors"
                 >
                   Re-run Brief
                 </button>
@@ -248,8 +248,8 @@ export default function AuditionDetailView() {
           {hasNewSchema ? (
             hasBothAnalyses ? (
               <div className="space-y-8">
-                <div className="rounded-2xl bg-[#FCFAF7] p-4 border-l-4 border-[#FF7316]">
-                  <h2 className="text-lg font-bold text-[#2C3328]">Sides Analysis</h2>
+                <div className="rounded-2xl bg-card p-4 border-l-4 border-primary border-t border-r border-b border-border shadow-sm">
+                  <h2 className="text-lg font-bold font-title text-foreground">Sides Analysis</h2>
                 </div>
                 {auditionData.sidesPerformanceMap && (
                   <StepResultSides
@@ -264,8 +264,8 @@ export default function AuditionDetailView() {
                     }
                   />
                 )}
-                <div className="rounded-2xl bg-[#FCFAF7] p-4 border-l-4 border-[#E8721A]">
-                  <h2 className="text-lg font-bold text-[#2C3328]">Brief Analysis</h2>
+                <div className="rounded-2xl bg-card p-4 border-l-4 border-primary border-t border-r border-b border-border shadow-sm">
+                  <h2 className="text-lg font-bold font-title text-foreground">Brief Analysis</h2>
                 </div>
                 {auditionData.briefPerformanceMap && (
                   <StepResultBrief
@@ -312,7 +312,7 @@ export default function AuditionDetailView() {
                 />
               )
             ) : (
-              <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>
+              <p className="text-center text-muted-foreground">No performance map data found for this audition.</p>
             )
           ) : auditionData.performanceMap ? (
             currentAnalysisType === "brief" ? (
@@ -331,7 +331,7 @@ export default function AuditionDetailView() {
               />
             )
           ) : (
-            <p className="text-center text-[#6B6B6B]">No performance map data found for this audition.</p>
+            <p className="text-center text-muted-foreground">No performance map data found for this audition.</p>
           )}
         </div>
       </div>

@@ -198,28 +198,34 @@ export function useActingCoach(): UseActingCoachReturn {
         const data = await response.json();
         if (!data?.aiData?.coach_reply) throw new Error("Invalid response from coach");
 
-        // 3. Write assistant reply to Firestore
+        // 3. Handle Firestore write operations concurrently
         if (userPath) {
           const sessionRef = doc(getDb(), `users/${userPath}/coachSessions/${sessionId}`);
           const messagesRef = collection(sessionRef, "messages");
+          const dbPromises: Promise<unknown>[] = [];
 
-          await addDoc(messagesRef, {
-            role: "assistant",
-            content: data.aiData.coach_reply,
-            timestamp: serverTimestamp(),
-          });
+          // Add assistant message
+          dbPromises.push(
+            addDoc(messagesRef, {
+              role: "assistant",
+              content: data.aiData.coach_reply,
+              timestamp: serverTimestamp(),
+            })
+          );
 
           // Update session metadata
-          await updateDoc(sessionRef, {
-            lastActiveAt: serverTimestamp(),
-            messageCount: increment(1),
-            sessionFocus: data.aiData.session_focus ?? null,
-            stepIndex: data.aiData.step_index ?? 0,
-            mode: data.aiData.mode ?? null,
-            phase: data.aiData.phase ?? null,
-          });
+          dbPromises.push(
+            updateDoc(sessionRef, {
+              lastActiveAt: serverTimestamp(),
+              messageCount: increment(1),
+              sessionFocus: data.aiData.session_focus ?? null,
+              stepIndex: data.aiData.step_index ?? 0,
+              mode: data.aiData.mode ?? null,
+              phase: data.aiData.phase ?? null,
+            })
+          );
 
-          // 4. Handle DNA Extraction Quality Gate
+          // Handle DNA Extraction Quality Gate
           if (data.aiData.action?.type === "trigger_dna_extraction" && data.aiData.extractions) {
             const aiExtractions = data.aiData.extractions;
             const isHighQuality =
@@ -230,48 +236,47 @@ export function useActingCoach(): UseActingCoachReturn {
               const profileRef = doc(getDb(), `users/${userPath}/profile/master`);
               const updatePayload: Record<string, any> = { lastUpdated: serverTimestamp() };
 
-              // Map extraction fields to Firestore schema
               if (aiExtractions.new_traits?.length) updatePayload["psychology.traits"] = arrayUnion(...aiExtractions.new_traits);
               if (aiExtractions.core_values?.length) updatePayload["psychology.coreValues"] = arrayUnion(...aiExtractions.core_values);
               if (aiExtractions.somatic_tells?.length) updatePayload["physicality.somaticTells"] = arrayUnion(...aiExtractions.somatic_tells);
-              // Add other mappings as needed...
 
-              await setDoc(profileRef, updatePayload, { merge: true });
-              log.debug("Coach extraction written to profile/master");
+              dbPromises.push(
+                setDoc(profileRef, updatePayload, { merge: true }).then(() => {
+                  log.debug("Coach extraction written to profile/master");
+                })
+              );
             }
           }
-        }
 
-        // 5. Handle Profile Update Action — runs independently of userPath (uses uid from auth)
-        if (data.aiData.action?.type === "update_actor_profile" && data.aiData.action?.payload) {
-          const auth = getAuth();
-          const uid = auth.currentUser?.uid;
-          if (uid) {
-            const COACH_WRITABLE_FIELDS = new Set([
-              "headshot", "additionalPhotos", "playingAgeMin", "playingAgeMax",
-              "location", "gender", "height", "heightUnit", "eyeColour", "hairColour",
-              "nationalities", "ethnicity", "appearance", "awardsCallout", "bio",
-              "showreels", "credits", "training", "skillsAndAccents",
-            ]);
-            const rawPayload = data.aiData.action.payload as Record<string, unknown>;
-            const safePayload: Record<string, unknown> = { lastUpdated: serverTimestamp() };
-            for (const [key, value] of Object.entries(rawPayload)) {
-              if (COACH_WRITABLE_FIELDS.has(key)) {
-                safePayload[key] = value;
+          // Handle Profile Update Action
+          if (data.aiData.action?.type === "update_actor_profile" && data.aiData.action?.payload) {
+            const auth = getAuth();
+            const uid = auth.currentUser?.uid;
+            if (uid) {
+              const COACH_WRITABLE_FIELDS = new Set([
+                "headshot", "additionalPhotos", "playingAgeMin", "playingAgeMax",
+                "location", "gender", "height", "heightUnit", "eyeColour", "hairColour",
+                "nationalities", "ethnicity", "appearance", "awardsCallout", "bio",
+                "showreels", "credits", "training", "skillsAndAccents",
+              ]);
+              const rawPayload = data.aiData.action.payload as Record<string, unknown>;
+              const safePayload: Record<string, unknown> = { lastUpdated: serverTimestamp() };
+              for (const [key, value] of Object.entries(rawPayload)) {
+                if (COACH_WRITABLE_FIELDS.has(key)) {
+                  safePayload[key] = value;
+                }
               }
-            }
-            if (Object.keys(safePayload).length > 1) {
-              try {
-                await setDoc(
-                  doc(getDb(), "actorProfiles", uid),
-                  safePayload,
-                  { merge: true }
+              if (Object.keys(safePayload).length > 1) {
+                dbPromises.push(
+                  setDoc(doc(getDb(), "actorProfiles", uid), safePayload, { merge: true }).catch((writeError) => {
+                    log.error({ err: writeError, msg: "Coach profile write failed" });
+                  })
                 );
-              } catch (writeError) {
-                log.error({ err: writeError, msg: "Coach profile write failed" });
               }
             }
           }
+
+          await Promise.all(dbPromises);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to get coach response";

@@ -25,7 +25,7 @@ interface ActorProfileFormProps {
  */
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[#C7C0B5]/50 bg-[#F5F0E8] p-6">
+    <div className="rounded-2xl border border-border bg-card text-card-foreground p-6 shadow-sm">
       {children}
     </div>
   );
@@ -89,10 +89,10 @@ export function ActorProfileForm({ onSave, saveStatus }: ActorProfileFormProps) 
         type="button"
         onClick={onSave}
         disabled={saveStatus === "saving"}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#E8721A] px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-[#E8721A]/90 disabled:opacity-70"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-70 shadow-md hover:shadow-lg"
       >
         <Save className="h-4 w-4" />
-        {saveStatus === "saving" ? "Saving..." : "Save Profile"}
+        {saveStatus === "saving" ? "Saving Profile..." : "Save Profile"}
       </button>
     </div>
   );

@@ -321,22 +321,22 @@ const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) 
 
   if (isLoading) {
     return (
-      <main className="flex flex-1 flex-col">
+      <main className="flex flex-1 flex-col bg-background text-foreground transition-colors">
         <DashboardHeader title="My Profile" />
-        <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="flex flex-1 flex-col items-center justify-center py-20">
           <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute w-24 h-24 border-2 border-[#E8721A] rounded-full animate-ping opacity-20" />
-            <div className="absolute w-20 h-20 border-4 border-[#E8721A]/30 rounded-full animate-pulse" />
-            <div className="relative z-10 bg-[#3D4A3C] p-4 rounded-full shadow-2xl">
-              <Clapperboard className="w-8 h-8 text-[#E8721A]" />
+            <div className="absolute w-24 h-24 border-2 border-primary rounded-full animate-ping opacity-20" />
+            <div className="absolute w-20 h-20 border-4 border-primary/30 rounded-full animate-pulse" />
+            <div className="relative z-10 bg-card border border-border p-4 rounded-full shadow-2xl">
+              <Clapperboard className="w-8 h-8 text-primary" />
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-[#E8721A] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-            <div className="w-2 h-2 bg-[#E8721A] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-            <div className="w-2 h-2 bg-[#E8721A] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
           </div>
-          <p className="text-[#6B6B6B] text-sm uppercase tracking-[0.2em] mt-4 font-medium h-5 transition-opacity duration-300">
+          <p className="text-muted-foreground text-sm uppercase tracking-[0.2em] mt-4 font-medium h-5 transition-opacity duration-300">
             {loadingText}
           </p>
         </div>
@@ -345,7 +345,7 @@ const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) 
   }
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-background text-foreground transition-colors pb-8">
       <DashboardHeader title="My Profile" />
 
       <div className="px-4 sm:px-8 pb-4 sm:pb-8">

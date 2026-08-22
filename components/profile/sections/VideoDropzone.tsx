@@ -188,33 +188,33 @@ export function VideoDropzone({ onUploadSuccess }: VideoDropzoneProps) {
   return (
     <div
       {...getRootProps()}
-      className={`relative mt-4 flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-all 
-        ${isDragActive ? "border-[#E8721A] bg-[#E8721A]/10" : "border-[#C7C0B5] bg-[#E8DFD0]/50 hover:bg-[#E8DFD0]"}
+      className={`relative mt-4 flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 transition-all shadow-sm
+        ${isDragActive ? "border-primary bg-primary/10" : "border-border bg-input/30 hover:bg-input/60"}
         ${isUploading ? "pointer-events-none opacity-80" : ""}`}
     >
       <input {...getInputProps()} />
       
       {isUploading ? (
         <div className="flex flex-col items-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-[#E8721A]" />
-          <div className="text-sm font-medium text-[#2C3328]">Uploading... {progress}%</div>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="text-sm font-semibold text-foreground">Uploading... {progress}%</div>
           {/* Visual progress bar */}
-          <div className="h-2 w-48 overflow-hidden rounded-full bg-[#C7C0B5]">
+          <div className="h-2 w-48 overflow-hidden rounded-full bg-muted">
             <div 
-              className="h-full bg-[#E8721A] transition-all duration-300 ease-out"
+              className="h-full bg-primary transition-all duration-300 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
       ) : (
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="rounded-full bg-[#E8DFD0] p-3">
-            <UploadCloud className="h-6 w-6 text-[#E8721A]" />
+          <div className="rounded-full bg-primary/10 p-3">
+            <UploadCloud className="h-6 w-6 text-primary" />
           </div>
-          <p className="text-sm font-medium text-[#2C3328]">
+          <p className="text-sm font-semibold text-foreground">
             Drag & drop a video up to 500MB
           </p>
-          <p className="text-xs text-[#6B6B6B]">
+          <p className="text-xs text-muted-foreground">
             or click to browse from your computer
           </p>
         </div>

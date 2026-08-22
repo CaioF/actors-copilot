@@ -80,99 +80,103 @@ export function ProfileHeader({ onPublish, onSave, saveStatus }: ProfileHeaderPr
   return (
     <div className="mb-6 space-y-4">
       {/* Title Row */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="font-title text-2xl font-bold text-[#2C3328]">
+            <h2 className="font-title text-2xl font-bold text-foreground">
               Your Actor Profile
             </h2>
             <span
-              className={`rounded-full px-3 py-0.5 text-xs font-medium ${
+              className={`rounded-full px-3 py-0.5 text-xs font-semibold ${
                 status === "published"
-                  ? "bg-[#E8721A]/15 text-[#E8721A]"
-                  : "bg-[#C7C0B5]/30 text-[#6B6B6B]"
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground"
               }`}
             >
               {status === "published" ? "Published" : "Draft"}
             </span>
           </div>
-          <p className="mt-1 text-sm text-[#6B6B6B]">
+          <p className="mt-1 text-sm text-muted-foreground">
             Build your professional presence. Control what the world sees.
           </p>
         </div>
 
         {/* Save Status Indicator */}
-        <div className="flex items-center gap-1.5 text-xs text-[#6B6B6B]">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {saveStatus === "saving" && (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#E8721A]" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               <span>Saving...</span>
             </>
           )}
           {saveStatus === "saved" && (
             <>
-              <Cloud className="h-3.5 w-3.5 text-[#4A5548]" />
-              <span className="text-[#4A5548]">Saved</span>
+              <Cloud className="h-3.5 w-3.5 text-primary" />
+              <span className="text-primary font-medium">Saved</span>
             </>
           )}
           {saveStatus === "error" && (
             <>
-              <CloudOff className="h-3.5 w-3.5 text-[#C45A3C]" />
-              <span className="text-[#C45A3C]">Save failed</span>
+              <CloudOff className="h-3.5 w-3.5 text-destructive" />
+              <span className="text-destructive font-medium">Save failed</span>
             </>
           )}
         </div>
       </div>
 
       {/* URL Bar + Actions */}
-      <div className="flex items-center gap-2 rounded-lg border border-[#C7C0B5] bg-white px-3 py-2">
-        <ExternalLink className="h-4 w-4 flex-shrink-0 text-[#6B6B6B]" />
-        <span className="flex-1 truncate text-sm text-[#2C3328]">{profileUrl}</span>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-2 shadow-sm">
+        <div className="flex flex-1 items-center gap-2 min-w-[200px] px-2 py-1">
+          <ExternalLink className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate text-sm text-foreground font-mono">{profileUrl}</span>
+        </div>
 
-        {/* Copy Link */}
-        <button
-          type="button"
-          onClick={copyLink}
-          className="flex items-center gap-1.5 rounded-lg bg-[#3D4A3C] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#4A5548]"
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? "Copied!" : "Copy Link"}
-        </button>
-
-        {/* Share */}
-        <button
-          type="button"
-          onClick={handleShare}
-          className="flex items-center gap-1.5 rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#E8DFD0]"
-        >
-          <Share2 className="h-3.5 w-3.5" />
-          Share
-        </button>
-
-        {/* Draft / Unpublish */}
-        {status === "published" ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Copy Link */}
           <button
             type="button"
-            onClick={unpublish}
-            className="flex items-center gap-1 rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#2C3328] transition-colors hover:bg-[#E8DFD0]"
+            onClick={copyLink}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
           >
-            Unpublish
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied!" : "Copy Link"}
           </button>
-        ) : (
-          <span className="rounded-lg border border-[#C7C0B5] bg-[#F0E9DE] px-3 py-1.5 text-xs font-medium text-[#6B6B6B]">
-            Draft
-          </span>
-        )}
 
-        {/* Publish */}
-        <button
-          type="button"
-          onClick={onPublish}
-          disabled={saveStatus === "saving" || status === "published"}
-          className="rounded-lg bg-[#E8721A] px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#E8721A]/90 disabled:opacity-70"
-        >
-          {status === "published" ? "Published" : "Publish"}
-        </button>
+          {/* Share */}
+          <button
+            type="button"
+            onClick={handleShare}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            <Share2 className="h-3.5 w-3.5 text-muted-foreground" />
+            Share
+          </button>
+
+          {/* Draft / Unpublish */}
+          {status === "published" ? (
+            <button
+              type="button"
+              onClick={unpublish}
+              className="flex items-center gap-1 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              Unpublish
+            </button>
+          ) : (
+            <span className="rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              Draft
+            </span>
+          )}
+
+          {/* Publish */}
+          <button
+            type="button"
+            onClick={onPublish}
+            disabled={saveStatus === "saving" || status === "published"}
+            className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-70 shadow-sm"
+          >
+            {status === "published" ? "Published" : "Publish"}
+          </button>
+        </div>
       </div>
     </div>
   );

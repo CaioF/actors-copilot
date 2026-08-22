@@ -23,11 +23,11 @@ export default function InteriorLayout({
         <ProtectedRoute>
           <AppSidebar />
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-            {children}
+            <div className="flex-1 flex flex-col shrink-0">
+              {children}
+            </div>
             <DashboardFooter />
           </div>
-          {}
-
         </ProtectedRoute>
 
       </div>

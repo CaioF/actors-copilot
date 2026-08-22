@@ -16,6 +16,7 @@ interface ChatMessagesProps {
   isInitializing: boolean;
   isReprocessing?: boolean;
   actorName?: string;
+  activeSection?: string;
 }
 
 export function getInitials(name?: string) {
@@ -76,15 +77,17 @@ function MessageBubble({
   message,
   userInitials,
   isFirstAssistantMessage = false,
+  activeSection,
 }: {
   message: ChatMessage & { attachmentName?: string };
   userInitials: string;
   isFirstAssistantMessage?: boolean;
+  activeSection?: string;
 }) {
   const isAssistant = message.role === "assistant";
 
   // Renders the Hero Intro Card for the initial assistant message
-  if (isAssistant && isFirstAssistantMessage) {
+  if (isAssistant && isFirstAssistantMessage && activeSection === "identity") {
     return <ChatIntroCard content={message.content} />;
   }
 
@@ -98,13 +101,11 @@ function MessageBubble({
 
       <div className={`flex max-w-[70%] flex-col ${isAssistant ? "items-start" : "items-end"}`}>
         <div
-          className={`rounded-2xl px-6 py-4 shadow-sm border ${
-            isAssistant
-              ? "bg-card text-card-foreground border-border"
-              : "bg-primary text-primary-foreground border-transparent"
-          }`}
+          className={`rounded-2xl px-6 py-4 shadow-sm border ${isAssistant
+            ? "bg-card text-card-foreground border-border"
+            : "bg-primary text-primary-foreground border-transparent"
+            }`}
         >
-          {/* Document attachment badge */}
           {!isAssistant && message.attachmentName && (
             <div className="flex items-center gap-1.5 rounded-md bg-primary-foreground/15 px-2.5 py-1.5 mb-3 w-fit border border-primary-foreground/20">
               <FileText size={12} className="text-primary-foreground/80" />
@@ -226,6 +227,7 @@ export function ChatMessages({
   streamingContent,
   isInitializing,
   actorName,
+  activeSection, // <-- Recebe aqui
   isReprocessing = false,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -260,6 +262,7 @@ export function ChatMessages({
               message={msg}
               userInitials={initials}
               isFirstAssistantMessage={isFirstAssistantMessage}
+              activeSection={activeSection}
             />
           );
         })}

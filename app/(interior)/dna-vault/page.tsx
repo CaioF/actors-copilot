@@ -4,17 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, RefreshCcw, Download, Dna, Brain, SlidersHorizontal } from "lucide-react";
+import { Sparkles, RefreshCcw, Download, Dna, Quote, History } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDb } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import HeroSummary from "@/components/dna-vault/HeroSummary";
 import DnaVaultGrid, { DnaAttribute } from "@/components/dna-vault/DnaVaultGrid";
+import { parseDnaProfileData } from "@/lib/dna/dna-parser";
 
-type DnaProfile = {
+type DnaProfileState = {
   attributes: DnaAttribute[];
-  completion?: number;
-  aiSummary?: string;
+  completion: number;
+  aiSummary: string;
+  analysisTimeline: Array<{ inference: string; section?: string; timestamp?: string }>;
+  leafSnippets: Array<{ quote: string; section?: string; timestamp?: string }>;
 };
 
 export default function DnaVaultPage() {
@@ -22,7 +25,7 @@ export default function DnaVaultPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<DnaProfile | null>(null);
+  const [profile, setProfile] = useState<DnaProfileState | null>(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -31,34 +34,50 @@ export default function DnaVaultPage() {
 
     try {
       const firstName = (user.displayName || "").split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Actor";
-      const userPath = `${user.uid}_${firstName}`;
+      const possibleUserPaths = [
+        `${user.uid}_${firstName}`,
+        `${user.uid}_Actor`,
+        user.uid,
+      ];
 
       const db = getDb();
-      const vaultRef = doc(db, `users/${userPath}/dnaVault/master`);
-      const vaultSnap = await getDoc(vaultRef);
+      let masterData: any = null;
+      let vaultSubcollectionDocs: any[] = [];
 
-      if (vaultSnap.exists()) {
-        const data = vaultSnap.data() as any;
-        setProfile({
-          attributes: data.attributes || [],
-          completion: typeof data.completion === "number" ? data.completion : 0,
-          aiSummary: data.aiSummary || undefined,
-        });
-      } else {
-        const profileRef = doc(db, `users/${userPath}/profile/master`);
+      // Try candidates for profile/master
+      for (const path of possibleUserPaths) {
+        const profileRef = doc(db, `users/${path}/profile/master`);
         const profileSnap = await getDoc(profileRef);
         if (profileSnap.exists()) {
-          const d = profileSnap.data() as any;
-          setProfile({ 
-            attributes: d.dnaAttributes || [], 
-            completion: d.dnaCompletion || 0, 
-            aiSummary: d.aiSummary 
-          });
-        } else {
-          setProfile({ attributes: [], completion: 0 });
+          masterData = profileSnap.data();
+
+          // Try subcollection dnaVault for this user path
+          try {
+            const subcollRef = collection(db, `users/${path}/dnaVault`);
+            const subcollSnap = await getDocs(subcollRef);
+            if (!subcollSnap.empty) {
+              vaultSubcollectionDocs = subcollSnap.docs.map((d) => d.data());
+            }
+          } catch (subErr) {
+            console.warn("Could not read dnaVault subcollection:", subErr);
+          }
+
+          break;
+        }
+
+        // Also check if dnaVault/master document exists as legacy
+        const masterVaultRef = doc(db, `users/${path}/dnaVault/master`);
+        const masterVaultSnap = await getDoc(masterVaultRef);
+        if (masterVaultSnap.exists()) {
+          masterData = masterVaultSnap.data();
+          break;
         }
       }
+
+      const parsed = parseDnaProfileData(masterData || {}, vaultSubcollectionDocs);
+      setProfile(parsed);
     } catch (err: any) {
+      console.error("Error loading DNA Vault:", err);
       setError(err?.message || String(err));
     } finally {
       setLoading(false);
@@ -70,11 +89,10 @@ export default function DnaVaultPage() {
   }, [user, authLoading]);
 
   return (
-    <main className="flex flex-1 flex-col min-h-screen bg-background text-foreground transition-colors pb-16">
+    <main className="flex flex-1 flex-col min-h-screen bg-background text-foreground transition-colors pb-8">
       <DashboardHeader title="Personal DNA Vault" />
 
-      <div className="px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full space-y-8">
-        
+      <div className="px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full space-y-8 flex-1">
         {/* Page Title & Actions Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border">
           <div>
@@ -175,9 +193,76 @@ export default function DnaVaultPage() {
 
               <DnaVaultGrid attributes={profile?.attributes || []} />
             </div>
+
+            {/* AI Insights Timeline & Memory Quotes */}
+            {((profile?.analysisTimeline && profile.analysisTimeline.length > 0) ||
+              (profile?.leafSnippets && profile.leafSnippets.length > 0)) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                {/* Profiler Inferences */}
+                {profile.analysisTimeline && profile.analysisTimeline.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                        <History className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-title font-bold text-base text-foreground">
+                          AI Profiler Insights Timeline
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Key psychological deductions made by your AI Copilot
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-3 pt-1">
+                      {profile.analysisTimeline.map((item, idx) => (
+                        <div key={idx} className="p-3.5 rounded-xl border border-border/70 bg-muted/30 text-xs sm:text-sm space-y-1">
+                          <p className="text-foreground leading-relaxed font-medium">{item.inference}</p>
+                          {item.section && (
+                            <span className="inline-block text-[10px] uppercase tracking-wider font-semibold text-primary/80">
+                              Section: {item.section}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recorded Quotes / Leaf Snippets */}
+                {profile.leafSnippets && profile.leafSnippets.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                        <Quote className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-title font-bold text-base text-foreground">
+                          Key Memory Quotes
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Verbatim actor statements captured during extraction
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-3 pt-1">
+                      {profile.leafSnippets.map((item, idx) => (
+                        <div key={idx} className="p-3.5 rounded-xl border border-border/70 bg-muted/30 text-xs sm:text-sm space-y-1">
+                          <p className="text-foreground leading-relaxed italic">"{item.quote}"</p>
+                          {item.section && (
+                            <span className="inline-block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                              {item.section}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
-
       </div>
     </main>
   );

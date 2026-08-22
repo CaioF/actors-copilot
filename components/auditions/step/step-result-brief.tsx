@@ -82,7 +82,7 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
    * Renders standardized markdown elements maintaining enterprise-grade typography.
    */
   const renderMarkdown = (text: string) => (
-    <div className="prose prose-slate max-w-none prose-p:m-0 prose-p:inline prose-strong:font-semibold prose-strong:text-gray-900">
+    <div className="prose prose-neutral dark:prose-invert max-w-none prose-p:m-0 prose-p:inline prose-strong:font-semibold prose-strong:text-foreground text-foreground">
       <ReactMarkdown>{text}</ReactMarkdown>
     </div>
   );
@@ -105,15 +105,15 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
       <div className="space-y-6">
         
         {/* Top Instructional Notice Banner */}
-        <div className="flex items-center gap-3 px-5 py-4 bg-[#ffe3b9] border border-gray-200/60 rounded-2xl shadow-sm text-md text-gray-600 font-medium">
-          <Info size={18} className="text-[#FF7316] shrink-0" />
+        <div className="flex items-center gap-3 px-5 py-4 bg-card border border-border rounded-2xl shadow-sm text-sm text-muted-foreground font-medium">
+          <Info size={18} className="text-primary shrink-0" />
           <span>Read the breakdown and attach sides above.</span>
         </div>
         
         {/* Intro Block: Data Parsing & Header UI */}
         {data.intro && (
-          <div className="rounded-2xl bg-white shadow-sm p-6 sm:p-8 border border-gray-200/60 mb-6">
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Audition Details</h4>
+          <div className="rounded-2xl bg-card shadow-sm p-6 sm:p-8 border border-border mb-6">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4 font-title">Audition Details</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {(() => {
                 // Tolerant intro parser to accommodate dynamic AI outputs.
@@ -133,7 +133,7 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
 
                 if (parts.length <= 1) {
                   return (
-                    <div className="col-span-full text-sm text-gray-700 leading-relaxed">
+                    <div className="col-span-full text-sm text-foreground leading-relaxed">
                       {data.intro}
                     </div>
                   );
@@ -155,7 +155,7 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
 
                 if (items.length === 0) {
                   return (
-                    <div className="col-span-full text-sm text-gray-700 leading-relaxed">
+                    <div className="col-span-full text-sm text-foreground leading-relaxed">
                       {data.intro}
                     </div>
                   );
@@ -164,17 +164,17 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
                 return (
                   <>
                     {prelude && (
-                      <div className="col-span-full text-sm text-gray-600 italic leading-relaxed">
+                      <div className="col-span-full text-sm text-muted-foreground italic leading-relaxed">
                         {prelude}
                       </div>
                     )}
                     {items.map((item, idx) => {
                       return (
                         <div key={idx} className="flex flex-col gap-1.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                             {item.label}
                           </span>
-                          <span className="text-sm text-gray-900 font-semibold">
+                          <span className="text-sm text-foreground font-semibold">
                             {item.value}
                           </span>
                         </div>
@@ -195,10 +195,10 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
           const cleanTitle = section.title.replace(/^(\d+\.|Phase \d+:)\s*/i, '');
 
           return (
-            <div key={idx} id={sectionId} className="rounded-2xl bg-[#FCFAF7] shadow-sm p-6 sm:p-8 border border-gray-200/50 scroll-mt-8">
-              <div className="flex items-center gap-3 mb-6 border-b border-gray-200/50 pb-4">
-                <SectionIcon className="text-[#FF7316]" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">{cleanTitle}</h3>
+            <div key={idx} id={sectionId} className="rounded-2xl bg-card text-card-foreground shadow-sm p-6 sm:p-8 border border-border scroll-mt-8">
+              <div className="flex items-center gap-3 mb-6 border-b border-border pb-4">
+                <SectionIcon className="text-primary" size={24} />
+                <h3 className="text-xl font-bold font-title text-foreground">{cleanTitle}</h3>
               </div>
               
               <div className="space-y-4">
@@ -211,17 +211,17 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
                     const description = item.substring(splitIndex + 1).trim();
                     
                     return (
-                      <div key={i} className="flex flex-col gap-1.5 p-4 bg-white border border-gray-100 rounded-xl hover:border-[#FF7316]/30 transition-colors">
-                          <div className="font-bold text-gray-900 text-[14px] uppercase tracking-wide">{renderMarkdown(header)}</div>
-                          <div className="text-gray-600 text-[15px] leading-relaxed">{renderMarkdown(description)}</div>
+                      <div key={i} className="flex flex-col gap-1.5 p-4 bg-muted/30 border border-border/70 rounded-xl hover:border-primary/40 transition-colors">
+                          <div className="font-bold text-foreground text-[14px] uppercase tracking-wide">{renderMarkdown(header)}</div>
+                          <div className="text-muted-foreground text-[15px] leading-relaxed">{renderMarkdown(description)}</div>
                       </div>
                     );
                   }
 
                   return (
                     <div key={i} className="flex gap-3 items-start pl-2">
-                      <span className="text-[#FF7316] mt-0.5 shrink-0 text-lg leading-none">•</span>
-                      <div className="text-gray-700 text-[15px] leading-relaxed">
+                      <span className="text-primary mt-0.5 shrink-0 text-lg leading-none">•</span>
+                      <div className="text-foreground text-[15px] leading-relaxed">
                         {renderMarkdown(item)}
                       </div>
                     </div>
@@ -234,8 +234,8 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
 
         {/* Outro Block */}
         {data.outro && (
-          <div className="rounded-2xl bg-transparent p-6 sm:p-8 text-gray-600 text-center">
-            <div className="prose prose-slate max-w-none prose-p:italic prose-p:m-0 text-sm">
+          <div className="rounded-2xl bg-transparent p-6 sm:p-8 text-muted-foreground text-center">
+            <div className="prose prose-neutral dark:prose-invert max-w-none prose-p:italic prose-p:m-0 text-sm">
               <ReactMarkdown>{data.outro}</ReactMarkdown>
             </div>
           </div>
@@ -244,10 +244,10 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
         {/* Primary Call-to-Action: Save Output */}
         {/* Conditionally rendered: Mounts only if an onSave handler is provided, preventing display in read-only views. */}
         {onSave && (
-          <div className="mt-10 pt-6 flex justify-center w-full border-t border-gray-200/60">
+          <div className="mt-10 pt-6 flex justify-center w-full border-t border-border">
             <button
               onClick={onSave}
-              className="group flex items-center justify-center gap-3 w-full sm:w-auto px-12 py-4 bg-[#FF7316] hover:bg-[#e66613] text-white text-lg font-bold rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-[#FF7316]/30"
+              className="group flex items-center justify-center gap-3 w-full sm:w-auto px-12 py-4 bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-bold rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-primary/30"
               aria-label="Save Breakdown Output"
             >
               <Save size={24} className="group-hover:scale-110 transition-transform duration-300" />
@@ -260,8 +260,8 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
 
       {/* RIGHT COLUMN: DYNAMIC SIDEBAR NAVIGATION */}
       {data.sections.length > 0 && (
-        <div className="hidden lg:block sticky top-10 rounded-2xl bg-[#FCFAF7] shadow-sm p-6 border border-gray-200/50">
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Workflow</h4>
+        <div className="hidden lg:block sticky top-10 rounded-2xl bg-card text-card-foreground shadow-sm p-6 border border-border">
+          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6 font-title">Workflow</h4>
           <nav>
             <ul className="space-y-2">
               {data.sections.map((section, idx) => {
@@ -276,11 +276,11 @@ export function StepResultBrief({ data, localDeadlineStr, onSave }: StepResultPr
                       onClick={() => scrollToSection(sectionId)}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors border text-left ${
                         isActive 
-                          ? "bg-[#FDECE2] text-[#FF7316] border-transparent" 
-                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-transparent hover:border-gray-200"
+                          ? "bg-primary/15 text-primary border-transparent font-semibold" 
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground border-transparent"
                       }`}
                     >
-                      <Icon  size={18} className='shrink-0  text-[#FF7316] '/>
+                      <Icon size={18} className='shrink-0 text-primary'/>
                       <span className="truncate">{cleanTitle}</span>
                     </button>
                   </li>
