@@ -7,6 +7,9 @@ import { DashboardFooter } from "@/components/dashboard-footer";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { useChat } from "@/hooks/use-chat";
+import { useSessionTimer } from "@/hooks/use-session-timer";
+import { useChatTimeTracker } from "@/hooks/use-chat-time-tracker";
+import { BreakCheckInModal } from "@/components/break-check-in-modal";
 import { getAuth } from "firebase/auth";
 import { Sparkles, HelpCircle, Flag, Play, RefreshCw } from "lucide-react";
 
@@ -16,6 +19,8 @@ import { Sparkles, HelpCircle, Flag, Play, RefreshCw } from "lucide-react";
  * @returns {JSX.Element} The rendered chat page layout
  */
 export default function ChatPage() {
+  useChatTimeTracker();
+
   const {
     messages,
     session,
@@ -25,6 +30,11 @@ export default function ChatPage() {
     streamingContent,
     isInitializing,
   } = useChat();
+
+  const {
+    isBreakPromptOpen,
+    dismissBreakPrompt,
+  } = useSessionTimer();
 
   const [activeSection, setActiveSection] = useState("identity");
   const [actorName, setActorName] = useState("ME");
@@ -162,6 +172,12 @@ export default function ChatPage() {
         {/* Footer */}
         <DashboardFooter />
       </div>
+
+      {/* Timed Session Break Check-In Modal */}
+      <BreakCheckInModal
+        isOpen={isBreakPromptOpen}
+        onKeepGoing={dismissBreakPrompt}
+      />
     </div>
   );
-}
+}

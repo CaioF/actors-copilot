@@ -1,4 +1,4 @@
-import { parseDnaProfileData } from "@/lib/dna/dna-parser";
+import { parseDnaProfileData, formatChatDuration } from "@/lib/dna/dna-parser";
 
 describe("parseDnaProfileData", () => {
   it("parses empty profile data gracefully", () => {
@@ -8,10 +8,20 @@ describe("parseDnaProfileData", () => {
     expect(result.aiSummary).toContain("No AI summary available yet");
     expect(result.analysisTimeline).toEqual([]);
     expect(result.leafSnippets).toEqual([]);
+    expect(result.totalChatSeconds).toBe(0);
+  });
+
+  it("correctly parses totalChatSeconds and totalChatDurationSeconds fallback", () => {
+    const res1 = parseDnaProfileData({ totalChatSeconds: 15300 });
+    expect(res1.totalChatSeconds).toBe(15300);
+
+    const res2 = parseDnaProfileData({ totalChatDurationSeconds: 2700 });
+    expect(res2.totalChatSeconds).toBe(2700);
   });
 
   it("correctly parses nested psychology, acting_fuel, history, and physicality fields", () => {
     const mockData = {
+      totalChatSeconds: 9000,
       psychology: {
         traits: ["Introspective", "Perfectionist"],
         defenseMechanisms: ["Intellectualization"],
@@ -47,6 +57,7 @@ describe("parseDnaProfileData", () => {
     expect(result.analysisTimeline[0].inference).toBe("Uses perfectionism to shield vulnerability");
     expect(result.leafSnippets.length).toBe(1);
     expect(result.leafSnippets[0].quote).toBe("I always feel I need to get it right the first time.");
+    expect(result.totalChatSeconds).toBe(9000);
 
     // Check categories mapping
     const categories = result.attributes.map((a) => a.category);
@@ -114,4 +125,16 @@ describe("parseDnaProfileData", () => {
     expect(result.analysisTimeline[0].inference).toContain("determination");
   });
 });
+
+describe("formatChatDuration", () => {
+  it("formats seconds into human readable strings", () => {
+    expect(formatChatDuration(0)).toBe("0s");
+    expect(formatChatDuration(12)).toBe("12s");
+    expect(formatChatDuration(2700)).toBe("45m");
+    expect(formatChatDuration(9000)).toBe("2h 30m");
+    expect(formatChatDuration(15300)).toBe("4h 15m");
+    expect(formatChatDuration(3600)).toBe("1h");
+  });
+});
+
 
