@@ -28,12 +28,19 @@ interface UseActingCoachReturn {
   isLoading: boolean;
   error: string | null;
   /**
-   * Sends a message to the AI coach, optionally including audition context and an attached document.
+   * Sends a message to the AI coach, optionally including audition context, coachType, and targetStage.
    */
-  sendMessage: (content: string, auditionId?: string, document?: AttachedDocument | null) => Promise<void>;
-  startNewSession: (opts?: { linkedAuditionId?: string | null }) => Promise<void>;
+  sendMessage: (
+    content: string, 
+    auditionId?: string, 
+    document?: AttachedDocument | null,
+    opts?: { coachType?: "general" | "character"; targetStage?: number }
+  ) => Promise<void>;
+  startNewSession: (opts?: { linkedAuditionId?: string | null; coachType?: "general" | "character" }) => Promise<void>;
   clearSessionFocus: () => Promise<void>;
   switchSession: (id: string) => void;
+  selectStage: (stageNumber: number) => Promise<void>;
+  setCoachType: (type: "general" | "character") => Promise<void>;
   session: CoachSession | null;
   sessions: CoachSession[];
   sessionId: string;
@@ -95,6 +102,10 @@ export function useActingCoach(): UseActingCoachReturn {
           stepIndex: 0,
           mode: null,
           phase: null,
+          coachType: "general",
+          currentStage: 1,
+          completedStages: [],
+          flightPlanMode: "guided",
         });
       }
     }, () => setSession(null));
@@ -139,7 +150,12 @@ export function useActingCoach(): UseActingCoachReturn {
 
   // --- Core Message Logic ---
   const sendMessage = useCallback(
-    async (content: string, auditionId?: string, document?: AttachedDocument | null) => {
+    async (
+      content: string, 
+      auditionId?: string, 
+      document?: AttachedDocument | null,
+      opts?: { coachType?: "general" | "character"; targetStage?: number }
+    ) => {
       const trimmedContent = content.trim();
       if (!trimmedContent) return;
 
@@ -164,6 +180,8 @@ export function useActingCoach(): UseActingCoachReturn {
           });
         }
 
+        const resolvedCoachType = opts?.coachType || session?.coachType || (auditionId ? "character" : "general");
+
         // 2. Call the backend API
         const response = await fetch("/api/coach/chat", {
           method: "POST",
@@ -175,11 +193,16 @@ export function useActingCoach(): UseActingCoachReturn {
             content: trimmedContent,
             history,
             auditionId,
+            coachType: resolvedCoachType,
+            targetStage: opts?.targetStage,
             currentFocus: session?.sessionFocus != null ? {
               sessionFocus: session.sessionFocus,
               stepIndex: session.stepIndex,
               mode: session.mode,
               phase: session.phase,
+              currentStage: session.currentStage ?? 1,
+              completedStages: session.completedStages ?? [],
+              flightPlanMode: session.flightPlanMode ?? "guided",
             } : null,
             document: document || undefined,
           }),
@@ -222,6 +245,11 @@ export function useActingCoach(): UseActingCoachReturn {
               stepIndex: data.aiData.step_index ?? 0,
               mode: data.aiData.mode ?? null,
               phase: data.aiData.phase ?? null,
+              coachType: resolvedCoachType,
+              currentStage: data.aiData.current_stage ?? session?.currentStage ?? 1,
+              completedStages: data.aiData.completed_stages ?? session?.completedStages ?? [],
+              flightPlanMode: data.aiData.flight_plan_mode ?? session?.flightPlanMode ?? "guided",
+              ...(data.aiData.audition_plan ? { auditionPlan: data.aiData.audition_plan } : {}),
             })
           );
 
@@ -302,20 +330,25 @@ export function useActingCoach(): UseActingCoachReturn {
   );
 
   const startNewSession = useCallback(
-    async (opts?: { linkedAuditionId?: string | null }) => {
+    async (opts?: { linkedAuditionId?: string | null; coachType?: "general" | "character" }) => {
       if (!userPath) return;
       const newSessionId = crypto.randomUUID();
+      const type = opts?.coachType || (opts?.linkedAuditionId ? "character" : "general");
       await setDoc(doc(getDb(), `users/${userPath}/coachSessions/${newSessionId}`), {
         createdAt: serverTimestamp(),
         lastActiveAt: serverTimestamp(),
         status: "active",
-        title: "New Session",
+        title: type === "character" ? "Character Coach Session" : "General Coach Session",
         linkedAuditionId: opts?.linkedAuditionId ?? null,
         messageCount: 0,
         sessionFocus: null,
         stepIndex: 0,
         mode: null,
         phase: null,
+        coachType: type,
+        currentStage: 1,
+        completedStages: [],
+        flightPlanMode: "guided",
       });
       hasAutoSelectedSession.current = true;
       setMessages([]);
@@ -343,6 +376,22 @@ export function useActingCoach(): UseActingCoachReturn {
     setSessionId(id);
   }, [sessionId]);
 
+  const selectStage = useCallback(async (stageNumber: number) => {
+    if (!userPath || !sessionId) return;
+    await updateDoc(doc(getDb(), `users/${userPath}/coachSessions/${sessionId}`), {
+      currentStage: stageNumber,
+      flightPlanMode: "menu",
+      sessionFocus: `Stage ${stageNumber}`,
+    });
+  }, [userPath, sessionId]);
+
+  const setCoachType = useCallback(async (type: "general" | "character") => {
+    if (!userPath || !sessionId) return;
+    await updateDoc(doc(getDb(), `users/${userPath}/coachSessions/${sessionId}`), {
+      coachType: type,
+    });
+  }, [userPath, sessionId]);
+
   return {
     messages,
     isLoading,
@@ -351,6 +400,8 @@ export function useActingCoach(): UseActingCoachReturn {
     startNewSession,
     clearSessionFocus,
     switchSession,
+    selectStage,
+    setCoachType,
     session,
     sessions,
     sessionId,
