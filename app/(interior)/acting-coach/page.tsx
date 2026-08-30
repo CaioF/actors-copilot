@@ -188,7 +188,7 @@ export default function ActingCoachPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <DashboardHeader title={headerTitleText} titleSlot={headerTitleSlot} />
+      <DashboardHeader title={headerTitleText} titleSlot={headerTitleSlot} className="mb-0 border-b border-border" />
 
       {/* Coach Mode Switcher Bar */}
       <div className="bg-card/80 border-b border-border px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 transition-colors">
