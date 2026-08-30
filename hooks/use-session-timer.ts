@@ -45,7 +45,7 @@ export function useSessionTimer({
   enabled = true,
 }: UseSessionTimerOptions = {}): UseSessionTimerReturn {
   const [isBreakPromptOpen, setIsBreakPromptOpen] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
