@@ -389,6 +389,7 @@ export default function DnaVaultPage() {
                       {insightsQuery && (
                         <button
                           onClick={() => setInsightsQuery("")}
+                          aria-label="Clear search"
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
                         >
                           ✕
@@ -517,6 +518,7 @@ export default function DnaVaultPage() {
                       {memoryQuery && (
                         <button
                           onClick={() => setMemoryQuery("")}
+                          aria-label="Clear search"
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
                         >
                           ✕

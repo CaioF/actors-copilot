@@ -127,20 +127,23 @@ export function useChatTimeTracker() {
     }, 1000);
 
     // Sync on tab visibility change or unload
-    const handleVisibilityOrUnload = () => {
+    const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         void flushSeconds();
       }
     };
+    const handleBeforeUnload = () => {
+      void flushSeconds();
+    };
 
-    window.addEventListener("visibilitychange", handleVisibilityOrUnload);
-    window.addEventListener("beforeunload", handleVisibilityOrUnload);
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       unsubscribeAuth();
       clearInterval(timerId);
-      window.removeEventListener("visibilitychange", handleVisibilityOrUnload);
-      window.removeEventListener("beforeunload", handleVisibilityOrUnload);
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
 
       // Cleanup flush remaining unsynced time
       void flushSeconds();

@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { CoachMessage, CoachSession } from "@/lib/chat-types";
+import type { FlightPlanStage } from "@/lib/acting-coach/contracts";
 import { createChildLogger } from "@/lib/logger";
 import type { AttachedDocument } from "@/components/chat-input";
 
@@ -34,7 +35,7 @@ interface UseActingCoachReturn {
     content: string, 
     auditionId?: string, 
     document?: AttachedDocument | null,
-    opts?: { coachType?: "general" | "character"; targetStage?: number }
+    opts?: { coachType?: "general" | "character"; targetStage?: FlightPlanStage }
   ) => Promise<void>;
   startNewSession: (opts?: { linkedAuditionId?: string | null; coachType?: "general" | "character" }) => Promise<void>;
   clearSessionFocus: () => Promise<void>;
@@ -154,7 +155,7 @@ export function useActingCoach(): UseActingCoachReturn {
       content: string, 
       auditionId?: string, 
       document?: AttachedDocument | null,
-      opts?: { coachType?: "general" | "character"; targetStage?: number }
+      opts?: { coachType?: "general" | "character"; targetStage?: FlightPlanStage }
     ) => {
       const trimmedContent = content.trim();
       if (!trimmedContent) return;
@@ -250,6 +251,7 @@ export function useActingCoach(): UseActingCoachReturn {
               completedStages: data.aiData.completed_stages ?? session?.completedStages ?? [],
               flightPlanMode: data.aiData.flight_plan_mode ?? session?.flightPlanMode ?? "guided",
               ...(data.aiData.audition_plan ? { auditionPlan: data.aiData.audition_plan } : {}),
+              ...(typeof data.aiData.sides_text === "string" ? { sidesText: data.aiData.sides_text } : {}),
             })
           );
 

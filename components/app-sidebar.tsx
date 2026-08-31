@@ -182,7 +182,7 @@ export function AppSidebar() {
               className="flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium text-white/70 transition-colors hover:text-white"
             >
               <Users className="h-4 w-4 shrink-0" />
-              <span>Skool Comunity</span>
+              <span>Skool Community</span>
             </a>
           </div>
 

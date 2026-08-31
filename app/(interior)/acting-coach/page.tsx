@@ -244,7 +244,7 @@ export default function ActingCoachPage() {
         {!isEmpty && (
           <div className="pointer-events-none sticky top-0 z-10 flex justify-end pt-2">
             <div className="pointer-events-auto">
-              <QuickPromptsDropdown onSelect={(text) => sendMessage(text)} />
+              <QuickPromptsDropdown onSelect={(text) => sendMessage(text, session?.linkedAuditionId || auditionId || undefined, null, { coachType: session?.coachType || "general" })} />
             </div>
           </div>
         )}
@@ -332,7 +332,7 @@ export default function ActingCoachPage() {
       {/* Fixed quick prompts (only on empty state) */}
       {isEmpty && (
         <div className="flex justify-center pb-4">
-          <QuickPromptsDropdown onSelect={(text) => sendMessage(text)} />
+          <QuickPromptsDropdown onSelect={(text) => sendMessage(text, session?.linkedAuditionId || auditionId || undefined, null, { coachType: session?.coachType || "general" })} />
         </div>
       )}
 
