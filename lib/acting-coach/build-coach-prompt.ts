@@ -1,17 +1,17 @@
-import { ACTING_COACH_SYSTEM_PROMPT } from "../prompts";
+import { ACTING_COACH_SYSTEM_PROMPT, CHARACTER_COACH_SYSTEM_PROMPT } from "../prompts";
 import { CoachPromptInput, RetrievedExcerpt } from "./contracts";
 
 /**
  * Constructs the final prompt string for the Acting Coach AI by aggregating system instructions,
  * the actor's specific identity and context, optional reference excerpts, and conversation history.
- * * This version includes session focus and audition-specific performance maps to ensure
- * high-context coaching responses.
+ * Supports both General Acting Coach and dedicated Character Coach personas.
  *
  * @param {CoachPromptInput} input - The aggregated context data required to build the prompt.
  * @returns {string} The fully assembled prompt string ready to be sent to the generation model.
  */
 export function buildCoachPrompt(input: CoachPromptInput): string {
   const { 
+    coachType = "general",
     actorName, 
     actorBaseline,
     actorProfile,
@@ -20,13 +20,18 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     history, 
     auditions, 
     auditionFullData,
-    currentFocus // Added to maintain session continuity
+    currentFocus
   } = input;
 
   const sections: string[] = [];
 
   // 1. Core System Persona & Instructions
-  sections.push(ACTING_COACH_SYSTEM_PROMPT);
+  const isCharacterCoach = coachType === "character" || Boolean(auditionFullData && currentFocus?.currentStage);
+  if (isCharacterCoach) {
+    sections.push(CHARACTER_COACH_SYSTEM_PROMPT);
+  } else {
+    sections.push(ACTING_COACH_SYSTEM_PROMPT);
+  }
 
   // 2. Dynamic Actor Identity Injection
   if (actorName) {
@@ -43,17 +48,21 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     sections.push(`# ACTOR PUBLIC PROFILE\n${actorProfile}`);
   }
 
-  // 4. Current Session Focus
-  if (currentFocus?.sessionFocus) {
-    sections.push(`Session focus: ${currentFocus.sessionFocus}`);
-    sections.push(`Step index: ${currentFocus.stepIndex ?? 0}`);
-    sections.push(`Mode: ${currentFocus.mode ?? "guided"}`);
-    sections.push(`Phase: ${currentFocus.phase ?? "(none)"}`);
+  // 4. Current Session Focus & Stage State
+  if (currentFocus) {
+    const focusLines: string[] = [];
+    if (currentFocus.sessionFocus) focusLines.push(`Session focus: ${currentFocus.sessionFocus}`);
+    focusLines.push(`Step index: ${currentFocus.stepIndex ?? 0}`);
+    focusLines.push(`Mode: ${currentFocus.mode ?? "guided"}`);
+    focusLines.push(`Phase: ${currentFocus.phase || "(none)"}`);
+    if (currentFocus.currentStage) focusLines.push(`Current Flight Plan Stage: Stage ${currentFocus.currentStage}`);
+    if (currentFocus.completedStages?.length) focusLines.push(`Completed Stages: [${currentFocus.completedStages.join(", ")}]`);
+    if (currentFocus.flightPlanMode) focusLines.push(`Flight Plan Mode: ${currentFocus.flightPlanMode}`);
+
+    sections.push(`# CURRENT SESSION FOCUS & STAGE STATE\n${focusLines.join("\n")}`);
   }
 
   // 5. Critical Brief Facts (non-negotiable director/casting-supplied character data).
-  //    Placed before the map rendering so the coach sees these as the highest-priority
-  //    constraints when reasoning about the audition. Tolerates undefined/null/empty array.
   const criticalBriefFacts = auditionFullData?.criticalBriefFacts;
   if (criticalBriefFacts?.length) {
     const factLines = criticalBriefFacts
@@ -64,6 +73,16 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
         `# CRITICAL BRIEF FACTS\nThe casting brief surfaced the following non-negotiable facts. Honor them in every recommendation, even if the sides do not mention them:\n${factLines.join("\n")}`
       );
     }
+  }
+
+  // 5b. Exact Uploaded Sides Text (Single Source of Truth for Dialogue)
+  const sidesText = typeof auditionFullData?.sidesText === "string" ? auditionFullData.sidesText : null;
+  if (sidesText && sidesText.trim().length > 0) {
+    sections.push(
+      `# EXACT SIDES TEXT (SINGLE SOURCE OF TRUTH FOR ALL DIALOGUE)\n` +
+      `Below is the exact script text uploaded by the actor. When quoting dialogue or setting cue lines, you MUST quote verbatim from this text. NEVER invent, re-generate, or paraphrase dialogue from memory.\n\n` +
+      `\`\`\`\n${sidesText.trim()}\n\`\`\``
+    );
   }
 
   // 6. Current Audition Focus (Performance Map Integration)
@@ -80,10 +99,6 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
     const briefMap = auditionFullData.briefPerformanceMap as PerformanceMap | null | undefined;
     const legacyMap = auditionFullData.performanceMap as PerformanceMap | null | undefined;
 
-    // Audition-level metadata that should travel with EVERY map (deadline, timezones,
-    // casting director). The coach uses this to advise on pacing, time-pressure, and
-    // who the actor is performing for — without this, advice like "rest tonight, tape
-    // tomorrow morning" is impossible.
     const project = typeof auditionFullData.project === "string" ? auditionFullData.project : null;
     const role = typeof auditionFullData.role === "string" ? auditionFullData.role : null;
     const deadline = typeof auditionFullData.deadline === "string" ? auditionFullData.deadline : null;
@@ -190,3 +205,4 @@ export function buildCoachPrompt(input: CoachPromptInput): string {
 
   return sections.join("\n\n");
 }
+

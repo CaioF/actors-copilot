@@ -6,12 +6,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import Link from "next/link";
 import { useSidebar } from "@/lib/context/SidebarContext";
-import { ThemeToggle } from "@/components/theme-toggle"; 
+import { ThemeToggle } from "@/components/theme-toggle";
+import { cn } from "@/lib/utils";
 
 interface DashboardHeaderProps {
   title?: string
   /** Optional custom title element. When provided, replaces the default <h1>{title}</h1>. */
   titleSlot?: React.ReactNode
+  className?: string
 }
 
 /**
@@ -20,8 +22,9 @@ interface DashboardHeaderProps {
  * Listens to Firebase Auth state to dynamically update user info.
  * @param title - Optional page title, defaults to "My Self Tape Copilot"
  * @param titleSlot - Optional custom node rendered in place of the title
+ * @param className - Optional custom CSS classes to override default layout styling
  */
-export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot }: DashboardHeaderProps) {
+export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, className }: DashboardHeaderProps) {
   const { setIsOpen } = useSidebar();
 
   const [user, setUser] = useState<User | null>(null);
@@ -49,7 +52,7 @@ export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot }: D
 
   return (
     <>
-      <header className="flex bg-card items-center justify-between gap-3 px-4 sm:px-8 mb-10 py-6 transition-colors">
+      <header className={cn("flex bg-card items-center justify-between gap-3 px-4 sm:px-8 mb-10 py-6 transition-colors", className)}>
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             type="button"

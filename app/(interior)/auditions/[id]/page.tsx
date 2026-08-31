@@ -259,7 +259,7 @@ export default function AuditionDetailView() {
                     }}
                     onCoachClick={() =>
                       router.push(
-                        `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides`
+                        `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides&coachType=character`
                       )
                     }
                   />
@@ -283,7 +283,7 @@ export default function AuditionDetailView() {
                 }}
                 onCoachClick={() =>
                   router.push(
-                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides`
+                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides&coachType=character`
                   )
                 }
               />
@@ -306,7 +306,7 @@ export default function AuditionDetailView() {
                   data={auditionData.performanceMap}
                   onCoachClick={() =>
                     router.push(
-                      `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides`
+                      `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides&coachType=character`
                     )
                   }
                 />
@@ -325,7 +325,7 @@ export default function AuditionDetailView() {
                 data={auditionData.performanceMap}
                 onCoachClick={() =>
                   router.push(
-                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides`
+                    `/acting-coach?auditionId=${encodeURIComponent(auditionId)}&project=${encodeURIComponent(auditionData.project)}&role=${encodeURIComponent(auditionData.role)}&analysisType=sides&coachType=character`
                   )
                 }
               />

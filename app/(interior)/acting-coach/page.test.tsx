@@ -146,7 +146,7 @@ describe("ActingCoachPage", () => {
   describe("Empty State", () => {
     it("renders empty state with logo and description when no messages", () => {
       render(<ActingCoachPage />);
-      expect(screen.getByText("Your coach is ready.")).toBeInTheDocument();
+      expect(screen.getByText(/Coach is ready/i)).toBeInTheDocument();
       expect(screen.getByText(/Ask anything about your character/)).toBeInTheDocument();
     });
 
@@ -276,8 +276,10 @@ describe("ActingCoachPage", () => {
 
       await waitFor(() => {
         expect(mockSendMessage).toHaveBeenCalledWith(
-          "I want to work on my FOUNDATION audition as TECHNICIAN.",
-          "aud-123"
+          expect.stringContaining("I'm ready to work on my FOUNDATION audition as TECHNICIAN"),
+          "aud-123",
+          null,
+          { coachType: "character" }
         );
       });
     });
@@ -335,7 +337,8 @@ describe("ActingCoachPage", () => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         "How do I prepare for an audition?",
         undefined,
-        undefined
+        undefined,
+        { coachType: "general" }
       );
     });
   });

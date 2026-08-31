@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Plus,
   X,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -173,6 +174,16 @@ export function AppSidebar() {
               </div>
               <ChevronRight className="h-4 w-4 text-white/70 shrink-0" />
             </button>
+
+            <a
+              href="https://www.skool.com/the-actors-copilot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium text-white/70 transition-colors hover:text-white"
+            >
+              <Users className="h-4 w-4 shrink-0" />
+              <span>Skool Community</span>
+            </a>
           </div>
 
           {/* Divisor */}

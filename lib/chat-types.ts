@@ -56,6 +56,12 @@ export interface CoachSession {
   stepIndex: number;
   mode: "guided" | "informational" | "transition" | null;
   phase: string | null;
+  coachType?: "general" | "character";
+  currentStage?: number | null;
+  completedStages?: number[];
+  flightPlanMode?: "guided" | "menu";
+  auditionPlan?: import("./acting-coach/contracts").AuditionPlanData | null;
+  sidesText?: string | null;
 }
 
 export interface CoachMessage {

@@ -6,7 +6,33 @@ export interface ParsedDnaResult {
   aiSummary: string;
   analysisTimeline: Array<{ inference: string; section?: string; timestamp?: string }>;
   leafSnippets: Array<{ quote: string; section?: string; timestamp?: string }>;
+  totalChatSeconds: number;
 }
+
+/**
+ * Formats seconds gracefully into a human-readable duration string.
+ * Examples:
+ * - 12 -> "12s"
+ * - 2700 -> "45m"
+ * - 9000 -> "2h 30m"
+ * - 15300 -> "4h 15m"
+ */
+export function formatChatDuration(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds <= 0) return "0s";
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  return `${seconds}s`;
+}
+
 
 /**
  * Parses raw Firestore profile data and subcollection extractions into a unified,
@@ -306,11 +332,19 @@ export function parseDnaProfileData(docData: any, vaultDocs: any[] = []): Parsed
     completion = Math.min(1, Math.max(0.05, totalScore));
   }
 
+  const totalChatSeconds =
+    typeof docData?.totalChatSeconds === "number" && docData.totalChatSeconds >= 0
+      ? docData.totalChatSeconds
+      : typeof docData?.totalChatDurationSeconds === "number" && docData.totalChatDurationSeconds >= 0
+      ? docData.totalChatDurationSeconds
+      : 0;
+
   return {
     attributes,
     completion,
     aiSummary,
     analysisTimeline,
     leafSnippets,
+    totalChatSeconds,
   };
 }

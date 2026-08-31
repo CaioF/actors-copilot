@@ -18,8 +18,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    // CORREÇÃO 1: Adicionei o currentFocus aqui
-    const { content, history, auditionId, document, currentFocus } = body;
+    const { content, history, auditionId, document, currentFocus, coachType, targetStage: rawTargetStage } = body;
+    const targetStage = Number.isInteger(rawTargetStage) && rawTargetStage >= 1 && rawTargetStage <= 10
+      ? (rawTargetStage as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10)
+      : undefined;
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -99,7 +101,23 @@ export async function POST(request: Request) {
 
     const historyToInclude = (history ?? []).slice(-MAX_HISTORY_MESSAGES);
 
+    const mergedFocus = currentFocus ? {
+      ...currentFocus,
+      ...(targetStage ? { currentStage: targetStage } : {}),
+    } : (targetStage ? {
+      sessionFocus: `Stage ${targetStage}`,
+      stepIndex: 0,
+      mode: "guided" as const,
+      phase: null,
+      currentStage: targetStage,
+      completedStages: [],
+      flightPlanMode: "guided" as const,
+    } : null);
+
+    const resolvedCoachType = coachType || (auditionId ? "character" : "general");
+
     const promptText = buildCoachPrompt({
+      coachType: resolvedCoachType,
       actorName: firstName,
       actorBaseline,
       actorProfile,
@@ -108,7 +126,7 @@ export async function POST(request: Request) {
       history: historyToInclude,
       auditions: auditionSummaries,
       auditionFullData,
-      currentFocus: currentFocus ?? null,
+      currentFocus: mergedFocus,
     });
 
     const tModelInitStart = performance.now();
@@ -151,6 +169,11 @@ export async function POST(request: Request) {
           step_index: parsedResponse.step_index ?? currentFocus?.stepIndex ?? 0,
           mode: parsedResponse.mode ?? currentFocus?.mode ?? "informational",
           phase: parsedResponse.phase ?? currentFocus?.phase ?? null,
+          current_stage: parsedResponse.current_stage ?? targetStage ?? currentFocus?.currentStage ?? (auditionId ? 1 : null),
+          completed_stages: parsedResponse.completed_stages ?? currentFocus?.completedStages ?? [],
+          flight_plan_mode: parsedResponse.flight_plan_mode ?? currentFocus?.flightPlanMode ?? "guided",
+          sides_text: typeof auditionFullData?.sidesText === "string" ? auditionFullData.sidesText : null,
+          audition_plan: parsedResponse.audition_plan || null,
           action: parsedResponse.action || null,
           extractions: parsedResponse.extractions || null
         }
@@ -160,6 +183,7 @@ export async function POST(request: Request) {
       log.error({ err }, "Generation failed");
       return NextResponse.json({ error: "Failed to generate response" }, { status: 500 });
     }
+
   } catch (error) {
     logger.error({ err: error, msg: "Coach Chat API Error" });
     return NextResponse.json({ error: "Failed to generate chat response" }, { status: 500 });

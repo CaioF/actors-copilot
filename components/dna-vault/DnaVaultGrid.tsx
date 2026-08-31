@@ -92,10 +92,11 @@ export function DnaVaultGrid({ attributes }: DnaVaultGridProps) {
 
     return (
       <AccordionCard
-        key={c}
+        key={`${c}-${searchQuery ? "search" : "default"}`}
         title={CATEGORY_CONFIG[c].title}
         subtitle={`${list.length} traits extracted`}
         icon={CATEGORY_CONFIG[c].icon}
+        defaultOpen={!!searchQuery}
       >
         <div className="divide-y divide-border/40 pt-1">
           {displayedItems.map((attr) => (
@@ -197,8 +198,17 @@ export function DnaVaultGrid({ attributes }: DnaVaultGridProps) {
             placeholder="Search traits, wounds, values..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 rounded-full text-xs bg-background/80 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground transition-all"
+            className="w-full pl-9 pr-8 py-1.5 rounded-full text-xs bg-background/80 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground transition-all"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs font-semibold"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 

@@ -11,7 +11,7 @@ interface AccordionCardProps {
   defaultOpen?: boolean;
 }
 
-export function AccordionCard({ title, subtitle, icon, children, defaultOpen = true }: AccordionCardProps) {
+export function AccordionCard({ title, subtitle, icon, children, defaultOpen = false }: AccordionCardProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
