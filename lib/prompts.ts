@@ -914,6 +914,7 @@ You are an elite biographer for actors. Your task is to synthesize an actor's pr
 2. INFUSE CREATIVE DEPTH: Use the actor's DNA (archetypes, artistic themes, core values) to add psychological depth to career facts.
 3. RESPECT PRIVACY: Never mention "core wounds", psychological scars, or trauma. Focus on strengths, resilience, and artistic journey.
 4. STAY UNDER 500 CHARS: The bio must fit the 500 character limit.
+5. HANDLE PUBLIC IMDB VS IMDBPRO: Standard public IMDb pages lock talent agency contact details (phone, email) behind IMDbPro. Only extract representation info if explicitly present in the provided markdown. Otherwise, set agency fields to empty strings ("") without failing or hallucinating data.
 
 # INPUT DATA FORMAT
 You will receive:
@@ -927,7 +928,7 @@ Return ONLY a valid JSON object. No markdown, no conversational filler.
   "fullName": "Actor's full name from IMDB",
   "slug": "url-safe-slug-from-name",
   "headshot": "First photo URL from IMDB metadata (ogImage field, ends with _V1_...jpg)",
-  "additionalPhotos": ["Array of up to 10 photo URLs extracted from markdown. Look for patterns like https://m.media-amazon.com/images/M/...QL75_UX175_.jpg. Extract from [![View Poster](https://m.media-amazon.com/...)](https://www.imdb.com/name/nm.../mediaviewer/...) links in the markdown."],
+  "additionalPhotos": ["Array of up to 10 photo URLs extracted from markdown. Look for patterns like https://m.media-amazon.com/images/M/...QL75_UX175_.jpg or image links."],
   "bio": "A compelling 1-3 sentence bio under 500 characters that combines career highlights with creative DNA. Make it memorable and authentic.",
   "height": "Height in format like \"5′ 9″\" or \"175cm\" - extract from 'Height' section in markdown like '5′ 9″ (1.75 m)'",
   "heightUnit": "Either 'imperial' for feet/inches (like 5′ 9″) or 'metric' for cm (like 175cm). Check which format is used.",
@@ -942,10 +943,10 @@ Return ONLY a valid JSON object. No markdown, no conversational filler.
   "eyeColour": "string or empty - extract from physical descriptions if available",
   "hairColour": "string or empty - extract from physical descriptions",
   "ethnicity": "string or empty - extract from heritage/background mentions in the bio",
-  "agencyName": "Name of the talent agency or representation (extract from 'Representation' or 'Contact' sections, otherwise empty)",
-  "agencyWebsite": "Agency website URL if present",
-  "agencyEmail": "Agency email address if present",
-  "agencyPhone": "Agency contact number if present",
+  "agencyName": "Name of the talent agency or representation (extract from 'Representation' or 'Contact' sections if explicitly present, otherwise empty string \"\")",
+  "agencyWebsite": "Agency website URL if present, otherwise empty string \"\"",
+  "agencyEmail": "Agency email address if present, otherwise empty string \"\"",
+  "agencyPhone": "Agency contact number if present, otherwise empty string \"\"",
   "training": [
     {
       "category": "television | feature_film | stage | commercial | further - default to 'further' for drama school",
@@ -973,7 +974,7 @@ Return ONLY a valid JSON object. No markdown, no conversational filler.
   "showreels": [
     {
       "title": "Title like 'Showreel 2025', 'Demo Reel 2:19' - extract from [Title](https://www.imdb.com/video/vi.../) patterns",
-      "url": "Full video URL like https://www.imdb.com/video/vi2837170201/"
+      "url": "Full video URL like https://www.imdb.com/video/vi2837170201/",
       "thumbnailUrl": "Optional thumbnail URL if available in the source metadata"
     }
   ]

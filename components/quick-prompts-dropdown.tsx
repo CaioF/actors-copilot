@@ -47,7 +47,7 @@ export function QuickPromptsDropdown({ onSelect }: QuickPromptsDropdownProps) {
           Quick Prompts <ChevronDown className="h-4 w-4 opacity-70" />
         </button>
       </PopoverTrigger>
-      
+
       <PopoverContent className="w-[560px] max-w-[calc(100vw-2rem)] p-0 border border-[#C7C0B5] shadow-2xl rounded-xl bg-white" align="end" sideOffset={12} collisionPadding={16}>
         {fillingPrompt ? (
           <PlaceholderFillForm
@@ -60,23 +60,23 @@ export function QuickPromptsDropdown({ onSelect }: QuickPromptsDropdownProps) {
           />
         ) : (
           <Command className="bg-transparent">
-            <CommandInput 
-              placeholder="Search prompts..." 
-              className="text-sm border-b border-[#C7C0B5] px-4 py-3" 
+            <CommandInput
+              placeholder="Search prompts..."
+              className="text-sm border-b border-[#C7C0B5] px-4 py-3"
             />
             <CommandList className="max-h-[420px] overflow-y-auto p-2">
               <CommandEmpty className="py-6 text-center text-sm text-[#6B6B6B]">
                 No prompts found
               </CommandEmpty>
-              
+
               {QUICK_PROMPT_CATEGORIES.map((category) => {
                 const prompts = QUICK_PROMPTS.filter((p) => p.category === category.id);
-                
+
                 if (prompts.length === 0) return null;
 
                 return (
-                  <CommandGroup 
-                    key={category.id} 
+                  <CommandGroup
+                    key={category.id}
                     heading={category.label}
                     className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:text-[#E8721A]"
                   >
@@ -111,4 +111,5 @@ export function QuickPromptsDropdown({ onSelect }: QuickPromptsDropdownProps) {
       </PopoverContent>
     </Popover>
   );
+
 }
