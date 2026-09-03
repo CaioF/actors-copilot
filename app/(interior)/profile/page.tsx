@@ -239,6 +239,19 @@ export default function ProfilePage() {
 const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) => {
     const currentValues = methods.getValues();
 
+    const isNonEmpty = (val?: string | null) => typeof val === 'string' && val.trim().length > 0;
+    
+    const hasRealItems = (arr: any[] | undefined | null) => {
+      if (!arr || arr.length === 0) return false;
+      return arr.some(item => {
+        if (typeof item === 'string') return item.trim().length > 0;
+        if (typeof item === 'object' && item !== null) {
+          return Object.values(item).some(val => typeof val === 'string' && val.trim().length > 0);
+        }
+        return item != null;
+      });
+    };
+
     /**
      * Deep Merge Strategy for External Profiles
      * Ensures AI-discovered links supplement (rather than overwrite) existing user data.
@@ -248,7 +261,7 @@ const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) 
       Object.keys(autofillData.externalProfiles).forEach((key) => {
         const k = key as keyof typeof mergedExternalProfiles;
         // Only inject AI data if the user hasn't already provided a link for this platform
-        if (!mergedExternalProfiles[k] && autofillData.externalProfiles![k]) {
+        if (!isNonEmpty(mergedExternalProfiles[k]) && isNonEmpty(autofillData.externalProfiles![k])) {
           mergedExternalProfiles[k] = autofillData.externalProfiles![k];
         }
       });
@@ -257,50 +270,50 @@ const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) 
     const merged: Partial<ActorProfile> = {
       ...currentValues,
       // String fields: keep current non-empty value, else use autofill
-      fullName: currentValues.fullName || autofillData.fullName || '',
-      slug: currentValues.slug || autofillData.slug || '',
-      bio: currentValues.bio || autofillData.bio || '',
-      headshot: currentValues.headshot || autofillData.headshot || '',
-      height: currentValues.height || autofillData.height || '',
-      heightUnit: currentValues.heightUnit || autofillData.heightUnit || 'imperial',
-      location: currentValues.location || autofillData.location || '',
-      timezone: currentValues.timezone || autofillData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-      gender: currentValues.gender || autofillData.gender || '',
-      awardsCallout: currentValues.awardsCallout || autofillData.awardsCallout || '',
+      fullName: isNonEmpty(currentValues.fullName) ? currentValues.fullName : (autofillData.fullName || ''),
+      slug: isNonEmpty(currentValues.slug) ? currentValues.slug : (autofillData.slug || ''),
+      bio: isNonEmpty(currentValues.bio) ? currentValues.bio : (autofillData.bio || ''),
+      headshot: isNonEmpty(currentValues.headshot) ? currentValues.headshot : (autofillData.headshot || null),
+      height: isNonEmpty(currentValues.height) ? currentValues.height : (autofillData.height || ''),
+      heightUnit: isNonEmpty(currentValues.heightUnit) ? currentValues.heightUnit : (autofillData.heightUnit || 'imperial'),
+      location: isNonEmpty(currentValues.location) ? currentValues.location : (autofillData.location || ''),
+      timezone: isNonEmpty(currentValues.timezone) ? currentValues.timezone : (autofillData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone),
+      gender: isNonEmpty(currentValues.gender) ? currentValues.gender : (autofillData.gender || ''),
+      awardsCallout: isNonEmpty(currentValues.awardsCallout) ? currentValues.awardsCallout : (autofillData.awardsCallout || ''),
       
       // Extended Physical Details
-      playingAgeMin: currentValues.playingAgeMin || autofillData.playingAgeMin || null,
-      playingAgeMax: currentValues.playingAgeMax || autofillData.playingAgeMax || null,
-      eyeColour: currentValues.eyeColour || autofillData.eyeColour || '',
-      hairColour: currentValues.hairColour || autofillData.hairColour || '',
-      ethnicity: currentValues.ethnicity || autofillData.ethnicity || '',
+      playingAgeMin: currentValues.playingAgeMin ?? autofillData.playingAgeMin ?? null,
+      playingAgeMax: currentValues.playingAgeMax ?? autofillData.playingAgeMax ?? null,
+      eyeColour: isNonEmpty(currentValues.eyeColour) ? currentValues.eyeColour : (autofillData.eyeColour || ''),
+      hairColour: isNonEmpty(currentValues.hairColour) ? currentValues.hairColour : (autofillData.hairColour || ''),
+      ethnicity: isNonEmpty(currentValues.ethnicity) ? currentValues.ethnicity : (autofillData.ethnicity || ''),
 
       // Agency Data
-      agencyName: currentValues.agencyName || autofillData.agencyName || '',
-      agencyWebsite: currentValues.agencyWebsite || autofillData.agencyWebsite || '',
-      agencyEmail: currentValues.agencyEmail || autofillData.agencyEmail || '',
-      agencyPhone: currentValues.agencyPhone || autofillData.agencyPhone || '',
+      agencyName: isNonEmpty(currentValues.agencyName) ? currentValues.agencyName : (autofillData.agencyName || ''),
+      agencyWebsite: isNonEmpty(currentValues.agencyWebsite) ? currentValues.agencyWebsite : (autofillData.agencyWebsite || ''),
+      agencyEmail: isNonEmpty(currentValues.agencyEmail) ? currentValues.agencyEmail : (autofillData.agencyEmail || ''),
+      agencyPhone: isNonEmpty(currentValues.agencyPhone) ? currentValues.agencyPhone : (autofillData.agencyPhone || ''),
 
       // External Profiles (Deep Merged)
       externalProfiles: mergedExternalProfiles as any,
 
       // Array fields: keep current non-empty array, else use autofill; ensure defaults
-      credits: (currentValues.credits && currentValues.credits.length > 0)
+      credits: hasRealItems(currentValues.credits)
         ? currentValues.credits
         : (autofillData.credits ?? []),
-      showreels: (currentValues.showreels && currentValues.showreels.length > 0)
+      showreels: hasRealItems(currentValues.showreels)
         ? currentValues.showreels
         : (autofillData.showreels ?? []),
-      additionalPhotos: (currentValues.additionalPhotos && currentValues.additionalPhotos.length > 0)
+      additionalPhotos: hasRealItems(currentValues.additionalPhotos)
         ? currentValues.additionalPhotos
         : (autofillData.additionalPhotos ?? []),
-      nationalities: (currentValues.nationalities && currentValues.nationalities.length > 0)
+      nationalities: hasRealItems(currentValues.nationalities)
         ? currentValues.nationalities
         : (autofillData.nationalities ?? []),
-      skillsAndAccents: (currentValues.skillsAndAccents && currentValues.skillsAndAccents.length > 0)
+      skillsAndAccents: hasRealItems(currentValues.skillsAndAccents)
         ? currentValues.skillsAndAccents
         : (autofillData.skillsAndAccents ?? []),
-      training: (currentValues.training && currentValues.training.length > 0)
+      training: hasRealItems(currentValues.training)
         ? currentValues.training
         : (autofillData.training ?? []),
       appearance: currentValues.appearance ?? autofillData.appearance ?? [],

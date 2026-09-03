@@ -13,14 +13,20 @@ interface FirecrawlMetadata {
 
 /**
  * Parses IMDB page markdown content to extract actor profile data including name,
- * bio, height, location, credits, showreels, and known-for works.
+ * bio, height, location, credits, showreels, known-for works, and additional photos.
  * @param markdown - The IMDB page content in markdown format
  * @param metadata - Additional metadata from the scraped page (title, ogImage, description)
  * @returns Structured ImdbExtractedData object with parsed actor information
  */
 export function parseIMDBMarkdown(markdown: string, metadata: FirecrawlMetadata): ImdbExtractedData {
   const lines = markdown.split('\n');
-  let fullName = metadata?.title?.replace(' - IMDb', '') || '';
+  
+  // Clean fullName from title metadata (strip - IMDb, - Biography, - Filmography, etc.)
+  let fullName = '';
+  if (metadata?.title) {
+    fullName = metadata.title.replace(/\s*-\s*(IMDb|Biography|Filmography|Photos|News|Mini Bio).*/i, '').trim();
+  }
+  
   let bio = '';
   let height = '';
   let location = '';
@@ -28,115 +34,109 @@ export function parseIMDBMarkdown(markdown: string, metadata: FirecrawlMetadata)
   const showreels: Showreel[] = [];
   const knownFor: KnownForEntry[] = [];
 
-  // Parse markdown lines
+  let currentCategory: Credit['category'] = 'further';
+  let inCreditsSection = false;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    if (!line) continue;
 
-    // Extract name from heading
+    // Heading name extraction: # Full Name
     if (line.startsWith('# ')) {
-      fullName = line.substring(2).trim();
-      continue;
+      const h1Name = line.substring(2).trim();
+      if (h1Name && !h1Name.toLowerCase().includes('imdb')) {
+        fullName = h1Name;
+      }
     }
 
-    // Extract bio snippets
-    if (line.startsWith('- ') && !height && !location) {
-      if (line.includes('Born') || line.includes('United') || line.includes('UK') || line.includes('USA') || line.includes('Canada')) {
-        // Birth info line
-        const birthMatch = line.match(/Born\s+(.+)/i);
-        const locationMatch = line.match(/(United Kingdom|United States|USA|UK|Canada|Australia|Germany|France)/i);
-        if (birthMatch) {
-          const birthInfo = birthMatch[1];
-          const heightMatch = birthInfo.match(/(\d+′\s*\d+″|\d+\s*cm)/);
-          if (heightMatch) {
-            height = heightMatch[1];
-          }
-        }
-        if (locationMatch) {
-          location = locationMatch[1];
+    // Extract Birthplace / Location from "Born" or "Personal Details"
+    if (!location && (line.toLowerCase().includes('born') || line.toLowerCase().includes('birth place'))) {
+      const bornMatch = line.match(/(?:Born|Birth Place)[:\s]+(?:in\s+)?([A-Za-z0-9\s,\.\-–—]+?)(?:\s+\d{1,4}\s*cm|\s+\d+′|\s*\(|$)/i);
+      if (bornMatch && bornMatch[1]) {
+        const extractedLoc = bornMatch[1].replace(/^(?:on\s+)?[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+(?:in\s+)?/i, '').trim();
+        if (extractedLoc && extractedLoc.length > 2 && !extractedLoc.startsWith('http')) {
+          location = extractedLoc.replace(/,$/, '').trim();
         }
       }
     }
 
-    // Extract height from personal details
-    if (line.includes("Height") && line.includes('(')) {
-      const heightMatch = line.match(/\((\d+['"′"]?\s*\d*["′"]?\s*\/?\s*\d+\s*(cm|m)?)\)/);
+    // Extract Height (Imperial e.g. 5′ 9″ / 5'9" / 5 ft 9 in OR Metric e.g. 175 cm / 1.75 m)
+    if (!height && (line.toLowerCase().includes('height') || line.includes('′') || line.includes('cm') || line.includes('m'))) {
+      const heightMatch = line.match(/(\d+['"′']\s*\d*["′"]?|\d+\s*ft\s*\d*\s*in|\d{3}\s*cm|\d\.\d{2}\s*m)/i);
       if (heightMatch) {
-        height = heightMatch[1];
-      } else {
-        const simpleMatch = line.match(/(\d+′+\s*\d+″+|\d+\s*cm)/);
-        if (simpleMatch) {
-          height = simpleMatch[1];
+        height = heightMatch[1].trim();
+      }
+    }
+
+    // "Known For" section detection & parsing
+    if (line.toLowerCase().includes('known for')) {
+      for (let j = i + 1; j < Math.min(i + 15, lines.length); j++) {
+        const kLine = lines[j].trim();
+        if (kLine.startsWith('## ') || kLine.startsWith('# ')) break;
+        
+        const cleanKLine = kLine.replace(/^-\s+/, '');
+        const titleMatch = cleanKLine.match(/^(?:\[(.*?)\]\(.*?\)|\*\*(.*?)\*\*|(.*?))\s+\((\d{4})\)\s*(?:[-–—:]\s*|\s+as\s+|\s+)?(.*)?$/i);
+        if (titleMatch) {
+          const kTitle = (titleMatch[1] || titleMatch[2] || titleMatch[3] || '').trim();
+          const kYear = titleMatch[4];
+          const kRole = (titleMatch[5] || '').trim().replace(/^as\s+/i, '');
+          if (kTitle) {
+            knownFor.push({ title: kTitle, year: kYear, role: kRole, imageUrl: '' });
+          }
         }
       }
     }
 
-    // Extract credits from "Known for" section
-    if (line.includes('Known for') || line.includes('known for')) {
-      // Look at next lines for credits
-      for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
-        const creditLine = lines[j].trim();
-        if (creditLine.startsWith('- ') && creditLine.includes('(')) {
-          const normalizedCreditLine = creditLine.replace(/^-\s+/, '');
-          const knownForMatch = normalizedCreditLine.match(/^(.+?)\s+\((\d{4})\)\s*(?:-\s*(.*))?$/);
+    // Section header tracking for Credits/Filmography
+    if (line.toLowerCase().includes('filmography') || line.toLowerCase().includes('credits')) {
+      inCreditsSection = true;
+    }
 
-          if (knownForMatch) {
-            knownFor.push({
-              title: knownForMatch[1].trim(),
-              year: knownForMatch[2],
-              role: knownForMatch[3] ? knownForMatch[3].trim() : '',
-              imageUrl: '',
-            });
-          }
-        }
-        if (creditLine.startsWith('#') || creditLine.includes('##')) break;
+    // Category Subheadings (e.g., "#### Television", "### Actor - Feature Film")
+    if (line.startsWith('#')) {
+      const lower = line.toLowerCase();
+      if (lower.includes('television') || lower.includes('tv')) {
+        currentCategory = 'television';
+        inCreditsSection = true;
+      } else if (lower.includes('feature') || lower.includes('film') || lower.includes('movie')) {
+        currentCategory = 'feature_film';
+        inCreditsSection = true;
+      } else if (lower.includes('stage') || lower.includes('theatre') || lower.includes('theater')) {
+        currentCategory = 'stage';
+        inCreditsSection = true;
+      } else if (lower.includes('commercial')) {
+        currentCategory = 'commercial';
+        inCreditsSection = true;
+      } else if (lower.includes('videos') || lower.includes('photos') || lower.includes('personal details')) {
+        inCreditsSection = false;
       }
     }
 
-    // Extract credits from "Credits" section
-    if (line.includes('Actress') || line.includes('Actor') || line.includes('Credits')) {
-      for (let j = i + 1; j < Math.min(i + 50, lines.length); j++) {
-        const creditLine = lines[j].trim();
+    // Parse Credit Lines under Filmography/Credits sections
+    if (inCreditsSection || line.startsWith('- ')) {
+      const cleanCreditLine = line.replace(/^-\s+/, '');
+      
+      const cMatch = cleanCreditLine.match(/^(?:\[(.*?)\]\(.*?\)|\*\*(.*?)\*\*|(.*?))\s+\((?:(?:TV\s+Series\s+)?(\d{4}(?:[–—\-]\d{4}|\s*[–—\-]\s*)?))\)\s*(?:[-–—:]\s*|\s+as\s+|\s+)?(.*)?$/i);
+      
+      if (cMatch) {
+        const title = (cMatch[1] || cMatch[2] || cMatch[3] || '').trim();
+        const year = cMatch[4].trim();
+        const role = (cMatch[5] || '').trim().replace(/^as\s+/i, '');
 
-        // Stop at next section
-        if (creditLine.startsWith('#') || creditLine.includes('Videos') || creditLine.includes('Photos')) {
-          break;
-        }
-
-        if (creditLine.startsWith('- ') && creditLine.match(/\(\d{4}\)/)) {
-          const normalizedCreditLine = creditLine.replace(/^-\s+/, '');
-          const creditMatch = normalizedCreditLine.match(/^(.+?)\s+\((\d{4})\)\s*(?:-\s*(.*))?$/);
-
-          if (creditMatch) {
-            const title = creditMatch[1].trim();
-            const year = creditMatch[2];
-            const role = creditMatch[3] ? creditMatch[3].trim() : '';
-
-            // Determine category based on context
-            let category: Credit['category'] = 'further';
-            if (line.toLowerCase().includes('television') || line.toLowerCase().includes('tv')) {
-              category = 'television';
-            } else if (line.toLowerCase().includes('feature') || line.toLowerCase().includes('film')) {
-              category = 'feature_film';
-            } else if (line.toLowerCase().includes('stage') || line.toLowerCase().includes('theatre')) {
-              category = 'stage';
-            } else if (line.toLowerCase().includes('commercial')) {
-              category = 'commercial';
-            }
-
-            credits.push({
-              title,
-              role,
-              year,
-              category,
-              featured: knownFor.some(k => k.title === title),
-            });
-          }
+        if (title && !credits.some(c => c.title === title && c.year === year)) {
+          credits.push({
+            title,
+            role,
+            year,
+            category: currentCategory,
+            featured: knownFor.some(k => k.title === title),
+          });
         }
       }
     }
 
     // Extract video/showreel URLs
-    if (line.includes('Video') || line.includes('Showreel') || line.includes('Demo Reel')) {
+    if (line.toLowerCase().includes('video') || line.toLowerCase().includes('showreel') || line.toLowerCase().includes('demo reel')) {
       for (let j = i; j < Math.min(i + 10, lines.length); j++) {
         const videoLine = lines[j].trim();
         const urlMatch = videoLine.match(/https?:\/\/[^\s\)\"\'\]]+/);
@@ -151,14 +151,14 @@ export function parseIMDBMarkdown(markdown: string, metadata: FirecrawlMetadata)
     }
   }
 
-  // Extract bio from metadata description if available
+  // Fallback bio from metadata description if available
   if (!bio && metadata?.description) {
     bio = metadata.description.substring(0, 500);
   }
 
   return {
-    fullName,
-    slug: generateSlug(fullName),
+    fullName: fullName || 'Actor Profile',
+    slug: generateSlug(fullName || 'actor'),
     headshot: metadata?.ogImage || null,
     bio,
     height,
@@ -251,7 +251,7 @@ export async function POST(request: Request) {
 
     log.debug({ url, msg: 'Fetching IMDB data via Firecrawl' });
 
-    // Firecrawl API call
+    // Firecrawl API call with options to capture full DOM and lazy-loaded accordions
     const firecrawlResponse = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
       headers: {
@@ -261,6 +261,8 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         url,
         formats: ['markdown'],
+        onlyMainContent: false,
+        waitFor: 2000,
       }),
     });
 
@@ -282,7 +284,9 @@ export async function POST(request: Request) {
       );
     }
 
-    log.debug({ msg: 'Firecrawl request successful, fetching DNA profile' });
+    const markdownLength = firecrawlData.data?.markdown?.length || 0;
+    const markdownPreview = firecrawlData.data?.markdown?.slice(0, 200) || '';
+    log.debug({ markdownLength, markdownPreview, msg: 'Firecrawl scrape completed successfully' });
 
     // Fetch DNA profile from Firestore using admin SDK (has full permissions in server context)
     const { db } = await import('@/lib/firebase.admin');
@@ -308,7 +312,14 @@ export async function POST(request: Request) {
       firecrawlData.data.metadata
     );
 
-    log.debug({ fullName: imdbExtracted.fullName, creditsCount: imdbExtracted.credits.length, msg: 'IMDB data extracted' });
+    log.debug({ 
+      fullName: imdbExtracted.fullName, 
+      creditsCount: imdbExtracted.credits.length, 
+      knownForCount: imdbExtracted.knownFor.length,
+      height: imdbExtracted.height,
+      location: imdbExtracted.location,
+      msg: 'IMDB markdown parsed successfully' 
+    });
 
     // Initialize Vertex AI
     const { getAI, getGenerativeModel, VertexAIBackend } = await import('firebase/ai');
@@ -378,7 +389,7 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       headshot: synthesizedData.headshot || imdbExtracted.headshot,
       bio: synthesizedData.bio || imdbExtracted.bio,
       height: synthesizedData.height || imdbExtracted.height,
-      heightUnit: synthesizedData.heightUnit || 'imperial',
+      heightUnit: synthesizedData.heightUnit || (imdbExtracted.height.includes('cm') || imdbExtracted.height.includes('m') ? 'metric' : 'imperial'),
       location: synthesizedData.location || imdbExtracted.location,
       timezone: synthesizedData.timezone || '',
       gender: synthesizedData.gender || '',
@@ -402,7 +413,13 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       agencyPhone: synthesizedData.agencyPhone || '',
     };
 
-    log.info({ fullName: finalData.fullName, creditsCount: finalData.credits.length, msg: 'Autofill completed successfully' });
+    log.info({ 
+      fullName: finalData.fullName, 
+      creditsCount: finalData.credits.length, 
+      photosCount: finalData.additionalPhotos.length,
+      hasBio: !!finalData.bio,
+      msg: 'Autofill completed successfully' 
+    });
 
     return NextResponse.json({
       success: true,
@@ -415,3 +432,4 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

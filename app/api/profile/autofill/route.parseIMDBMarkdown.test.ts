@@ -52,14 +52,14 @@ Actress
             ]);
         });
 
-        it('extracts location from birth info', () => {
+        it('extracts location from birth info with global countries', () => {
             const markdown = `# Test Actor
 
-- Born June 15, 1980 in United States`;
+- Born June 15, 1980 in Madrid, Spain`;
 
             const result = parseIMDBMarkdown(markdown, baseMetadata);
 
-            expect(result.location).toBe('United States');
+            expect(result.location).toContain('Spain');
         });
 
         it('extracts height when present in birth info with cm', () => {
@@ -70,6 +70,45 @@ Actress
             const result = parseIMDBMarkdown(markdown, baseMetadata);
 
             expect(result.height).toBe('175 cm');
+        });
+
+        it('parses credits under markdown subheadings and link formatting with year ranges', () => {
+            const markdown = `# Complex Actor
+
+## Filmography
+
+#### Feature Film
+- [Awesome Movie](https://www.imdb.com/title/tt12345/) (2020) - Lead Role
+- Movie Two (2018–2022) - Supporting
+
+#### Television
+- [Big Drama Series](https://www.imdb.com/title/tt67890/) (2021–2024) as Detective Smith`;
+
+            const result = parseIMDBMarkdown(markdown, baseMetadata);
+
+            expect(result.fullName).toBe('Complex Actor');
+            expect(result.credits).toHaveLength(3);
+            expect(result.credits[0]).toEqual({
+                title: 'Awesome Movie',
+                year: '2020',
+                role: 'Lead Role',
+                category: 'feature_film',
+                featured: false,
+            });
+            expect(result.credits[1]).toEqual({
+                title: 'Movie Two',
+                year: '2018–2022',
+                role: 'Supporting',
+                category: 'feature_film',
+                featured: false,
+            });
+            expect(result.credits[2]).toEqual({
+                title: 'Big Drama Series',
+                year: '2021–2024',
+                role: 'Detective Smith',
+                category: 'television',
+                featured: false,
+            });
         });
     });
 

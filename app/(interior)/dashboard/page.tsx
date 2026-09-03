@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Dna, Monitor, Sparkles, FileText } from "lucide-react";
@@ -12,12 +12,15 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { getHasSeenIntroVideo, markHasSeenIntroVideo } from "@/lib/firestore.utils";
 import { useRouter, useSearchParams } from "next/navigation";
 
-/**
- * Main dashboard page showing the self-tape copilot workflow.
- * Renders the hero section, main action cards, memory recording banner, and baseline upload modal.
- * @returns The rendered dashboard page component
- */
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const [isBaselineModalOpen, setIsBaselineModalOpen] = useState(false);
   const [isIntroVideoOpen, setIsIntroVideoOpen] = useState(false);
   const { user, loading } = useAuth();

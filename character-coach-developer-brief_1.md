@@ -1,7 +1,5 @@
 # The Character Coach: developer brief
 
-**For:** Arrow Digital Media
-**From:** Tracey Collis, The Actors Copilot
 **What this is:** the specification for a new, dedicated coaching AI that takes an actor through their character breakdown and gets them ready to record.
 
 ## The problem we are solving

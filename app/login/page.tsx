@@ -1,19 +1,20 @@
 "use client";
 
 import { useAuth } from "@/lib/context/AuthContext";
-import { 
-  Dna, 
-  FileText, 
-  ShieldCheck, 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  ArrowRight 
+import {
+  Dna,
+  FileText,
+  ShieldCheck,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight
 } from "lucide-react";
-import { useState, ReactNode } from "react";
+import { useState, useEffect, ReactNode, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 
 interface FirebaseError {
   code: string;
@@ -30,7 +31,23 @@ function isFirebaseError(error: unknown): error is FirebaseError {
 }
 
 export default function LoginPage() {
-  const { loginWithGoogle, loginWithEmail, signupWithEmail, sendPasswordReset, loading } = useAuth();
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen w-full flex items-center justify-center bg-background text-foreground">
+          <div className="animate-pulse text-xs sm:text-sm text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
+  const { user, loginWithGoogle, loginWithEmail, signupWithEmail, sendPasswordReset, loading } = useAuth();
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
 
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
@@ -39,6 +56,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [keepSigned, setKeepSigned] = useState(true);
+
+  const redirectAfterAuth = () => {
+    if (plan === "economy" || plan === "business") {
+      window.location.href = "/upgrade";
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && user) {
+      if (plan === "economy" || plan === "business") {
+        window.location.href = "/upgrade";
+      }
+    }
+  }, [user, loading, plan]);
 
   const handlePasswordReset = async () => {
     setErrorMsg("");
@@ -66,6 +97,7 @@ export default function LoginPage() {
     setInfoMsg("");
     try {
       await loginWithGoogle();
+      redirectAfterAuth();
     } catch (error: unknown) {
       if (isFirebaseError(error)) {
         if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
@@ -91,12 +123,14 @@ export default function LoginPage() {
 
     try {
       await loginWithEmail(email, password);
+      redirectAfterAuth();
     } catch (error: any) {
       const errorCode = error.cause?.code || error.code;
 
-      if (errorCode === "auth/invalid-credential") {
+      if (errorCode === "auth/invalid-credential" || errorCode === "auth/user-not-found") {
         try {
           await signupWithEmail(email, password);
+          redirectAfterAuth();
         } catch (signupError: any) {
           const signupErrorCode = signupError.cause?.code || signupError.code;
 
@@ -116,12 +150,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex bg-background text-foreground transition-colors">
-      
+
       {/* ========================================================= */}
       {/* LEFT PANEL: Branding & Visual Hero                        */}
       {/* ========================================================= */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-neutral-950 p-12 lg:p-16 flex-col justify-between overflow-hidden">
-        
+
         {/* Background Image & Overlay */}
         <div className="absolute inset-0 z-0">
           <Image
@@ -193,7 +227,7 @@ export default function LoginPage() {
       {/* ========================================================= */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 bg-background">
         <div className="w-full max-w-md space-y-6">
-          
+
           {/* Mobile Logo */}
           <div className="flex justify-center lg:hidden pb-2">
             <Image
@@ -208,20 +242,22 @@ export default function LoginPage() {
 
           {/* Main Login Card */}
           <div className="rounded-3xl bg-card border border-border p-6 sm:p-10 shadow-sm transition-colors">
-            
+
             {/* Header */}
             <div className="text-center space-y-1.5 mb-8">
               <h2 className="font-title text-2xl sm:text-3xl font-bold text-foreground">
-                Welcome back
+                {plan ? "First, Create Your Account" : "Welcome back"}
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Sign in to continue your acting journey.
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                {plan
+                  ? "Let's set up your account first, then choose the perfect plan to boost your career."
+                  : "Sign in to continue your acting journey."}
               </p>
             </div>
 
             {/* Email Form */}
             <form onSubmit={handleEmailAuth} className="space-y-5">
-              
+
               {/* Email Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
