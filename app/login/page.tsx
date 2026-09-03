@@ -11,7 +11,7 @@ import {
   EyeOff,
   ArrowRight
 } from "lucide-react";
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, ReactNode, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -31,6 +31,20 @@ function isFirebaseError(error: unknown): error is FirebaseError {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen w-full flex items-center justify-center bg-background text-foreground">
+          <div className="animate-pulse text-xs sm:text-sm text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const { user, loginWithGoogle, loginWithEmail, signupWithEmail, sendPasswordReset, loading } = useAuth();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");

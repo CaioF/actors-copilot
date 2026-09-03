@@ -1,6 +1,6 @@
 "use client"
 
-import { RefObject, useEffect, useMemo, useRef, useState } from "react"
+import { RefObject, useEffect, useMemo, useRef, useState, Suspense } from "react"
 import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
@@ -41,12 +41,15 @@ interface AuditionData {
   analysisType?: "sides" | "brief";
 }
 
-/**
- * Detailed view page for a single character breakdown.
- * Displays performance map data and provides print functionality.
- * @returns The rendered audition detail page
- */
 export default function AuditionDetailView() {
+  return (
+    <Suspense fallback={<div className="flex h-full w-full items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+      <AuditionDetailContent />
+    </Suspense>
+  )
+}
+
+function AuditionDetailContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
