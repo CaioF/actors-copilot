@@ -9,7 +9,11 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+  LogIn,
+  UserPlus
 } from "lucide-react";
 import { useState, useEffect, ReactNode, Suspense } from "react";
 import Link from "next/link";
@@ -48,7 +52,9 @@ function LoginContent() {
   const { user, loginWithGoogle, loginWithEmail, signupWithEmail, sendPasswordReset, loading } = useAuth();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
+  const initialModeParam = searchParams.get("mode");
 
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
@@ -56,6 +62,12 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [keepSigned, setKeepSigned] = useState(true);
+
+  useEffect(() => {
+    if (initialModeParam === "signup" || plan) {
+      setMode("signup");
+    }
+  }, [initialModeParam, plan]);
 
   const redirectAfterAuth = () => {
     if (plan === "economy" || plan === "business") {
@@ -70,6 +82,12 @@ function LoginContent() {
       }
     }
   }, [user, loading, plan]);
+
+  const handleModeSwitch = (newMode: "login" | "signup") => {
+    setMode(newMode);
+    setErrorMsg("");
+    setInfoMsg("");
+  };
 
   const handlePasswordReset = async () => {
     setErrorMsg("");
@@ -92,7 +110,7 @@ function LoginContent() {
     }
   };
 
-  const handleLogin = async () => {
+  const handleGoogleAuth = async () => {
     setErrorMsg("");
     setInfoMsg("");
     try {
@@ -121,29 +139,32 @@ function LoginContent() {
       return;
     }
 
-    try {
-      await loginWithEmail(email, password);
-      redirectAfterAuth();
-    } catch (error: any) {
-      const errorCode = error.cause?.code || error.code;
-
-      if (errorCode === "auth/invalid-credential" || errorCode === "auth/user-not-found") {
-        try {
-          await signupWithEmail(email, password);
-          redirectAfterAuth();
-        } catch (signupError: any) {
-          const signupErrorCode = signupError.cause?.code || signupError.code;
-
-          if (signupErrorCode === "auth/email-already-in-use") {
-            setErrorMsg("The email address or password is incorrect. Please try again.");
-          } else if (signupErrorCode === "auth/weak-password") {
-            setErrorMsg("Please choose a password with at least 6 characters.");
-          } else {
-            setErrorMsg(signupError.message || "We could not complete sign-in. Please try again.");
-          }
+    if (mode === "login") {
+      try {
+        await loginWithEmail(email, password);
+        redirectAfterAuth();
+      } catch (error: any) {
+        const errorCode = error.cause?.code || error.code;
+        if (errorCode === "auth/invalid-credential" || errorCode === "auth/user-not-found") {
+          setErrorMsg("Incorrect email or password. Don't have an account yet? Switch to 'Create Account' above.");
+        } else {
+          setErrorMsg(error.message || "We could not complete sign-in. Please try again.");
         }
-      } else {
-        setErrorMsg(error.message || "Connection failed.");
+      }
+    } else {
+      // Create Account mode
+      try {
+        await signupWithEmail(email, password);
+        redirectAfterAuth();
+      } catch (signupError: any) {
+        const signupErrorCode = signupError.cause?.code || signupError.code;
+        if (signupErrorCode === "auth/email-already-in-use") {
+          setErrorMsg("An account with this email already exists. Switch to 'Log In' above to access your account.");
+        } else if (signupErrorCode === "auth/weak-password") {
+          setErrorMsg("Please choose a password with at least 6 characters.");
+        } else {
+          setErrorMsg(signupError.message || "Could not create account. Please try again.");
+        }
       }
     }
   };
@@ -188,11 +209,17 @@ function LoginContent() {
           <div className="my-auto py-12 space-y-8 rounded-3xl bg-neutral-900/60 backdrop-blur-md border border-white/10 p-8">
             <div className="space-y-3">
               <h1 className="font-title text-3xl xl:text-4xl font-bold text-white leading-tight">
-                Your AI Partner for<br />Self-Taping
+                {mode === "signup" ? (
+                  <>Experience the Future of<br />Audition Preparation</>
+                ) : (
+                  <>Your AI Partner for<br />Self-Taping</>
+                )}
               </h1>
               <div className="w-12 h-[2px] bg-primary" />
               <p className="text-neutral-300 text-sm leading-relaxed">
-                Build your Personal DNA, Breakdown Characters in minutes, and prepare with confidence.
+                {mode === "signup"
+                  ? "Explore the dashboard, build your Personal DNA, and preview how AI accelerates your character prep—100% free."
+                  : "Build your Personal DNA, Breakdown Characters in minutes, and prepare with confidence."}
               </p>
             </div>
 
@@ -209,8 +236,8 @@ function LoginContent() {
               />
               <FeatureItem
                 icon={<ShieldCheck className="w-4 h-4 text-white" />}
-                title="Private by Default"
-                description="Your data stays yours. Delete anytime"
+                title="Private & Risk-Free"
+                description="Signing up is free with instant preview access. Delete anytime"
               />
             </div>
           </div>
@@ -243,17 +270,72 @@ function LoginContent() {
           {/* Main Login Card */}
           <div className="rounded-3xl bg-card border border-border p-6 sm:p-10 shadow-sm transition-colors">
 
-            {/* Header */}
-            <div className="text-center space-y-1.5 mb-8">
+            {/* Segmented Mode Switcher */}
+            <div className="flex bg-muted/70 p-1.5 rounded-2xl border border-border mb-6">
+              <button
+                type="button"
+                onClick={() => handleModeSwitch("login")}
+                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
+                  mode === "login"
+                    ? "bg-card text-foreground shadow-sm border border-border/60 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Log In</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeSwitch("signup")}
+                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
+                  mode === "signup"
+                    ? "bg-card text-foreground shadow-sm border border-border/60 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Create Account</span>
+              </button>
+            </div>
+
+            {/* Header Copy */}
+            <div className="text-center space-y-1.5 mb-6">
               <h2 className="font-title text-2xl sm:text-3xl font-bold text-foreground">
-                {plan ? "First, Create Your Account" : "Welcome back"}
+                {mode === "signup"
+                  ? (plan ? "First, Create Your Account" : "Discover The Actor's Copilot")
+                  : "Welcome back"}
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                {plan
-                  ? "Let's set up your account first, then choose the perfect plan to boost your career."
+                {mode === "signup"
+                  ? (plan
+                      ? "Let's set up your account first, then choose the perfect plan to boost your career."
+                      : "Sign up for free to get a sneak peek into the dashboard and see how AI can elevate your audition prep.")
                   : "Sign in to continue your acting journey."}
               </p>
             </div>
+
+            {/* Prominent Invitation Callout for Create Account */}
+            {mode === "signup" && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/15 via-primary/5 to-transparent border border-primary/25 space-y-2 text-left mb-6 animate-in fade-in duration-300">
+                <div className="flex items-center gap-2 text-primary font-bold text-xs sm:text-sm">
+                  <Sparkles className="w-4 h-4 shrink-0 animate-pulse text-primary" />
+                  <span>Discover the App & Explore the Dashboard</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Creating your account is <strong className="text-foreground font-semibold">100% Free</strong>. Preview the dashboard experience, set up your Personal DNA, and explore features with zero obligation.
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                    No credit card required
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                    Instant sneak peek access
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Email Form */}
             <form onSubmit={handleEmailAuth} className="space-y-5">
@@ -313,14 +395,18 @@ function LoginContent() {
                   <span>Keep me signed in</span>
                 </label>
 
-                <button
-                  type="button"
-                  onClick={handlePasswordReset}
-                  disabled={resetLoading || loading}
-                  className="text-primary hover:underline font-semibold disabled:opacity-60 transition-all"
-                >
-                  {resetLoading ? "Sending link..." : "Forgot password?"}
-                </button>
+                {mode === "login" ? (
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    disabled={resetLoading || loading}
+                    className="text-primary hover:underline font-semibold disabled:opacity-60 transition-all"
+                  >
+                    {resetLoading ? "Sending link..." : "Forgot password?"}
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">Min. 6 characters</span>
+                )}
               </div>
 
               {/* Submit Button */}
@@ -331,9 +417,14 @@ function LoginContent() {
               >
                 {loading ? (
                   <span className="animate-pulse">Processing...</span>
+                ) : mode === "signup" ? (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Create Free Account & Discover App</span>
+                  </>
                 ) : (
                   <>
-                    <span>Continue</span>
+                    <span>Sign In</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -353,7 +444,7 @@ function LoginContent() {
             <div>
               <button
                 type="button"
-                onClick={handleLogin}
+                onClick={handleGoogleAuth}
                 disabled={loading}
                 className="w-full py-3 px-4 rounded-full bg-card hover:bg-muted border border-border text-foreground font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-colors shadow-sm disabled:opacity-70"
               >
@@ -375,7 +466,9 @@ function LoginContent() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span>Continue with Google</span>
+                <span>
+                  {mode === "signup" ? "Sign Up with Google & Discover" : "Continue with Google"}
+                </span>
               </button>
             </div>
 
@@ -419,7 +512,7 @@ function LoginContent() {
           {/* Subtitle / Secure Footer */}
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Lock className="w-3.5 h-3.5" />
-            <span>Secure, private, and never shared.</span>
+            <span>Secure, private, and free to preview.</span>
           </div>
 
         </div>
@@ -441,4 +534,4 @@ function FeatureItem({ icon, title, description }: { icon: ReactNode; title: str
       </div>
     </div>
   );
-}
+}
