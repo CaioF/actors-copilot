@@ -149,6 +149,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
             customer: 'cus_historical_888',
             client_reference_id: mockUid,
             mode: 'subscription',
+            allow_promotion_codes: true,
             payment_method_types: ['card'],
             billing_address_collection: 'required',
             line_items: [
