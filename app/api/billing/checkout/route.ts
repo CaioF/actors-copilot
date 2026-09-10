@@ -39,7 +39,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // 3. Fetch active customer billing configurations from Firestore to prevent duplicate client entities
         const billingDocRef = db.doc(`users/${uid}/billing/current`);
         const billingDoc = await billingDocRef.get();
-        
+
         let stripeCustomerId: string | undefined;
 
         if (billingDoc.exists) {
@@ -73,6 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             customer: stripeCustomerId,
             client_reference_id: uid,
             mode: 'subscription',
+            allow_promotion_codes: true,
             payment_method_types: ['card'],
             billing_address_collection: 'required',
             line_items: [

@@ -407,6 +407,14 @@ ${JSON.stringify(dnaContext, null, 2)}` : 'No DNA profile found. Use only IMDB d
       training: synthesizedData.training?.length > 0 ? synthesizedData.training : [],
       externalProfiles: synthesizedData.externalProfiles || {},
 
+      agents: (synthesizedData.agencyName || synthesizedData.agencyEmail || synthesizedData.agencyWebsite || synthesizedData.agencyPhone)
+        ? [{
+            agencyName: synthesizedData.agencyName || '',
+            agencyWebsite: synthesizedData.agencyWebsite || '',
+            agencyEmail: synthesizedData.agencyEmail || '',
+            agencyPhone: synthesizedData.agencyPhone || '',
+          }]
+        : [],
       agencyName: synthesizedData.agencyName || '',
       agencyWebsite: synthesizedData.agencyWebsite || '',
       agencyEmail: synthesizedData.agencyEmail || '',

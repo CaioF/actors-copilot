@@ -3,6 +3,7 @@ import {
   CREDIT_CATEGORY_LABELS,
   EXTERNAL_PROFILE_FIELDS,
   ExternalProfileKey,
+  normalizeAgents,
 } from "@/lib/profile-types";
 
 /**
@@ -150,9 +151,10 @@ export function profileToMarkdown(
   }
 
   // ── Representation ────────────────────────────────────────────────
+  const displayAgents = normalizeAgents(profile);
   if (
     profile.showContactPublicly &&
-    (profile.agencyName || profile.agencyEmail)
+    displayAgents.some((a) => a.agencyName || a.agencyEmail)
   ) {
     sections.push("");
     sections.push("## Representation");
@@ -160,14 +162,16 @@ export function profileToMarkdown(
     sections.push(
       "For booking inquiries, casting offers, or audition requests, contact the actor's representation:"
     );
-    sections.push("");
-    if (profile.agencyName) sections.push(`**Agency:** ${profile.agencyName}`);
-    if (profile.agencyEmail)
-      sections.push(`**Email:** ${profile.agencyEmail}`);
-    if (profile.agencyPhone)
-      sections.push(`**Phone:** ${profile.agencyPhone}`);
-    if (profile.agencyWebsite)
-      sections.push(`**Website:** ${profile.agencyWebsite}`);
+    for (const agent of displayAgents) {
+      sections.push("");
+      if (agent.agencyName) sections.push(`**Agency:** ${agent.agencyName}`);
+      if (agent.agencyEmail)
+        sections.push(`**Email:** ${agent.agencyEmail}`);
+      if (agent.agencyPhone)
+        sections.push(`**Phone:** ${agent.agencyPhone}`);
+      if (agent.agencyWebsite)
+        sections.push(`**Website:** ${agent.agencyWebsite}`);
+    }
   }
 
   // ── Availability & Work Permits ───────────────────────────────────
@@ -427,14 +431,22 @@ function buildStructuredCastingData(
     jsonLd.knowsAbout = profile.skillsAndAccents;
   }
 
-  if (profile.showContactPublicly && profile.agencyName) {
-    jsonLd.worksFor = {
-      "@type": "Organization",
-      name: profile.agencyName,
-      ...(profile.agencyEmail && { email: profile.agencyEmail }),
-      ...(profile.agencyPhone && { telephone: profile.agencyPhone }),
-      ...(profile.agencyWebsite && { url: profile.agencyWebsite }),
-    };
+  const displayAgents = normalizeAgents(profile);
+  if (profile.showContactPublicly && displayAgents.length > 0) {
+    const orgs = displayAgents
+      .filter((a) => a.agencyName || a.agencyEmail || a.agencyPhone || a.agencyWebsite)
+      .map((agent) => ({
+        "@type": "Organization",
+        ...(agent.agencyName && { name: agent.agencyName }),
+        ...(agent.agencyEmail && { email: agent.agencyEmail }),
+        ...(agent.agencyPhone && { telephone: agent.agencyPhone }),
+        ...(agent.agencyWebsite && { url: agent.agencyWebsite }),
+      }));
+    if (orgs.length === 1) {
+      jsonLd.worksFor = orgs[0];
+    } else if (orgs.length > 1) {
+      jsonLd.worksFor = orgs;
+    }
   }
 
   if (profile.credits.length > 0) {
@@ -521,14 +533,22 @@ function buildFrontmatter(
   if (profile.eyeColour) fm.eyeColor = profile.eyeColour;
   if (profile.hairColour) fm.hairColor = profile.hairColour;
 
-  if (profile.showContactPublicly && profile.agencyName) {
-    fm.representedBy = {
-      "@type": "Organization",
-      name: profile.agencyName,
-      ...(profile.agencyEmail && { email: profile.agencyEmail }),
-      ...(profile.agencyPhone && { telephone: profile.agencyPhone }),
-      ...(profile.agencyWebsite && { url: profile.agencyWebsite }),
-    };
+  const fmAgents = normalizeAgents(profile);
+  if (profile.showContactPublicly && fmAgents.length > 0) {
+    const repOrgs = fmAgents
+      .filter((a) => a.agencyName || a.agencyEmail || a.agencyPhone || a.agencyWebsite)
+      .map((agent) => ({
+        "@type": "Organization",
+        ...(agent.agencyName && { name: agent.agencyName }),
+        ...(agent.agencyEmail && { email: agent.agencyEmail }),
+        ...(agent.agencyPhone && { telephone: agent.agencyPhone }),
+        ...(agent.agencyWebsite && { url: agent.agencyWebsite }),
+      }));
+    if (repOrgs.length === 1) {
+      fm.representedBy = repOrgs[0];
+    } else if (repOrgs.length > 1) {
+      fm.representedBy = repOrgs;
+    }
   }
 
   if (profile.lastUpdated) {
