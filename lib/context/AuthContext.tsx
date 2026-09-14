@@ -71,6 +71,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState<boolean>(true);
      
     /**
+     * Handles post-authentication redirection. Checks if a 14-day trial intent was stored,
+     * initiates a Stripe checkout session if present, and redirects to Stripe Checkout URL.
+     * Otherwise redirects to /dashboard.
+     */
+    const handlePostAuthRedirect = async () => {
+        if (typeof window !== 'undefined') {
+            const trialIntent = sessionStorage.getItem('trial_intent');
+            const trialTier = sessionStorage.getItem('trial_tier') || 'business';
+
+            if (trialIntent) {
+                try {
+                    const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : undefined;
+                    const checkoutRes = await fetch('/api/billing/checkout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            tier: trialTier,
+                            isTrial: true,
+                            idToken,
+                        }),
+                    });
+
+                    const checkoutData = await checkoutRes.json();
+                    if (checkoutRes.ok && checkoutData.url) {
+                        sessionStorage.removeItem('trial_intent');
+                        sessionStorage.removeItem('trial_tier');
+                        window.location.href = checkoutData.url;
+                        return;
+                    } else {
+                        logger.error({ msg: 'Failed to initiate trial checkout session post-auth', error: checkoutData?.error });
+                    }
+                } catch (err) {
+                    logger.error({ err, msg: 'Failed to initiate trial checkout session post-auth' });
+                }
+            }
+        }
+        window.location.href = "/dashboard";
+    };
+
+    /**
      * Initiates the Google OAuth login flow via Firebase pop-up.
      * Upon successful Firebase authentication, it securely exchanges the Firebase ID token
      * with the backend to validate subscription state and issue a secure platform session cookie.
@@ -100,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             setUser(result.user as AppUser);
-            window.location.href = "/dashboard"; 
+            await handlePostAuthRedirect();
 
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -145,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             setUser(result.user as AppUser);
-            window.location.href = "/dashboard"; 
+            await handlePostAuthRedirect();
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
                 if (error.code === 'auth/invalid-credential') {
@@ -191,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             setUser(userWithBilling);
-            window.location.href = "/dashboard"; 
+            await handlePostAuthRedirect();
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
                 if (error.code === 'auth/email-already-in-use') {
