@@ -29,9 +29,10 @@ export function ProfileLivePreview() {
   const cvUrl = useWatch({ control, name: "cvUrl" });
   const headshot = useWatch({ control, name: "headshot" });
 
+  const agentNames = agents?.map((a) => a.agencyName).filter(Boolean) ?? [];
   const representationText =
-    agents && agents.length > 0
-      ? agents.map((a) => a.agencyName).filter(Boolean).join(", ")
+    agentNames.length > 0
+      ? agentNames.join(", ")
       : agencyName;
 
   const ageRange =

@@ -86,37 +86,8 @@ function LoginContent() {
   }, [initialModeParam, planParam, trialParam]);
 
   useEffect(() => {
-    if (!loading && user) {
-      const trialIntent = typeof window !== 'undefined' ? sessionStorage.getItem('trial_intent') : null;
-      if (trialIntent) {
-        const trialTier = sessionStorage.getItem('trial_tier') || 'business';
-        user.getIdToken().then((idToken) => {
-          fetch('/api/billing/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tier: trialTier, isTrial: true, idToken }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              if (data.url) {
-                sessionStorage.removeItem('trial_intent');
-                sessionStorage.removeItem('trial_tier');
-                window.location.href = data.url;
-              } else {
-                console.error("Trial checkout creation failed:", data.error);
-                window.location.href = '/dashboard';
-              }
-            })
-            .catch((err) => {
-              console.error("Error creating trial checkout:", err);
-              window.location.href = '/dashboard';
-            });
-        }).catch(() => {
-          window.location.href = '/dashboard';
-        });
-      } else if (planParam === "economy" || planParam === "business") {
-        window.location.href = "/upgrade";
-      }
+    if (!loading && user && !sessionStorage.getItem("trial_intent") && (planParam === "economy" || planParam === "business")) {
+      window.location.href = "/upgrade";
     }
   }, [user, loading, planParam]);
 

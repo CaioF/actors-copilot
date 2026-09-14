@@ -97,7 +97,7 @@ export async function createMigrationCheckoutSession({
     // 2. Build the Checkout Session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      allow_promotion_codes: true,
+      allow_promotion_codes: false,
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [

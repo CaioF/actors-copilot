@@ -13,7 +13,14 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
-        const body = await req.json();
+        let body: Record<string, unknown>;
+        try {
+            const parsedBody = await req.json();
+            body = parsedBody && typeof parsedBody === 'object' ? parsedBody as Record<string, unknown> : {};
+        } catch {
+            return NextResponse.json({ error: 'Malformed JSON request body' }, { status: 400 });
+        }
+
         const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string } = body;
 
         // 1. Enforce authentication via platform session cookie or Firebase ID Token fallback

@@ -71,6 +71,22 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(data.error).toBe('Invalid or unsupported subscription tier specified');
     });
 
+    it('returns 400 Bad Request for malformed JSON request bodies', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{',
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(data.error).toBe('Malformed JSON request body');
+    });
+
     /**
      * Test suite verifying lazy customer creation and mapping when no historical customerId exists.
      */
