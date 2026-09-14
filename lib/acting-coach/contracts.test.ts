@@ -87,6 +87,11 @@ describe("CoachProfileUpdatePayload excludes restricted fields", () => {
     const _: CoachProfileUpdatePayload = { fullName: "Test" };
   });
 
+  it("does not include agents in CoachProfileUpdatePayload", () => {
+    // @ts-expect-error - agents is restricted and should not be allowed
+    const _: CoachProfileUpdatePayload = { agents: [] };
+  });
+
   it("does not include agencyName in CoachProfileUpdatePayload", () => {
     // @ts-expect-error - agencyName is restricted and should not be allowed
     const _: CoachProfileUpdatePayload = { agencyName: "Agency" };

@@ -125,15 +125,30 @@ async function resolvePlatformUserId(params: {
 }
 
 /**
- * Idempotently updates the user's billing document in Firestore.
+ * Idempotently updates the user's billing document and root user profile in Firestore.
  */
 async function syncUserBilling(platformUserId: string, data: Record<string, any>): Promise<void> {
     const billingRef = db.doc(`users/${platformUserId}/billing/current`);
+    const userRef = db.doc(`users/${platformUserId}`);
+
     const payload = sanitizeFirestorePayload({
         ...data,
+        subscriptionStatus: data.status,
         updatedAt: new Date().toISOString(),
     });
+
     await billingRef.set(payload, { merge: true });
+
+    // Sync root user document so direct queries on the users collection have billing status
+    await userRef.set(sanitizeFirestorePayload({
+        stripeCustomerId: data.customerId ?? null,
+        subscriptionStatus: data.status ?? null,
+        hasAccess: data.hasAccess ?? null,
+        tier: data.tier ?? null,
+        cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
+        cancelAt: data.cancelAt ?? null,
+        updatedAt: new Date().toISOString(),
+    }), { merge: true });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -175,11 +190,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
                 const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
                 let priceId: string | null = null;
+                let subscriptionObj: Stripe.Subscription | null = null;
 
                 if (subscriptionId) {
                     try {
-                        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                        priceId = subscription.items.data[0]?.price?.id || null;
+                        subscriptionObj = await stripe.subscriptions.retrieve(subscriptionId);
+                        priceId = subscriptionObj.items.data[0]?.price?.id || null;
                     } catch (subErr) {
                         logger.warn({ err: subErr, msg: `Failed to retrieve subscription ${subscriptionId}` });
                     }
@@ -196,18 +212,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
                 const tier = session.metadata?.targetTier || (priceId ? mapStripePriceToTier(priceId) : 'free');
                 const isMigrationFlow = session.metadata?.flow === 'subscriber_migration';
+                const isTrialSession = session.metadata?.isTrial === 'true' || subscriptionObj?.status === 'trialing';
+                const subStatus = subscriptionObj?.status || (isTrialSession ? 'trialing' : 'active');
+                const hasAccess = ['trialing', 'active'].includes(subStatus);
 
                 await syncUserBilling(platformUserId, {
                     customerId,
                     subscriptionId: subscriptionId || null,
                     priceId: priceId || null,
                     tier,
-                    status: 'active',
+                    status: subStatus,
+                    hasAccess,
+                    hasUsedTrial: isTrialSession ? true : undefined,
+                    trialStart: subscriptionObj?.trial_start ?? null,
+                    trialEnd: subscriptionObj?.trial_end ?? null,
                     migrationSource: isMigrationFlow ? 'kajabi' : null,
                     migratedAt: isMigrationFlow ? new Date().toISOString() : null,
                 });
 
-                logger.info(`[checkout.session.completed] Successfully synced user ${platformUserId}`);
+                logger.info(`[checkout.session.completed] Successfully synced user ${platformUserId} (status: ${subStatus})`);
                 break;
             }
 
@@ -231,6 +254,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 const priceId = firstItem?.price?.id || null;
                 const tier = priceId ? mapStripePriceToTier(priceId) : 'free';
                 const status = subscription.status;
+                const isDeleted = event.type === 'customer.subscription.deleted' || status === 'canceled' || status === 'unpaid';
+                const hasAccess = !isDeleted && ['trialing', 'active'].includes(status);
 
                 const subscriptionWithPeriod = subscription as Stripe.Subscription & { current_period_end?: number };
                 const currentPeriodEnd =
@@ -238,17 +263,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     firstItem?.current_period_end ??
                     Math.floor(Date.now() / 1000);
 
+                const cancelAtPeriodEnd = subscription.cancel_at_period_end ?? false;
+                const cancelAt = subscription.cancel_at ?? (cancelAtPeriodEnd ? currentPeriodEnd : null);
+
                 await syncUserBilling(platformUserId, {
                     customerId,
                     subscriptionId: subscription.id,
                     priceId,
-                    tier: status === 'canceled' || status === 'unpaid' ? 'free' : tier,
-                    status,
+                    tier: isDeleted ? 'free' : tier,
+                    status: isDeleted ? 'canceled' : status,
+                    hasAccess,
+                    hasUsedTrial: status === 'trialing' ? true : undefined,
+                    trialStart: subscription.trial_start ?? null,
+                    trialEnd: subscription.trial_end ?? null,
                     currentPeriodEnd,
-                    cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+                    cancelAtPeriodEnd: isDeleted ? false : cancelAtPeriodEnd,
+                    cancelAt: isDeleted ? null : cancelAt,
                 });
 
-                logger.info(`[${event.type}] Successfully synced status '${status}' for user ${platformUserId}`);
+                logger.info(`[${event.type}] Successfully synced status '${status}' (hasAccess: ${hasAccess}, cancelAtPeriodEnd: ${cancelAtPeriodEnd}) for user ${platformUserId}`);
                 break;
             }
 
@@ -264,11 +297,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 });
 
                 if (platformUserId) {
+                    const updatedStatus = isPaid ? 'active' : 'past_due';
                     await syncUserBilling(platformUserId, {
                         customerId,
-                        status: isPaid ? 'active' : 'past_due',
+                        status: updatedStatus,
+                        hasAccess: isPaid,
                     });
-                    logger.info(`[${event.type}] Updated billing status to '${isPaid ? 'active' : 'past_due'}' for user ${platformUserId}`);
+                    logger.info(`[${event.type}] Updated billing status to '${updatedStatus}' for user ${platformUserId}`);
                 }
                 break;
             }

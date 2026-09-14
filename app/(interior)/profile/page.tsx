@@ -16,6 +16,7 @@ import {
   actorProfileSchema,
   defaultActorProfile,
   generateSlug,
+  normalizeAgents,
 } from "@/lib/profile-types";
 import { useAuth } from "@/lib/context/AuthContext";
 
@@ -127,7 +128,8 @@ export default function ProfilePage() {
         if (cancelled) return;
         if (docSnap.exists()) {
           const data = docSnap.data() as Partial<ActorProfile>;
-          methods.reset({ ...defaults, ...data });
+          const agents = normalizeAgents(data);
+          methods.reset({ ...defaults, ...data, agents });
         } else {
           methods.reset(defaults);
         }
@@ -289,6 +291,16 @@ const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) 
       ethnicity: isNonEmpty(currentValues.ethnicity) ? currentValues.ethnicity : (autofillData.ethnicity || ''),
 
       // Agency Data
+      agents: hasRealItems(currentValues.agents)
+        ? currentValues.agents
+        : hasRealItems(autofillData.agents)
+          ? autofillData.agents!
+          : normalizeAgents({
+              agencyName: isNonEmpty(currentValues.agencyName) ? currentValues.agencyName : (autofillData.agencyName || ''),
+              agencyWebsite: isNonEmpty(currentValues.agencyWebsite) ? currentValues.agencyWebsite : (autofillData.agencyWebsite || ''),
+              agencyEmail: isNonEmpty(currentValues.agencyEmail) ? currentValues.agencyEmail : (autofillData.agencyEmail || ''),
+              agencyPhone: isNonEmpty(currentValues.agencyPhone) ? currentValues.agencyPhone : (autofillData.agencyPhone || ''),
+            }),
       agencyName: isNonEmpty(currentValues.agencyName) ? currentValues.agencyName : (autofillData.agencyName || ''),
       agencyWebsite: isNonEmpty(currentValues.agencyWebsite) ? currentValues.agencyWebsite : (autofillData.agencyWebsite || ''),
       agencyEmail: isNonEmpty(currentValues.agencyEmail) ? currentValues.agencyEmail : (autofillData.agencyEmail || ''),

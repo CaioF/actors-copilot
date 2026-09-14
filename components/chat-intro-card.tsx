@@ -29,7 +29,7 @@ export function ChatIntroCard({ content }: ChatIntroCardProps) {
         <p>This engine helps you build that archive.</p>
       </div>
 
-      <div className="mt-6 pt-2">
+      <div className="mt-2 pt-2">
         <h3 className="font-title text-xl italic font-semibold text-primary mb-3">
           It will:
         </h3>
@@ -49,8 +49,10 @@ export function ChatIntroCard({ content }: ChatIntroCardProps) {
         </ul>
       </div>
 
+      <p className="mt-6 text-sm text-muted-foreground leading-relaxed">Your Personal DNA is designed to be built over time, in 15-minute sections. The deeper you go, the more your Personal DNA develops — and the deeper and more personalised your character breakdowns will become.</p>
+
       {/* Baseline Upload & First Question Section */}
-      <div className="mt-8 pt-6 border-t border-border/60 space-y-4 text-sm leading-relaxed">
+      <div className="mt-4 pt-6 border-t border-border/60 space-y-4 text-sm leading-relaxed">
         <div>
           <h4 className="font-semibold text-foreground tracking-wide text-xs uppercase mb-1">
             Baseline Upload

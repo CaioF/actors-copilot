@@ -1,5 +1,5 @@
 import { Calendar, MapPin, Award, Play, Download, Mail, Phone, Globe, User } from "lucide-react";
-import { ActorProfile, EXTERNAL_PROFILE_FIELDS, ExternalProfileKey } from "@/lib/profile-types";
+import { ActorProfile, EXTERNAL_PROFILE_FIELDS, ExternalProfileKey, normalizeAgents } from "@/lib/profile-types";
 import { PlatformIcon } from "./platform-icon";
 
 interface HeroSectionProps {
@@ -8,9 +8,10 @@ interface HeroSectionProps {
 
 export function HeroSection({ profile }: HeroSectionProps) {
   const firstShowreelUrl = profile.showreels?.find((s) => s.url)?.url;
+  const displayAgents = normalizeAgents(profile);
   const hasAgencyInfo =
     profile.showContactPublicly &&
-    (profile.agencyName || profile.agencyEmail || profile.agencyPhone || profile.agencyWebsite);
+    displayAgents.some((a) => a.agencyName || a.agencyEmail || a.agencyPhone || a.agencyWebsite);
 
   const formattedDate = profile.lastUpdated
     ? new Date(profile.lastUpdated).toLocaleDateString("en-US", {
@@ -125,50 +126,54 @@ export function HeroSection({ profile }: HeroSectionProps) {
 
       {/* Right: Representation */}
       {hasAgencyInfo && (
-        <div className="w-full flex-shrink-0 rounded-xl border border-[#C7C0B5] bg-[#F0E9DE] p-5 lg:w-64">
+        <div className="w-full flex-shrink-0 rounded-xl border border-[#C7C0B5] bg-[#F0E9DE] p-5 lg:w-64 space-y-4">
           <p className="text-xs font-medium uppercase tracking-wider text-[#7E7E7E]">
             REPRESENTATION
           </p>
-          {profile.agencyName && (
-            <p className="mt-1 text-base font-semibold text-[#212121]">
-              {profile.agencyName}
-            </p>
-          )}
-          <div className="mt-3 space-y-2">
-            {profile.agencyEmail && (
-              <a
-                href={`mailto:${profile.agencyEmail}`}
-                className="flex items-center gap-2 text-sm text-[#7E7E7E] transition-colors hover:text-[#2C3328]"
-              >
-                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="truncate">{profile.agencyEmail}</span>
-              </a>
-            )}
-            {profile.agencyPhone && (
-              <a
-                href={`tel:${profile.agencyPhone}`}
-                className="flex items-center gap-2 text-sm text-[#7E7E7E] transition-colors hover:text-[#2C3328]"
-              >
-                <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                {profile.agencyPhone}
-              </a>
-            )}
-            {profile.agencyWebsite && (
-              <a
-                href={
-                  profile.agencyWebsite.startsWith("http")
-                    ? profile.agencyWebsite
-                    : `https://${profile.agencyWebsite}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-[#7E7E7E] transition-colors hover:text-[#2C3328]"
-              >
-                <Globe className="h-3.5 w-3.5 flex-shrink-0" />
-                Website
-              </a>
-            )}
-          </div>
+          {displayAgents.map((agent, index) => (
+            <div key={index} className={index > 0 ? "pt-3 border-t border-[#C7C0B5]/60" : ""}>
+              {agent.agencyName && (
+                <p className="text-base font-semibold text-[#212121]">
+                  {agent.agencyName}
+                </p>
+              )}
+              <div className="mt-2 space-y-1.5">
+                {agent.agencyEmail && (
+                  <a
+                    href={`mailto:${agent.agencyEmail}`}
+                    className="flex items-center gap-2 text-sm text-[#7E7E7E] transition-colors hover:text-[#2C3328]"
+                  >
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate">{agent.agencyEmail}</span>
+                  </a>
+                )}
+                {agent.agencyPhone && (
+                  <a
+                    href={`tel:${agent.agencyPhone}`}
+                    className="flex items-center gap-2 text-sm text-[#7E7E7E] transition-colors hover:text-[#2C3328]"
+                  >
+                    <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                    {agent.agencyPhone}
+                  </a>
+                )}
+                {agent.agencyWebsite && (
+                  <a
+                    href={
+                      agent.agencyWebsite.startsWith("http")
+                        ? agent.agencyWebsite
+                        : `https://${agent.agencyWebsite}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-[#7E7E7E] transition-colors hover:text-[#2C3328]"
+                  >
+                    <Globe className="h-3.5 w-3.5 flex-shrink-0" />
+                    Website
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

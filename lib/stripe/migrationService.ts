@@ -97,6 +97,7 @@ export async function createMigrationCheckoutSession({
     // 2. Build the Checkout Session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
+      allow_promotion_codes: false,
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [
@@ -112,8 +113,6 @@ export async function createMigrationCheckoutSession({
           originalEmail: email,
         },
       },
-      // Prevents adding extra trial days via coupons during migration
-      allow_promotion_codes: false,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {

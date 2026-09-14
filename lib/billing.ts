@@ -32,6 +32,10 @@ export interface UserBilling {
   priceId?: string;
   currentPeriodEnd?: number; // Epoch timestamp in seconds
   cancelAtPeriodEnd?: boolean;
+  hasAccess?: boolean;
+  trialStart?: number | null;
+  trialEnd?: number | null;
+  hasUsedTrial?: boolean;
 }
 
 /**

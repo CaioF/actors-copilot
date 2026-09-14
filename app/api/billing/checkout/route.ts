@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { stripe } from '@/lib/stripe';
-import { db } from '@/lib/firebase.admin';
+import { db, auth } from '@/lib/firebase.admin';
 import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
 import { logger } from '@/lib/logger';
 
@@ -13,38 +13,67 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
-        // 1. Enforce strict authentication via the modern platform session cookie
-        const session = await getPlatformSession();
-        if (!session || !session.uid) {
-            return NextResponse.json({ error: 'Unauthorized: Missing valid platform session' }, { status: 401 });
+        let body: Record<string, unknown>;
+        try {
+            const parsedBody = await req.json();
+            body = parsedBody && typeof parsedBody === 'object' ? parsedBody as Record<string, unknown> : {};
+        } catch {
+            return NextResponse.json({ error: 'Malformed JSON request body' }, { status: 400 });
         }
 
-        const { uid, email } = session;
-        const body = await req.json();
-        const { tier, billingCycle }: { tier: SubscriptionTier; billingCycle?: BillingCycle } = body;
+        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string } = body;
+
+        // 1. Enforce authentication via platform session cookie or Firebase ID Token fallback
+        let uid: string | undefined;
+        let email: string | undefined;
+
+        const session = await getPlatformSession();
+        if (session && session.uid) {
+            uid = session.uid;
+            email = session.email;
+        } else if (idToken) {
+            try {
+                const decodedToken = await auth.verifyIdToken(idToken);
+                uid = decodedToken.uid;
+                email = decodedToken.email;
+            } catch (authErr) {
+                logger.warn({ err: authErr, msg: 'ID Token verification failed in checkout endpoint' });
+            }
+        }
+
+        if (!uid || !email) {
+            return NextResponse.json({ error: 'Unauthorized: Missing valid platform session or authentication token' }, { status: 401 });
+        }
+
+        const isTrial = Boolean(reqIsTrial || trial || tier === 'trial');
+        const selectedTier: SubscriptionTier = (tier && tier !== 'trial') ? tier : 'business';
         const selectedBillingCycle: BillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
 
-        if (!tier || (tier !== 'economy' && tier !== 'business')) {
+        if (!selectedTier || (selectedTier !== 'economy' && selectedTier !== 'business')) {
             return NextResponse.json({ error: 'Invalid or unsupported subscription tier specified' }, { status: 400 });
         }
 
         // 2. Resolve the official Stripe Price ID corresponding to the requested tier
         let priceId: string;
         try {
-            priceId = getStripePriceIdForTier(tier, selectedBillingCycle);
+            priceId = getStripePriceIdForTier(selectedTier, selectedBillingCycle);
         } catch (tierError) {
             return NextResponse.json({ error: (tierError as Error).message }, { status: 400 });
         }
 
-        // 3. Fetch active customer billing configurations from Firestore to prevent duplicate client entities
+        // 3. Fetch active customer billing configurations from Firestore to prevent duplicate client entities & check trial eligibility
         const billingDocRef = db.doc(`users/${uid}/billing/current`);
         const billingDoc = await billingDocRef.get();
-        
+
         let stripeCustomerId: string | undefined;
 
         if (billingDoc.exists) {
             const billingData = billingDoc.data();
             stripeCustomerId = billingData?.customerId;
+
+            if (isTrial && billingData?.hasUsedTrial) {
+                return NextResponse.json({ error: 'A free trial has already been used for this account.' }, { status: 400 });
+            }
         }
 
         // 4. Lazy-initialize Stripe Customer if no relationship mapping exists within the persistence layer
@@ -53,6 +82,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 email,
                 metadata: {
                     platformUserId: uid,
+                    firebaseUid: uid,
                 },
             });
             stripeCustomerId = customer.id;
@@ -66,14 +96,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             }, { merge: true });
         }
 
-        // 5. Construct the external checkout session posture with programmatic success and cancel parameters
+        // 5. Construct external checkout session with trial parameters & payment_method_collection = 'always'
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: stripeCustomerId,
             client_reference_id: uid,
             mode: 'subscription',
-            payment_method_types: ['card'],
+            allow_promotion_codes: true,
             billing_address_collection: 'required',
             line_items: [
                 {
@@ -81,12 +111,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     quantity: 1,
                 },
             ],
+            subscription_data: {
+                metadata: {
+                    firebaseUid: uid,
+                    platformUserId: uid,
+                    targetTier: selectedTier,
+                },
+                ...(isTrial ? { trial_period_days: 14 } : {}),
+            },
+            ...(isTrial ? { payment_method_collection: 'always' as const } : {}),
             success_url: `${appUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${appUrl}/api/billing/cancelled`,
             metadata: {
                 platformUserId: uid,
-                targetTier: tier,
+                firebaseUid: uid,
+                targetTier: selectedTier,
                 billingCycle: selectedBillingCycle,
+                isTrial: isTrial ? 'true' : 'false',
             },
         });
 

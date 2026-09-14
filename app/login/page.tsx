@@ -51,7 +51,8 @@ export default function LoginPage() {
 function LoginContent() {
   const { user, loginWithGoogle, loginWithEmail, signupWithEmail, sendPasswordReset, loading } = useAuth();
   const searchParams = useSearchParams();
-  const plan = searchParams.get("plan");
+  const trialParam = searchParams.get("trial");
+  const planParam = searchParams.get("plan");
   const initialModeParam = searchParams.get("mode");
 
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -64,24 +65,38 @@ function LoginContent() {
   const [keepSigned, setKeepSigned] = useState(true);
 
   useEffect(() => {
-    if (initialModeParam === "signup" || plan) {
+    const isTrialIntent = Boolean(
+      trialParam ||
+      (planParam && (planParam.includes("trial") || planParam === "14d"))
+    );
+
+    if (isTrialIntent) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("trial_intent", "14d");
+        if (planParam && (planParam.includes("business") || planParam.includes("economy"))) {
+          sessionStorage.setItem("trial_tier", planParam.includes("economy") ? "economy" : "business");
+        } else {
+          sessionStorage.setItem("trial_tier", "business");
+        }
+      }
+      setMode("signup");
+    } else if (initialModeParam === "signup" || planParam) {
       setMode("signup");
     }
-  }, [initialModeParam, plan]);
+  }, [initialModeParam, planParam, trialParam]);
+
+  useEffect(() => {
+    if (!loading && user && !sessionStorage.getItem("trial_intent") && (planParam === "economy" || planParam === "business")) {
+      window.location.href = "/upgrade";
+    }
+  }, [user, loading, planParam]);
 
   const redirectAfterAuth = () => {
-    if (plan === "economy" || plan === "business") {
+    const trialIntent = typeof window !== 'undefined' ? sessionStorage.getItem('trial_intent') : null;
+    if (!trialIntent && (planParam === "economy" || planParam === "business")) {
       window.location.href = "/upgrade";
     }
   };
-
-  useEffect(() => {
-    if (!loading && user) {
-      if (plan === "economy" || plan === "business") {
-        window.location.href = "/upgrade";
-      }
-    }
-  }, [user, loading, plan]);
 
   const handleModeSwitch = (newMode: "login" | "signup") => {
     setMode(newMode);
@@ -302,12 +317,12 @@ function LoginContent() {
             <div className="text-center space-y-1.5 mb-6">
               <h2 className="font-title text-2xl sm:text-3xl font-bold text-foreground">
                 {mode === "signup"
-                  ? (plan ? "First, Create Your Account" : "Discover The Actor's Copilot")
+                  ? (planParam ? "First, Create Your Account" : "Discover The Actor's Copilot")
                   : "Welcome back"}
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {mode === "signup"
-                  ? (plan
+                  ? (planParam
                       ? "Let's set up your account first, then choose the perfect plan to boost your career."
                       : "Sign up for free to get a sneak peek into the dashboard and see how AI can elevate your audition prep.")
                   : "Sign in to continue your acting journey."}

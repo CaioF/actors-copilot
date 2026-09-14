@@ -16,6 +16,7 @@ export function ProfileLivePreview() {
   const playingAgeMin = useWatch({ control, name: "playingAgeMin" });
   const playingAgeMax = useWatch({ control, name: "playingAgeMax" });
   const location = useWatch({ control, name: "location" });
+  const agents = useWatch({ control, name: "agents" });
   const agencyName = useWatch({ control, name: "agencyName" });
   const height = useWatch({ control, name: "height" });
   const eyeColour = useWatch({ control, name: "eyeColour" });
@@ -27,6 +28,12 @@ export function ProfileLivePreview() {
   const showreels = useWatch({ control, name: "showreels" });
   const cvUrl = useWatch({ control, name: "cvUrl" });
   const headshot = useWatch({ control, name: "headshot" });
+
+  const agentNames = agents?.map((a) => a.agencyName).filter(Boolean) ?? [];
+  const representationText =
+    agentNames.length > 0
+      ? agentNames.join(", ")
+      : agencyName;
 
   const ageRange =
     playingAgeMin && playingAgeMax
@@ -62,8 +69,8 @@ export function ProfileLivePreview() {
           </p>
           {ageRange && <p className="text-xs text-muted-foreground">{ageRange}</p>}
           {location && <p className="text-xs text-muted-foreground">{location}</p>}
-          {agencyName && (
-            <p className="text-xs text-muted-foreground">Rep: {agencyName}</p>
+          {representationText && (
+            <p className="text-xs text-muted-foreground">Rep: {representationText}</p>
           )}
         </div>
 

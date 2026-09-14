@@ -10,7 +10,10 @@ import {
   Camera, 
   Save, 
   Lock, 
-  Check 
+  Check,
+  CreditCard,
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import {
@@ -87,6 +90,7 @@ export default function SettingsPage() {
   const [isDeletingChat, setIsDeletingChat] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,6 +101,39 @@ export default function SettingsPage() {
       setPhotoURL(user.photoURL || "");
     }
   }, [user]);
+
+  const handleManageSubscription = async () => {
+    setIsPortalLoading(true);
+    try {
+      let idToken: string | undefined;
+      const { getAuth } = await import("firebase/auth");
+      const auth = getAuth();
+      if (auth.currentUser) {
+        idToken = await auth.currentUser.getIdToken();
+      }
+
+      const response = await fetch("/api/create-portal-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Failed to generate subscription management session.");
+      }
+
+      window.location.href = data.url;
+    } catch (error: unknown) {
+      logger.error({ err: error, msg: "Error opening Stripe Customer Portal session" });
+      alert(error instanceof Error ? error.message : "Failed to open subscription management portal.");
+      setIsPortalLoading(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -485,7 +522,62 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* SECTION 2: PRIVACY & DATA */}
+          {/* SECTION 2: SUBSCRIPTION & BILLING */}
+          <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden transition-colors">
+            <SectionHeader icon={CreditCard} title="Subscription & Billing" subtitle="Manage your plan, payment methods, and cancellations" />
+            
+            <div className="p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border bg-muted/40 p-4 sm:p-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-title font-bold text-foreground text-sm sm:text-base capitalize">
+                      {user?.tier ? `${user.tier} Plan` : "Free Plan"}
+                    </h4>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      user?.subscriptionStatus === 'active' 
+                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                        : user?.subscriptionStatus === 'trialing'
+                        ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {user?.subscriptionStatus ? user.subscriptionStatus.toUpperCase() : 'INACTIVE'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {user?.subscriptionStatus === 'trialing' 
+                      ? 'You are currently enjoying access on a free trial.' 
+                      : user?.subscriptionStatus === 'active'
+                      ? 'Your subscription is active and renews automatically.'
+                      : 'You do not currently have an active subscription or free trial.'}
+                  </p>
+                </div>
+
+                {['active', 'trialing'].includes(user?.subscriptionStatus || '') && (
+                  <button
+                    type="button"
+                    onClick={handleManageSubscription}
+                    disabled={isPortalLoading}
+                    className="py-2.5 px-5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-70 shrink-0"
+                  >
+                    {isPortalLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Opening Portal...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4" />
+                        <span>Manage Subscription</span>
+                        <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: PRIVACY & DATA */}
           <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden transition-colors">
             <SectionHeader icon={Shield} title="Privacy & Data" subtitle="How we handle your data" />
             

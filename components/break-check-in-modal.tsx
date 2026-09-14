@@ -65,7 +65,7 @@ export function BreakCheckInModal({
             </DialogTitle>
           </div>
           <DialogDescription className="text-muted-foreground text-sm leading-relaxed text-center max-w-sm">
-            You&apos;ve been doing deep, focused work for the last 15 minutes. Acting prep can be emotionally and mentally demanding — feel free to step away for a glass of water, stretch, or take a quick breath.
+            You&apos;ve been doing deep, focused work for the last 15 minutes. Acting prep can be emotionally and mentally demanding — feel free to step away for a glass of water, stretch, take a quick breath or come back tomorrow.
           </DialogDescription>
         </DialogHeader>
 

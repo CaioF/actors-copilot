@@ -101,6 +101,15 @@ const externalProfilesSchema = z.object({
   facebook: z.string().optional().default("")
 });
 
+const agentSchema = z.object({
+  agencyName: z.string(),
+  agencyEmail: z.string(),
+  agencyWebsite: z.string(),
+  agencyPhone: z.string(),
+});
+
+export type Agent = z.infer<typeof agentSchema>;
+
 export const actorProfileSchema = z.object({
   // Meta
   slug: z.string(),
@@ -133,10 +142,11 @@ export const actorProfileSchema = z.object({
   bio: z.string().max(500, "Bio must be 500 characters or less"),
 
   // Agent / Representation
-  agencyName: z.string(),
-  agencyEmail: z.string(),
-  agencyWebsite: z.string(),
-  agencyPhone: z.string(),
+  agents: z.array(agentSchema).default([]),
+  agencyName: z.string().optional(),
+  agencyEmail: z.string().optional(),
+  agencyWebsite: z.string().optional(),
+  agencyPhone: z.string().optional(),
   showContactPublicly: z.boolean(),
 
   // Showreels
@@ -182,6 +192,7 @@ export const defaultActorProfile: ActorProfile = {
   appearance: [],
   awardsCallout: "",
   bio: "",
+  agents: [],
   agencyName: "",
   agencyEmail: "",
   agencyWebsite: "",
@@ -228,4 +239,27 @@ export function generateSlug(name: string): string {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
+}
+
+/** Ensures profile has a normalized agents array, migrating legacy single-agency fields if present */
+export function normalizeAgents(profile: Partial<ActorProfile>): Agent[] {
+  if (Array.isArray(profile.agents) && profile.agents.length > 0) {
+    return profile.agents.map((agent) => ({
+      agencyName: agent?.agencyName || "",
+      agencyEmail: agent?.agencyEmail || "",
+      agencyWebsite: agent?.agencyWebsite || "",
+      agencyPhone: agent?.agencyPhone || "",
+    }));
+  }
+  if (profile.agencyName || profile.agencyEmail || profile.agencyWebsite || profile.agencyPhone) {
+    return [
+      {
+        agencyName: profile.agencyName || "",
+        agencyEmail: profile.agencyEmail || "",
+        agencyWebsite: profile.agencyWebsite || "",
+        agencyPhone: profile.agencyPhone || "",
+      },
+    ];
+  }
+  return [];
 }

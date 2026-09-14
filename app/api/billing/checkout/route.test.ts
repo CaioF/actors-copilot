@@ -19,6 +19,7 @@ jest.mock('@/lib/stripe', () => ({
 
 jest.mock('@/lib/firebase.admin', () => ({
     db: { doc: jest.fn() },
+    auth: { verifyIdToken: jest.fn() },
 }));
 
 jest.mock('@/lib/billing', () => ({
@@ -49,7 +50,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         const data = await res.json();
 
         expect(res.status).toBe(401);
-        expect(data.error).toBe('Unauthorized: Missing valid platform session');
+        expect(data.error).toBe('Unauthorized: Missing valid platform session or authentication token');
     });
 
     /**
@@ -68,6 +69,22 @@ describe('Stripe Subscription Checkout Route Handler', () => {
 
         expect(res.status).toBe(400);
         expect(data.error).toBe('Invalid or unsupported subscription tier specified');
+    });
+
+    it('returns 400 Bad Request for malformed JSON request bodies', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{',
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(data.error).toBe('Malformed JSON request body');
     });
 
     /**
@@ -103,7 +120,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         // 3. Confirm Stripe API arguments match user criteria safely [cite: 91]
         expect(stripe.customers.create).toHaveBeenCalledWith({
             email: mockEmail,
-            metadata: { platformUserId: mockUid },
+            metadata: { platformUserId: mockUid, firebaseUid: mockUid },
         });
 
         // 4. Verify baseline structural bindings flush down safely to Firestore
@@ -144,12 +161,12 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(res.status).toBe(200);
         expect(data.url).toBe('https://checkout.stripe.com/pay/active_session_link');
 
-        // 2. Validate Stripe Session Creation parameters match strict design criteria [cite: 36, 91]
+        // 2. Validate Stripe Session Creation parameters match strict design criteria
         expect(stripe.checkout.sessions.create).toHaveBeenCalledWith({
             customer: 'cus_historical_888',
             client_reference_id: mockUid,
             mode: 'subscription',
-            payment_method_types: ['card'],
+            allow_promotion_codes: true,
             billing_address_collection: 'required',
             line_items: [
                 {
@@ -157,16 +174,120 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                     quantity: 1,
                 },
             ],
+            subscription_data: {
+                metadata: {
+                    firebaseUid: mockUid,
+                    platformUserId: mockUid,
+                    targetTier: 'economy',
+                },
+            },
             success_url: 'http://localhost:3000/api/billing/success?session_id={CHECKOUT_SESSION_ID}',
             cancel_url: 'http://localhost:3000/api/billing/cancelled',
             metadata: {
                 platformUserId: mockUid,
+                firebaseUid: mockUid,
                 targetTier: 'economy',
                 billingCycle: 'monthly',
+                isTrial: 'false',
             },
         });
 
         // 3. Ensure no redundant customer objects get initialized during mapped flows
         expect(stripe.customers.create).not.toHaveBeenCalled();
+    });
+
+    it('configures 14-day free trial and payment_method_collection=always with business tier by default', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+        (getStripePriceIdForTier as jest.Mock).mockReturnValue('price_business_id_xyz');
+
+        const mockGet = jest.fn().mockResolvedValue({
+            exists: true,
+            data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled', hasUsedTrial: false }),
+        });
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
+
+        (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/trial_session_link' });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ isTrial: true }),
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(data.url).toBe('https://checkout.stripe.com/pay/trial_session_link');
+
+        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                customer: 'cus_historical_888',
+                client_reference_id: mockUid,
+                mode: 'subscription',
+                payment_method_collection: 'always',
+                subscription_data: {
+                    metadata: {
+                        firebaseUid: mockUid,
+                        platformUserId: mockUid,
+                        targetTier: 'business',
+                    },
+                    trial_period_days: 14,
+                },
+                metadata: expect.objectContaining({
+                    isTrial: 'true',
+                    targetTier: 'business',
+                }),
+            })
+        );
+    });
+
+    it('rejects trial requests with 400 Bad Request if the account has already redeemed a trial', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+
+        const mockGet = jest.fn().mockResolvedValue({
+            exists: true,
+            data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled', hasUsedTrial: true }),
+        });
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ isTrial: true }),
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(data.error).toBe('A free trial has already been used for this account.');
+    });
+
+    it('authenticates via idToken fallback when platform session cookie is absent', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue(null);
+        const { auth } = require('@/lib/firebase.admin');
+        (auth.verifyIdToken as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+        (getStripePriceIdForTier as jest.Mock).mockReturnValue('price_business_id_xyz');
+
+        const mockGet = jest.fn().mockResolvedValue({
+            exists: false,
+            data: () => null,
+        });
+        const mockSet = jest.fn().mockResolvedValue(true);
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet, set: mockSet });
+
+        (stripe.customers.create as jest.Mock).mockResolvedValue({ id: 'cus_token_123' });
+        (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/idtoken_session' });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ isTrial: true, idToken: 'valid_firebase_id_token' }),
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(data.url).toBe('https://checkout.stripe.com/pay/idtoken_session');
+        expect(auth.verifyIdToken).toHaveBeenCalledWith('valid_firebase_id_token');
     });
 });

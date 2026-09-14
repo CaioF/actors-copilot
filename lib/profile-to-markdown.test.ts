@@ -23,6 +23,7 @@ const createMockProfile = (overrides?: Partial<ActorProfile>): ActorProfile & { 
     credits: [],
     showreels: [],
     additionalPhotos: [],
+    agents: [],
     showContactPublicly: false,
   };
 
@@ -114,6 +115,23 @@ describe("Markdown Generator: profileToMarkdown", () => {
       expect(publicMarkdown).toContain("## Representation");
       expect(publicMarkdown).toContain("**Agency:** CAA");
       expect(publicMarkdown).toContain("**Email:** agent@caa.com");
+    });
+
+    it("should render multiple agencies when provided in agents array", () => {
+      const multiAgentProfile = createMockProfile({
+        showContactPublicly: true,
+        agents: [
+          { agencyName: "CAA", agencyEmail: "agent@caa.com", agencyWebsite: "https://caa.com", agencyPhone: "+1 555 1234" },
+          { agencyName: "UTA", agencyEmail: "rep@uta.com", agencyWebsite: "https://uta.com", agencyPhone: "+1 555 5678" },
+        ],
+      });
+      const markdown = profileToMarkdown(multiAgentProfile, BASE_URL);
+
+      expect(markdown).toContain("## Representation");
+      expect(markdown).toContain("**Agency:** CAA");
+      expect(markdown).toContain("**Email:** agent@caa.com");
+      expect(markdown).toContain("**Agency:** UTA");
+      expect(markdown).toContain("**Email:** rep@uta.com");
     });
   });
 
