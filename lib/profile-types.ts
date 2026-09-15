@@ -244,7 +244,12 @@ export function generateSlug(name: string): string {
 /** Ensures profile has a normalized agents array, migrating legacy single-agency fields if present */
 export function normalizeAgents(profile: Partial<ActorProfile>): Agent[] {
   if (Array.isArray(profile.agents) && profile.agents.length > 0) {
-    return profile.agents;
+    return profile.agents.map((agent) => ({
+      agencyName: agent?.agencyName || "",
+      agencyEmail: agent?.agencyEmail || "",
+      agencyWebsite: agent?.agencyWebsite || "",
+      agencyPhone: agent?.agencyPhone || "",
+    }));
   }
   if (profile.agencyName || profile.agencyEmail || profile.agencyWebsite || profile.agencyPhone) {
     return [
@@ -258,4 +263,3 @@ export function normalizeAgents(profile: Partial<ActorProfile>): Agent[] {
   }
   return [];
 }
-

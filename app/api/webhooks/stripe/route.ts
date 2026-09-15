@@ -125,9 +125,6 @@ async function resolvePlatformUserId(params: {
 }
 
 /**
- * Idempotently updates the user's billing document in Firestore.
- */
-/**
  * Idempotently updates the user's billing document and root user profile in Firestore.
  */
 async function syncUserBilling(platformUserId: string, data: Record<string, any>): Promise<void> {
