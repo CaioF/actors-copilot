@@ -254,7 +254,7 @@ function LoginContent() {
             <div className="space-y-3">
               <h1 className="font-title text-3xl xl:text-4xl font-bold text-white leading-tight">
                 {mode === "signup" ? (
-                  <>Experience the Future of<br />Audition Preparation</>
+                  <>Create Your Account &<br />Start Your Free Trial</>
                 ) : (
                   <>Your AI Partner for<br />Self-Taping</>
                 )}
@@ -262,7 +262,7 @@ function LoginContent() {
               <div className="w-12 h-[2px] bg-primary" />
               <p className="text-neutral-300 text-sm leading-relaxed">
                 {mode === "signup"
-                  ? "Explore the dashboard, build your Personal DNA, and preview how AI accelerates your character prep—100% free."
+                  ? "Build your Personal DNA, break down scripts in minutes, and elevate your audition prep with a 14-day free trial."
                   : "Build your Personal DNA, Breakdown Characters in minutes, and prepare with confidence."}
               </p>
             </div>
@@ -280,8 +280,8 @@ function LoginContent() {
               />
               <FeatureItem
                 icon={<ShieldCheck className="w-4 h-4 text-white" />}
-                title="Private & Risk-Free"
-                description="Signing up is free with instant preview access. Delete anytime"
+                title="14-Day Free Trial"
+                description="Full access to all AI features. Cancel anytime, risk-free"
               />
             </div>
           </div>
@@ -319,11 +319,10 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={() => handleModeSwitch("login")}
-                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                  mode === "login"
-                    ? "bg-card text-foreground shadow-sm border border-border/60 font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${mode === "login"
+                  ? "bg-card text-foreground shadow-sm border border-border/60 font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Log In</span>
@@ -331,11 +330,10 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={() => handleModeSwitch("signup")}
-                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                  mode === "signup"
-                    ? "bg-card text-foreground shadow-sm border border-border/60 font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${mode === "signup"
+                  ? "bg-card text-foreground shadow-sm border border-border/60 font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Create Account</span>
@@ -345,41 +343,15 @@ function LoginContent() {
             {/* Header Copy */}
             <div className="text-center space-y-1.5 mb-6">
               <h2 className="font-title text-2xl sm:text-3xl font-bold text-foreground">
-                {mode === "signup"
-                  ? (planParam ? "First, Create Your Account" : "Discover The Actor's Copilot")
-                  : "Welcome back"}
+                {mode === "signup" ? "Create Your Account" : "Welcome back"}
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {mode === "signup"
-                  ? (planParam
-                      ? "Let's set up your account first, then choose the perfect plan to boost your career."
-                      : "Sign up for free to get a sneak peek into the dashboard and see how AI can elevate your audition prep.")
+                  ? "Start your 14-day free trial and experience how our AI elevates your audition preparation."
                   : "Sign in to continue your acting journey."}
               </p>
             </div>
 
-            {/* Prominent Invitation Callout for Create Account */}
-            {mode === "signup" && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/15 via-primary/5 to-transparent border border-primary/25 space-y-2 text-left mb-6 animate-in fade-in duration-300">
-                <div className="flex items-center gap-2 text-primary font-bold text-xs sm:text-sm">
-                  <Sparkles className="w-4 h-4 shrink-0 animate-pulse text-primary" />
-                  <span>Discover the App & Explore the Dashboard</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Creating your account is <strong className="text-foreground font-semibold">100% Free</strong>. Preview the dashboard experience, set up your Personal DNA, and explore features with zero obligation.
-                </p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[11px] text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    No credit card required
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    Instant sneak peek access
-                  </span>
-                </div>
-              </div>
-            )}
 
             {/* Email Form */}
             <form onSubmit={handleEmailAuth} className="space-y-5">
@@ -464,7 +436,7 @@ function LoginContent() {
                 ) : mode === "signup" ? (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    <span>Create Free Account & Discover App</span>
+                    <span>Create Account</span>
                   </>
                 ) : (
                   <>
@@ -511,7 +483,7 @@ function LoginContent() {
                   />
                 </svg>
                 <span>
-                  {mode === "signup" ? "Sign Up with Google & Discover" : "Continue with Google"}
+                  {mode === "signup" ? "Sign Up with Google" : "Continue with Google"}
                 </span>
               </button>
             </div>
@@ -556,7 +528,7 @@ function LoginContent() {
           {/* Subtitle / Secure Footer */}
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Lock className="w-3.5 h-3.5" />
-            <span>Secure, private, and free to preview.</span>
+            <span>14-day free trial • Cancel anytime</span>
           </div>
 
         </div>
@@ -578,4 +550,4 @@ function FeatureItem({ icon, title, description }: { icon: ReactNode; title: str
       </div>
     </div>
   );
-}
+}
