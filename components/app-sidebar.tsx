@@ -22,12 +22,14 @@ import {
   Plus,
   X,
   Users,
+  Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Menu principal do topo (baseado no design)
 const mainMenuItems = [
   { label: "Dashboard", href: "/dashboard", icon: Home },
+  { label: "Reader Copilot", href: "/reader-copilot", icon: Clapperboard },
   { label: "Personal DNA", href: "/chat", icon: Sparkles },
   { label: "Acting Coach", href: "/acting-coach", icon: BookOpen },
   { label: "Auditions", href: "/auditions", icon: Mic },
