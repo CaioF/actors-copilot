@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     const auditionId = body.auditionId as string | undefined;
     const userPath = body.userPath as string | undefined;
 
+    if ((userPath && (userPath.includes("/") || userPath.includes(".."))) || (auditionId && auditionId.includes("/"))) {
+      return NextResponse.json({ error: "Invalid path parameters" }, { status: 400 });
+    }
     // If auditionId and userPath provided, verify access and load sidesText from Firestore if needed
     if (auditionId && userPath) {
       if (!userPath.startsWith(`${authenticatedUserId}_`)) {
