@@ -186,7 +186,8 @@ export function ActorCopilotRehearsal({
       // Prioritize prefetching upcoming AI lines relative to currentLineIndex sequentially
       const upcomingAiLines = scene.lines
         .slice(currentLineIndex)
-        .filter((line) => line.character !== actorCharacter && !audioCacheRef.current.has(line.id));
+        .filter((line) => line.character !== actorCharacter && !audioCacheRef.current.has(line.id))
+        .slice(0, 6);
 
       for (const line of upcomingAiLines) {
         if (isCancelled) break;
