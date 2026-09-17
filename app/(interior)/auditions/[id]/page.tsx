@@ -6,7 +6,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
 import { getDb } from "@/lib/firebase"
 import { logger } from '@/lib/logger';
-import { Loader2, ArrowLeft, Printer, BookOpen, ClipboardList, CalendarDays, User, RefreshCw } from "lucide-react"
+import { Loader2, ArrowLeft, Printer, BookOpen, ClipboardList, CalendarDays, User, RefreshCw, Clapperboard } from "lucide-react"
 import { useReactToPrint } from "react-to-print"
 
 import { StepResultSides } from "@/components/auditions/step/step-result"
@@ -152,6 +152,14 @@ function AuditionDetailContent() {
         </button>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Rehearse with Reader Copilot CTA */}
+          <button
+            onClick={() => router.push(`/reader-copilot/${auditionId}`)}
+            className="flex items-center gap-2 bg-gradient-to-r from-amber-600 to-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-full font-bold shadow-sm transition-all text-sm"
+          >
+            <Clapperboard className="w-4 h-4" />
+            Rehearse Scene
+          </button>
           {/* Breakdown-type badge — capitalized for visual consistency */}
           <span className="px-3 py-1 rounded-full bg-primary text-[11px] text-primary-foreground uppercase tracking-wider font-semibold shadow-sm">
             {hasBothAnalyses ? "Sides + Brief" : analysisLabel}
