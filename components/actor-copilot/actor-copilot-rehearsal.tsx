@@ -387,6 +387,7 @@ export function ActorCopilotRehearsal({
           try {
             const auth = getAuth();
             const idToken = await auth.currentUser?.getIdToken();
+            if (!idToken) throw new Error("Authentication token missing.");
 
             const response = await fetch("/api/dna/transcribe/chat", {
               method: "POST",
@@ -396,6 +397,11 @@ export function ActorCopilotRehearsal({
               },
               body: JSON.stringify({ audioBase64: base64data, mimeType: audioBlob.type }),
             });
+
+            if (!response.ok) {
+              const errJson = await response.json().catch(() => ({}));
+              throw new Error(errJson.error || "Failed to transcribe audio.");
+            }
 
             const data = await response.json();
             const transcribedText = data.text || "";
