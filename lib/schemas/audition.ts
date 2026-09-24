@@ -26,6 +26,7 @@ const enrichmentField = z.string().optional().default("");
 
 export const auditionFormDataSchema = z.object({
   projectType: z.enum(["cinematic", "theater", "commercial"]).default("cinematic"),
+  breakdownDepth: z.enum(["complete", "quick"]).optional().default("complete"),
   project: z.string().max(150).trim().optional().default(""),
   role: z.string().max(100).trim().optional().default(""),
   actorName: z.string().max(200).optional().default("Actor"),

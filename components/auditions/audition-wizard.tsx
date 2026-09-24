@@ -322,6 +322,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       const payload = new FormData();
 
       payload.append("projectType", formData.projectType || "cinematic"); // Defaults to cinematic if not set
+      payload.append("breakdownDepth", formData.breakdownDepth || "complete");
       payload.append("project", formData.project);
       payload.append("role", formData.role);
       if (formData.deadline) payload.append("deadline", formData.deadline);
@@ -449,6 +450,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     auditionTimezone: formData.auditionTimezone || null,
     actorLocalDeadline: localDeadlineStr,
     castingDirectorName: formData.castingDirectorName?.trim() || null,
+    breakdownDepth: formData.breakdownDepth || "complete",
     performanceMap: resultData,
     analysisType: mode,
     sidesPerformanceMap: mode === "sides" ? resultData : null,
@@ -774,12 +776,12 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
             <div className="flex flex-col animate-in fade-in duration-700 max-w-7xl mx-auto w-full">
 
                {/* --- FIGMA-ALIGNED HEADER --- */}
-               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 w-full border-b border-[#D0D4D0]/50 pb-6">
+               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 w-full border-b border-border/50 pb-6">
                  <div>
-                   <h1 className="text-[32px] font-title text-[#2C3328] leading-tight mb-1 uppercase">
+                   <h1 className="text-[32px] font-title text-foreground leading-tight mb-1 uppercase font-bold">
                      {formData.role || "character breakdown"}
                    </h1>
-                   <p className="text-[#646A64] text-[15px] mb-3 uppercase">
+                   <p className="text-muted-foreground text-[15px] mb-3 uppercase font-medium">
                      {formData.project || "Audition Project"} 
                    </p>
                  </div>
@@ -789,7 +791,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                    <button 
                      type="button"
                      onClick={handleDelete}
-                     className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#D0D4D0] text-[#646A64] text-sm font-medium hover:bg-[#FCFAF7] transition-colors"
+                     className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-border text-muted-foreground text-sm font-medium hover:bg-muted hover:text-foreground transition-colors"
                    >
                      <Trash2 className="w-4 h-4" />
                      Delete
@@ -799,7 +801,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                      <button
                        type="button"
                        onClick={() => handleGenerate(true)}
-                       className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#FF7316] text-[#FF7316] text-sm font-medium hover:bg-[#FFF1E8] transition-colors"
+                       className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-primary/40 text-primary text-sm font-medium hover:bg-primary/10 transition-colors"
                        title="Generate an opposing creative choice"
                      >
                        <RefreshCcw className="w-4 h-4" />
@@ -809,7 +811,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                    {/* Print Action */}
                    <button 
                      onClick={handlePrintDocument}
-                     className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-700 text-sm hover:bg-white transition-colors"
+                     className="flex items-center gap-2 px-4 py-2 rounded-full border border-border text-foreground text-sm hover:bg-muted transition-colors"
                    >
                      <Printer className="w-4 h-4" />
                      Print
@@ -818,7 +820,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                    {/* Save Action */}
                    <button 
                      onClick={handleSaveAndFinish}
-                     className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#FF7316] text-white text-sm font-medium hover:bg-[#E5630F] transition-colors shadow-sm"
+                     className="flex items-center gap-2 px-6 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
                    >
                     <Save className="w-4 h-4" />
                      Save Output
@@ -830,17 +832,17 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                {(localDeadlineStr || formData.castingDirectorName) && (
                  <div className="mb-6 flex flex-wrap items-center gap-3">
                    {localDeadlineStr && (
-                     <div className="flex items-center gap-2 rounded-full bg-[#FFF5F0] border border-[#FF7316]/30 px-4 py-2">
-                       <CalendarDays className="text-[#FF7316] w-4 h-4 shrink-0" />
-                       <span className="text-[10px] font-bold text-[#FF7316] uppercase tracking-widest">Your Local Deadline:</span>
-                       <span className="text-[#2C3328] font-semibold text-sm">{localDeadlineStr}</span>
+                     <div className="flex items-center gap-2 rounded-full bg-primary/10 border border-primary/30 px-4 py-2">
+                       <CalendarDays className="text-primary w-4 h-4 shrink-0" />
+                       <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Your Local Deadline:</span>
+                       <span className="text-foreground font-semibold text-sm">{localDeadlineStr}</span>
                      </div>
                    )}
                    {formData.castingDirectorName?.trim() && (
-                     <div className="flex items-center gap-2 rounded-full bg-white border border-[#C7C0B5] px-4 py-2">
-                       <UserIcon className="text-[#6B6B6B] w-4 h-4 shrink-0" />
-                       <span className="text-[10px] font-bold text-[#6B6B6B] uppercase tracking-widest">Casting Director:</span>
-                       <span className="text-[#2C3328] font-medium text-sm">{formData.castingDirectorName.trim()}</span>
+                     <div className="flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 shadow-sm">
+                       <UserIcon className="text-muted-foreground w-4 h-4 shrink-0" />
+                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Casting Director:</span>
+                       <span className="text-foreground font-medium text-sm">{formData.castingDirectorName.trim()}</span>
                      </div>
                    )}
                  </div>
@@ -879,17 +881,17 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
       {/* Duplicate-audition dialog (replaces window.confirm) */}
       <AlertDialog open={pendingDup !== null} onOpenChange={(open) => { if (!open) setPendingDup(null); }}>
-        <AlertDialogContent className="bg-[#F0E8DC] border-[#C7C0B5]">
+        <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-title text-[#2C3328]">
+            <AlertDialogTitle className="font-title text-foreground">
               You already have a {mode} analysis for this role
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#6B6B6B] space-y-2">
+            <AlertDialogDescription className="text-muted-foreground space-y-2">
               <span className="block">
-                We found an existing audition for <span className="font-semibold uppercase text-[#2C3328]">&quot;{formData.project}&quot;</span> as <span className="font-semibold uppercase text-[#2C3328]">&quot;{formData.role}&quot;</span> that already has a <span className="font-semibold">{mode}</span> breakdown.
+                We found an existing audition for <span className="font-semibold uppercase text-foreground">&quot;{formData.project}&quot;</span> as <span className="font-semibold uppercase text-foreground">&quot;{formData.role}&quot;</span> that already has a <span className="font-semibold">{mode}</span> breakdown.
               </span>
               <span className="block">
-                The cleanest move is to <span className="font-semibold text-[#2C3328]">enrich the existing audition</span> with this {dupOtherMode === mode ? mode : dupOtherMode} — it keeps everything in one place and your coach will see both maps together.
+                The cleanest move is to <span className="font-semibold text-foreground">enrich the existing audition</span> with this {dupOtherMode === mode ? mode : dupOtherMode} — it keeps everything in one place and your coach will see both maps together.
               </span>
               <span className="block text-xs italic">
                 Choose &quot;Create new anyway&quot; only if this is a different take that should live as its own audition.
@@ -897,7 +899,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-            <AlertDialogCancel className="border-[#C7C0B5] text-[#2C3328] hover:bg-[#E8DFD0]">
+            <AlertDialogCancel className="border-border text-foreground hover:bg-muted">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction

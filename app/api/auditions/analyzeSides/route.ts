@@ -103,6 +103,7 @@ export async function POST(request: Request) {
 
     const textFields = {
       projectType: (formData.get("projectType") as string | null) ?? undefined,
+      breakdownDepth: (formData.get("breakdownDepth") as string | null) ?? undefined,
       project: (formData.get("project") as string | null) ?? undefined,
       role: (formData.get("role") as string | null) ?? undefined,
       actorName: (formData.get("actorName") as string | null) ?? undefined,
@@ -134,6 +135,7 @@ export async function POST(request: Request) {
     const project = validated.project ?? "";
     const role = validated.role ?? "";
     const projectType = validated.projectType ?? "cinematic";
+    const breakdownDepth = validated.breakdownDepth ?? "complete";
     const actorName = validated.actorName || "Actor";
     let sidesText = validated.sidesText ?? "";
     const deadline = validated.deadline ?? null;
@@ -204,7 +206,7 @@ export async function POST(request: Request) {
 
     const model = getGenerativeModel(ai, { 
       model: "gemini-3.1-pro-preview", 
-      systemInstruction: { role: "user", parts: [{ text: getAuditionCoachPrompt(isStandalone, projectType) }] },
+      systemInstruction: { role: "user", parts: [{ text: getAuditionCoachPrompt(isStandalone, projectType, breakdownDepth) }] },
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: {
