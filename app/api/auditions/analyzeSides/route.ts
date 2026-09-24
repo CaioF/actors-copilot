@@ -204,7 +204,7 @@ export async function POST(request: Request) {
 
     const model = getGenerativeModel(ai, { 
       model: "gemini-3.1-pro-preview", 
-      systemInstruction: { role: "user", parts: [{ text: getAuditionCoachPrompt(isStandalone) }] },
+      systemInstruction: { role: "user", parts: [{ text: getAuditionCoachPrompt(isStandalone, projectType) }] },
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: {

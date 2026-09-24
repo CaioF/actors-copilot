@@ -137,16 +137,17 @@ describe('Stripe Subscription Checkout Route Handler', () => {
     /**
      * Test suite verifying structural parameter configurations on successful existing workflows[cite: 91].
      */
-    it('resolves checkout variables and returns an explicit redirection URL on happy path execution', async () => {
+    it('resolves checkout variables and returns an explicit redirection URL on happy path execution for accounts with prior trials', async () => {
         (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
         (getStripePriceIdForTier as jest.Mock).mockReturnValue('price_economy_id_abc');
 
-        // 1. Mock established payment credentials inside Firestore
+        // 1. Mock established payment credentials inside Firestore with prior trial used
         const mockGet = jest.fn().mockResolvedValue({
             exists: true,
-            data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled' }),
+            data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled', hasUsedTrial: true }),
         });
-        (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
+        const mockSet = jest.fn().mockResolvedValue(true);
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet, set: mockSet });
 
         (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/active_session_link' });
 
@@ -161,7 +162,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(res.status).toBe(200);
         expect(data.url).toBe('https://checkout.stripe.com/pay/active_session_link');
 
-        // 2. Validate Stripe Session Creation parameters match strict design criteria
+        // 2. Validate Stripe Session Creation parameters match non-trial subscription criteria
         expect(stripe.checkout.sessions.create).toHaveBeenCalledWith({
             customer: 'cus_historical_888',
             client_reference_id: mockUid,
@@ -196,7 +197,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(stripe.customers.create).not.toHaveBeenCalled();
     });
 
-    it('configures 14-day free trial and payment_method_collection=always with business tier by default', async () => {
+    it('configures 14-day free trial and payment_method_collection=always by default when user has not used a trial', async () => {
         (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
         (getStripePriceIdForTier as jest.Mock).mockReturnValue('price_business_id_xyz');
 
@@ -204,13 +205,14 @@ describe('Stripe Subscription Checkout Route Handler', () => {
             exists: true,
             data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled', hasUsedTrial: false }),
         });
-        (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
+        const mockSet = jest.fn().mockResolvedValue(true);
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet, set: mockSet });
 
         (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/trial_session_link' });
 
         const req = new Request('http://localhost/api/billing/checkout', {
             method: 'POST',
-            body: JSON.stringify({ isTrial: true }),
+            body: JSON.stringify({ tier: 'business' }),
         }) as NextRequest;
 
         const res = await POST(req);
@@ -218,6 +220,11 @@ describe('Stripe Subscription Checkout Route Handler', () => {
 
         expect(res.status).toBe(200);
         expect(data.url).toBe('https://checkout.stripe.com/pay/trial_session_link');
+
+        expect(mockSet).toHaveBeenCalledWith(
+            expect.objectContaining({ hasUsedTrial: true }),
+            { merge: true }
+        );
 
         expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
             expect.objectContaining({

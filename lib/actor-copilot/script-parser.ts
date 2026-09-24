@@ -23,6 +23,7 @@ export type RehearsalStatus =
   | "AI_READING"
   | "WAITING_FOR_ACTOR"
   | "ACTOR_RECORDING"
+  | "HANDS_FREE_LISTENING"
   | "TRANSCRIBING"
   | "MATCHING_LINE"
   | "FINISHED";
@@ -68,25 +69,35 @@ export function normalizeText(text: string): string {
 
 /**
  * Fuzzy matches what the actor said against the expected script line.
- * Uses word-set overlap and string length ratios for high-performance, robust matching.
+ * Evaluates whether the actor has completed speaking their expected line.
  */
 export function matchActorLine(
   expectedLine: string,
-  actualTranscript: string
+  actualTranscript: string,
+  isFinalResult: boolean = false
 ): { isMatch: boolean; score: number } {
   const normExpected = normalizeText(expectedLine);
   const normActual = normalizeText(actualTranscript);
 
   if (!normExpected || !normActual) {
-    return { isMatch: true, score: 1.0 }; // Fail open for empty/short edge cases
+    return { isMatch: false, score: 0 };
   }
 
   if (normExpected === normActual) {
     return { isMatch: true, score: 1.0 };
   }
 
-  const expectedWords = normExpected.split(" ");
-  const actualWords = normActual.split(" ");
+  // If actual transcript fully contains the expected line (actor said whole line plus extra)
+  if (normActual.includes(normExpected)) {
+    return { isMatch: true, score: 1.0 };
+  }
+
+  const expectedWords = normExpected.split(" ").filter(Boolean);
+  const actualWords = normActual.split(" ").filter(Boolean);
+
+  if (expectedWords.length === 0 || actualWords.length === 0) {
+    return { isMatch: false, score: 0 };
+  }
 
   const actualWordSet = new Set(actualWords);
   let matchedWordCount = 0;
@@ -99,8 +110,27 @@ export function matchActorLine(
 
   const wordScore = matchedWordCount / expectedWords.length;
 
-  // If at least 35% of the expected words were spoken, count as a match for V1 rehearsal flow
-  const isMatch = wordScore >= 0.35 || normExpected.includes(normActual) || normActual.includes(normExpected);
+  // Check if the actor spoke the end of the line (final expected word appears in the last 3 spoken words)
+  const lastExpectedWord = expectedWords[expectedWords.length - 1];
+  const lastSpokenWords = actualWords.slice(-3);
+  const spokenEndMatch = lastExpectedWord ? lastSpokenWords.includes(lastExpectedWord) : false;
+
+  // If this is interim streaming speech (actor is actively talking mid-sentence),
+  // require near-complete word coverage (>= 88%) or (>= 75% + end word) to avoid mid-sentence cutoffs.
+  if (!isFinalResult) {
+    const isInterimMatch = wordScore >= 0.88 || (wordScore >= 0.75 && spokenEndMatch);
+    return { isMatch: isInterimMatch, score: wordScore };
+  }
+
+  // Short lines (1-3 words)
+  if (expectedWords.length <= 3) {
+    const isMatch = wordScore >= 0.66 || spokenEndMatch;
+    return { isMatch, score: wordScore };
+  }
+
+  // Medium to long lines (final result / pause):
+  // Match if high word overlap (>= 75%) OR (word score >= 60% AND end of line was spoken)
+  const isMatch = wordScore >= 0.75 || (wordScore >= 0.60 && spokenEndMatch);
 
   return {
     isMatch,

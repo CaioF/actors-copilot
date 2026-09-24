@@ -224,7 +224,7 @@ export default function ActorCopilotMainPage() {
             Paste a New Script / Scene Text
           </h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Paste raw dialogue text directly to start a instant rehearsal session.
+            Paste raw dialogue text directly to start an instant rehearsal session.
           </p>
 
           <textarea

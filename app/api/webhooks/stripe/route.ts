@@ -139,8 +139,7 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
 
     await billingRef.set(payload, { merge: true });
 
-    // Sync root user document so direct queries on the users collection have billing status
-    await userRef.set(sanitizeFirestorePayload({
+    const userPayload: Record<string, any> = {
         stripeCustomerId: data.customerId ?? null,
         subscriptionStatus: data.status ?? null,
         hasAccess: data.hasAccess ?? null,
@@ -148,7 +147,14 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
         cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
         cancelAt: data.cancelAt ?? null,
         updatedAt: new Date().toISOString(),
-    }), { merge: true });
+    };
+
+    if (data.hasUsedTrial !== undefined) {
+        userPayload.hasUsedTrial = data.hasUsedTrial;
+    }
+
+    // Sync root user document so direct queries on the users collection have billing status
+    await userRef.set(sanitizeFirestorePayload(userPayload), { merge: true });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
