@@ -11,6 +11,7 @@ describe("Audition Flow Types and Constants", () => {
       // We define the expected keys strictly to ensure no fields are accidentally dropped or renamed
       const expectedKeys: Array<keyof AuditionFormData> = [
         "projectType",
+        "breakdownDepth",
         "project",
         "role",
         "deadline",
@@ -30,9 +31,10 @@ describe("Audition Flow Types and Constants", () => {
       expect(Object.keys(initialAuditionData).length).toBe(expectedKeys.length);
     });
 
-    it("should set the default projectType to 'cinematic'", () => {
+    it("should set the default projectType to 'cinematic' and breakdownDepth to 'complete'", () => {
       // Cinematic is the required default baseline for the AI generation prompt
       expect(initialAuditionData.projectType).toBe("cinematic");
+      expect(initialAuditionData.breakdownDepth).toBe("complete");
     });
 
     it("should initialize all text-based fields as empty strings", () => {
