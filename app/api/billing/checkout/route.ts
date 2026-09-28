@@ -115,20 +115,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             }, { merge: true });
         }
 
-        // Save trial redemption state to database so the user cannot claim a second trial period
-        if (isTrial) {
-            const trialTimestamp = new Date().toISOString();
-            await billingDocRef.set({
-                hasUsedTrial: true,
-                updatedAt: trialTimestamp,
-            }, { merge: true });
-
-            await userDocRef.set({
-                hasUsedTrial: true,
-                updatedAt: trialTimestamp,
-            }, { merge: true });
-        }
-
         // 5. Construct external checkout session with trial parameters & payment_method_collection = 'always'
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 

@@ -74,7 +74,7 @@ export function normalizeText(text: string): string {
 export function matchActorLine(
   expectedLine: string,
   actualTranscript: string,
-  isFinalResult: boolean = false
+  isFinalResult: boolean = true
 ): { isMatch: boolean; score: number } {
   const normExpected = normalizeText(expectedLine);
   const normActual = normalizeText(actualTranscript);
