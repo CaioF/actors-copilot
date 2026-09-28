@@ -24,12 +24,36 @@ describe("script-parser utilities", () => {
       expect(result.isMatch).toBe(true);
     });
 
-    it("matches fuzzy spoken lines with sufficient word overlap", () => {
+    it("matches fuzzy spoken lines with sufficient word overlap on final result", () => {
       const result = matchActorLine(
         "I told you I was working at the office until late.",
-        "I told you I was working late"
+        "I told you I was working late",
+        true
       );
       expect(result.isMatch).toBe(true);
+    });
+
+    it("does NOT match when actor has only spoken the first word or prefix of a line (interim or final)", () => {
+      const result1 = matchActorLine(
+        "Where were you last night when I called you five times?",
+        "Where",
+        false
+      );
+      expect(result1.isMatch).toBe(false);
+
+      const result2 = matchActorLine(
+        "Where were you last night when I called you five times?",
+        "Where were you",
+        false
+      );
+      expect(result2.isMatch).toBe(false);
+
+      const result3 = matchActorLine(
+        "Where were you last night when I called you five times?",
+        "Where were you",
+        true
+      );
+      expect(result3.isMatch).toBe(false);
     });
   });
 

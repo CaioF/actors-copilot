@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ShoppingBag, Film, Check, Drama, User, Globe, Clock, Clapperboard } from "lucide-react";
+import { Calendar, ShoppingBag, Film, Check, Drama, User, Globe, Clock, Clapperboard, Zap, Sparkles } from "lucide-react";
 import { AuditionFormData } from "@/lib/audition-types";
 import { cn } from "@/lib/utils"; 
 
@@ -96,6 +96,57 @@ export function StepBasics({ data, updateData, mode, isStandaloneScene }: StepBa
             );
           })}
         </div>
+
+        {/* Breakdown Depth Selector for Cinematic Projects (Sides mode) */}
+        {isSidesMode && data.projectType === "cinematic" && (
+          <div className="mt-5 pt-5 border-t border-border/60 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-muted/30 border border-border/70">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                  <span className="font-title text-sm font-bold text-foreground">
+                    Breakdown Detail Level
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {data.breakdownDepth === "quick"
+                    ? "Short on time? Generates a focused, high-impact 6-section core map."
+                    : "Complete 21-step psychological character breakdown for deep prep."}
+                </p>
+              </div>
+
+              {/* Clean Segmented Control Switch */}
+              <div className="inline-flex items-center p-1 rounded-xl bg-card border border-border/80 shrink-0 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => updateData({ breakdownDepth: "complete" })}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5",
+                    data.breakdownDepth !== "quick"
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <span>Full Breakdown</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => updateData({ breakdownDepth: "quick" })}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5",
+                    data.breakdownDepth === "quick"
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Zap className={cn("w-3.5 h-3.5", data.breakdownDepth === "quick" ? "text-primary-foreground" : "text-muted-foreground")} />
+                  <span>Quick / On-The-Run</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Inline Form Fields Container */}

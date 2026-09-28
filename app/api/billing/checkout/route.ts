@@ -45,7 +45,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: 'Unauthorized: Missing valid platform session or authentication token' }, { status: 401 });
         }
 
-        const isTrial = Boolean(reqIsTrial || trial || tier === 'trial');
+        const isExplicitTrialReq = Boolean(reqIsTrial || trial || tier === 'trial');
         const selectedTier: SubscriptionTier = (tier && tier !== 'trial') ? tier : 'business';
         const selectedBillingCycle: BillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
 
@@ -63,18 +63,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         // 3. Fetch active customer billing configurations from Firestore to prevent duplicate client entities & check trial eligibility
         const billingDocRef = db.doc(`users/${uid}/billing/current`);
+        const userDocRef = db.doc(`users/${uid}`);
         const billingDoc = await billingDocRef.get();
 
         let stripeCustomerId: string | undefined;
+        let hasUsedTrial = false;
 
         if (billingDoc.exists) {
             const billingData = billingDoc.data();
             stripeCustomerId = billingData?.customerId;
-
-            if (isTrial && billingData?.hasUsedTrial) {
-                return NextResponse.json({ error: 'A free trial has already been used for this account.' }, { status: 400 });
+            if (billingData?.hasUsedTrial) {
+                hasUsedTrial = true;
             }
         }
+
+        if (!hasUsedTrial) {
+            try {
+                const userDoc = await userDocRef.get();
+                if (userDoc.exists && userDoc.data()?.hasUsedTrial) {
+                    hasUsedTrial = true;
+                }
+            } catch (err) {
+                logger.warn({ err, msg: 'Failed to inspect root user document for hasUsedTrial status' });
+            }
+        }
+
+        if (hasUsedTrial && isExplicitTrialReq) {
+            return NextResponse.json({ error: 'A free trial has already been used for this account.' }, { status: 400 });
+        }
+
+        // All checkout sessions allow for 14 days of free trial unless the user has already used a trial
+        const isTrial = !hasUsedTrial;
 
         // 4. Lazy-initialize Stripe Customer if no relationship mapping exists within the persistence layer
         if (!stripeCustomerId) {

@@ -343,7 +343,7 @@ function LoginContent() {
             {/* Header Copy */}
             <div className="text-center space-y-1.5 mb-6">
               <h2 className="font-title text-2xl sm:text-3xl font-bold text-foreground">
-                {mode === "signup" ? "Create Your Account" : "Welcome back"}
+                {mode === "signup" ? "14-Day Free Trial" : "Welcome back"}
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {mode === "signup"

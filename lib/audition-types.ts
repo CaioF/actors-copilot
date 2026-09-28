@@ -39,6 +39,7 @@ export interface AuditionDocument {
   auditionTimezone?: string | null;
   actorLocalDeadline?: string | null;
   castingDirectorName?: string | null;
+  breakdownDepth?: "complete" | "quick";
   performanceMap?: PerformanceMap | null;
   sidesPerformanceMap?: PerformanceMap | null;
   briefPerformanceMap?: PerformanceMap | null;
@@ -53,6 +54,7 @@ export interface AuditionDocument {
 export interface AuditionFormData {
   // Step 1: Basics
   projectType: "cinematic" | "commercial" | "theater" ;
+  breakdownDepth?: "complete" | "quick";
   project: string;
   role: string;
   deadline?: string;
@@ -71,6 +73,7 @@ export interface AuditionFormData {
 
 export const initialAuditionData: AuditionFormData = {
   projectType: "cinematic",
+  breakdownDepth: "complete",
   project: "",
   role: "",
   deadline: "",
