@@ -93,7 +93,7 @@ export function ActorCopilotRehearsal({
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lineContainerRef = useRef<HTMLDivElement | null>(null);
   const speechRecognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAdvancingRef = useRef<boolean>(false);
 
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -471,7 +471,9 @@ export function ActorCopilotRehearsal({
           speechRecognitionRef.current.onend = null;
           speechRecognitionRef.current.onerror = null;
           speechRecognitionRef.current.stop();
-        } catch (_) {}
+        } catch (_) {
+          // Ignore errors if recognition already stopped
+        }
         speechRecognitionRef.current = null;
       }
       setIsHandsFreeListening(false);
@@ -505,7 +507,9 @@ export function ActorCopilotRehearsal({
       if (speechRecognitionRef.current) {
         try {
           speechRecognitionRef.current.stop();
-        } catch (_) {}
+        } catch (_) {
+          // Ignore errors if recognition already stopped
+        }
         speechRecognitionRef.current = null;
       }
       setIsHandsFreeListening(false);
@@ -588,7 +592,9 @@ export function ActorCopilotRehearsal({
         ) {
           try {
             recognition.start();
-          } catch (_) {}
+          } catch (_) {
+            // Ignore errors if recognition already active
+          }
         }
       };
 
@@ -606,7 +612,9 @@ export function ActorCopilotRehearsal({
           recognition.onend = null;
           recognition.onerror = null;
           recognition.stop();
-        } catch (_) {}
+        } catch (_) {
+          // Ignore errors if recognition already stopped
+        }
       }
     };
   }, [actorCharacter, currentLine, isActorTurn, isHandsFreeMode, isProcessing, completeActorTurn]);
@@ -716,7 +724,9 @@ export function ActorCopilotRehearsal({
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
-      } catch (_) {}
+      } catch (_) {
+        // Ignore errors if recognition already stopped
+      }
       speechRecognitionRef.current = null;
     }
     if (silenceTimerRef.current) {
