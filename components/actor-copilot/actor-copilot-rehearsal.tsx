@@ -134,12 +134,16 @@ export function ActorCopilotRehearsal({
           }
 
           const ctx = audioContextRef.current;
-          const source = ctx.createMediaStreamSource(micStreamRef.current);
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 64;
-          source.connect(analyser);
-          analyserRef.current = analyser;
 
+          if (!analyserRef.current) {
+            const source = ctx.createMediaStreamSource(micStreamRef.current);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 64;
+            source.connect(analyser);
+            analyserRef.current = analyser;
+          }
+
+          const analyser = analyserRef.current;
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
           const updateVolume = () => {
@@ -1022,8 +1026,12 @@ export function ActorCopilotRehearsal({
           </div>
           <button
             onClick={() => {
-              setMicPermissionError(false);
-              void navigator.mediaDevices.getUserMedia({ audio: true });
+              navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                micStreamRef.current = stream;
+                setMicPermissionError(false);
+              }).catch(() => {
+                // permission still denied; keep the error visible
+              });
             }}
             className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-amber-950 font-bold hover:bg-amber-400 transition-colors shrink-0 shadow-sm"
           >
