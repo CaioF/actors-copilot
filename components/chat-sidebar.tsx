@@ -9,7 +9,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DNA_SECTIONS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
+import { DNA_SECTIONS, DNA_CHAPTERS, ARENA_THEMES, THEME_DISPLAY_NAMES } from "@/lib/chat-types";
 import type { DNASession, DNASectionId } from "@/lib/chat-types";
 import { useState, useMemo, useEffect } from "react";
 import { useSidebar } from "@/lib/context/SidebarContext";
@@ -276,55 +276,75 @@ export function ChatSidebar({
           </p>
         </div>
 
-        {/* DNA Progress Sections */}
-        <div className="px-5 flex-1 overflow-y-auto custom-scrollbar pb-3">
-          <div className="mb-2 flex items-center gap-1.5">
-            <Dna className="h-3.5 w-3.5 text-sidebar-foreground/50" />
-            <span className="text-[10px] uppercase tracking-widest text-sidebar-foreground/50">
-              DNA Sections
+        {/* DNA 4 Chapters Navigation */}
+        <div className="px-4 flex-1 overflow-y-auto custom-scrollbar pb-3 space-y-2">
+          <div className="px-2 pt-1 pb-1 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              DNA Chapters
             </span>
           </div>
-          <nav className="flex flex-col gap-0.5 pl-1">
-            {DNA_SECTIONS.map((section) => {
-              const isCompleted = session?.completedSections?.includes(section.id);
-              const extractionCount = session?.sectionHqCounts?.[section.id] ?? 0;
 
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => onSectionClick(section.id)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
-                    activeSection === section.id
-                      ? "font-medium text-primary bg-primary/10"
-                      : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          {DNA_CHAPTERS.map((chapter) => {
+            const isActive =
+              activeSection === chapter.id ||
+              chapter.sections.includes(activeSection as DNASectionId);
+
+            const completedSectionsCount = chapter.sections.filter((secId) =>
+              session?.completedSections?.includes(secId)
+            ).length;
+
+            const isFullyCompleted = completedSectionsCount === chapter.sections.length;
+
+            // Total extractions across sections in this chapter
+            const totalExtractionsInChapter = chapter.sections.reduce(
+              (acc, secId) => acc + (session?.sectionHqCounts?.[secId] ?? 0),
+              0
+            );
+
+            return (
+              <button
+                key={chapter.id}
+                onClick={() => onSectionClick(chapter.id)}
+                className={cn(
+                  "flex w-full flex-col gap-1 rounded-xl p-3 text-left transition-all duration-150",
+                  isActive
+                    ? "bg-primary/10 border border-primary/30 shadow-2xs"
+                    : "bg-sidebar-accent/25 border border-sidebar-border/40 hover:bg-sidebar-accent/60 hover:border-sidebar-border/80"
+                )}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className={cn("text-xs font-bold font-title tracking-tight", isActive ? "text-primary" : "text-sidebar-foreground")}>
+                    {chapter.title}
+                  </span>
+                  {isFullyCompleted || session?.completedSections?.includes(chapter.id) ? (
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  ) : (
+                    <span className={cn("text-[10px] font-semibold uppercase tracking-wider", isActive ? "text-primary font-bold" : "text-sidebar-foreground/50")}>
+                      {isActive ? "Active" : `Ch. ${chapter.number}`}
+                    </span>
                   )}
-                >
-                  <SectionProgressRing
-                    current={extractionCount}
-                    total={HQ_EXTRACTIONS_FOR_COMPLETION}
-                    isCompleted={isCompleted ?? false}
-                    sectionId={section.id}
-                    themesCovered={session?.sectionThemes?.[section.id]}
-                  />
-                  <span className="flex-1">{section.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+                </div>
+
+                <p className="text-[11px] text-sidebar-foreground/70 leading-relaxed">
+                  {chapter.subtitle}
+                </p>
+              </button>
+            );
+          })}
         </div>
 
         {/* Global Progress Bar */}
-        <div className="px-5 pb-6 flex-shrink-0">
+        <div className="px-5 pb-6 flex-shrink-0 border-t border-sidebar-border/50 pt-3">
+          <div className="flex items-center justify-between text-[11px] text-sidebar-foreground/70 mb-1.5">
+            <span>DNA Profile Progress</span>
+            <span className="font-semibold text-primary">{session?.progress ?? 10}%</span>
+          </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-sidebar-foreground/15">
             <div
               className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${session?.progress ?? 10}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11px] text-sidebar-foreground/60">
-            Progress: {session?.progress ?? 10}%
-          </p>
         </div>
       </aside>
     </>

@@ -13,18 +13,12 @@ interface DashboardHeaderProps {
   title?: string
   /** Optional custom title element. When provided, replaces the default <h1>{title}</h1>. */
   titleSlot?: React.ReactNode
+  /** Optional extra action buttons to render in the header toolbar. */
+  extraActions?: React.ReactNode
   className?: string
 }
 
-/**
- * DashboardHeader Component
- * Displays the page title and authenticated user's profile.
- * Listens to Firebase Auth state to dynamically update user info.
- * @param title - Optional page title, defaults to "My Self Tape Copilot"
- * @param titleSlot - Optional custom node rendered in place of the title
- * @param className - Optional custom CSS classes to override default layout styling
- */
-export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, className }: DashboardHeaderProps) {
+export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, extraActions, className }: DashboardHeaderProps) {
   const { setIsOpen } = useSidebar();
 
   const [user, setUser] = useState<User | null>(null);
@@ -52,7 +46,7 @@ export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, cla
 
   return (
     <>
-      <header className={cn("flex bg-card items-center justify-between gap-3 px-4 sm:px-8 mb-10 py-6 transition-colors", className)}>
+      <header className={cn("flex bg-card items-center justify-between gap-3 px-4 sm:px-8 mb-4 py-4 border-b border-border/50 transition-colors", className)}>
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             type="button"
@@ -64,14 +58,14 @@ export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, cla
           </button>
           <div className="min-w-0 flex-1">
             {titleSlot ?? (
-              <h1 className="truncate font-title text-2xl font-bold text-foreground sm:text-3xl">{title}</h1>
+              <h1 className="truncate font-title text-xl font-bold text-foreground sm:text-2xl">{title}</h1>
             )}
           </div>
         </div>
 
         {/* Grupo de Ações do Canto Direito */}
-        <div className="flex items-center gap-3">
-          {/* 2. Toggle de Tema Adicionado Aqui */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {extraActions}
           <ThemeToggle />
 
           <button
