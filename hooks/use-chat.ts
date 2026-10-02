@@ -18,7 +18,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SECTION_INTROS } from "@/lib/prompts";
-import { ARENA_THEMES, DNASectionId } from "@/lib/chat-types";
+import { ARENA_THEMES, DNASectionId, DNA_CHAPTERS } from "@/lib/chat-types";
 import {
   type ExtractionTracker,
   DEFAULT_THRESHOLDS,
@@ -137,7 +137,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
   const [firebaseAvailable, setFirebaseAvailable] = useState(true);
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [extractionTracker, setExtractionTracker] = useState<ExtractionTracker>({
-    currentSection: "identity",
+    currentSection: "chapter_1",
     extractedThemes: [],
     hqExtractionHistory: [],
     questionCounter: 0,
@@ -176,7 +176,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         id: DEFAULT_SESSION_ID,
         sessionNumber: 2,
         totalSessions: 7,
-        currentSection: "identity",
+        currentSection: "chapter_1",
         progress: 10,
         lastActiveAt: null,
         durationMinutes: 18,
@@ -187,9 +187,9 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         {
           id: "intro-msg",
           role: "assistant",
-          content: SECTION_INTROS["identity"],
+          content: SECTION_INTROS["chapter_1"],
           timestamp: null,
-          section: "identity",
+          section: "chapter_1",
         },
       ]);
       return;
@@ -259,7 +259,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           const defaultSession: Omit<DNASession, "id"> = {
             sessionNumber: 2,
             totalSessions: 7,
-            currentSection: "identity",
+            currentSection: "chapter_1",
             progress: 10,
             lastActiveAt: serverTimestamp() as DNASession["lastActiveAt"],
             durationMinutes: 18,
@@ -275,7 +275,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           id: DEFAULT_SESSION_ID,
           sessionNumber: 2,
           totalSessions: 7,
-          currentSection: "identity",
+          currentSection: "chapter_1",
           progress: 10,
           lastActiveAt: null,
           durationMinutes: 18,
@@ -286,9 +286,9 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           {
             id: "intro-msg",
             role: "assistant",
-            content: SECTION_INTROS["identity"],
+            content: SECTION_INTROS["chapter_1"],
             timestamp: null,
-            section: "identity",
+            section: "chapter_1",
           },
         ]);
         setIsInitializing(false);
@@ -323,9 +323,9 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
         if (msgs.length === 0) {
           await addDoc(messagesRef, {
             role: "assistant",
-            content: SECTION_INTROS["identity"],
+            content: SECTION_INTROS["chapter_1"],
             timestamp: serverTimestamp(),
-            section: "identity",
+            section: "chapter_1",
           });
         } else {
           setMessages(msgs);
@@ -338,9 +338,9 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           {
             id: "intro-msg",
             role: "assistant",
-            content: SECTION_INTROS["identity"],
+            content: SECTION_INTROS["chapter_1"],
             timestamp: null,
-            section: "identity",
+            section: "chapter_1",
           },
         ]);
         setIsInitializing(false);
@@ -361,7 +361,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
     async (content: string, activeSection?: string, document?: AttachedDocument | null) => {
       if (!content.trim()) return;
 
-      const currentSection = activeSection ?? session?.currentSection ?? "identity";
+      const currentSection = activeSection ?? session?.currentSection ?? "chapter_1";
 
       // Mock behavior for missing Firebase config
       if (!firebaseAvailable) {
@@ -597,7 +597,7 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
             const meetsThemeRequirement = uniqueThemes.size >= REQUIRED_THEMES;
             const meetsCountRequirement = currentSecCount >= HQ_EXTRACTIONS_FOR_COMPLETION;
 
-            if (meetsCountRequirement && meetsThemeRequirement && !newCompletedSecs.includes(currentSection)) {
+            if (meetsCountRequirement && !newCompletedSecs.includes(currentSection)) {
               newCompletedSecs.push(currentSection);
             }
 
@@ -640,29 +640,41 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
           }
         }
         
-        if (newCompletedSecs.length >= 4) unlockedAuditions = true;
+        if (newCompletedSecs.length >= 2) unlockedAuditions = true;
 
-        const TOTAL_SECTIONS = 12;
+        const TOTAL_CHAPTERS = 4;
         const DIVERSITY_WEIGHT = 0.6;
         const COUNT_WEIGHT = 0.4;
 
         let totalProgressPercentage = 0;
 
-        Object.entries(sectionCounts).forEach(([sectionId, count]) => {
-          const themesCovered = sectionThemes[sectionId as DNASectionId] || [];
-          const uniqueThemes = new Set(themesCovered);
+        DNA_CHAPTERS.forEach((chapter) => {
+          const chId = chapter.id;
+          const isChCompleted =
+            newCompletedSecs.includes(chId) ||
+            chapter.sections.every((sec) => newCompletedSecs.includes(sec));
 
-          if (newCompletedSecs.includes(sectionId)) {
-            totalProgressPercentage += 100 / TOTAL_SECTIONS;
+          if (isChCompleted) {
+            totalProgressPercentage += 100 / TOTAL_CHAPTERS;
           } else {
+            const chCount =
+              (sectionCounts[chId] || 0) +
+              chapter.sections.reduce((acc, sec) => acc + (sectionCounts[sec] || 0), 0);
+            
+            const chThemes = [
+              ...(sectionThemes[chId as DNASectionId] || []),
+              ...chapter.sections.flatMap((sec) => sectionThemes[sec] || []),
+            ];
+            const uniqueThemes = new Set(chThemes);
+
             const diversityScore = Math.min(uniqueThemes.size / REQUIRED_THEMES, 1);
-            const countScore = Math.min((count as number) / HQ_EXTRACTIONS_FOR_COMPLETION, 1);
-            const sectionScore = (diversityScore * DIVERSITY_WEIGHT) + (countScore * COUNT_WEIGHT);
-            totalProgressPercentage += sectionScore * (100 / TOTAL_SECTIONS);
+            const countScore = Math.min(chCount / HQ_EXTRACTIONS_FOR_COMPLETION, 1);
+            const chapterScore = (diversityScore * DIVERSITY_WEIGHT) + (countScore * COUNT_WEIGHT);
+            totalProgressPercentage += chapterScore * (100 / TOTAL_CHAPTERS);
           }
         });
 
-        const newProgress = Math.round(Math.min(totalProgressPercentage, 100));
+        const newProgress = Math.round(Math.min(totalProgressPercentage || 25, 100));
 
         const newAskedQuestions = [...previouslyAsked, ...(selectedQuestions || [])];
 

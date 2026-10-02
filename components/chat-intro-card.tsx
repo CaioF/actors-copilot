@@ -14,63 +14,39 @@ interface ChatIntroCardProps {
  */
 export function ChatIntroCard({ content }: ChatIntroCardProps) {
   return (
-    <div className="ml-5 mr-auto max-w-3xl rounded-3xl bg-card text-card-foreground border border-border p-8 shadow-sm transition-colors my-4">
-      <h2 className="font-title text-2xl sm:text-3xl font-bold leading-tight text-foreground">
-        This process exists for one reason only:
-      </h2>
-      <p className="font-title text-xl sm:text-2xl text-foreground/90 mt-1 mb-4">
-        To make you a more truthful, bold, and compelling actor.
+    <div className="w-full rounded-3xl bg-card/70 dark:bg-card/40 text-card-foreground border border-border/50 p-6 sm:p-7 shadow-2xs transition-all my-2 space-y-4">
+      <div>
+        <h2 className="font-title text-xl sm:text-2xl font-bold leading-tight text-foreground">
+          Personal DNA Extraction
+        </h2>
+        <p className="font-title text-base sm:text-lg text-primary mt-0.5 italic">
+          Building a truthful, specific archive of your authentic persona for powerful acting.
+        </p>
+      </div>
+
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Every great actor draws from a private, lived archive—real moments where something was at stake. This engine conducts a thorough analysis of your underlying patterns so your AI Acting Coach can tailor audition notes directly to you.
       </p>
 
-      <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
-        <p>
-          Every great actor draws from a private, specific, lived archive. Not ideas. Not concepts. Events. Moments where something was at stake. Moments that left a mark.
+      {/* Clean guidance note */}
+      <div className="rounded-2xl bg-muted/40 p-4 border border-border/40 text-xs text-muted-foreground space-y-1">
+        <p className="font-semibold text-foreground flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span>How to move through this space:</span>
         </p>
-        <p>This engine helps you build that archive.</p>
+        <p className="leading-relaxed">
+          Take your time. Each chapter is designed for deep reflection. You don&apos;t need to complete everything in one sitting—work at your own pace, or use the <span className="font-semibold text-foreground">Upload Baseline</span> button in the top bar to submit a bio or journal entry anytime.
+        </p>
       </div>
 
-      <div className="mt-2 pt-2">
-        <h3 className="font-title text-xl italic font-semibold text-primary mb-3">
-          It will:
-        </h3>
-        <ul className="space-y-2 text-sm text-foreground/90">
-          <li className="flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <span>Extract real turning points from your life.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <span>Anchor them in sensory truth so they are playable, not theoretical.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <span>Map your patterns: needs, contradictions, protective strategies.</span>
-          </li>
-        </ul>
-      </div>
-
-      <p className="mt-6 text-sm text-muted-foreground leading-relaxed">Your Personal DNA is designed to be built over time, in 15-minute sections. The deeper you go, the more your Personal DNA develops — and the deeper and more personalised your character breakdowns will become.</p>
-
-      {/* Baseline Upload & First Question Section */}
-      <div className="mt-4 pt-6 border-t border-border/60 space-y-4 text-sm leading-relaxed">
-        <div>
-          <h4 className="font-semibold text-foreground tracking-wide text-xs uppercase mb-1">
-            Baseline Upload
-          </h4>
-          <p className="text-muted-foreground">
-            If you prefer not to start from absolute zero, you can use the Baseline Upload feature. Submit a written personal history, bio, or past journal entry, and the Copilot will extract your foundation directly from the text to jumpstart your Vault.
-          </p>
-        </div>
-
-        <div className="space-y-3 text-foreground/90">
-          <p>
-            We begin with <span className="font-semibold text-foreground">Identity & Self-Story</span>. This session explores the gap between how you are seen and what is true underneath. We want to understand the traits you are known for, the parts you keep private, and the contradictions that make you who you are. Understanding this gives your later character work more depth, helping you play both the mask a character presents and the truth they keep hidden.
-          </p>
-
-          <p className="font-medium text-foreground bg-muted/40 rounded-xl p-4 border border-border/50">
-            To start, let&apos;s establish the baseline: How old are you, where are you from, and what is the &quot;elevator pitch&quot; you usually use to describe yourself to a stranger?
-          </p>
-        </div>
+      {/* Initial Question */}
+      <div className="pt-2 border-t border-border/50 space-y-2.5">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+          Starting Point • Chapter 1: Foundation & Persona
+        </p>
+        <p className="text-sm font-medium text-foreground bg-muted/30 rounded-2xl p-4 border border-border/40 leading-relaxed">
+          To begin establishing your baseline: How old are you, where are you from, and what is the &quot;elevator pitch&quot; you usually use to describe yourself to a stranger?
+        </p>
       </div>
     </div>
   );

@@ -54,14 +54,14 @@ export function formatTime(timestamp: ChatMessage["timestamp"]): string {
  */
 function CopilotAvatar() {
   return (
-    <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-full border border-border bg-card shadow-sm">
-      <span className="text-[4px] font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border border-primary/30 bg-primary/10 shadow-2xs">
+      <span className="text-[4px] font-medium uppercase tracking-wider text-primary">
         The
       </span>
-      <span className="font-sans text-[7px] font-extrabold uppercase leading-none tracking-wide text-foreground">
+      <span className="font-sans text-[6.5px] font-extrabold uppercase leading-none tracking-wide text-primary">
         Actors
       </span>
-      <span className="text-[4px] font-medium uppercase tracking-wider text-muted-foreground">
+      <span className="text-[4px] font-medium uppercase tracking-wider text-primary">
         Copilot
       </span>
     </div>
@@ -87,27 +87,32 @@ function MessageBubble({
   const isAssistant = message.role === "assistant";
 
   // Renders the Hero Intro Card for the initial assistant message
-  if (isAssistant && isFirstAssistantMessage && activeSection === "identity") {
+  if (
+    isAssistant &&
+    isFirstAssistantMessage &&
+    (activeSection === "chapter_1" || activeSection === "identity")
+  ) {
     return <ChatIntroCard content={message.content} />;
   }
 
   return (
-    <div className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"}`}>
+    <div className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"} group w-full`}>
       {isAssistant && (
-        <div className="mt-auto mb-2">
+        <div className="mt-1 shrink-0">
           <CopilotAvatar />
         </div>
       )}
 
-      <div className={`flex max-w-[70%] flex-col ${isAssistant ? "items-start" : "items-end"}`}>
+      <div className={`flex max-w-[95%] sm:max-w-[90%] flex-col ${isAssistant ? "items-start" : "items-end"}`}>
         <div
-          className={`rounded-2xl px-6 py-4 shadow-sm border ${isAssistant
-            ? "bg-card text-card-foreground border-border"
-            : "bg-primary text-primary-foreground border-transparent"
-            }`}
+          className={`rounded-2xl px-5 py-4 shadow-2xs border ${
+            isAssistant
+              ? "bg-card/70 dark:bg-card/50 text-card-foreground border-border/50"
+              : "bg-primary text-primary-foreground border-transparent font-medium"
+          }`}
         >
           {!isAssistant && message.attachmentName && (
-            <div className="flex items-center gap-1.5 rounded-md bg-primary-foreground/15 px-2.5 py-1.5 mb-3 w-fit border border-primary-foreground/20">
+            <div className="flex items-center gap-1.5 rounded-lg bg-primary-foreground/15 px-2.5 py-1.5 mb-2.5 w-fit border border-primary-foreground/20">
               <FileText size={12} className="text-primary-foreground/80" />
               <span className="text-[11px] font-medium text-primary-foreground truncate max-w-[180px]">
                 {message.attachmentName}
@@ -128,15 +133,15 @@ function MessageBubble({
             )}
           </div>
         </div>
-        <span className="mt-1.5 text-xs text-muted-foreground">
+        <span className="mt-1 text-[11px] text-muted-foreground/60 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {formatTime(message.timestamp)}
         </span>
       </div>
 
       {!isAssistant && (
-        <div className="mt-auto mb-2">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-primary/20 text-xs font-semibold text-primary">
+        <div className="mt-1 shrink-0">
+          <Avatar className="h-8 w-8 border border-border/50">
+            <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
               {userInitials}
             </AvatarFallback>
           </Avatar>
@@ -153,12 +158,12 @@ function MessageBubble({
  */
 function StreamingBubble({ content }: { content: string }) {
   return (
-    <div className="flex justify-start gap-3">
-      <div className="mt-auto mb-2">
+    <div className="flex justify-start gap-3 w-full">
+      <div className="mt-1 shrink-0">
         <CopilotAvatar />
       </div>
-      <div className="flex max-w-[70%] flex-col items-start">
-        <div className="rounded-2xl bg-card text-card-foreground border border-border px-6 py-4 shadow-sm ring-1 ring-primary/20">
+      <div className="flex max-w-[95%] sm:max-w-[90%] flex-col items-start">
+        <div className="rounded-2xl bg-card/70 text-card-foreground border border-border/50 px-5 py-4 shadow-2xs ring-1 ring-primary/20">
           <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
             {content}
             <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-primary" />
@@ -175,15 +180,15 @@ function StreamingBubble({ content }: { content: string }) {
  */
 function TypingIndicator() {
   return (
-    <div className="flex justify-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="mt-auto mb-2">
+    <div className="flex justify-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
+      <div className="mt-1 shrink-0">
         <CopilotAvatar />
       </div>
-      <div className="rounded-2xl bg-card border border-border px-6 py-4 shadow-sm">
-        <div className="flex gap-1.5">
-          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
-          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
-          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+      <div className="rounded-2xl bg-card/70 border border-border/50 px-5 py-3.5 shadow-2xs">
+        <div className="flex gap-1.5 items-center">
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:0ms]" />
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:150ms]" />
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:300ms]" />
         </div>
       </div>
     </div>
@@ -196,9 +201,9 @@ function TypingIndicator() {
  */
 function LoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-6 px-4 sm:px-8 py-8">
+    <div className="flex flex-col gap-6 w-full px-4 sm:px-8 py-8">
       <div className="flex justify-start gap-3">
-        <Skeleton className="h-9 w-9 rounded-full bg-muted" />
+        <Skeleton className="h-8 w-8 rounded-full bg-muted" />
         <div className="flex flex-col gap-2">
           <Skeleton className="h-4 w-80 rounded-lg bg-muted" />
           <Skeleton className="h-4 w-64 rounded-lg bg-muted" />
@@ -206,7 +211,7 @@ function LoadingSkeleton() {
         </div>
       </div>
       <div className="flex justify-start gap-3">
-        <Skeleton className="h-9 w-9 rounded-full bg-muted" />
+        <Skeleton className="h-8 w-8 rounded-full bg-muted" />
         <div className="flex flex-col gap-2">
           <Skeleton className="h-4 w-72 rounded-lg bg-muted" />
           <Skeleton className="h-4 w-56 rounded-lg bg-muted" />
@@ -227,7 +232,7 @@ export function ChatMessages({
   streamingContent,
   isInitializing,
   actorName,
-  activeSection, // <-- Recebe aqui
+  activeSection,
   isReprocessing = false,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -251,7 +256,7 @@ export function ChatMessages({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="flex flex-col gap-6 px-4 sm:px-8 py-8">
+      <div className="flex flex-col gap-6 w-full px-4 sm:px-8 py-6">
         {messages.map((msg, index) => {
           const isFirstAssistantMessage =
             index === 0 && msg.role === "assistant";

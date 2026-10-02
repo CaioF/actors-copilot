@@ -89,8 +89,63 @@ export const DNA_SECTIONS = [
   { id: "desire", label: "Desire and Ambition" },
   { id: "joy", label: "Joy and Vitality" },
   { id: "conflict", label: "Conflict and Pressure" },
-  { id: "beliefs", label: " Beliefs and Life Patterns" },
+  { id: "beliefs", label: "Beliefs and Life Patterns" },
 ] as const;
+
+/**
+ * High-level 4 DNA Chapters that consolidate the 12 psychological arenas into structured milestones.
+ * Provides a clear, finite roadmap for the actor's persona analysis.
+ * @constant
+ */
+export interface DNAChapter {
+  id: string;
+  number: number;
+  title: string;
+  subtitle: string;
+  description: string;
+  unlockReward: string;
+  sections: DNASectionId[];
+}
+
+export const DNA_CHAPTERS: DNAChapter[] = [
+  {
+    id: "chapter_1",
+    number: 1,
+    title: "Chapter 1: Foundation & Persona",
+    subtitle: "Identity, Roots & Formative Beliefs",
+    description: "Deep exploration of your origin story, self-narrative, and foundational beliefs that shape your authentic acting persona.",
+    unlockReward: "🚀 Unlocks AI Audition Prep & Acting Coach",
+    sections: ["identity", "childhood", "beliefs"],
+  },
+  {
+    id: "chapter_2",
+    number: 2,
+    title: "Chapter 2: World & Relational Power",
+    subtitle: "Authority, Belonging & Relationships",
+    description: "In-depth investigation of how you navigate authority, social inclusion, attachment styles, and interpersonal power.",
+    unlockReward: "🎭 Unlocks Subconscious Archetype & Dynamic Character Matching",
+    sections: ["school_authority", "belonging", "relationships", "power"],
+  },
+  {
+    id: "chapter_3",
+    number: 3,
+    title: "Chapter 3: Inner Shadow & Vulnerability",
+    subtitle: "Defense Mechanisms, Shame & Grief",
+    description: "Comprehensive extraction of your private vulnerabilities, coping strategies, loss processing, and fight/flight triggers.",
+    unlockReward: "🔥 Unlocks High-Stakes Emotional Trigger Analysis",
+    sections: ["shame", "loss", "conflict"],
+  },
+  {
+    id: "chapter_4",
+    number: 4,
+    title: "Chapter 4: Core Fuel & Creative Drive",
+    subtitle: "Desire, Ambition & Vitality",
+    description: "Uncovering your underlying motivations, denied desires, creative play capacity, and authentic emotional energy.",
+    unlockReward: "👑 Unlocks Master DNA Profile & Full Vault Synthesis",
+    sections: ["desire", "joy"],
+  },
+];
+
 
 /**
  * Controlled vocabulary of psychological themes per arena.

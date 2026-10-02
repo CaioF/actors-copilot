@@ -221,31 +221,39 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(res.status).toBe(200);
         expect(data.url).toBe('https://checkout.stripe.com/pay/trial_session_link');
 
-        expect(mockSet).toHaveBeenCalledWith(
-            expect.objectContaining({ hasUsedTrial: true }),
-            { merge: true }
-        );
+        expect(mockSet).not.toHaveBeenCalled();
 
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                customer: 'cus_historical_888',
-                client_reference_id: mockUid,
-                mode: 'subscription',
-                payment_method_collection: 'always',
-                subscription_data: {
-                    metadata: {
-                        firebaseUid: mockUid,
-                        platformUserId: mockUid,
-                        targetTier: 'business',
-                    },
-                    trial_period_days: 14,
+        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith({
+            customer: 'cus_historical_888',
+            client_reference_id: mockUid,
+            mode: 'subscription',
+            allow_promotion_codes: true,
+            billing_address_collection: 'required',
+            line_items: [
+                {
+                    price: 'price_business_id_xyz',
+                    quantity: 1,
                 },
-                metadata: expect.objectContaining({
-                    isTrial: 'true',
+            ],
+            subscription_data: {
+                metadata: {
+                    firebaseUid: mockUid,
+                    platformUserId: mockUid,
                     targetTier: 'business',
-                }),
-            })
-        );
+                },
+                trial_period_days: 14,
+            },
+            payment_method_collection: 'always',
+            success_url: 'http://localhost:3000/api/billing/success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url: 'http://localhost:3000/api/billing/cancelled',
+            metadata: {
+                platformUserId: mockUid,
+                firebaseUid: mockUid,
+                targetTier: 'business',
+                billingCycle: 'monthly',
+                isTrial: 'true',
+            },
+        });
     });
 
     it('rejects trial requests with 400 Bad Request if the account has already redeemed a trial', async () => {

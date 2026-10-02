@@ -67,7 +67,85 @@ To use it effectively, you must follow this psychological algorithm for every re
  * It strictly confines the AI's investigation, preventing cross-contamination of topics.
  */
 export const SECTION_PROMPTS: Record<string, string> = {
-  
+  chapter_1: `[CURRENT ARENA: CHAPTER 1 - FOUNDATION & PERSONA]
+  Focus: Comprehensive, unified exploration of the actor's foundation. You are exploring three interconnected areas in this chapter: 
+  1. Identity & Self-Story (public mask vs. private truth, self-narrative, core traits),
+  2. Early Childhood & Home (formative atmosphere, unspoken rules, upbringing),
+  3. Formative Beliefs & Life Patterns (core philosophy, self-beliefs, repeating cycles).
+  DIRECTIVE: Dynamically differentiate and move between these three subjects as the user responds. As you dig into their identity, seamlessly pivot to early childhood influences or foundational life beliefs. Ensure the chapter covers all of its constituent subjects naturally through Socratic questioning.
+
+  Route: Mask vs. Core (The Public Armor)
+  - TARGET: Extract the mechanics of their public persona, their self-narrative, and the exhaustion of maintaining it.
+  - PSYCHOLOGICAL PROBE: Investigate suppressed emotions and what they omit in public. Explore the fear of the mask cracking.
+  - CONTRADICTION CHECK: If they claim to be "an open book," probe the defense mechanism behind over-sharing.
+
+  Route: The Emotional Baseline & Upbringing
+  - TARGET: Extract the emotional frequency of the childhood home and unspoken survival rules.
+  - PSYCHOLOGICAL PROBE: Who dictated the mood of the house? What did they have to be to feel safe or loved?
+  - CONTRADICTION CHECK: If they claim childhood was "always happy," ask how negative emotions or mistakes were handled.
+
+  Route: Architecture of the Law (Life Beliefs)
+  - TARGET: Extract foundational life rules and repeating patterns of choices.
+  - PSYCHOLOGICAL PROBE: What invisible law governs their life choices? What repeating situation keeps happening?
+  - CONTRADICTION CHECK: Challenge external excuses to expose the core belief running their life.`,
+
+  chapter_2: `[CURRENT ARENA: CHAPTER 2 - WORLD & RELATIONAL POWER]
+  Focus: Comprehensive, unified investigation of how the actor navigates the outside world. You are exploring four interconnected areas in this chapter:
+  1. School & Authority (reacting to rules, teachers, and authority figures),
+  2. Belonging & Exclusion (group identification, feeling like an insider or outsider),
+  3. Relationships & Attachment (intimacy capacity, trust, loyalty, boundary dynamics),
+  4. Power & Control (handling disempowerment, status sensitivity, control patterns).
+  DIRECTIVE: Dynamically differentiate and transition between these four subjects as the user responds. You guide the user through their social identity, authority reactions, relational attachment, and power dynamics across the chapter.
+
+  Route: Authority & School Mapping
+  - TARGET: Extract how they learned to navigate rules, teachers, status, and peer pressure.
+  - PSYCHOLOGICAL PROBE: Who outside home had authority over them? Did they charm, defy, or shrink before power?
+
+  Route: Belonging & Exclusion (The Outsider Wound)
+  - TARGET: Extract moments of rejection, assimilation costs, and group hierarchy survival.
+  - PSYCHOLOGICAL PROBE: What was the admission fee to fit in? What part of themselves did they hide?
+
+  Route: Relationships & Attachment (Architecture of Trust)
+  - TARGET: Extract vulnerability mechanics, trust scorecards, intimacy barriers, and repair styles.
+  - PSYCHOLOGICAL PROBE: When they feel close to someone, do they pull back or smother? How do they handle fear of replacement?
+
+  Route: Power Dynamics & Control
+  - TARGET: Extract instincts when cornered by status or authority, and how they handle holding power themselves.
+  - PSYCHOLOGICAL PROBE: How do they react to public judgment? What do they do to regain control when feeling small?`,
+
+  chapter_3: `[CURRENT ARENA: CHAPTER 3 - INNER SHADOW & VULNERABILITY]
+  Focus: Comprehensive, unified extraction of the actor's hidden shadow. You are exploring three interconnected areas in this chapter:
+  1. Shame & Self-Worth (shame origins, coping mechanisms, perfectionist shields, dignity),
+  2. Loss & Grief (rupture moments, phantom pains, abandonment fears, adaptation),
+  3. Conflict & Pressure (fight/flight/freeze responses, pressure triggers, boundary violations).
+  DIRECTIVE: Dynamically differentiate and move between shame triggers, grief/ruptures, and conflict survival mechanisms. Provide a safe space for raw truth while surgically exposing defense mechanisms.
+
+  Route: Architecture of Exposure & Shame
+  - TARGET: Extract relationship with humiliation, inner critic, and tactics to outrun feelings of inadequacy.
+  - PSYCHOLOGICAL PROBE: When shame hits, do they deflect, dissociate, or attack? What secret are they terrified will be found out?
+
+  Route: The Rupture & Phantom Limb (Loss & Grief)
+  - TARGET: Extract moments that split their life into 'before' and 'after' and the adaptation logic afterwards.
+  - PSYCHOLOGICAL PROBE: What small, ordinary detail of the 'before' world do they miss most? What rule was born from that loss?
+
+  Route: Conflict Style & Ego Tripwire
+  - TARGET: Extract automated survival responses under attack (fight, flight, freeze, fawn) and boundary limits.
+  - PSYCHOLOGICAL PROBE: What specific accusation makes them see red or shut down? What is the internal warning sign before war?`,
+
+  chapter_4: `[CURRENT ARENA: CHAPTER 4 - CORE FUEL & CREATIVE DRIVE]
+  Focus: Deep, unified extraction of the actor's underlying motivation and creative energy. You are exploring two interconnected areas in this chapter:
+  1. Desire & Ambition (core aspirations, denied desires, envy, hunger, sacrifice),
+  2. Joy & Vitality (flow state, unmonitored play, humor as survival, sensory sanctuary).
+  DIRECTIVE: Dynamically differentiate and move between hidden hunger/ambition and pure unmonitored vitality. Uncover what ignites them and where their inner critic goes silent.
+
+  Route: Engine of Hunger (Desire & Ambition)
+  - TARGET: Extract the psychological void ambition is trying to fill, envy, and denied dreams.
+  - PSYCHOLOGICAL PROBE: What do they want so badly it scares them? What envy exposes their own perceived lack?
+
+  Route: Flow State & Vitality (Joy & Play)
+  - TARGET: Extract conditions where the inner critic goes silent and unfiltered joy emerges.
+  - PSYCHOLOGICAL PROBE: Where does time disappear for them? How do they use humor as a shield or release?`,
+
   childhood: `[CURRENT ARENA: EARLY CHILDHOOD & HOME]
   Focus: The foundation of the user's worldview. Seek the emotional atmosphere and unspoken survival rules that shaped them before they had language. Extract how they first learned what felt safe, what felt risky, and their primal psychological survival responses.
   Choose the most appropriate Follow-up Route based on the user's answers and use the framework to construct ONE surgical, context-aware question:
@@ -399,7 +477,30 @@ export const SECTION_PROMPTS: Record<string, string> = {
  * @constant {Record<string, string>}
  */
 export const SECTION_INTROS: Record<string, string> = {
-  
+  chapter_1: `Chapter 1: Foundation & Persona. 
+
+In this chapter, we explore your origin story, early childhood environment, and core identity. We want to understand the gap between how you are seen and what is true underneath—giving your later character work immense depth.
+
+To start, let's establish the baseline: How old are you, where are you from, and what is the "elevator pitch" you usually use to describe yourself to a stranger?`,
+
+  chapter_2: `Chapter 2: World & Relational Power. 
+
+In this chapter, we examine how you navigate authority, social belonging, power dynamics, and attachment styles in relationships.
+
+When you think about school, authority figures, and stepping out into the wider world, what do you remember becoming most aware of in yourself?`,
+
+  chapter_3: `Chapter 3: Inner Shadow & Vulnerability. 
+
+This chapter focuses on your private defense mechanisms, shame triggers, loss processing, and conflict habits—uncovering high-stakes emotional fuel for your roles.
+
+What kind of situation tends to make you feel most exposed or judged? Describe a specific moment when you felt that way, and what you did to try to hide it.`,
+
+  chapter_4: `Chapter 4: Core Fuel & Creative Drive. 
+
+In this final chapter, we extract your deepest desires, suppressed longings, creative play capacity, and authentic emotional energy.
+
+What is one dream, passion, or ambition you've kept locked away in the dark, and what makes that desire stay with you?`,
+
   identity: `This process exists for one reason only: to make you a more truthful, bold, and compelling actor.
 
 Every great actor draws from a private, specific, lived archive. Not ideas. Not concepts. Events. Moments where something was at stake. Moments that left a mark.
