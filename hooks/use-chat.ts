@@ -18,7 +18,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import type { ChatMessage, DNASession } from "@/lib/chat-types";
 import { SECTION_INTROS } from "@/lib/prompts";
-import { ARENA_THEMES, DNASectionId } from "@/lib/chat-types";
+import { ARENA_THEMES, DNASectionId, DNA_CHAPTERS } from "@/lib/chat-types";
 import {
   type ExtractionTracker,
   DEFAULT_THRESHOLDS,
@@ -648,32 +648,30 @@ export function useChat( sessionId: string = DEFAULT_SESSION_ID ) {
 
         let totalProgressPercentage = 0;
 
-        import("@/lib/chat-types").then(({ DNA_CHAPTERS }) => {
-          DNA_CHAPTERS.forEach((chapter) => {
-            const chId = chapter.id;
-            const isChCompleted =
-              newCompletedSecs.includes(chId) ||
-              chapter.sections.every((sec) => newCompletedSecs.includes(sec));
+        DNA_CHAPTERS.forEach((chapter) => {
+          const chId = chapter.id;
+          const isChCompleted =
+            newCompletedSecs.includes(chId) ||
+            chapter.sections.every((sec) => newCompletedSecs.includes(sec));
 
-            if (isChCompleted) {
-              totalProgressPercentage += 100 / TOTAL_CHAPTERS;
-            } else {
-              const chCount =
-                (sectionCounts[chId] || 0) +
-                chapter.sections.reduce((acc, sec) => acc + (sectionCounts[sec] || 0), 0);
-              
-              const chThemes = [
-                ...(sectionThemes[chId as DNASectionId] || []),
-                ...chapter.sections.flatMap((sec) => sectionThemes[sec] || []),
-              ];
-              const uniqueThemes = new Set(chThemes);
+          if (isChCompleted) {
+            totalProgressPercentage += 100 / TOTAL_CHAPTERS;
+          } else {
+            const chCount =
+              (sectionCounts[chId] || 0) +
+              chapter.sections.reduce((acc, sec) => acc + (sectionCounts[sec] || 0), 0);
+            
+            const chThemes = [
+              ...(sectionThemes[chId as DNASectionId] || []),
+              ...chapter.sections.flatMap((sec) => sectionThemes[sec] || []),
+            ];
+            const uniqueThemes = new Set(chThemes);
 
-              const diversityScore = Math.min(uniqueThemes.size / REQUIRED_THEMES, 1);
-              const countScore = Math.min(chCount / HQ_EXTRACTIONS_FOR_COMPLETION, 1);
-              const chapterScore = (diversityScore * DIVERSITY_WEIGHT) + (countScore * COUNT_WEIGHT);
-              totalProgressPercentage += chapterScore * (100 / TOTAL_CHAPTERS);
-            }
-          });
+            const diversityScore = Math.min(uniqueThemes.size / REQUIRED_THEMES, 1);
+            const countScore = Math.min(chCount / HQ_EXTRACTIONS_FOR_COMPLETION, 1);
+            const chapterScore = (diversityScore * DIVERSITY_WEIGHT) + (countScore * COUNT_WEIGHT);
+            totalProgressPercentage += chapterScore * (100 / TOTAL_CHAPTERS);
+          }
         });
 
         const newProgress = Math.round(Math.min(totalProgressPercentage || 25, 100));
