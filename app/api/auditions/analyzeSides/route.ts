@@ -205,7 +205,7 @@ export async function POST(request: Request) {
     const isStandalone = validated.isStandalone === "true";
 
     const model = getGenerativeModel(ai, { 
-      model: "gemini-3.1-pro-preview", 
+      model: "gemini-3-flash-preview", 
       systemInstruction: { role: "user", parts: [{ text: getAuditionCoachPrompt(isStandalone, projectType, breakdownDepth) }] },
       generationConfig: { 
         responseMimeType: "application/json",

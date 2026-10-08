@@ -183,7 +183,7 @@ export async function POST(request: Request) {
     const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
 
     const model = getGenerativeModel(ai, { 
-      model: "gemini-3.1-pro-preview", 
+      model: "gemini-3-flash-preview", 
       systemInstruction: { role: "user", parts: [{ text: BRIEF_ANALYSIS_PROMPT }] }, 
       generationConfig: { 
         responseMimeType: "application/json",
