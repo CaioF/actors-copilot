@@ -14,7 +14,7 @@ export async function runCoachTriggeredExtraction(
   const { content, history } = inputs;
   const ai = getAI(getApp(), { backend: new VertexAIBackend() });
   const extractionModel = getGenerativeModel(ai, {
-    model: "gemini-2.5-pro",
+    model: "gemini-2.5-flash",
     generationConfig: { temperature: 0.1 },
     tools: [EXTRACTION_TOOL],
   });

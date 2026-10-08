@@ -198,12 +198,12 @@ export async function POST(request: Request) {
         
         // --- AGENT 1: YAN (Conversational) ---
         const chatModel = getGenerativeModel(aiGlobal, { 
-            model: "gemini-3.1-pro-preview", 
+            model: "gemini-3-flash-preview", 
         }); 
 
         // --- AGENT 2: MEMLISTENER (Context Extraction) ---
         const extractionModel = getGenerativeModel(aiCentral, {
-            model: "gemini-2.5-pro",
+            model: "gemini-2.5-flash",
             generationConfig: { temperature: 0.1 }, 
             tools: [EXTRACTION_TOOL],
         }); 

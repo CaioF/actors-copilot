@@ -183,7 +183,7 @@ describe("runCoachTriggeredExtraction", () => {
     });
   });
 
-  it("uses gemini-2.5-pro model and temperature 0.1", async () => {
+  it("uses gemini-2.5-flash model and temperature 0.1", async () => {
     await jest.isolateModulesAsync(async () => {
       const { runCoachTriggeredExtraction } = require("./run-extraction");
 
@@ -203,7 +203,7 @@ describe("runCoachTriggeredExtraction", () => {
       expect(getGenerativeModel).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          model: "gemini-2.5-pro",
+          model: "gemini-2.5-flash",
           generationConfig: { temperature: 0.1 },
         })
       );

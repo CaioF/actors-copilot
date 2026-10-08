@@ -97,7 +97,7 @@ export async function POST(request: Request) {
 
     // extraction model
     const extractionModel = getGenerativeModel(ai, {
-            model: "gemini-2.5-pro",
+            model: "gemini-2.5-flash",
             generationConfig: { temperature: 0.1 }, 
             // @ts-expect-error
             thinkingConfig: { thinkingLevel: "HIGH" },

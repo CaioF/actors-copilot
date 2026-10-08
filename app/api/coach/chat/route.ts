@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     const { getApp: getFirebaseApp } = await import("@/lib/firebase");
 
     const aiGlobal = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
-    const coachModel = getGenerativeModel(aiGlobal, { model: "gemini-3.1-pro-preview" });
+    const coachModel = getGenerativeModel(aiGlobal, { model: "gemini-3-flash-preview" });
 
     const promptParts: any[] = [{ text: promptText }];
     if (document?.data && document?.mimeType) {
