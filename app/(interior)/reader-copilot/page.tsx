@@ -155,8 +155,8 @@ export default function ActorCopilotMainPage() {
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-5xl mx-auto w-full">
         {/* HERO BANNER */}
-        <div className="rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 p-8 mb-8 shadow-sm">
-          <div className="flex items-center gap-3 text-primary mb-3">
+        <div className="px-1 pt-1 mb-5 md:px-8 md:pt-8 md:pb-8 md:mb-8 md:rounded-3xl md:border md:border-border md:bg-gradient-to-br md:from-card md:via-card md:to-primary/5 md:shadow-sm">
+          <div className="flex items-center gap-3 text-primary mb-2 md:mb-3">
             <Clapperboard className="w-8 h-8" />
             <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10">
               Interactive Scene Partner
@@ -235,11 +235,17 @@ export default function ActorCopilotMainPage() {
             className="w-full rounded-2xl border border-border bg-background p-4 text-sm font-serif leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 mb-4 resize-y"
           />
 
-          <div className="flex justify-end">
+          <div className="flex flex-col items-stretch gap-2 md:flex-row md:justify-end md:items-center">
+            {!sidesText.trim() && !isParsing && (
+              <p id="rehearsal-hint" className="text-xs text-muted-foreground text-center md:hidden">
+                Paste your script above to start rehearsing.
+              </p>
+            )}
             <button
               onClick={() => handleStartRehearsal()}
               disabled={!sidesText.trim() || isParsing}
-              className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
+              aria-describedby={!sidesText.trim() && !isParsing ? "rehearsal-hint" : undefined}
+              className="flex items-center justify-center gap-2 min-h-11 px-8 py-3.5 rounded-full bg-primary font-semibold transition-all text-neutral-950 shadow-md shadow-primary/30 hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none disabled:border disabled:border-border md:text-primary-foreground md:shadow-lg md:shadow-primary/20 md:disabled:bg-primary md:disabled:text-primary-foreground md:disabled:border-0 md:disabled:shadow-lg md:disabled:opacity-50 md:disabled:cursor-default"
             >
               {isParsing ? (
                 <>
