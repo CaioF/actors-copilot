@@ -12,6 +12,9 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { getHasSeenIntroVideo, markHasSeenIntroVideo } from "@/lib/firestore.utils";
 import { useRouter, useSearchParams } from "next/navigation";
 
+const secondaryCardActionClass =
+  "w-full py-2.5 px-4 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted md:border-transparent md:bg-primary md:hover:bg-primary/90 md:text-primary-foreground font-medium text-sm flex items-center justify-center gap-2 transition-colors";
+
 export default function DashboardPage() {
   return (
     <Suspense fallback={null}>
@@ -63,11 +66,11 @@ function DashboardContent() {
 
   return (
     <main className="flex flex-1 flex-col pb-12">
-      <DashboardHeader title="My Self Tape Copilot" />
+      <DashboardHeader title="My Self Tape Copilot" mobileTitle="My Self Tape" />
 
-      <div className="px-4 sm:px-8 space-y-8">
+      <div className="px-4 sm:px-8 space-y-6 md:space-y-8">
         {/* Hero Section */}
-        <section className="relative overflow-hidden min-h-105 rounded-2xl bg-neutral-900 text-white ">
+        <section className="relative overflow-hidden md:min-h-105 rounded-2xl bg-neutral-900 text-white ">
           <div className="absolute inset-0 z-0">
             <Image
               src="/image1.png"
@@ -79,13 +82,13 @@ function DashboardContent() {
             <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/90 via-neutral-950/70 to-transparent" />
           </div>
 
-          <div className="relative z-10 p-8 sm:p-12 max-w-2xl space-y-4">
-            <h1 className="font-title text-4xl sm:text-5xl font-bold tracking-tight">
+          <div className="relative z-10 p-6 md:p-12 max-w-2xl space-y-3 md:space-y-4">
+            <h1 className="font-title text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight">
               My Acting Copilot
             </h1>
             <hr className="border-white/20 w-full" />
 
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-wider text-neutral-200 uppercase">
+            <h2 className="text-lg md:text-2xl font-semibold tracking-wider text-neutral-200 uppercase">
               CREATE. PERFORM. PRODUCE.
             </h2>
 
@@ -99,10 +102,10 @@ function DashboardContent() {
         </section>
 
         {/* Step Cards Grid */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {/* Card 1: Personal DNA */}
           <div className="group rounded-2xl bg-card border border-border overflow-hidden shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
-            <div className="relative h-48 w-full bg-neutral-800">
+            <div className="relative h-32 md:h-48 w-full bg-neutral-800">
               <Image
                 src="/image2.png"
                 alt="Personal DNA Upload"
@@ -114,16 +117,16 @@ function DashboardContent() {
               </div>
             </div>
 
-            <div className="p-6 pt-8 text-center flex-1 flex flex-col justify-between space-y-4">
+            <div className="p-5 pt-7 md:p-6 md:pt-8 text-center flex-1 flex flex-col justify-between space-y-3 md:space-y-4">
               <div>
-                <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                <span className="text-[11px] md:text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
                   START HERE
                 </span>
                 <h3 className="font-title text-xl font-bold text-foreground mt-1">
                   Personal DNA Upload
                 </h3>
                 <div className="w-16 h-[1px] bg-border mx-auto my-2" />
-                <p className="text-xs text-muted-foreground">Know your core.</p>
+                <p className="text-sm leading-relaxed text-foreground/80 md:text-xs md:leading-normal md:text-muted-foreground">Know your core.</p>
               </div>
 
               <Link
@@ -137,7 +140,7 @@ function DashboardContent() {
 
           {/* Card 2: Audition Breakdown */}
           <div className="group rounded-2xl bg-card border border-border overflow-hidden shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
-            <div className="relative h-48 w-full bg-neutral-800">
+            <div className="relative h-32 md:h-48 w-full bg-neutral-800">
               <Image
                 src="/image3.png"
                 alt="Audition Breakdown"
@@ -149,32 +152,32 @@ function DashboardContent() {
               </div>
             </div>
 
-            <div className="p-6 pt-8 text-center flex-1 flex flex-col justify-between space-y-4">
+            <div className="p-5 pt-7 md:p-6 md:pt-8 text-center flex-1 flex flex-col justify-between space-y-3 md:space-y-4">
               <div>
-                <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                <span className="text-[11px] md:text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
                   GOT AN AUDITION?
                 </span>
                 <h3 className="font-title text-xl font-bold text-foreground mt-1">
                   Audition Breakdown
                 </h3>
                 <div className="w-16 h-[1px] bg-border mx-auto my-2" />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm leading-relaxed text-foreground/80 md:text-xs md:leading-normal md:text-muted-foreground">
                   Break it down. Own the room.
                 </p>
               </div>
 
               <Link
                 href="/auditions/new/brief"
-                className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors"
+                className={secondaryCardActionClass}
               >
-                Upload Casting Brief and sides <Sparkles className="h-4 w-4" />
+                Upload Casting Brief and sides <Sparkles className="h-4 w-4 text-primary md:text-current" />
               </Link>
             </div>
           </div>
 
           {/* Card 3: Independent Study */}
           <div className="group rounded-2xl bg-card border border-border overflow-hidden shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
-            <div className="relative h-48 w-full bg-neutral-800">
+            <div className="relative h-32 md:h-48 w-full bg-neutral-800">
               <Image
                 src="/image4.png"
                 alt="Independent Study"
@@ -186,25 +189,25 @@ function DashboardContent() {
               </div>
             </div>
 
-            <div className="p-6 pt-8 text-center flex-1 flex flex-col justify-between space-y-4">
+            <div className="p-5 pt-7 md:p-6 md:pt-8 text-center flex-1 flex flex-col justify-between space-y-3 md:space-y-4">
               <div>
-                <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                <span className="text-[11px] md:text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
                   Working on a scene?
                 </span>
                 <h3 className="font-title text-xl font-bold text-foreground mt-1">
                   Independent Study
                 </h3>
                 <div className="w-16 h-[1px] bg-border mx-auto my-2" />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm leading-relaxed text-foreground/80 md:text-xs md:leading-normal md:text-muted-foreground">
                   Train this scene. Elevate the story.
                 </p>
               </div>
 
               <Link
                 href="/auditions/new/sides"
-                className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors"
+                className={secondaryCardActionClass}
               >
-                Start Scene Study <Monitor className="h-4 w-4" />
+                Start Scene Study <Monitor className="h-4 w-4 text-primary md:text-current" />
               </Link>
             </div>
           </div>
@@ -214,7 +217,7 @@ function DashboardContent() {
         <MemoryRecordingBanner />
 
         {/* Baseline Upload Banner */}
-        <section className="p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <section className="p-5 md:p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 md:gap-6">
           <div className="flex gap-4 items-start">
             <div className="bg-primary/10 p-3 rounded-2xl shrink-0">
               <FileText className="w-6 h-6 text-primary" />
@@ -223,14 +226,14 @@ function DashboardContent() {
               <h3 className="text-foreground text-xl font-bold font-title">
                 Give the Coach a Head Start
               </h3>
-              <p className="text-muted-foreground text-sm max-w-4xl leading-relaxed mt-1">
+              <p className="text-foreground/80 md:text-muted-foreground text-sm max-w-4xl leading-relaxed mt-1">
                 Already have a journal, personal story, or written biography? Upload it here to give your coach deeper context for your Personal DNA extraction. It’s optional now, and you can always add it later.
               </p>
             </div>
           </div>
           <button
             onClick={() => setIsBaselineModalOpen(true)}
-            className="w-full sm:w-auto px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-all shrink-0 text-center"
+            className="w-full sm:w-auto px-6 py-3 rounded-full font-medium transition-all shrink-0 text-center border border-border bg-transparent text-foreground hover:bg-muted md:border-transparent md:bg-primary md:text-primary-foreground md:hover:bg-primary/90"
           >
             Upload Baseline
           </button>

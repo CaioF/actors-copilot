@@ -138,9 +138,9 @@ export function MemoryRecordingBanner() {
         return (
           <button
             onClick={startRecording}
-            className="flex items-center gap-3 px-4 py-4 bg-[#FF7316] text-white rounded-full font-medium hover:bg-[#FF7316]/90 transition-all shrink-0 hover:scale-105 active:scale-95"
+            className="flex w-full sm:w-auto items-center justify-center gap-3 px-4 py-3 md:py-4 border border-border bg-transparent text-foreground hover:bg-muted md:border-transparent md:bg-[#FF7316] md:text-white md:hover:bg-[#FF7316]/90 rounded-full font-medium transition-all shrink-0 md:hover:scale-105 active:scale-95"
           >
-            <Mic className="h-5 w-5" />
+            <Mic className="h-5 w-5 text-primary md:text-current" />
             <span>Capture a Memory</span>
           </button>
         );
@@ -148,7 +148,7 @@ export function MemoryRecordingBanner() {
   };
 
   return (
-    <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+    <div className="p-5 md:p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 md:gap-6">
       <div className="flex gap-4 items-center">
         <div className="bg-[#FF7316]/20 p-4 rounded-full shrink-0 hidden sm:flex">
           <Mic className="w-6 h-6 text-[#ff6600]" />
@@ -157,7 +157,7 @@ export function MemoryRecordingBanner() {
           <h3 className="text-foreground text-xl font-bold font-title">
             Memory Recording
           </h3>
-          <p className="text-muted-foreground text-sm max-w-4xl leading-relaxed mt-1">
+          <p className="text-foreground/80 md:text-muted-foreground text-sm max-w-4xl leading-relaxed mt-1">
             When something surfaces, record it while it’s still fresh. Stay close to the details — what you saw, heard, smelt, touched, or tasted. The more vivid and specific the memory, the more truthfully it&nbsp;can&nbsp;live&nbsp;in&nbsp;your&nbsp;work.
           </p>
         </div>

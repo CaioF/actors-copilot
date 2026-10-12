@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 
 interface DashboardHeaderProps {
   title?: string
+  /** Optional shorter title shown below the md breakpoint so it doesn't truncate. */
+  mobileTitle?: string
   /** Optional custom title element. When provided, replaces the default <h1>{title}</h1>. */
   titleSlot?: React.ReactNode
   /** Optional extra action buttons to render in the header toolbar. */
@@ -18,7 +20,7 @@ interface DashboardHeaderProps {
   className?: string
 }
 
-export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, extraActions, className }: DashboardHeaderProps) {
+export function DashboardHeader({ title = "My Self Tape Copilot", mobileTitle, titleSlot, extraActions, className }: DashboardHeaderProps) {
   const { setIsOpen } = useSidebar();
 
   const [user, setUser] = useState<User | null>(null);
@@ -58,39 +60,46 @@ export function DashboardHeader({ title = "My Self Tape Copilot", titleSlot, ext
           </button>
           <div className="min-w-0 flex-1">
             {titleSlot ?? (
-              <h1 className="truncate font-title text-xl font-bold text-foreground sm:text-2xl">{title}</h1>
+              mobileTitle ? (
+                <h1 className="font-title font-bold text-foreground">
+                  <span className="block truncate text-lg md:hidden">{mobileTitle}</span>
+                  <span className="hidden truncate text-2xl md:block">{title}</span>
+                </h1>
+              ) : (
+                <h1 className="truncate font-title text-xl font-bold text-foreground sm:text-2xl">{title}</h1>
+              )
             )}
           </div>
         </div>
 
         {/* Grupo de Ações do Canto Direito */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {extraActions}
           <ThemeToggle />
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="hidden h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
             aria-label="Support"
           >
             <Mail className="h-5 w-5" />
           </button>
 
           <Link href={"/settings"}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="hidden h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
             aria-label="Settings"
           >
             <Settings className="h-5 w-5" />
           </Link>
 
-          <Link href={"/profile"} className="flex items-center gap-2">
+          <Link href={"/profile"} className="flex items-center gap-2" aria-label={`Profile: ${displayName}`}>
             <Avatar className="h-9 w-9">
               <AvatarImage src={user?.photoURL || ""} alt={displayName} />
               <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium text-foreground">
+            <span className="hidden text-sm font-medium text-foreground md:inline">
               {user ? firstName : "Loading..."}
             </span>
           </Link>
