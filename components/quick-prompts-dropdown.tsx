@@ -41,9 +41,10 @@ export function QuickPromptsDropdown({ onSelect }: QuickPromptsDropdownProps) {
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-1.5 text-sm font-semibold text-[#6B6B6B] border border-[#C7C0B5] bg-transparent hover:bg-[#E8DFD0] hover:text-[#2C3328] px-6 py-2.5 rounded-full transition-all shadow-sm"
+          className="flex min-h-11 md:min-h-0 items-center gap-1.5 text-sm font-semibold rounded-full transition-all shadow-sm px-4 py-2 border border-[#E8721A]/50 bg-[#E8721A]/10 text-[#B4530F] hover:bg-[#E8721A]/20 md:px-6 md:py-2.5 md:border-[#C7C0B5] md:bg-transparent md:text-[#6B6B6B] md:hover:bg-[#E8DFD0] md:hover:text-[#2C3328]"
           aria-label="Quick Prompts"
         >
+          <MessageSquareText className="h-4 w-4 md:hidden" aria-hidden="true" />
           Quick Prompts <ChevronDown className="h-4 w-4 opacity-70" />
         </button>
       </PopoverTrigger>
@@ -64,7 +65,7 @@ export function QuickPromptsDropdown({ onSelect }: QuickPromptsDropdownProps) {
               placeholder="Search prompts..."
               className="text-sm border-b border-[#C7C0B5] px-4 py-3"
             />
-            <CommandList className="max-h-[420px] overflow-y-auto p-2">
+            <CommandList className="max-h-[50vh] md:max-h-[420px] overflow-y-auto p-2">
               <CommandEmpty className="py-6 text-center text-sm text-[#6B6B6B]">
                 No prompts found
               </CommandEmpty>
