@@ -28,11 +28,11 @@ export function ThemeToggle() {
       {/* Botão Principal com Label e Ícone */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-9 items-center gap-2 rounded-full border border-border bg-popover/70 px-3 text-xs font-medium text-foreground shadow-sm transition-all hover:bg-popover focus:outline-none"
+        className="flex h-9 min-w-9 items-center justify-center gap-2 rounded-full border border-border bg-popover/70 px-2.5 text-xs font-medium text-foreground shadow-sm transition-all hover:bg-popover focus:outline-none md:px-3"
         aria-label="Select theme"
       >
         {currentIcon()}
-        <span className="capitalize">{theme ?? "Theme"}</span>
+        <span className="hidden capitalize md:inline">{theme ?? "Theme"}</span>
       </button>
 
       {/* Dropdown de Seleção */}
