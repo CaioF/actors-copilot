@@ -43,8 +43,38 @@ const bottomMenuItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
+const navigableHrefs = [...mainMenuItems, ...bottomMenuItems].map((item) => item.href);
+
+// Longest-prefix match so nested routes (e.g. /auditions/new/brief) light up
+// exactly one parent section.
+function getActiveHref(pathname: string | null): string | null {
+  if (!pathname) return null;
+  return navigableHrefs
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+function navItemClassName(isActive: boolean): string {
+  return cn(
+    "relative flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
+    isActive
+      ? "text-white font-semibold max-md:bg-[#3A5144]"
+      : "text-white/70 hover:text-white"
+  );
+}
+
+function ActiveIndicator() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-[#FF7316] md:hidden"
+    />
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
+  const activeHref = getActiveHref(pathname);
   const router = useRouter();
   const { logout, user } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
@@ -141,18 +171,15 @@ export function AppSidebar() {
             </p>
             <nav className="flex flex-col gap-1.5">
               {mainMenuItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = activeHref === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={cn(
-                      "flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
-                      isActive
-                        ? "text-white font-semibold"
-                        : "text-white/70 hover:text-white"
-                    )}
+                    aria-current={isActive ? "page" : undefined}
+                    className={navItemClassName(isActive)}
                   >
+                    {isActive && <ActiveIndicator />}
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
                   </Link>
@@ -195,18 +222,15 @@ export function AppSidebar() {
           {/* Suporte, Configurações & Logout */}
           <nav className="flex flex-col gap-1.5 pb-6">
             {bottomMenuItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = activeHref === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={cn(
-                    "flex items-center gap-3.5 rounded-md px-2 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-white font-semibold"
-                      : "text-white/70 hover:text-white"
-                  )}
+                  aria-current={isActive ? "page" : undefined}
+                  className={navItemClassName(isActive)}
                 >
+                  {isActive && <ActiveIndicator />}
                   <item.icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
                 </Link>
