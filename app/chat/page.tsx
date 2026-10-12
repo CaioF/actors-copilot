@@ -90,7 +90,7 @@ export default function ChatPage() {
   }, [session?.currentSection, activeSection]);
 
   return (
-    <div className="flex h-screen bg-background text-foreground transition-colors">
+    <div className="flex h-dvh md:h-screen bg-background text-foreground transition-colors">
       {/* Sidebar with section and progress tracking */}
       <ChatSidebar
         session={session}
@@ -107,6 +107,8 @@ export default function ChatPage() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader
           title="Personal DNA Extraction"
+          mobileTitle="My DNA"
+          className="mb-0 py-3 md:mb-4 md:py-4"
           extraActions={
             <div className="flex items-center gap-2">
               <button
@@ -145,7 +147,7 @@ export default function ChatPage() {
         {/* =========================================
             QUICK ACTIONS / SHORTCUTS (Centered Above Input)
             ========================================= */}
-        <div className="w-full px-4 sm:px-8 py-1.5 bg-background flex justify-center items-center">
+        <div className="w-full px-3 sm:px-8 pt-1 md:py-1.5 bg-background flex justify-center items-center">
           {isSessionPaused ? (
             <div className="flex flex-wrap items-center justify-center gap-2 max-w-5xl">
               <button
@@ -167,16 +169,22 @@ export default function ChatPage() {
               </button>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center justify-center gap-2 max-w-5xl">
+            <div
+              role="group"
+              aria-label="Session shortcuts"
+              className="flex w-full max-w-5xl flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:w-auto md:flex-wrap md:justify-center md:overflow-visible"
+            >
               <button
                 onClick={() =>
                   sendMessage("Change the subject, next question", activeSection)
                 }
                 disabled={isLoading || isInitializing}
-                className="flex items-center gap-1.5 text-xs font-medium bg-card/70 hover:bg-muted/80 border border-border/50 text-foreground/80 hover:text-foreground px-3.5 py-1.5 rounded-full shadow-2xs transition-all disabled:opacity-40"
+                aria-label="Change the subject"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/50 bg-card/70 px-3 text-xs font-medium text-foreground/80 shadow-2xs transition-all hover:bg-muted/80 hover:text-foreground disabled:opacity-40 md:min-h-0 md:px-3.5 md:py-1.5"
               >
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                Change the subject
+                <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                <span className="md:hidden">Change subject</span>
+                <span className="hidden md:inline">Change the subject</span>
               </button>
 
               <button
@@ -184,11 +192,15 @@ export default function ChatPage() {
                   sendMessage("I don't understand the question", activeSection)
                 }
                 disabled={isLoading || isInitializing}
-                className="flex items-center gap-1.5 text-xs font-medium bg-card/70 hover:bg-muted/80 border border-border/50 text-foreground/80 hover:text-foreground px-3.5 py-1.5 rounded-full shadow-2xs transition-all disabled:opacity-40"
+                aria-label="I don't understand the question"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/50 bg-card/70 px-3 text-xs font-medium text-foreground/80 shadow-2xs transition-all hover:bg-muted/80 hover:text-foreground disabled:opacity-40 md:min-h-0 md:px-3.5 md:py-1.5"
               >
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                Clarify question
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                <span className="md:hidden">Explain question</span>
+                <span className="hidden md:inline">Clarify question</span>
               </button>
+
+              <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-border md:hidden" />
 
               <button
                 onClick={() =>
@@ -198,9 +210,9 @@ export default function ChatPage() {
                   )
                 }
                 disabled={isLoading || isInitializing}
-                className="flex items-center gap-1.5 text-xs font-medium bg-card/70 hover:bg-muted/80 border border-border/50 text-foreground/80 hover:text-foreground px-3.5 py-1.5 rounded-full shadow-2xs transition-all disabled:opacity-40"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-muted/80 hover:text-foreground disabled:opacity-40 md:min-h-0 md:border md:border-border/50 md:bg-card/70 md:px-3.5 md:py-1.5 md:text-foreground/80 md:shadow-2xs"
               >
-                <Flag className="h-3.5 w-3.5 text-muted-foreground" />
+                <Flag className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                 End Session
               </button>
             </div>
@@ -208,15 +220,19 @@ export default function ChatPage() {
         </div>
 
         {/* Input Bar */}
-        <ChatInput
-          onSend={(content, document) =>
-            sendMessage(content, activeSection, document)
-          }
-          isLoading={isLoading}
-        />
+        <div className="pb-[env(safe-area-inset-bottom)] md:pb-0">
+          <ChatInput
+            onSend={(content, document) =>
+              sendMessage(content, activeSection, document)
+            }
+            isLoading={isLoading}
+          />
+        </div>
 
-        {/* Footer */}
-        <DashboardFooter />
+        {/* Footer: hidden on mobile to free up reading space for the conversation */}
+        <div className="hidden md:contents">
+          <DashboardFooter />
+        </div>
       </div>
 
       {/* Timed Session Break Check-In Modal */}
@@ -241,4 +257,4 @@ export default function ChatPage() {
       )}
     </div>
   );
-}
+}
