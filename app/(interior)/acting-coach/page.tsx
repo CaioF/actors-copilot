@@ -26,6 +26,10 @@ import type { FlightPlanStage } from "@/lib/acting-coach/contracts";
 const COACH_DESCRIPTION =
   "Ask anything about your character, your audition, your career, or the industry. Get guidance on performance, self-tapes, casting, agents, mindset, and next steps in your career. All in a private space that is yours, whenever you need it.";
 
+/** Space reserved for the sticky Quick Prompts bar when scrolling to a message start. */
+const STICKY_CONTROLS_OFFSET = 64;
+const NEAR_BOTTOM_THRESHOLD = 80;
+
 function sessionLabel(s: Pick<CoachSession, "sessionFocus" | "title" | "coachType">): string {
   const prefix = s.coachType === "character" ? "Character Coach • " : "";
   return prefix + (s.sessionFocus?.trim() || s.title?.trim() || "New Session");
@@ -68,6 +72,10 @@ export default function ActingCoachPage() {
 
   const hasFiredInitialMessage = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef(new Map<string, HTMLDivElement>());
+  const lastMessageIdRef = useRef<string | null>(null);
+  const wasLoadingRef = useRef(false);
+  const isNearBottomRef = useRef(true);
 
   const [pendingInitialMessage, setPendingInitialMessage] = useState(false);
   const [isRunnerOpen, setIsRunnerOpen] = useState(false);
@@ -111,20 +119,49 @@ export default function ActingCoachPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingInitialMessage, session, auditionId, project, role, analysisType, sendMessage]);
 
-  // Auto-scroll to latest message
+  // Scroll only on discrete events (new message / loading start), never on streaming
+  // content updates, so long coach replies are read from their first line and manual
+  // scrolling is respected.
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollToTop = (top: number) => {
       if (typeof container.scrollTo === "function") {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: "smooth",
-        });
+        container.scrollTo({ top, behavior: "smooth" });
       } else {
-        container.scrollTop = container.scrollHeight;
+        container.scrollTop = top;
       }
+    };
+
+    const last = messages[messages.length - 1];
+    const lastId = last?.id ?? null;
+    const isNewMessage = lastId !== lastMessageIdRef.current;
+    const loadingStarted = isLoading && !wasLoadingRef.current;
+    lastMessageIdRef.current = lastId;
+    wasLoadingRef.current = isLoading;
+
+    if (isNewMessage && last?.role === "assistant") {
+      const el = messageRefs.current.get(last.id);
+      if (el) {
+        scrollToTop(Math.max(el.offsetTop - STICKY_CONTROLS_OFFSET, 0));
+        isNearBottomRef.current = false;
+      }
+      return;
+    }
+
+    if ((isNewMessage && last?.role === "user") || (loadingStarted && isNearBottomRef.current)) {
+      scrollToTop(container.scrollHeight);
+      isNearBottomRef.current = true;
     }
   }, [messages, isLoading]);
+
+  const handleMessagesScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    isNearBottomRef.current =
+      container.scrollHeight - container.scrollTop - container.clientHeight < NEAR_BOTTOM_THRESHOLD;
+  };
 
   const handleSend = (content: string, document?: AttachedDocument | null) => {
     const currentAuditionId = session?.linkedAuditionId || auditionId || undefined;
@@ -191,11 +228,16 @@ export default function ActingCoachPage() {
       <DashboardHeader title={headerTitleText} titleSlot={headerTitleSlot} className="mb-0 border-b border-border" />
 
       {/* Coach Mode Switcher Bar */}
-      <div className="bg-card/80 border-b border-border px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 transition-colors">
-        <div className="flex items-center gap-2">
+      <div className="bg-card/80 border-b border-border px-3 py-1.5 sm:px-8 md:py-2.5 flex flex-nowrap md:flex-wrap items-center justify-between gap-2 md:gap-3 transition-colors">
+        <div
+          role="group"
+          aria-label="Coaching mode"
+          className="flex min-w-0 flex-1 md:flex-none items-center gap-2 overflow-x-auto md:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           <button
             onClick={() => setCoachType("character")}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            aria-pressed={isCharacterCoach}
+            className={`inline-flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
               isCharacterCoach
                 ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                 : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
@@ -206,7 +248,8 @@ export default function ActingCoachPage() {
           </button>
           <button
             onClick={() => setCoachType("general")}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            aria-pressed={!isCharacterCoach}
+            className={`inline-flex min-h-11 md:min-h-0 shrink-0 whitespace-nowrap items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
               !isCharacterCoach
                 ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                 : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
@@ -217,13 +260,13 @@ export default function ActingCoachPage() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={() => startNewSession({ coachType: isCharacterCoach ? "character" : "general" })}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex h-11 w-11 md:h-auto md:w-auto shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary md:px-4 md:py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            <Plus className="h-3.5 w-3.5" />
-            New Session
+            <Plus className="h-4 w-4 md:h-3.5 md:w-3.5" aria-hidden="true" />
+            <span className="sr-only md:not-sr-only">New Session</span>
           </button>
         </div>
       </div>
@@ -240,29 +283,33 @@ export default function ActingCoachPage() {
       )}
 
       {/* Scrollable messages region */}
-      <div ref={scrollContainerRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleMessagesScroll}
+        className="relative min-h-0 flex-1 overflow-y-auto px-4 sm:px-8"
+      >
         {!isEmpty && (
-          <div className="pointer-events-none sticky top-0 z-10 flex justify-end pt-2">
+          <div className="pointer-events-none sticky top-0 z-10 -mx-4 flex justify-end bg-background/90 px-4 py-1.5 backdrop-blur-sm sm:-mx-8 sm:px-8 md:mx-0 md:bg-transparent md:px-0 md:pb-0 md:pt-2 md:backdrop-blur-none">
             <div className="pointer-events-auto">
               <QuickPromptsDropdown onSelect={(text) => sendMessage(text, session?.linkedAuditionId || auditionId || undefined, null, { coachType: session?.coachType || "general" })} />
             </div>
           </div>
         )}
         {isEmpty ? (
-          <div className="flex h-full items-center justify-center py-8">
+          <div className="flex h-full items-center justify-center py-4 md:py-8">
             <div className="flex max-w-md flex-col items-center text-center">
               <Image
                 src="/logo.png"
                 alt="The Actors Copilot"
                 width={120}
                 height={120}
-                className="object-contain"
+                className="h-16 w-16 object-contain md:h-[120px] md:w-[120px]"
                 priority
               />
-              <h3 className="mt-6 font-title text-xl font-bold text-[#2C3328]">
+              <h2 className="mt-3 font-title text-lg font-bold text-[#2C3328] md:mt-6 md:text-xl">
                 {isCharacterCoach ? "Character Coach Ready." : "Your 24/7 Coach is ready."}
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-[#6B6B6B]">
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-[#6B6B6B] md:mt-3">
                 {isCharacterCoach
                   ? "Takes your completed breakdown and coaches you step-by-step through the 10-stage Flight Plan until you are ready to press record."
                   : COACH_DESCRIPTION}
@@ -270,16 +317,20 @@ export default function ActingCoachPage() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-2xl space-y-6 py-4">
+          <div className="mx-auto w-full max-w-2xl space-y-4 py-3 md:space-y-6 md:py-4">
             {messages.map((msg) => (
               <div
                 key={msg.id}
+                ref={(el) => {
+                  if (el) messageRefs.current.set(msg.id, el);
+                  else messageRefs.current.delete(msg.id);
+                }}
                 className={`flex ${
                   msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 <div
-                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-5 py-4 ${
+                  className={`max-w-[88%] sm:max-w-[80%] rounded-2xl px-4 py-3 sm:px-5 sm:py-4 ${
                     msg.role === "user"
                       ? "bg-[#E8721A] text-white"
                       : "bg-[#E8DFD0] text-[#2C3328] shadow-sm"
@@ -331,7 +382,7 @@ export default function ActingCoachPage() {
 
       {/* Fixed quick prompts (only on empty state) */}
       {isEmpty && (
-        <div className="flex justify-center pb-4">
+        <div className="flex justify-center px-4 pb-2 md:px-0 md:pb-4">
           <QuickPromptsDropdown onSelect={(text) => sendMessage(text, session?.linkedAuditionId || auditionId || undefined, null, { coachType: session?.coachType || "general" })} />
         </div>
       )}
@@ -353,4 +404,4 @@ export default function ActingCoachPage() {
       />
     </div>
   );
-}
+}
