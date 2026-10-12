@@ -71,9 +71,9 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
   const isError = state === "error";
 
   return (
-    <div className="rounded-2xl bg-card border border-border text-card-foreground p-5 shadow-sm">
+    <div className="rounded-2xl bg-card border border-border max-md:border-primary/40 text-card-foreground p-5 max-md:p-4 shadow-sm">
       {/* Header */}
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 max-md:mb-3 flex items-center gap-2">
         <Sparkles className="h-5 w-5 text-primary shrink-0" />
         <div>
           <h3 className="text-sm font-semibold text-foreground font-title">AI Autofill</h3>
@@ -92,7 +92,8 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://www.imdb.com/name/nm0000000/"
             disabled={isLoading || isSuccess}
-            className="w-full rounded-xl border border-border bg-input/50 px-3 py-2 text-sm text-foreground placeholder-muted-foreground transition-colors focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="IMDb profile URL"
+            className="w-full min-w-0 rounded-xl border border-border bg-input/50 px-3 py-2 max-md:min-h-11 max-md:text-base text-sm text-foreground placeholder-muted-foreground transition-colors focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
@@ -109,7 +110,7 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
           <button
             type="submit"
             disabled={isLoading || isSuccess || !url.trim()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm max-md:min-h-11 max-md:text-base max-md:shadow-md max-md:disabled:opacity-90 max-md:focus-visible:outline-none max-md:focus-visible:ring-2 max-md:focus-visible:ring-primary max-md:focus-visible:ring-offset-2"
           >
             {isLoading ? (
               <>
@@ -133,7 +134,7 @@ export function ImdbAutofill({ onSuccess }: ImdbAutofillProps) {
             <button
               type="button"
               onClick={handleRetry}
-              className="rounded-full border border-border bg-muted/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className="rounded-full border border-border bg-muted/60 px-4 py-2.5 max-md:min-h-11 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               Retry
             </button>

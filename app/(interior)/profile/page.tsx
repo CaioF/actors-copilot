@@ -381,17 +381,21 @@ const handleAutofillSuccess = useCallback((autofillData: Partial<ActorProfile>) 
             saveStatus={saveStatus}
           />
 
-          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mt-2 lg:mt-0">
+          <div className="flex flex-col lg:flex-row gap-4 md:gap-6 lg:gap-8 mt-2 lg:mt-0">
             {/* Left column: Form */}
             <div className="flex-1 min-w-0 order-2 lg:order-1">
               <ActorProfileForm onSave={saveProfile} saveStatus={saveStatus} />
             </div>
 
-            {/* Right column: Live Preview & Autofill */}
-            <div className="w-full lg:w-[280px] flex-shrink-0 order-1 lg:order-2">
-              <div className="space-y-4">
-                <ImdbAutofill onSuccess={handleAutofillSuccess} />
-                <ProfileLivePreview />
+            {/* Right column: Live Preview & Autofill. Below md the wrappers use `contents` so Autofill sits directly above the form and the preview drops below it. */}
+            <div className="w-full lg:w-[280px] flex-shrink-0 order-1 lg:order-2 max-md:contents">
+              <div className="md:space-y-4 max-md:contents">
+                <div className="max-md:order-1 min-w-0">
+                  <ImdbAutofill onSuccess={handleAutofillSuccess} />
+                </div>
+                <div className="max-md:order-3 min-w-0">
+                  <ProfileLivePreview />
+                </div>
               </div>
             </div>
           </div>
