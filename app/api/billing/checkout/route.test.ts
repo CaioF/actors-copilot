@@ -24,6 +24,7 @@ jest.mock('@/lib/firebase.admin', () => ({
 
 jest.mock('@/lib/billing', () => ({
     getStripePriceIdForTier: jest.fn(),
+    getStripeGreenRoomPriceId: jest.fn(),
 }));
 
 describe('Stripe Subscription Checkout Route Handler', () => {
@@ -179,6 +180,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 metadata: {
                     firebaseUid: mockUid,
                     platformUserId: mockUid,
+                    product: 'economy',
                     targetTier: 'economy',
                 },
             },
@@ -187,6 +189,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
             metadata: {
                 platformUserId: mockUid,
                 firebaseUid: mockUid,
+                product: 'economy',
                 targetTier: 'economy',
                 billingCycle: 'monthly',
                 isTrial: 'false',
@@ -239,6 +242,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 metadata: {
                     firebaseUid: mockUid,
                     platformUserId: mockUid,
+                    product: 'business',
                     targetTier: 'business',
                 },
                 trial_period_days: 14,
@@ -249,6 +253,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
             metadata: {
                 platformUserId: mockUid,
                 firebaseUid: mockUid,
+                product: 'business',
                 targetTier: 'business',
                 billingCycle: 'monthly',
                 isTrial: 'true',
@@ -275,6 +280,62 @@ describe('Stripe Subscription Checkout Route Handler', () => {
 
         expect(res.status).toBe(400);
         expect(data.error).toBe('A free trial has already been used for this account.');
+    });
+
+    it('creates a community-only Green Room session with no app tier and no free trial', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+        const { getStripeGreenRoomPriceId } = require('@/lib/billing');
+        (getStripeGreenRoomPriceId as jest.Mock).mockReturnValue('price_green_room_id_999');
+
+        const mockGet = jest.fn().mockResolvedValue({
+            exists: true,
+            data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled', hasUsedTrial: false }),
+        });
+        const mockSet = jest.fn().mockResolvedValue(true);
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet, set: mockSet });
+
+        (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/green_room_session' });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ product: 'green_room' }),
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(getStripeGreenRoomPriceId).toHaveBeenCalled();
+        expect(getStripePriceIdForTier).not.toHaveBeenCalled();
+        expect(data.url).toBe('https://checkout.stripe.com/pay/green_room_session');
+
+        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                line_items: [{ price: 'price_green_room_id_999', quantity: 1 }],
+                subscription_data: {
+                    metadata: {
+                        firebaseUid: mockUid,
+                        platformUserId: mockUid,
+                        product: 'green_room',
+                    },
+                },
+                metadata: {
+                    platformUserId: mockUid,
+                    firebaseUid: mockUid,
+                    product: 'green_room',
+                    billingCycle: 'monthly',
+                    isTrial: 'false',
+                },
+            })
+        );
+
+        // The community-only plan must never carry a Stripe trial or target an app tier.
+        const call = (stripe.checkout.sessions.create as jest.Mock).mock.calls[0][0];
+        expect(call.subscription_data.trial_period_days).toBeUndefined();
+        expect(call.payment_method_collection).toBeUndefined();
+        expect(call.subscription_data.metadata.targetTier).toBeUndefined();
+        expect(call.metadata.targetTier).toBeUndefined();
+        expect(call.mode).toBe('subscription');
     });
 
     it('authenticates via idToken fallback when platform session cookie is absent', async () => {

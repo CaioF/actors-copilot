@@ -7,6 +7,11 @@ import { stripe } from '@/lib/stripe';
 jest.mock('@/lib/billing', () => ({
   verifyStripeWebhookEvent: jest.fn(),
   mapStripePriceToTier: jest.fn((priceId) => (priceId === 'price_economy' ? 'economy' : 'free')),
+  mapStripePriceToCommunity: jest.fn((priceId) =>
+    priceId === 'price_economy' || priceId === 'price_business' || priceId === 'price_green_room'
+      ? 'green_room'
+      : 'none'
+  ),
 }));
 
 jest.mock('@/lib/stripe', () => ({

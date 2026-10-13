@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { stripe } from '@/lib/stripe';
 import { db, auth } from '@/lib/firebase.admin';
-import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
+import { BillingCycle, getStripePriceIdForTier, getStripeGreenRoomPriceId, SubscriptionTier } from '@/lib/billing';
 import { logger } from '@/lib/logger';
 
 /**
@@ -21,7 +21,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: 'Malformed JSON request body' }, { status: 400 });
         }
 
-        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string } = body;
+        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken, product }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string; product?: 'green_room' | 'economy' | 'business' } = body;
+
+        // Community-only purchase: grants the Skool Green Room and no app tier.
+        const isGreenRoomOnly = product === 'green_room';
 
         // 1. Enforce authentication via platform session cookie or Firebase ID Token fallback
         let uid: string | undefined;
@@ -49,14 +52,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const selectedTier: SubscriptionTier = (tier && tier !== 'trial') ? tier : 'business';
         const selectedBillingCycle: BillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
 
-        if (!selectedTier || (selectedTier !== 'economy' && selectedTier !== 'business')) {
+        if (!isGreenRoomOnly && selectedTier !== 'economy' && selectedTier !== 'business') {
             return NextResponse.json({ error: 'Invalid or unsupported subscription tier specified' }, { status: 400 });
         }
 
         // 2. Resolve the official Stripe Price ID corresponding to the requested tier
         let priceId: string;
         try {
-            priceId = getStripePriceIdForTier(selectedTier, selectedBillingCycle);
+            priceId = isGreenRoomOnly
+                ? getStripeGreenRoomPriceId()
+                : getStripePriceIdForTier(selectedTier, selectedBillingCycle);
         } catch (tierError) {
             return NextResponse.json({ error: (tierError as Error).message }, { status: 400 });
         }
@@ -92,8 +97,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: 'A free trial has already been used for this account.' }, { status: 400 });
         }
 
-        // All checkout sessions allow for 14 days of free trial unless the user has already used a trial
-        const isTrial = !hasUsedTrial;
+        // App tiers receive a 14-day free trial on the first checkout. The
+        // community-only Green Room plan never gets an app trial because it
+        // grants no app access.
+        const isTrial = !hasUsedTrial && !isGreenRoomOnly;
 
         // 4. Lazy-initialize Stripe Customer if no relationship mapping exists within the persistence layer
         if (!stripeCustomerId) {
@@ -134,7 +141,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 metadata: {
                     firebaseUid: uid,
                     platformUserId: uid,
-                    targetTier: selectedTier,
+                    product: isGreenRoomOnly ? 'green_room' : selectedTier,
+                    ...(isGreenRoomOnly ? {} : { targetTier: selectedTier }),
                 },
                 ...(isTrial ? { trial_period_days: 14 } : {}),
             },
@@ -144,7 +152,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             metadata: {
                 platformUserId: uid,
                 firebaseUid: uid,
-                targetTier: selectedTier,
+                product: isGreenRoomOnly ? 'green_room' : selectedTier,
+                ...(isGreenRoomOnly ? {} : { targetTier: selectedTier }),
                 billingCycle: selectedBillingCycle,
                 isTrial: isTrial ? 'true' : 'false',
             },

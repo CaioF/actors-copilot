@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
+import { verifyStripeWebhookEvent, mapStripePriceToTier, mapStripePriceToCommunity } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 import { stripe } from '@/lib/stripe';
@@ -153,6 +153,12 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
         userPayload.hasUsedTrial = data.hasUsedTrial;
     }
 
+    // Only mirror the community entitlement when the caller resolved it, so
+    // partial events (for example invoice.payment_*) never wipe it.
+    if (data.community !== undefined) {
+        userPayload.community = data.community;
+    }
+
     // Sync root user document so direct queries on the users collection have billing status
     await userRef.set(sanitizeFirestorePayload(userPayload), { merge: true });
 }
@@ -217,6 +223,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 }
 
                 const tier = session.metadata?.targetTier || (priceId ? mapStripePriceToTier(priceId) : 'free');
+                const community = priceId ? mapStripePriceToCommunity(priceId) : 'none';
                 const isMigrationFlow = session.metadata?.flow === 'subscriber_migration';
                 const isTrialSession = session.metadata?.isTrial === 'true' || subscriptionObj?.status === 'trialing';
                 const subStatus = subscriptionObj?.status || (isTrialSession ? 'trialing' : 'active');
@@ -227,6 +234,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     subscriptionId: subscriptionId || null,
                     priceId: priceId || null,
                     tier,
+                    community,
                     status: subStatus,
                     hasAccess,
                     hasUsedTrial: isTrialSession ? true : undefined,
@@ -259,6 +267,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 const firstItem = subscription.items.data[0];
                 const priceId = firstItem?.price?.id || null;
                 const tier = priceId ? mapStripePriceToTier(priceId) : 'free';
+                const community = priceId ? mapStripePriceToCommunity(priceId) : 'none';
                 const status = subscription.status;
                 const isDeleted = event.type === 'customer.subscription.deleted' || status === 'canceled' || status === 'unpaid';
                 const hasAccess = !isDeleted && ['trialing', 'active'].includes(status);
@@ -277,6 +286,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     subscriptionId: subscription.id,
                     priceId,
                     tier: isDeleted ? 'free' : tier,
+                    community: isDeleted ? 'none' : community,
                     status: isDeleted ? 'canceled' : status,
                     hasAccess,
                     hasUsedTrial: status === 'trialing' ? true : undefined,

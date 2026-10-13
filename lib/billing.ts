@@ -20,6 +20,18 @@ export type SubscriptionStatus =
 export type BillingCycle = 'monthly' | 'annual';
 
 /**
+ * Community access is modelled independently from the app tier.
+ *
+ * The Skool "The Actors Copilot Green Room" is a SINGLE membership:
+ * - it is included at no extra cost with Economy Class and Business Class;
+ * - it is also sold on its own (community-only, no app access).
+ *
+ * Therefore Economy and Business must never be represented as different
+ * levels of Skool access.
+ */
+export type CommunityEntitlement = 'none' | 'green_room';
+
+/**
  * Represents the structure of the billing document stored in Firestore 
  * at the path: `users/{uid}/billing/current` or mapped from user data.
  */
@@ -33,6 +45,8 @@ export interface UserBilling {
   currentPeriodEnd?: number; // Epoch timestamp in seconds
   cancelAtPeriodEnd?: boolean;
   hasAccess?: boolean;
+  /** Skool Green Room membership, independent from the app tier. */
+  community?: CommunityEntitlement;
   trialStart?: number | null;
   trialEnd?: number | null;
   hasUsedTrial?: boolean;
@@ -53,6 +67,12 @@ const economyPriceId = process.env.STRIPE_ECONOMY_PRICE_ID;
 const businessPriceId = process.env.STRIPE_BUSINESS_PRICE_ID;
 const economyAnnualPriceId = process.env.STRIPE_ECONOMY_ANNUAL_PRICE_ID;
 const businessAnnualPriceId = process.env.STRIPE_BUSINESS_ANNUAL_PRICE_ID;
+
+/**
+ * Community-only product (The Actors Copilot Green Room on Skool).
+ * Intentionally optional: existing deployments must keep booting without it.
+ */
+const greenRoomPriceId = process.env.STRIPE_GREEN_ROOM_PRICE_ID;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 if (!economyPriceId || !businessPriceId) {
@@ -104,6 +124,11 @@ export function getStripePriceIdForTier(tier: SubscriptionTier, billingCycle: Bi
 export function mapStripePriceToTier(priceId: string | undefined): SubscriptionTier {
   if (!priceId) return 'free';
 
+  // Community-only purchase: a valid product, but it never grants an app tier.
+  if (greenRoomPriceId && priceId === greenRoomPriceId) {
+    return 'free';
+  }
+
   switch (priceId) {
     case economyPriceId:
     case economyAnnualPriceId:
@@ -116,6 +141,66 @@ export function mapStripePriceToTier(priceId: string | undefined): SubscriptionT
       console.warn(`⚠️ Unmapped Stripe Price ID detected: ${priceId}. Defaulting to "free" tier.`);
       return 'free';
   }
+}
+
+/**
+ * Returns the Stripe Price ID of the community-only Green Room membership.
+ *
+ * @returns {string} The `price_...` ID for the Green Room product.
+ * @throws {Error} If `STRIPE_GREEN_ROOM_PRICE_ID` is not configured.
+ */
+export function getStripeGreenRoomPriceId(): string {
+  if (!greenRoomPriceId) {
+    throw new Error('Missing STRIPE_GREEN_ROOM_PRICE_ID for the Green Room membership.');
+  }
+  return greenRoomPriceId;
+}
+
+/**
+ * Maps a Stripe Price ID to the Skool Green Room entitlement.
+ *
+ * All paid plans include the SAME single Green Room membership at no extra
+ * cost, so the community-only price, Economy (monthly/annual) and Business
+ * (monthly/annual) all resolve to `green_room`.
+ *
+ * @param {string | undefined} priceId - The Stripe Price ID from the API or webhook.
+ * @returns {CommunityEntitlement} `green_room` when the price includes the community.
+ */
+export function mapStripePriceToCommunity(priceId: string | undefined): CommunityEntitlement {
+  if (!priceId) return 'none';
+
+  if (greenRoomPriceId && priceId === greenRoomPriceId) return 'green_room';
+
+  switch (priceId) {
+    case economyPriceId:
+    case economyAnnualPriceId:
+    case businessPriceId:
+    case businessAnnualPriceId:
+      return 'green_room';
+    default:
+      console.warn(`⚠️ Unmapped Stripe Price ID detected: ${priceId}. Defaulting community to "none".`);
+      return 'none';
+  }
+}
+
+/**
+ * Resolves both entitlements carried by a single Stripe Price.
+ *
+ * `appTier` gates the app features while `community` gates the Skool Green
+ * Room. A community-only purchase resolves to `appTier: 'free'` and
+ * `community: 'green_room'`.
+ *
+ * @param {string | undefined} priceId - The Stripe Price ID from the API or webhook.
+ * @returns {{ appTier: SubscriptionTier; community: CommunityEntitlement }} The resolved entitlements.
+ */
+export function resolveEntitlementsFromPrice(priceId: string | undefined): {
+  appTier: SubscriptionTier;
+  community: CommunityEntitlement;
+} {
+  return {
+    appTier: mapStripePriceToTier(priceId),
+    community: mapStripePriceToCommunity(priceId),
+  };
 }
 
 /**
