@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe';
 import { db, auth } from '@/lib/firebase.admin';
 import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
 import { logger } from '@/lib/logger';
+import { normalizeCurrency, type RequestedCurrency } from '@/lib/plan-selection';
 
 /**
  * POST /api/billing/checkout
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: 'Malformed JSON request body' }, { status: 400 });
         }
 
-        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string } = body;
+        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken, currency }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string; currency?: unknown } = body;
 
         // 1. Enforce authentication via platform session cookie or Firebase ID Token fallback
         let uid: string | undefined;
@@ -59,6 +60,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             priceId = getStripePriceIdForTier(selectedTier, selectedBillingCycle);
         } catch (tierError) {
             return NextResponse.json({ error: (tierError as Error).message }, { status: 400 });
+        }
+
+        // 2b. Only charge in a non-default currency when the Stripe Price is actually configured for it.
+        let checkoutCurrency: RequestedCurrency | undefined;
+        if (currency !== undefined && currency !== null) {
+            const requestedCurrency = normalizeCurrency(typeof currency === 'string' ? currency : null);
+            if (!requestedCurrency) {
+                return NextResponse.json({ error: 'Unsupported currency specified', code: 'currency_invalid' }, { status: 400 });
+            }
+
+            let availableCurrencies: RequestedCurrency[];
+            try {
+                const { getPriceCurrencies } = await import('@/lib/billing-currency');
+                availableCurrencies = await getPriceCurrencies(priceId);
+            } catch (currencyErr) {
+                logger.warn({ err: currencyErr, msg: 'Could not verify Stripe price currency support' });
+                return NextResponse.json({ error: 'Could not verify payment currency. Please try again.', code: 'currency_unverified' }, { status: 503 });
+            }
+
+            if (!availableCurrencies.includes(requestedCurrency)) {
+                return NextResponse.json({
+                    error: `${requestedCurrency.toUpperCase()} checkout is not yet available for this plan.`,
+                    code: 'currency_unavailable',
+                }, { status: 400 });
+            }
+            checkoutCurrency = requestedCurrency;
         }
 
         // 3. Fetch active customer billing configurations from Firestore to prevent duplicate client entities & check trial eligibility
@@ -124,6 +151,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             mode: 'subscription',
             allow_promotion_codes: true,
             billing_address_collection: 'required',
+            ...(checkoutCurrency ? { currency: checkoutCurrency } : {}),
             line_items: [
                 {
                     price: priceId,
