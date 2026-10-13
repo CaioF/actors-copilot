@@ -5,6 +5,7 @@ import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChang
 import { getApp } from "@/lib/firebase"; 
 import { logger } from '@/lib/logger';
 import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
+import { buildUpgradeUrl, readPlanSelection } from '@/lib/plan-selection';
 
 /**
  * Extends the default Firebase User to include modern Stripe billing context attributes.
@@ -105,6 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 } catch (err) {
                     logger.error({ err, msg: 'Failed to initiate trial checkout session post-auth' });
                 }
+            }
+
+            const requestedPlan = readPlanSelection();
+            if (!trialIntent && requestedPlan) {
+                window.location.href = buildUpgradeUrl(requestedPlan);
+                return;
             }
         }
         window.location.href = "/dashboard";

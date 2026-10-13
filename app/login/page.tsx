@@ -19,6 +19,7 @@ import { useState, useEffect, ReactNode, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
+import { buildUpgradeUrl, parsePlanSelection, readPlanSelection, savePlanSelection } from "@/lib/plan-selection";
 
 interface FirebaseError {
   code: string;
@@ -54,6 +55,16 @@ function LoginContent() {
   const trialParam = searchParams.get("trial");
   const planParam = searchParams.get("plan");
   const initialModeParam = searchParams.get("mode");
+  const currencyParam = searchParams.get("currency");
+  const requestedSelection = parsePlanSelection(planParam, currencyParam);
+  const requestedPlanKey = requestedSelection?.plan;
+  const requestedCurrencyKey = requestedSelection?.currency;
+
+  useEffect(() => {
+    if (requestedPlanKey && requestedCurrencyKey) {
+      savePlanSelection({ plan: requestedPlanKey, currency: requestedCurrencyKey });
+    }
+  }, [requestedPlanKey, requestedCurrencyKey]);
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [errorMsg, setErrorMsg] = useState("");
@@ -114,16 +125,17 @@ function LoginContent() {
         }).catch(() => {
           window.location.href = '/dashboard';
         });
-      } else if (planParam === "economy" || planParam === "business") {
-        window.location.href = "/upgrade";
+      } else if (requestedPlanKey && requestedCurrencyKey) {
+        window.location.href = buildUpgradeUrl({ plan: requestedPlanKey, currency: requestedCurrencyKey });
       }
     }
-  }, [user, loading, planParam]);
+  }, [user, loading, requestedPlanKey, requestedCurrencyKey]);
 
   const redirectAfterAuth = () => {
     const trialIntent = typeof window !== 'undefined' ? sessionStorage.getItem('trial_intent') : null;
-    if (!trialIntent && (planParam === "economy" || planParam === "business")) {
-      window.location.href = "/upgrade";
+    const selection = requestedSelection ?? readPlanSelection();
+    if (!trialIntent && selection) {
+      window.location.href = buildUpgradeUrl(selection);
     }
   };
 
