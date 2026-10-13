@@ -18,13 +18,22 @@ A comunidade **The Actors Copilot Green Room** (Skool) é **uma única membershi
 
 ### 2.1 Stripe (conta **The Actors Copilot**, modo **LIVE**)
 
-Product criado: **The Actors Copilot Green Room** (`prod_VQvghFBGjOICOX`), com logo aplicado.
+Product criado: **The Actors Copilot Green Room** (`prod_VQvghFBGjOICOX`), com logo aplicado e descrição em inglês. **6 preços** (3 moedas × mensal/anual) e **6 Payment Links**, todos em modo LIVE.
 
-| Moeda | Preço | Price ID | Payment Link |
-|---|---|---|---|
-| USD | US$ 9,00/mês | `price_1UQ9tLEnOTJRuCTXYblFkB0R` | <https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03> |
-| GBP | £9,00/mês | `price_1UQBj0EnOTJRuCTXkTIePIfS` | <https://buy.stripe.com/00waEX7HWeZ48k0gUWaZi04> |
-| EUR | €9,00/mês | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | <https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02> (⚠️ não divulgar) |
+Convenção do anual: `anual = 10 × mensal` (2 meses grátis), igual a Economy (€19→€190) e Business (€29→€290).
+
+| Ciclo | Moeda | Valor | Price ID | Payment Link |
+|---|---|---:|---|---|
+| Mensal | USD | US$ 9,00 | `price_1UQ9tLEnOTJRuCTXYblFkB0R` | <https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03> |
+| Anual | USD | US$ 90,00 | `price_1UQCEyEnOTJRuCTX44nKC5G8` | <https://buy.stripe.com/7sYcN56DS04a9o4bACaZi05> |
+| Mensal | GBP | £9,00 | `price_1UQBj0EnOTJRuCTXkTIePIfS` | <https://buy.stripe.com/00waEX7HWeZ48k0gUWaZi04> |
+| Anual | GBP | £90,00 | `price_1UQCF0EnOTJRuCTXI4SRYNyo` | <https://buy.stripe.com/cNiaEX0fu4kqeIo5ceaZi06> |
+| Mensal | EUR | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | <https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02> |
+| Anual | EUR | €90,00 | `price_1UQCF3EnOTJRuCTXHvewkOlR` | <https://buy.stripe.com/dRm7sL9Q418efMs346aZi07> |
+
+> Os 6 links foram verificados individualmente (HTTP 200). Os preços têm apelido (`nickname`) descritivo em inglês para aparecerem legíveis no Dashboard e no dropdown de preço do Zap/Make.
+
+> ⚠️ **Moeda:** o app hoje usa `RequestedCurrency = 'usd' | 'eur' | 'gbp'` (`lib/plan-selection.ts`), então as três moedas já estão previstas no lado da aplicação. Falta apenas garantir que o Green Room siga a mesma estratégia de moeda do resto do sistema (ver §4.7).
 
 ### 2.2 Código
 
@@ -100,6 +109,24 @@ A UI do app mostra `$19/$15/$29/$23`, mas a conta Stripe tem Economy `€19/€1
 - `firestore.rules` libera leitura/escrita para qualquer usuário autenticado.
 
 Detalhes: `02-regras-de-negocio.md` §11 e `05-integracao-stripe-skool-green-room.md` §7.
+
+### 4.7 🔴 Conflito com o PR #79 (multi-moeda) — decisão pendente
+
+O `main` recebeu o **PR #79 — "Preserve requested plan and currency through signup to plan selection"** (agente v0/Vercel), que implementou **multi-moeda** com uma abordagem **diferente** da usada nesta branch:
+
+| | PR #79 (main) | Esta branch |
+|---|---|---|
+| Moedas | `currency_options` no **mesmo Price** | **3 Prices separados** por moeda |
+| Validação | `getPriceCurrencies()` consulta a API do Stripe | Price ID fixo por moeda |
+| Escopo | `RequestedPlan = 'economy' \| 'business'` | inclui `green_room` |
+
+**Há conflito real** em `app/api/billing/checkout/route.ts` (confirmado com `git merge-tree`). É na linha do destructuring: nós adicionamos `product`, o PR adicionou `currency` — dá para manter os dois.
+
+**Ponto crítico:** o modelo do PR #79 **não conhece o Green Room** (`RequestedPlan` só tem `economy` e `business`). As duas abordagens de moeda coexistem hoje, mas precisam ser reconciliadas.
+
+**Decisão necessária:** manter os 3 Prices separados (como está nos Payment Links, que já funcionam) **ou** migrar o Green Room para `currency_options`, ficando consistente com Economy/Business. Nada foi resolvido — o conflito segue aberto de propósito.
+
+Novos arquivos vindos do `main`: `lib/billing-currency.ts`, `lib/plan-selection.ts`, `app/api/billing/currencies/route.ts`.
 
 ---
 

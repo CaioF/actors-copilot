@@ -83,56 +83,67 @@ Fonte: `app/api/webhooks/stripe/route.ts:179-315`.
 
 Ele sincroniza o entitlement do app em `users/{uid}/billing/current` e `users/{uid}`.
 
-### 2.2 Inventário real da conta Stripe (consulta MCP, somente leitura)
+### 2.2 Inventário real da conta Stripe
 
-Consulta executada na conta Stripe **The Actors Copilot**, após habilitar o conector Stripe via Zapier MCP. Resultado após a criação do Green Room: **3 Products ativos** e **7 Prices recorrentes ativos**.
+Consulta executada na conta Stripe **The Actors Copilot**. Resultado após a criação do Green Room completo: **3 Products ativos** e **10 Prices recorrentes ativos**.
+
+**The Actors Copilot Green Room** (`prod_VQvghFBGjOICOX`) — 6 preços, 3 moedas × 2 ciclos:
+
+| Ciclo | Moeda | Valor | Price ID | Apelido (nickname) |
+|---|---|---:|---|---|
+| Mensal | USD | US$ 9,00 | `price_1UQ9tLEnOTJRuCTXYblFkB0R` | Green Room - Monthly - USD 9 |
+| Anual | USD | US$ 90,00 | `price_1UQCEyEnOTJRuCTX44nKC5G8` | Green Room - Annual - USD 90 |
+| Mensal | GBP | £9,00 | `price_1UQBj0EnOTJRuCTXkTIePIfS` | Green Room - Monthly - GBP 9 |
+| Anual | GBP | £90,00 | `price_1UQCF0EnOTJRuCTXI4SRYNyo` | Green Room - Annual - GBP 90 |
+| Mensal | EUR | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | Green Room - Monthly - EUR 9 |
+| Anual | EUR | €90,00 | `price_1UQCF3EnOTJRuCTXHvewkOlR` | Green Room - Annual - EUR 90 |
+
+**Convenção do valor anual:** `anual = 10 × mensal` (2 meses grátis). Essa é a mesma regra já usada nos planos existentes — Economy €19→€190 e Business €29→€290. Por isso Green Room anual = US$90 / £90 / €90.
+
+**Produtos existentes (para referência):**
 
 | Product | Product ID | Price | Price ID | Cobrança |
 |---|---|---:|---|---|
-| The Actors Copilot Green Room | `prod_VQvghFBGjOICOX` | **US$ 9,00** | `price_1UQ9tLEnOTJRuCTXYblFkB0R` | mensal |
-| The Actors Copilot Green Room | `prod_VQvghFBGjOICOX` | **£9,00** | `price_1UQBj0EnOTJRuCTXkTIePIfS` | mensal |
-| The Actors Copilot Green Room | `prod_VQvghFBGjOICOX` | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | mensal |
 | The Actors Copilot Economy Class | `prod_Uu0uIaw9yLDSke` | €19,00 | `price_1TuCshEnOTJRuCTXl1SD2vMr` | mensal |
 | The Actors Copilot Economy Class | `prod_Uu0uIaw9yLDSke` | €190,00 | `price_1TwOUREnOTJRuCTXdUqc9fyK` | anual |
 | The Actors Copilot Business Class | `prod_Uu0uuFpzXE5YiE` | €29,00 | `price_1TuCsvEnOTJRuCTXbaAzTSbO` | mensal |
 | The Actors Copilot Business Class | `prod_Uu0uuFpzXE5YiE` | €290,00 | `price_1TwO6vEnOTJRuCTXl4ilzwrn` | anual |
 
-> ⚠️ O Green Room hoje tem **três preços** ativos no mesmo Product: **USD** e **GBP** (com link de venda) e **EUR** (criado antes, sem link em uso). Recomenda-se desativar o EUR para evitar cobrança na moeda errada.
+**Descrição do Product (inglês, exibida ao comprador no Checkout):**
 
-**Imagem do Product:** `https://www.theactorscopilot.com/logo.png` — aplicada em `images[0]` (mesma arte de `public/logo.png` do repositório, confirmada servindo `image/png` 200).
+> Membership for The Actors Copilot Green Room on Skool. Community access only - no Economy or Business Class access in the app. Cancel anytime.
+
+**Imagem do Product:** `https://www.theactorscopilot.com/logo.png` — aplicada em `images[0]`, a mesma em todos os links (mesma arte de `public/logo.png` do repositório, confirmada servindo `image/png` 200).
 
 **Links diretos no Stripe Dashboard:**
 
 - Product Green Room: <https://dashboard.stripe.com/products/prod_VQvghFBGjOICOX>
-- Price Green Room **US$ 9/mês**: <https://dashboard.stripe.com/prices/price_1UQ9tLEnOTJRuCTXYblFkB0R>
-- Price Green Room **£9/mês**: <https://dashboard.stripe.com/prices/price_1UQBj0EnOTJRuCTXkTIePIfS>
-- Price Green Room €9/mês (sem link em uso): <https://dashboard.stripe.com/prices/price_1UQ4X6EnOTJRuCTXoH6zHvtI>
-- Payment Link **USD**: <https://dashboard.stripe.com/payment-links/plink_1UQ9tVEnOTJRuCTXDmWZVBvW>
-- Payment Link **GBP**: <https://dashboard.stripe.com/payment-links/plink_1UQBj6EnOTJRuCTXohl1r4t2>
-- Payment Link EUR (antigo): <https://dashboard.stripe.com/payment-links/plink_1UQ9PkEnOTJRuCTXfyacvjPy>
+- Lista de preços do Product: <https://dashboard.stripe.com/prices?product=prod_VQvghFBGjOICOX>
+- Lista de Payment Links: <https://dashboard.stripe.com/payment-links>
 - Lista de produtos: <https://dashboard.stripe.com/products>
 
-### 2.2.1 Links de venda por moeda (Caminho A — escolhido)
+### 2.2.1 Os 6 links de venda (Caminho A — escolhido)
 
-Todos criados em **modo LIVE** e verificados (HTTP 200, abrem o Stripe Checkout):
+Todos criados em **modo LIVE** e verificados individualmente (**HTTP 200**, abrem o Stripe Checkout).
 
-| Moeda | Link de pagamento | Payment Link ID | Price ID |
-|---|---|---|---|
-| 🇺🇸 **USD** | <https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03> | `plink_1UQ9tVEnOTJRuCTXDmWZVBvW` | `price_1UQ9tLEnOTJRuCTXYblFkB0R` |
-| 🇬🇧 **GBP** | <https://buy.stripe.com/00waEX7HWeZ48k0gUWaZi04> | `plink_1UQBj6EnOTJRuCTXohl1r4t2` | `price_1UQBj0EnOTJRuCTXkTIePIfS` |
-| 🇪🇺 EUR (não divulgar) | <https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02> | `plink_1UQ9PkEnOTJRuCTXfyacvjPy` | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` |
+| Ciclo | Moeda | Valor | Link de pagamento | Payment Link ID |
+|---|---|---:|---|---|
+| **Mensal** | 🇺🇸 USD | US$ 9,00 | <https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03> | `plink_1UQ9tVEnOTJRuCTXDmWZVBvW` |
+| **Anual** | 🇺🇸 USD | US$ 90,00 | <https://buy.stripe.com/7sYcN56DS04a9o4bACaZi05> | `plink_1UQCFrEnOTJRuCTX1L9cN0pJ` |
+| **Mensal** | 🇬🇧 GBP | £9,00 | <https://buy.stripe.com/00waEX7HWeZ48k0gUWaZi04> | `plink_1UQBj6EnOTJRuCTXohl1r4t2` |
+| **Anual** | 🇬🇧 GBP | £90,00 | <https://buy.stripe.com/cNiaEX0fu4kqeIo5ceaZi06> | `plink_1UQCFxEnOTJRuCTXK1vej4fu` |
+| **Mensal** | 🇪🇺 EUR | €9,00 | <https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02> | `plink_1UQ9PkEnOTJRuCTXfyacvjPy` |
+| **Anual** | 🇪🇺 EUR | €90,00 | <https://buy.stripe.com/dRm7sL9Q418efMs346aZi07> | `plink_1UQCFzEnOTJRuCTXENKvv7gI` |
 
-**Comum a todos:** cupons promocionais habilitados (`allow_promotion_codes: true`), `payment_method_collection: always`, metadata `product_role: green_room_only`, `app_access: none`, `community: the_actors_copilot_green_room`. Os links GBP/USD também carregam `currency_market`.
+**Comum a todos:** cupons promocionais habilitados (`allow_promotion_codes: true`), `payment_method_collection: always`, `invoice_creation: false` (obrigatório em preço recorrente), metadata `product_role: green_room_only`, `app_access: none`, `community: the_actors_copilot_green_room`. Os links também carregam `currency_market` e `billing_cycle`.
 
-**Link oficial (USD)** — detalhamento:
+**Observação sobre a moeda EUR:** os três preços em EUR continuam ativos e agora **têm** link. Mantenha todos ou desative os que não forem usados comercialmente — os links EUR só devem ser divulgados se a venda em euro for intencional.
 
-```text
-https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03
-```
+**Detalhamento de um link (modelo — todos os 6 seguem o mesmo formato):**
 
 | Propriedade | Valor |
 |---|---|
-| ID | `plink_1UQ9tVEnOTJRuCTXDmWZVBvW` |
+| ID | `plink_1UQ9tVEnOTJRuCTXDmWZVBvW` (USD mensal) |
 | Produto / preço | The Actors Copilot Green Room · **US$ 9,00/mês** |
 | Price ID | `price_1UQ9tLEnOTJRuCTXYblFkB0R` |
 | Moeda | **USD** (`currency: "usd"`) |
@@ -140,17 +151,6 @@ https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03
 | Cupons promocionais | ✅ habilitado (`allow_promotion_codes: true`) |
 | Cobrança de método de pagamento | `always` |
 | Metadata | `product_role: green_room_only`, `app_access: none`, `community: the_actors_copilot_green_room` |
-
-<details>
-<summary>Link EUR anterior (criado por engano antes da definição de moeda)</summary>
-
-```text
-https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02
-```
-
-ID `plink_1UQ9PkEnOTJRuCTXfyacvjPy` · €9,00/mês · `price_1UQ4X6EnOTJRuCTXoH6zHvtI`. **Não divulgar** — usar apenas o link USD.
-
-</details>
 
 **Consequências de usar o Payment Link (importante):**
 
@@ -620,5 +620,8 @@ Se isso for necessário no futuro, o caminho realista é **usar a mesma abordage
 |---|---|---|
 | Economy | `price_1TuCshEnOTJRuCTXl1SD2vMr` (€19/mês) | `price_1TwOUREnOTJRuCTXdUqc9fyK` (€190/ano) |
 | Business | `price_1TuCsvEnOTJRuCTXbaAzTSbO` (€29/mês) | `price_1TwO6vEnOTJRuCTXl4ilzwrn` (€290/ano) |
-| Green Room Only (**oficial**) | `price_1UQ9tLEnOTJRuCTXYblFkB0R` (**US$ 9/mês**, LIVE) | opcional / a decidir |
-| Green Room Only (EUR, sem uso) | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` (€9/mês) | opcional / a decidir |
+| Green Room USD | `price_1UQ9tLEnOTJRuCTXYblFkB0R` (US$ 9/mês) | `price_1UQCEyEnOTJRuCTX44nKC5G8` (US$ 90/ano) |
+| Green Room GBP | `price_1UQBj0EnOTJRuCTXkTIePIfS` (£9/mês) | `price_1UQCF0EnOTJRuCTXI4SRYNyo` (£90/ano) |
+| Green Room EUR | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` (€9/mês) | `price_1UQCF3EnOTJRuCTXHvewkOlR` (€90/ano) |
+
+Todos os 6 preços do Green Room estão ativos, com apelido descritivo e link de venda próprio (ver §2.2.1).
