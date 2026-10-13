@@ -70,9 +70,17 @@ Fonte: `app/api/billing/checkout/route.ts` → `...(isTrial ? { trial_period_day
 
 O convite é responsabilidade do **Zap**. O app **não** chama o Skool em lugar nenhum. Se o Zap falhar, o cliente paga e não recebe convite.
 
-### 4.3 Zapier bloqueado no plano gratuito
+### 4.3 Zapier bloqueado no plano gratuito — **existe alternativa grátis**
 
-O fluxo tem mais de uma etapa (pagamento → filtro → convite). O plano free só permite automação de **um passo**. Para publicar, é necessário **Zapier Pro** (há teste de 14 dias).
+O fluxo tem mais de uma etapa (pagamento → filtro → convite). O plano free do Zapier só permite automação de **um passo**, então publicar exige **Zapier Pro**.
+
+**Alternativa pesquisada e recomendada: Make.com.**
+
+O app **skool** no Make tem exatamente um módulo — **`Invite a New Member`** — e funciona **já no plano gratuito** (2 cenários ativos, intervalo mínimo de 15 min). O Skool não tem trigger no Make, então o cenário precisa começar por webhook.
+
+Arquitetura sugerida: o **nosso** webhook do Stripe decide (idempotência, `trialing` vs `active`, e-mail correto) e chama o webhook do Make, que só executa o convite. Isso tira a decisão do filtro visual do Zap — que foi exatamente o que quebrou no trial (ver 4.1).
+
+**Contexto importante:** o Skool **não tem API oficial**. A API não oficial (Apify) cobre `approve`/`reject`/`ban`/`remove`, mas **não tem invite** — não serve para este fluxo. Detalhes e comparação completa em `05-integracao-stripe-skool-green-room.md` §9.
 
 ### 4.4 Preço EUR sobrando
 

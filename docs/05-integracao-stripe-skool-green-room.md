@@ -527,9 +527,81 @@ Para a primeira versão, **não** recomendo integrar o app diretamente à API n�
 5. **Manter o app separado do Zap na primeira fase:** o Zap entrega a comunidade; o webhook existente continua entregando Economy/Business ao app.
 6. **Só depois** adicionar o caminho Skool → app para upgrades vendidos no Skool, porque o trigger atual `New Paid Member` não informa Price/Offer/Tier.
 
-### Quando fazer sem Zapier?
+### Viabilidade de convite sem Zapier (pesquisa concluída)
 
-Só vale implementar o convite diretamente no Next.js se houver uma **API Skool oficial e estável**, com credenciais server-side, endpoint de convite e mecanismo de revogação/retry documentado. Isso reduziria uma ferramenta externa, mas hoje aumenta o risco: a integração pronta e autenticada que temos é a do Zapier.
+**Resposta curta:** sim, é viável — mas **não** através de uma API do Skool. O Skool **não tem API oficial**, e a API não oficial que existe **não sabe convidar**. A alternativa real é o **Make.com**, que tem exatamente o módulo de convite e funciona **já no plano gratuito**.
+
+#### O que existe hoje
+
+| Caminho | Convida? | Custo | Observações |
+|---|---|---|---|
+| **Zapier** (atual) | ✅ `Invite Member` | **Pro** (pago) | Bloqueado no free por ser fluxo multi-etapa |
+| **Make.com** | ✅ **`Invite a New Member`** | ✅ **Free plan** | Só 1 módulo, **sem trigger** — precisa começar por outro app |
+| **API oficial do Skool** | ❌ | — | **Não existe** |
+| **API não oficial (Apify)** | ❌ | ~US$1,50/mês | Tem `approve`/`reject`/`ban`/`remove`, **não tem invite** |
+| **Nosso backend (Next.js)** | ⚠️ | — | Só é possível reimplementando o endpoint de convite do Skool por engenharia reversa |
+| **Convite manual** | ✅ | Grátis | Não escala |
+
+#### Por que a API não oficial não resolve
+
+O actor `Skool All-in-One API` (Apify) cobre o ciclo de vida do **membro já existente**:
+
+```
+members:list      → membros ativos
+members:pending   → quem está na fila de aprovação
+members:approve   → aprovar quem já se candidatou
+members:reject    → rejeitar
+members:remove    → remover do grupo
+members:ban       → banir
+members:batchApprove
+members:export    → CSV de membros
+```
+
+Não há `members:invite`. Ele **aprova quem já pediu para entrar** — não envia convite para quem nunca entrou. Para o nosso fluxo (pagou no Stripe → precisa entrar sem pagar de novo no Skool), isso não serve.
+
+#### Make.com é a alternativa recomendada
+
+O app **skool** no Make tem **um único módulo**, e é justamente o que precisamos:
+
+> **Invite a New Member** — "Invites a new member into your group." Envia o convite por e-mail, então a pessoa entra na comunidade sem passar pelo admin.
+
+| Fato | Detalhe |
+|---|---|
+| Plano necessário | ✅ **Free plan** — "skool is a standard app in Make, so you can use it from the Free plan" |
+| Limites do free | 2 cenários ativos, intervalo mínimo de 15 min, 5 min por execução |
+| Trigger do Skool | ❌ **Nenhum** — o cenário precisa começar por outro app ou por webhook |
+| Outros módulos | ❌ Só esse. Não há remoção de membro nem leitura |
+| Operações | 1 operação por execução do módulo |
+
+**Arquitetura recomendada (sem Zapier e sem mensalidade):**
+
+```text
+Stripe (pagamento aprovado)
+   → webhook do NOSSO app (/api/webhooks/stripe)
+   → nossa lógica decide se deve convidar (idempotência + filtro de status)
+   → HTTP POST para o webhook do Make
+   → Make: skool "Invite a New Member"
+   → convite enviado
+```
+
+Vantagens sobre o Zapier:
+
+- **Custo zero** no plano free do Make (o Zapier exige Pro).
+- **A decisão fica no nosso código**: idempotência, status `trialing`/`active`, qual e-mail usar.
+- Sem depender de filtro visual frágil — foi justamente o filtro `active` do Zap que quebrou o fluxo no trial.
+- O Make fica responsável **apenas** pelo último passo, que é o único que ele faz bem.
+
+⚠️ Limitações a considerar: o Make free limita a **2 cenários ativos** e impõe **15 minutos** de intervalo se o gatilho for agendado. No desenho acima o gatilho é um **webhook** (instantâneo), então o intervalo não se aplica ao caso principal.
+
+#### E se quisermos convidar direto do Next.js, sem Make?
+
+Só é viável reimplementando por engenharia reversa o endpoint de convite que o próprio Skool usa. **Não recomendado** como primeira opção:
+
+- Não existe documentação oficial e o contrato pode mudar a qualquer momento.
+- Exige manter cookies de sessão de admin e um token de WAF que **rotaciona a cada ~3,5 dias**.
+- É o tipo de integração que quebra silenciosamente num deploy do Skool.
+
+Se isso for necessário no futuro, o caminho realista é **usar a mesma abordagem do actor da Apify**: autenticar como admin, manter cookies e tratar WAF/buildId. É trabalho contínuo de manutenção, não uma integração de uma vez.
 
 ### O que o código já permite / não permite
 
