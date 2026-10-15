@@ -20,20 +20,33 @@ A comunidade **The Actors Copilot Green Room** (Skool) é **uma única membershi
 
 Product criado: **The Actors Copilot Green Room** (`prod_VQvghFBGjOICOX`), com logo aplicado e descrição em inglês. **6 preços** (3 moedas × mensal/anual) e **6 Payment Links**, todos em modo LIVE.
 
-Convenção do anual: `anual = 10 × mensal` (2 meses grátis), igual a Economy (€19→€190) e Business (€29→€290).
+Convenção do anual: `anual = 10 × mensal` (2 meses grátis). Valores conforme a tabela **aprovada pela Tracey**.
+
+**Tabela atual (após a correção de 15/10/2026):**
 
 | Ciclo | Moeda | Valor | Price ID | Payment Link |
 |---|---|---:|---|---|
 | Mensal | USD | US$ 9,00 | `price_1UQ9tLEnOTJRuCTXYblFkB0R` | <https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03> |
 | Anual | USD | US$ 90,00 | `price_1UQCEyEnOTJRuCTX44nKC5G8` | <https://buy.stripe.com/7sYcN56DS04a9o4bACaZi05> |
-| Mensal | GBP | £9,00 | `price_1UQBj0EnOTJRuCTXkTIePIfS` | <https://buy.stripe.com/00waEX7HWeZ48k0gUWaZi04> |
-| Anual | GBP | £90,00 | `price_1UQCF0EnOTJRuCTXI4SRYNyo` | <https://buy.stripe.com/cNiaEX0fu4kqeIo5ceaZi06> |
-| Mensal | EUR | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | <https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02> |
-| Anual | EUR | €90,00 | `price_1UQCF3EnOTJRuCTXHvewkOlR` | <https://buy.stripe.com/dRm7sL9Q418efMs346aZi07> |
+| Mensal | GBP | **£7,00** | `price_1UQsxMEnOTJRuCTXt6ub7m9h` | <https://buy.stripe.com/5kQ7sL2nCeZ47fWawyaZi08> |
+| Anual | GBP | **£70,00** | `price_1UQsxTEnOTJRuCTXoD11VS1a` | <https://buy.stripe.com/4gM9ATaU8cQW43K6giaZi09> |
+| Mensal | EUR | **€8,00** | `price_1UQsxZEnOTJRuCTXnTW0Q09z` | <https://buy.stripe.com/7sYcN59Q45ougQwdIKaZi0a> |
+| Anual | EUR | **€80,00** | `price_1UQsxcEnOTJRuCTX8Z4HOFBd` | <https://buy.stripe.com/14AaEXd2g4kq57O8oqaZi0b> |
 
-> Os 6 links foram verificados individualmente (HTTP 200). Os preços têm apelido (`nickname`) descritivo em inglês para aparecerem legíveis no Dashboard e no dropdown de preço do Zap/Make.
+> Os 6 links foram verificados individualmente. Os preços têm apelido (`nickname`) descritivo em inglês para aparecerem legíveis no Dashboard e no dropdown de preço do Zap/Make.
 
-> ⚠️ **Moeda:** o app hoje usa `RequestedCurrency = 'usd' | 'eur' | 'gbp'` (`lib/plan-selection.ts`), então as três moedas já estão previstas no lado da aplicação. Falta apenas garantir que o Green Room siga a mesma estratégia de moeda do resto do sistema (ver §4.7).
+**Preços e links substituídos (15/10/2026).** Criados com o valor do dólar repetido (`£9/£90`, `€9/€90`) em vez dos valores locais aprovados. O `unit_amount` de um Price é imutável, por isso foram **recriados**, não editados. Os antigos estão **inativos** — reativáveis a qualquer momento pelo Dashboard:
+
+| Ciclo | Moeda | Valor antigo | Price ID (inativo) | Payment Link (inativo) |
+|---|---|---:|---|---|
+| Mensal | GBP | £9,00 | `price_1UQBj0EnOTJRuCTXkTIePIfS` | `plink_1UQBj6EnOTJRuCTXohl1r4t2` |
+| Anual | GBP | £90,00 | `price_1UQCF0EnOTJRuCTXI4SRYNyo` | `plink_1UQCFxEnOTJRuCTXK1vej4fu` |
+| Mensal | EUR | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | `plink_1UQ9PkEnOTJRuCTXfyacvjPy` |
+| Anual | EUR | €90,00 | `price_1UQCF3EnOTJRuCTXHvewkOLR` | `plink_1UQCFzEnOTJRuCTXENKvv7gI` |
+
+> Os links inativos mostram a mensagem "This link has been replaced…" com o endereço do link novo. Os links USD não foram tocados.
+
+> ⚠️ **Moeda:** o app **não** tem `lib/plan-selection.ts` nesta branch — o seletor de moeda do PR #79 não está aqui. Hoje o `/api/billing/checkout` escolhe o Price só por `tier` + `billingCycle` (`getStripePriceIdForTier`), ou seja, a moeda é sempre a **moeda base do Price**. Isso é aceitável para o Green Room (que tem um Price por moeda e é vendido por Payment Link), mas é o bloqueio para Economy/Business em multi-moeda — ver §4.7 e o doc 08.
 
 ### 2.2 Código
 

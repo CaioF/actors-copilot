@@ -87,27 +87,53 @@ Ele sincroniza o entitlement do app em `users/{uid}/billing/current` e `users/{u
 
 Consulta executada na conta Stripe **The Actors Copilot**. Resultado após a criação do Green Room completo: **3 Products ativos** e **10 Prices recorrentes ativos**.
 
-**The Actors Copilot Green Room** (`prod_VQvghFBGjOICOX`) — 6 preços, 3 moedas × 2 ciclos:
+**The Actors Copilot Green Room** (`prod_VQvghFBGjOICOX`) — 6 preços, 3 moedas × 2 ciclos (**valores corrigidos em 15/10/2026**):
 
 | Ciclo | Moeda | Valor | Price ID | Apelido (nickname) |
 |---|---|---:|---|---|
 | Mensal | USD | US$ 9,00 | `price_1UQ9tLEnOTJRuCTXYblFkB0R` | Green Room - Monthly - USD 9 |
 | Anual | USD | US$ 90,00 | `price_1UQCEyEnOTJRuCTX44nKC5G8` | Green Room - Annual - USD 90 |
-| Mensal | GBP | £9,00 | `price_1UQBj0EnOTJRuCTXkTIePIfS` | Green Room - Monthly - GBP 9 |
-| Anual | GBP | £90,00 | `price_1UQCF0EnOTJRuCTXI4SRYNyo` | Green Room - Annual - GBP 90 |
-| Mensal | EUR | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | Green Room - Monthly - EUR 9 |
-| Anual | EUR | €90,00 | `price_1UQCF3EnOTJRuCTXHvewkOlR` | Green Room - Annual - EUR 90 |
+| Mensal | GBP | **£7,00** | `price_1UQsxMEnOTJRuCTXt6ub7m9h` | Green Room - Monthly - GBP 7 |
+| Anual | GBP | **£70,00** | `price_1UQsxTEnOTJRuCTXoD11VS1a` | Green Room - Annual - GBP 70 |
+| Mensal | EUR | **€8,00** | `price_1UQsxZEnOTJRuCTXnTW0Q09z` | Green Room - Monthly - EUR 8 |
+| Anual | EUR | **€80,00** | `price_1UQsxcEnOTJRuCTX8Z4HOFBd` | Green Room - Annual - EUR 80 |
 
-**Convenção do valor anual:** `anual = 10 × mensal` (2 meses grátis). Essa é a mesma regra já usada nos planos existentes — Economy €19→€190 e Business €29→€290. Por isso Green Room anual = US$90 / £90 / €90.
+**Convenção do valor anual:** `anual = 10 × mensal` (2 meses grátis ≈ **16,7%** de desconto). Atenção: o rótulo da UI do app dizia "-20%", o que está errado — ver doc 08 §2.4.
 
-**Produtos existentes (para referência):**
+**Histórico da correção (15/10/2026):** os preços GBP e EUR foram criados com o valor do dólar repetido (`£9/£90`, `€9/€90`) em vez dos valores locais aprovados pela Tracey (`£7/£70`, `€8/€80`). Como o `unit_amount` de um Price é imutável, os quatro foram **recriados** e os antigos **desativados** (`active: false`), junto com os respectivos Payment Links:
 
-| Product | Product ID | Price | Price ID | Cobrança |
+| Ciclo | Moeda | Valor antigo | Price ID (inativo) | Payment Link (inativo) |
 |---|---|---:|---|---|
-| The Actors Copilot Economy Class | `prod_Uu0uIaw9yLDSke` | €19,00 | `price_1TuCshEnOTJRuCTXl1SD2vMr` | mensal |
-| The Actors Copilot Economy Class | `prod_Uu0uIaw9yLDSke` | €190,00 | `price_1TwOUREnOTJRuCTXdUqc9fyK` | anual |
-| The Actors Copilot Business Class | `prod_Uu0uuFpzXE5YiE` | €29,00 | `price_1TuCsvEnOTJRuCTXbaAzTSbO` | mensal |
-| The Actors Copilot Business Class | `prod_Uu0uuFpzXE5YiE` | €290,00 | `price_1TwO6vEnOTJRuCTXl4ilzwrn` | anual |
+| Mensal | GBP | £9,00 | `price_1UQBj0EnOTJRuCTXkTIePIfS` | `plink_1UQBj6EnOTJRuCTXohl1r4t2` |
+| Anual | GBP | £90,00 | `price_1UQCF0EnOTJRuCTXI4SRYNyo` | `plink_1UQCFxEnOTJRuCTXK1vej4fu` |
+| Mensal | EUR | €9,00 | `price_1UQ4X6EnOTJRuCTXoH6zHvtI` | `plink_1UQ9PkEnOTJRuCTXfyacvjPy` |
+| Anual | EUR | €90,00 | `price_1UQCF3EnOTJRuCTXHvewkOlR` | `plink_1UQCFzEnOTJRuCTXENKvv7gI` |
+
+Nada foi apagado: a reativação é uma flag `active: true`. Os links inativos exibem "This link has been replaced…" com o endereço do novo. Os preços e links **USD não foram tocados**. As assinaturas já existentes nesses preços continuam válidas (o Stripe mantém o preço contratado).
+
+**Produtos existentes** (multi-moeda aplicado em 15/10/2026 — ver nota abaixo):
+
+| Product | Product ID | Price ID | EUR (base) | GBP | USD | Cobrança |
+|---|---|---|---:|---:|---:|---|
+| Economy Class | `prod_Uu0uIaw9yLDSke` | `price_1TuCshEnOTJRuCTXl1SD2vMr` | €19,00 | £14,00 | $19,00 | mensal |
+| Economy Class | `prod_Uu0uIaw9yLDSke` | `price_1TwOUREnOTJRuCTXdUqc9fyK` | €190,00 | £140,00 | $190,00 | anual |
+| Business Class | `prod_Uu0uuFpzXE5YiE` | `price_1TuCsvEnOTJRuCTXbaAzTSbO` | €29,00 | £22,00 | $29,00 | mensal |
+| Business Class | `prod_Uu0uuFpzXE5YiE` | `price_1TwO6vEnOTJRuCTXl4ilzwrn` | €290,00 | £220,00 | $290,00 | anual |
+
+**Multi-moeda (15/10/2026).** Os quatro Prices ganharam `currency_options` com GBP e USD sobre a mesma Price (a moeda base continua **EUR**). Efeito: **os Price IDs não mudam**, logo não há alteração de env vars, código ou deploy — o `/api/billing/checkout` continua usando exatamente os mesmos IDs. Verificado com `expand[]=currency_options`.
+
+> ✅ **Decisão registrada:** o modelo de moeda do sistema é **`currency_options` (um Price por plano/ciclo com várias moedas)**, e não um Price por moeda. É o mesmo modelo do PR #79 e o único que não exige mudança de código no checkout.
+
+> 🟡 **Desvio consciente da tabela do board paper.** O paper propõe €17/€170 (Economy) e €26/€260 (Business). Optámos por **manter o EUR atual** (€19/€190 e €29/€290) e acrescentar apenas GBP e USD, para não reduzir o preço europeu que já está no ar sem confirmação explícita da Tracey. Se ela confirmar os valores do paper, é preciso **recriar** os quatro Prices (o `unit_amount` da moeda base é imutável) e voltar a apontar as env vars — trabalho maior, já que muda os IDs.
+>
+> Consequência a alinhar com ela: o USD fica com o mesmo número do EUR ($19/€19), o que é intencional na tabela aprovada, mas o GBP (£14/£22) é proporcionalmente mais barato.
+
+> 🔴 **PENDENTE (ação manual no Dashboard) — link que assina Economy *e* Business juntos.**
+> `plink_1UFJuNEnOTJRuCTXYZRUn4yl` → <https://buy.stripe.com/3cI14n6DSaIO7fWgUWaZi01>
+> Tem **dois line items** (Economy €19/mês **+** Business €29/mês = **€48/mês**) com trial de 14 dias. Payment Link não oferece "escolha um plano", portanto quem entrar por ele assina os dois.
+> **Não foi possível desativar pela conexão do Zapier:** o link tem Managed Payments ativo e a conexão envia header `Stripe-Account`, que o Stripe rejeita nesse caso (`Managed Payments cannot be used with Connect`). As tentativas via request bruto e via ação nativa devolveram o mesmo erro.
+> Desativar em: <https://dashboard.stripe.com/payment_links/plink_1UFJuNEnOTJRuCTXYZRUn4yl>
+> (O irmão dele, `plink_1UEBm5EnOTJRuCTXqRLXnvSl`, Business-only, já está inativo.)
 
 **Descrição do Product (inglês, exibida ao comprador no Checkout):**
 
@@ -130,14 +156,46 @@ Todos criados em **modo LIVE** e verificados individualmente (**HTTP 200**, abre
 |---|---|---:|---|---|
 | **Mensal** | 🇺🇸 USD | US$ 9,00 | <https://buy.stripe.com/eVqbJ1fao4kq9o4awyaZi03> | `plink_1UQ9tVEnOTJRuCTXDmWZVBvW` |
 | **Anual** | 🇺🇸 USD | US$ 90,00 | <https://buy.stripe.com/7sYcN56DS04a9o4bACaZi05> | `plink_1UQCFrEnOTJRuCTX1L9cN0pJ` |
-| **Mensal** | 🇬🇧 GBP | £9,00 | <https://buy.stripe.com/00waEX7HWeZ48k0gUWaZi04> | `plink_1UQBj6EnOTJRuCTXohl1r4t2` |
-| **Anual** | 🇬🇧 GBP | £90,00 | <https://buy.stripe.com/cNiaEX0fu4kqeIo5ceaZi06> | `plink_1UQCFxEnOTJRuCTXK1vej4fu` |
-| **Mensal** | 🇪🇺 EUR | €9,00 | <https://buy.stripe.com/00w14n9Q4cQW8k06giaZi02> | `plink_1UQ9PkEnOTJRuCTXfyacvjPy` |
-| **Anual** | 🇪🇺 EUR | €90,00 | <https://buy.stripe.com/dRm7sL9Q418efMs346aZi07> | `plink_1UQCFzEnOTJRuCTXENKvv7gI` |
+| **Mensal** | 🇬🇧 GBP | **£7,00** | <https://buy.stripe.com/5kQ7sL2nCeZ47fWawyaZi08> | `plink_1UQsxrEnOTJRuCTXaEcLFVO0` |
+| **Anual** | 🇬🇧 GBP | **£70,00** | <https://buy.stripe.com/4gM9ATaU8cQW43K6giaZi09> | `plink_1UQsxxEnOTJRuCTXws80RJlv` |
+| **Mensal** | 🇪🇺 EUR | **€8,00** | <https://buy.stripe.com/7sYcN59Q45ougQwdIKaZi0a> | `plink_1UQsy2EnOTJRuCTXoEPYxTP2` |
+| **Anual** | 🇪🇺 EUR | **€80,00** | <https://buy.stripe.com/14AaEXd2g4kq57O8oqaZi0b> | `plink_1UQsy6EnOTJRuCTXwcUAYVPj` |
+
+> ⚠️ **Os quatro links GBP/EUR acima são novos (15/10/2026).** Os antigos, com £9/£90 e €9/€90, foram **desativados**. Se a Tracey já tiver divulgado algum deles, é preciso avisá-la para trocar o endereço — o link antigo abre com a mensagem de substituição e o novo endereço.
 
 **Comum a todos:** cupons promocionais habilitados (`allow_promotion_codes: true`), `payment_method_collection: always`, `invoice_creation: false` (obrigatório em preço recorrente), metadata `product_role: green_room_only`, `app_access: none`, `community: the_actors_copilot_green_room`. Os links também carregam `currency_market` e `billing_cycle`.
 
 **Observação sobre a moeda EUR:** os três preços em EUR continuam ativos e agora **têm** link. Mantenha todos ou desative os que não forem usados comercialmente — os links EUR só devem ser divulgados se a venda em euro for intencional.
+
+### 2.2.2 O valor muda se o cliente trocar de moeda? **Não.**
+
+Pergunta feita pela Tracey. Resposta verificada ao vivo em 15/10/2026:
+
+**Cada link tem um valor fixo e não oferece escolha de moeda.** Isso não é configuração nossa — é consequência do modelo de Price:
+
+- cada Price do Green Room tem **uma única moeda** (`expand[]=currency_options` devolve só a própria moeda, ex.: `{"gbp":{"unit_amount":700}}` para o link de £7);
+- o Payment Link aponta para **um** Price e carrega `currency` fixo (`gbp`, `eur` ou `usd`).
+
+Logo: **o link GBP cobra sempre £7; o link EUR, sempre €8.** Não há seletor, não há conversão, não há surpresa. É justamente por isso que mantivemos **6 links separados** em vez de um link único multi-moeda — assim a Tracey controla exatamente o que cada mercado paga.
+
+**Onde o valor muda de verdade — e é intencional:** nos planos do **app** (Economy/Business), onde acabámos de adicionar `currency_options`. Aí o mesmo Price serve três moedas e o valor apresentado depende da moeda escolhida/localizada: Economy = **$19 / £14 / €19**; Business = **$29 / £22 / €29**. São valores fixos aprovados por moeda, não conversão por câmbio.
+
+**Adaptive Pricing — o único mecanismo que poderia alterar um valor fixo.** O Stripe tem uma funcionalidade de conta ("Adaptive Pricing") que converte automaticamente o preço para a moeda local do visitante, aplicando câmbio + taxa de conversão. Se estiver ligada, um visitante dos EUA a abrir o link de £7 poderia ver um valor convertido em USD.
+- Não é possível ler nem alterar isso pela conexão usada aqui: a API devolve `Received unknown parameter: adaptive_pricing`.
+- **Verificar no Dashboard:** Settings → Payments → Adaptive Pricing (ou Currency conversion).
+- Recomendação: para os 6 links do Green Room, manter **desligado** — os valores por moeda que a Tracey aprovou só fazem sentido se forem exatamente aqueles.
+
+### 2.2.3 Um link único multi-moeda (alternativa)
+
+Se houver interesse em **um só URL** para todos os mercados, é possível: colocar `currency_options` num Price único e criar um Payment Link multi-moeda. O Stripe passa a apresentar a moeda conforme a localização do visitante (e o cliente pode alternar).
+
+| | 6 links fixos (atual) | 1 link multi-moeda |
+|---|---|---|
+| Valor por mercado | **Garantido** (definido por nós) | Sugerido pelo Stripe conforme a localização |
+| URLs a divulgar | 6 | 1 |
+| Risco | Enviar o link do mercado errado | Cliente pode alternar e pagar em moeda diferente da planeada |
+
+Recomendação: **manter os 6 links** para o Green Room.
 
 **Detalhamento de um link (modelo — todos os 6 seguem o mesmo formato):**
 

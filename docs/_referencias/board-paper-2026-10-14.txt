@@ -1,0 +1,353 @@
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 1
+BOARD DECISION PAPER • RESEARCH-BASED RECOMMENDATION
+Grow through Skool.
+Keep the app on Stripe.
+A controlled hybrid acquisition model for The Actors Copilot
+Executive decision
+Offer native Skool Green Room subscriptions ($9/month, $90/year) as a dedicated community-acquisition channel.
+Retain Stripe as the billing and app-entitlement authority for Economy and Business, including the established USD,
+GBP and EUR website checkouts.
+Key constraint. Skool does not support the external subscription lifecycle notifications or automated paid-to-free
+conversion required for a one-step cross-platform transfer. A verified administrator handoff is therefore required by
+Skool's current integration and membership procedures; it is not a limitation of Stripe's billing capabilities.
+DECISION GO / NO-GO WHY
+Native Green Room only GO, with controls Skool-native discovery and reviews; no
+app permissions to synchronize
+Economy / Business on Stripe GO Documented subscription events and multi-
+currency control
+Native Skool Economy / Business NO-GO Missing supported app entitlement lifecycle
+signals
+Coupon-assisted migration CONDITIONAL GO Required by Skool cancellation and
+invitation capabilities
+Prepared for Tracey Collis and the implementation team. Source-based assessment; not confirmation of production readiness or a
+commitment to automated Skool subscription state synchronization.
+
+-- 1 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 2
+01 / COMMERCIAL RATIONALE
+Why native Skool billing still matters
+Skool native billing can support community acquisition while app subscriptions retain their
+existing payment architecture.
+Documented advantages
+ A native paid Green Room member can contribute to the paid-member review ecosystem; externally paying
+free-invited members cannot leave these native paid-member reviews. [S3]
+ Growth Boost may surface the community in search, recommendations and Skool-run advertising; Skool
+charges a 30% recurring commission on the members it acquires. [S1, S2]
+ Skool lists off-platform payments as a Discovery ranking penalty. The impact on a mixed-payment community is
+not quantified. [S4]
+ Native subscriptions are USD-only. Fixed GBP and EUR offers must therefore continue through Stripe. [S2]
+Commercial interpretation
+The recommended structure supports a native $9 Skool offer for community acquisition, while preserving an
+authoritative, auditable Stripe subscription lifecycle for premium app features. Growth Boost may provide
+incremental acquisition; visibility, reviews, conversion and volume remain subject to Skool policies and performance.
+Important qualification. Skool does not provide a supported guarantee of Growth Boost attribution or Discovery
+treatment after a member transitions from native paid billing to free invited access. We therefore do not assume
+continued attribution in the commercial model.
+
+-- 2 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 3
+02 / FEASIBILITY
+Decision matrix
+Production assessment rule: capabilities without explicit official support are classified NOT
+SUPPORTED and excluded from the implementation baseline.
+Why the limited hybrid is materially different
+Native Skool billing is limited to community-only access because external tier-change, cancellation and subscription-
+state interfaces are NOT SUPPORTED by Skool's official integration. Premium app entitlements instead use Stripe's
+supported subscription events and the existing app backend.
+Non-negotiable design principles
+ Only one community exists: every eligible customer sees the same Green Room content.
+ Maintain Economy and Business app billing in Stripe: Skool does not support the external lifecycle integration
+these plans require.
+ State clearly that Skool does not support automated cross-platform cancellation or paid-to-free conversion
+through its official integration.
+ No shared public founding-member or migration coupon; eligibility and use must be constrained.
+ Validate and document the Skool-required administrative transition before representing the cross-platform
+journey as complete.
+Supported* means Stripe-managed app entitlements plus an administrator-led handoff because Skool does not support
+subscription-change or paid-to-free conversion interfaces for external systems.
+
+-- 3 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 4
+03 / SYSTEMS DESIGN
+Two billing authorities, separate scopes
+Define discrete platform responsibilities in accordance with the interfaces each provider
+officially supports.
+SOURCE WHAT IT CONTROLS WHAT IT MUST NOT CONTROL
+Skool native billing Community membership purchased on Skool ($9 USD /
+$90 USD) Economy or Business app permissions
+Stripe billing Website Green Room; Economy and Business;
+currencies; founders; trials Native Skool renewal or cancellation state
+Actors Copilot backend Stripe-derived plan entitlements and account access Invented Skool subscription state
+Skool invitations Free community admission for qualified Stripe
+customers Subscription identity or price on Stripe
+Identity handling. Store app account ID, Stripe customer/subscription IDs, member email, the reported Skool
+account email and a verified link or operator note when migration occurs. Email equality alone is not strong proof of
+the same account. Do not claim Skool account merging is supported. [S10]
+
+-- 4 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 5
+04 / STANDARD JOURNEYS
+What customers should experience
+The model preserves simple purchase journeys for customers who remain in their original
+billing channel.
+Website Stripe purchase
+After a confirmed Economy or Business checkout, the customer should see a thank-you page, receive payment
+confirmation, obtain the proper app features and receive a free Green Room invitation if not already a member. The
+existing Stripe webhook/invitation integration is the implementation starting point; its end-to-end reliability still needs
+testing.
+Skool-native community purchase
+Skool collects the $9 USD community subscription and manages Green Room access within Skool. No premium app
+entitlement depends on native Skool billing, because Skool does not support the external lifecycle events needed for
+app authorization.
+Existing subscribers. For an existing Skool-paying member, the required handoff must be completed before treating
+a Stripe app purchase as a replacement subscription. Existing free-invited website subscribers must not be offered
+an unnecessary second paid Skool membership.
+
+-- 5 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 6
+05 / SKOOL-REQUIRED HANDOFF
+Coupon-assisted Skool → Stripe transition
+Skool does not support an automated paid-to-free conversion API or the external subscription-
+state events needed for direct migration. The process therefore follows administrator-
+controlled Skool procedures.
+Two transition schedules under Skool billing rules
+PATH PROCESS SKOOL-SPECIFIC CONDITION
+A. End-of-term Cancel native renewal; start Stripe app access near the Skool paid-
+through date; reconcile membership.
+Skool membership remains paid
+through term; admin confirmation is
+needed.
+B. Immediate Cancel Skool renewal; start Stripe app plan now; apply an approved
+one-time overlap credit.
+Skool cancellation is not immediate;
+paid-to-free re-invitation requires
+admin handling.
+Skool platform constraint. Skool retains canceled paid memberships through the paid period. Under Subscription or
+Tiers pricing, Skool documents an administrator removal and reinvitation to convert paid access to free invited
+access; the user must accept the invitation. Skool describes progress as recoverable upon rejoining. These are
+native Skool operating constraints, not Stripe integration defects. [S5, S6]
+
+-- 6 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 7
+06 / DISCOUNT GOVERNANCE
+One-time transition credit vs. lifetime founder entitlement
+Founding-member entitlements and short-term transition credits serve separate purposes and
+require distinct, controlled Stripe configurations.
+Practical Stripe configuration
+ Regular migration: a customer-bound, single-redemption, time-limited promotion code with a one-time coupon.
+Amount should reflect the approved overlap policy and verified remaining paid period. [S8, S9]
+ Founders: verify permanent eligibility against a founder registry; maintain free Skool membership; use an
+appropriately scoped recurring Stripe discount where the founder promise applies. [S2, S8]
+ Make currency explicit. A USD amount-off coupon is not automatically an equivalent GBP or EUR discount; use
+currency-specific values/configuration. [S8]
+ Annual Skool migration: do not assume the unused value equals one $9 monthly payment. Check the remaining
+prepaid annual period and establish a written credit/refund policy.
+ Do not stack migration incentives with founding discounts or promotional trials without an explicit business rule.
+Verify how the current 14-day app trial affects the first invoice.
+Example, not a default policy. A regular $9 Skool member moving to $19 Economy might receive up to $9 off the
+first Stripe invoice if one full month of Skool billing overlap is accepted and verified; subsequent Economy renewals
+remain $19. A founder may qualify for $9 off every monthly Economy invoice instead.
+
+-- 7 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 8
+07 / COMMERCIAL CONFIGURATION
+Pricing integrity and founding-member commitments
+Use Tracey’s latest fixed-currency pricing, not earlier Stripe links that still display different
+GBP/EUR values.
+Approved public prices supplied by Tracey
+PRODUCT USD / MONTH GBP / MONTH EUR / MONTH USD / YEAR GBP / YEAR EUR / YEAR
+Green Room $9 £7 €8 $90 £70 €80
+Economy $19 £14 €17 $190 £140 €170
+Business $29 £22 €26 $290 £220 €260
+Skool native billing can offer Green Room only in USD. Stripe website prices can use fixed approved USD/GBP/EUR amounts.
+Founding-member prices, derived from the promised Green Room-value discount
+APP
+SUBSCRIPTION
+USD / MONTH GBP / MONTH EUR / MONTH USD / YEAR GBP / YEAR EUR / YEAR
+Founder
+Economy $10 £7 €9 $100 £70 €90
+Founder Business $20 £15 €18 $200 £150 €180
+Derived assumption requires Tracey’s approval for GBP/EUR founder equivalencies. No founder payment is required for Green
+Room itself.
+Corrections before publish
+ Earlier Green Room Stripe payment links were described as GBP £9 / EUR €9 monthly and £90 / €90 annual.
+They conflict with the newest approved £7/€8 and £70/€80. Verify and replace or reconfigure those links.
+ “Two months free” on annual pricing means 10 months paid at monthly rates (about 16.7% off 12 months), not
+“20% off.” Correct inaccurate UI labels.
+ Check all Economy/Business monthly and annual Stripe Price IDs and supported currencies; earlier diagnostics
+reported missing annual price configuration.
+ Keep the 200 founding members’ free Skool entitlements independent of Stripe payment status.
+
+-- 8 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 9
+08 / GROWTH ECONOMICS
+Cost of acquiring a native Skool subscriber
+At $9/month, native community subscriptions can generate referral revenue, but Growth Boost
+commission is material.
+How to interpret the example
+These estimates use Skool’s published Pro processing fee (2.9% + $0.30) and, for a customer Skool brings, its
+additional 30% recurring Growth Boost commission. They are illustrative, exclude taxes and other costs, and should
+not be mistaken for a full unit-economics forecast. [S2, S4]
+Metrics worth tracking separately
+NATIVE SKOOL WEBSITE STRIPE MIGRATION QUALITY
+Discovery views and paid joins Visits → paid conversion % upgrades verified before checkout
+Skool-attributed subscribers Monthly/annual churn Time to free re-invite
+Native review eligibility Net revenue / renewal Duplicate-charge incidents
+Retention and revenue net of fees EUR/GBP pricing conversion Coupon redemption and abuse rate
+Decision lens. The 30% Growth Boost cost may be worthwhile if it attracts incremental customers, but there is no
+documented guarantee of traffic or sales. Likewise, the effect of later free-invited migrations on ongoing Discovery
+performance is not quantified.
+
+-- 9 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 10
+09 / RISKS
+Risk register and operating safeguards
+Stripe provides supported subscription lifecycle events for app billing. Skool does not support
+programmatic paid-to-free conversion or external-member offboarding, so those Skool-
+specific steps require administrator action.
+RISK SEVERITY CONTROL / ACCOUNTABLE OWNER
+Skool + Stripe charge overlap HIGH Customer-success verifies cancellation and paid-through date; migration credit
+approved before checkout.
+Member removed from Skool during
+conversion HIGH Admin-managed removal/re-invitation; use existing account; clear status updates to
+customer.
+Coupon shared or reused HIGH Stripe customer-bound / single-use codes, expiration and redemption audit.
+Founder loses lifetime access CRITICAL Permanent founder flag; never remove founder during app offboarding.
+Currency or annual-price mismatch HIGH Product-by-product Stripe test before launch; annual “two months free” copy.
+Website buyer canceled; Skool stays
+active MEDIUM Stripe event → offboarding task → verified admin action, founders excluded.
+Discovery/Boost expectations unmet MEDIUM Track Skool-only ROI; no acquisition forecast without real cohort data.
+Duplicate identity / account MEDIUM Verification step; do not use email match as proof of account ownership.
+Explicit product and support promises
+ Present Skool-to-Stripe as a verified transition request: Skool does not support a one-click cross-platform
+subscription conversion.
+ Show the customer what they will pay now, when their native Skool renewal ends and whether a transition credit
+applies.
+ Make it clear that free community access continues only while a qualifying Stripe subscription or lifetime founder
+entitlement is active.
+ Clearly state that automated external member removal and full tier-change synchronization are NOT
+SUPPORTED by Skool's official integration.
+
+-- 10 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 11
+10 / DELIVERY PLAN
+Phased implementation and release gates
+Implement native community acquisition without depending on subscription-event or
+membership-management interfaces NOT SUPPORTED by Skool.
+Minimum acceptance tests
+TEST JOURNEY MUST PASS
+Native Skool $9 monthly and $90 annual Correct charge, membership and acquisition tracking.
+Website Green Room (3 currencies) Approved prices and verified invitation.
+Website Economy and Business Correct plan, trial policy, currency, entitlement and email.
+Monthly Skool → Stripe migration Skool cancellation verified; approved credit; admin-confirmed free re-invite.
+Annual Skool → Stripe migration Remaining prepaid Skool term reconciled under an approved credit policy.
+Founding member Economy → cancel Founder never loses lifetime Green Room access.
+Stripe downgrade / cancellation App entitlements and Skool administrator-led offboarding follow the agreed
+effective date.
+Duplicate signup / mismatched email No unverified account merge or second unintentional charge.
+Suggested accountable owners — to be confirmed
+LEAD PROPOSED RESPONSIBILITY
+Tracey Approve prices, founding policy, credits and customer-facing migration language.
+Marcos Configure native Skool offer and Stripe prices/discounts; verify checkouts.
+Caio / development Implement and test Stripe entitlement rules, identities and event handling.
+Raquel Align website pricing, selectors, checkout destinations and confirmation journey.
+Community operations Verify Skool cancellations; coordinate free re-invites and offboarding.
+
+-- 11 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 12
+11 / FINAL DECISION
+Management recommendation and open approvals
+A defined commercial model that preserves native Skool acquisition and Stripe app billing
+within each platform’s documented operational capabilities.
+Approve subject to Skool-required administrative procedures
+ Skool-native Green Room subscription for direct Skool discovery, USD-only ($9/month; $90/year).
+ Continue Stripe billing for all website purchases and all Economy/Business app subscriptions.
+ Keep one shared Green Room and invite qualifying Stripe subscribers free of an additional Skool charge.
+ Use customer-verified, one-time Stripe credits for normal Skool-to-app migration when there is paid overlap.
+ Give founders distinct recurring entitlements and controlled discounts; never disturb lifetime free access.
+Do not approve
+ Economy/Business subscription tiers paid through Skool and synchronized to the app.
+ A promise of automatic Skool-to-Stripe upgrades or cancellations: these workflows are NOT SUPPORTED by
+Skool's official integration.
+ Unrestricted public coupons, unlimited credits for former Skool members, or discount stacking without policy.
+ A production launch with unverified annual prices, mixed currencies or unresolved
+member-invitation/offboarding handling.
+Four sign-offs requested from Tracey
+DECISION NEEDED APPROVAL
+Product ownership Skool native = Green Room only; Stripe = all app subscriptions.
+Migration policy End-of-term vs immediate credit; annual prepaid-value treatment.
+Founder pricing Final GBP/EUR founding equivalents and eligibility list.
+Launch operations Skool-required admin conversion and offboarding, with assigned ownership.
+BOTTOM LINE: Preserve Skool-native customer acquisition and Stripe-managed app entitlements. The
+administrator-led migration is required because Skool does not support the necessary cross-platform
+subscription and paid-to-free conversion interfaces.
+
+-- 12 of 13 --
+
+THE ACTORS COPILOT / COMMERCIAL ARCHITECTURE
+STRATEGY & FEASIBILITY • 14 OCT 2026 | 13
+APPENDIX / SOURCE NOTES
+Documentation reviewed
+Official sources prioritized. Reviewed 14 October 2026. Capabilities without explicit official
+support are classified NOT SUPPORTED.
+[S1] Skool — Traffic Sources & Growth Boost
+https://help.skool.com/article/226-traffic-sources
+[S2] Skool — Payments FAQs
+https://help.skool.com/article/86-subscriptions-faq
+[S3] Skool — How do reviews work?
+https://help.skool.com/article/239-how-do-reviews-work-on-skool
+[S4] Skool — Discovery FAQs
+https://help.skool.com/article/153-discovery-faqs
+[S5] Skool — How to cancel a paid membership
+https://help.skool.com/article/99-how-to-cancel-my-subscription-to-a-community
+[S6] Skool — How to make paid member free
+https://help.skool.com/article/242-how-to-make-paid-member-free
+[S7] Skool — Invite members to community
+https://help.skool.com/article/14-how-do-i-invite-members-to-my-community
+[S8] Stripe — Create a coupon
+https://docs.stripe.com/api/coupons/create
+[S9] Stripe — Create a promotion code
+https://docs.stripe.com/api/promotion_codes/create
+[S10] Skool — Multiple accounts cannot merge
+https://help.skool.com/article/222-how-to-manage-multiple-skool-accounts
+[S11] Skool — Official Zapier integration
+https://help.skool.com/article/56-zapier-integration
+[S12] Skool — New paid member trigger example
+https://help.skool.com/article/162-zapier-new-paid-member-info-to-crm
+[S13] Skool — Pricing models
+https://help.skool.com/article/215-how-to-setup-pricing-for-the-group
+Methodology and limitations
+Evidence standard: for this production-feasibility assessment, any capability absent from officially supported
+documentation is classified NOT SUPPORTED; this describes the integration commitment available for production
+planning, not a claim that no internal or future implementation could ever exist. The assessment uses published
+Skool and Stripe references, team-provided project context and labeled assumptions. Skool-specific limitations arise
+from Skool's supported interface and membership procedures, not Stripe. Live Stripe/Skool accounts, current
+source code and deployed Zapier workflows were not independently inspected. Pricing links require transactional
+verification; Growth Boost and Discovery results are not guaranteed. Unofficial Skool APIs are excluded from
+production entitlement authorization.
+
+-- 13 of 13 --
+
