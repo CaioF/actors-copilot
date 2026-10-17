@@ -802,30 +802,30 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 `/admin-dashboard` is a standalone, server-rendered internal operator view of the `adminMembers` reporting projection. It uses a separate Admin Session and does not use member authentication or fetch through the member `AuthContext`. The root `AuthProvider` remains mounted by `app/layout.tsx`; the dashboard does not consume it.
 
-Configure these server-only deployment variables with non-placeholder values. Do not prefix them with `NEXT_PUBLIC_` and do not commit real credentials:
-
-```dotenv
-ADMIN_USERNAME=<internal-operator-username>
-ADMIN_PASSWORD=<strong-internal-operator-password>
-ADMIN_JWT_SECRET=<independent-random-signing-secret>
-```
-
-After configuring Firebase Admin credentials, populate or repair the projection. The command is idempotent and reports counts only:
+### Local verification
 
 ```bash
-pnpm admin:backfill
+pnpm exec jest __tests__/integration/admin-dashboard-flow.test.tsx --runInBand
+pnpm exec jest --runInBand --forceExit
+pnpm typecheck
+pnpm exec eslint __tests__/integration/admin-dashboard-flow.test.tsx
 ```
 
-Firestore rules are not deployed by this repository automatically. Deploy `firestore.rules` manually with the project's Firebase tooling, then use Firebase Console or an authenticated Firebase client probe to verify that reads and writes to `adminMembers/{uid}` are denied. Firebase Admin operations should remain available because the Admin SDK bypasses client security rules.
+### Rollout checklist
 
-Operator rollout checklist:
+1. [ ] Configure non-placeholder, server-only `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `ADMIN_JWT_SECRET` values in the deployment environment. Do not use a `NEXT_PUBLIC_` prefix, commit values, or log values. Generate `ADMIN_JWT_SECRET` independently and confirm it differs from the member-session `JWT_SECRET`.
+2. [ ] Deploy the application and the narrowed `firestore.rules`. Rules deployment is manual because this repository has no Firebase deployment pipeline.
+3. [ ] From Firebase Console or an authenticated Firebase client, attempt to read and write `adminMembers/{uid}`. Record a permission-denied result for both; Firebase Admin access should remain available.
+4. [ ] Run `pnpm admin:backfill` with deployment Firebase Admin credentials. Retain only the `{processed, succeeded, failed}` count summary and require `failed: 0` before continuing.
+5. [ ] Run `pnpm admin:backfill` a second time. Record the second count summary and verify the `adminMembers` document count and UID set are unchanged, with no duplicate document IDs.
+6. [ ] In the deployed environment, verify admin login creates `admin_session`, the list shows trial/paid/no-plan records with exactly Name, Email, and Status columns, and logout removes only `admin_session`.
+7. [ ] Repeat the deployed login/list/logout smoke while a valid `platform_session` member cookie exists. Confirm the member session remains valid and does not authorize admin access by itself.
 
-1. Configure all three admin environment variables in the deployment environment.
-2. Deploy the application and the updated Firestore rules.
-3. Run `pnpm admin:backfill` and retain only its `{processed, succeeded, failed}` summary.
-4. Repeat the backfill to confirm stable counts and document IDs.
-5. Probe `adminMembers` with an authenticated Firebase client and confirm permission denial.
-6. Verify admin login, the member table, logout, and coexistence with a member session.
+### Rollback checklist
+
+1. [ ] Remove `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `ADMIN_JWT_SECRET` from the deployment environment and redeploy to disable admin login/session issuance.
+2. [ ] If the routes must be removed, perform a normal code rollback of the `/admin-dashboard/:path*` and `/api/admin/:path*` proxy matcher entries and redeploy. Do not edit the deployed matcher ad hoc.
+3. [ ] Leave `adminMembers` records protected by the narrowed Firestore rules. Do not broaden client access or delete production projection data as part of this rollback.
 
 ---
 
