@@ -32,20 +32,6 @@ import { collection, getDocs, doc, writeBatch, deleteDoc } from "firebase/firest
 import { getDb } from "@/lib/firebase";
 import { logger } from "@/lib/logger";
 
-interface FirebaseError {
-  code: string;
-  message: string;
-}
-
-function isFirebaseError(error: unknown): error is FirebaseError {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof (error as Record<string, unknown>).code === "string"
-  );
-}
-
 function SectionHeader({
   icon: Icon,
   title,
@@ -140,14 +126,23 @@ export default function SettingsPage() {
     setIsSaving(true);
 
     try {
-      const { getAuth, updateProfile } = await import("firebase/auth");
-      const auth = getAuth();
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/profile/display-name", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ displayName }),
+      });
+      const data = await response.json();
 
-      if (auth.currentUser) {
-        await updateProfile(auth.currentUser, {
-          displayName: displayName,
-        });
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save profile.");
       }
+
+      setDisplayName(data.displayName);
+      await user.reload();
     } catch (error) {
       logger.error({ err: error, msg: "Error updating profile" });
       alert("Failed to save profile. Please try again.");
@@ -295,7 +290,7 @@ export default function SettingsPage() {
     if (!user) return;
 
     const confirmFinal = window.confirm(
-      "Are you absolutely sure? This will permanently delete your profile, auditions, breakdowns, and account. This cannot be undone."
+      "Are you absolutely sure? This will permanently delete your account and the supported profile, billing, and legacy workspace data listed here. If cleanup is interrupted, you may need to retry. This cannot be undone."
     );
     if (!confirmFinal) return;
 
@@ -354,21 +349,27 @@ export default function SettingsPage() {
         }
       }
 
-      const { getAuth, deleteUser } = await import("firebase/auth");
-      const auth = getAuth();
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const data = await response.json();
 
-      if (auth.currentUser) {
-        await deleteUser(auth.currentUser);
-      }
-    } catch (error: unknown) {
-      logger.error({ err: error, msg: "Error deleting account" });
-      if (isFirebaseError(error)) {
-        if (error.code === "auth/requires-recent-login") {
+      if (!response.ok) {
+        if (data.code === "requires-recent-login") {
           alert("For security reasons, you need to verify your identity. Please log out, log back in, and try again.");
           return;
         }
+        throw new Error(data.error || "Account deletion was incomplete.");
       }
-      alert("Failed to delete account. Please try again.");
+
+      window.location.href = "/login";
+    } catch (error: unknown) {
+      logger.error({ err: error, msg: "Error deleting account" });
+      alert("Account deletion was incomplete. Please try again.");
     } finally {
       setIsDeletingAccount(false);
     }
@@ -678,7 +679,7 @@ export default function SettingsPage() {
                     <Trash2 className="h-5 w-5 text-destructive shrink-0" />
                     <div>
                       <p className="text-xs sm:text-sm font-semibold text-destructive">Delete account</p>
-                      <p className="text-xs text-muted-foreground">Permanently delete all your data. You'll have to start everything from scratch.</p>
+                      <p className="text-xs text-muted-foreground">Delete your account and supported profile, billing, and legacy workspace data.</p>
                     </div>
                   </button>
                 </AlertDialogTrigger>
@@ -686,7 +687,7 @@ export default function SettingsPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="font-title text-foreground">Delete Account</AlertDialogTitle>
                     <AlertDialogDescription className="text-muted-foreground text-xs sm:text-sm">
-                      This will permanently delete all your data. You will not lose access to your account but will lose all your information. This action cannot be undone.
+                      This deletes your account and the supported profile, billing, and legacy workspace data handled by this flow. If cleanup is interrupted, retry before the account is removed. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

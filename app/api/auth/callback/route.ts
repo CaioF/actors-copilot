@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin';
 import { setPlatformSession, getPlatformSession } from '@/lib/session';
 import { UserBilling, SubscriptionStatus } from '@/lib/billing';
+import { syncAdminMember } from '@/lib/admin-dashboard/sync';
+import { logger } from '@/lib/logger';
+
+function projectionErrorDetails(error: unknown) {
+  const details = error as { name?: unknown; code?: unknown };
+  return {
+    errorName: typeof details?.name === 'string' ? details.name : 'UnknownError',
+    errorCode:
+      typeof details?.code === 'string' || typeof details?.code === 'number'
+        ? details.code
+        : undefined,
+  };
+}
 
 /**
  * Validates the Firebase identity token, hydrates entitlement details from Firestore, and issues the active platform session.
@@ -56,6 +69,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       stripePriceId,
       currentPeriodEnd,
     });
+
+    try {
+      await syncAdminMember(uid);
+    } catch (error) {
+      logger.error({
+        ...projectionErrorDetails(error),
+        msg: 'Admin member projection sync failed after login',
+      });
+    }
 
     return NextResponse.json({ 
       success: true, 

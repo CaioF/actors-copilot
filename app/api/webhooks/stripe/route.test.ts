@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server';
 import { verifyStripeWebhookEvent } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { stripe } from '@/lib/stripe';
+import { syncAdminMember } from '@/lib/admin-dashboard/sync';
+import { logger } from '@/lib/logger';
 
 jest.mock('@/lib/billing', () => ({
   verifyStripeWebhookEvent: jest.fn(),
@@ -25,12 +27,26 @@ jest.mock('@/lib/firebase.admin', () => ({
   },
 }));
 
+jest.mock('@/lib/admin-dashboard/sync', () => ({
+  syncAdminMember: jest.fn(),
+}));
+
+jest.mock('@/lib/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
 describe('Stripe Webhook Route Handler', () => {
   const mockUid = 'user_trial_test_123';
   const mockCustomerId = 'cus_stripe_123';
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (syncAdminMember as jest.Mock).mockResolvedValue(undefined);
   });
 
   it('returns 400 Bad Request if stripe-signature header is missing', async () => {
@@ -93,6 +109,11 @@ describe('Stripe Webhook Route Handler', () => {
       }),
       { merge: true }
     );
+    expect(mockSet).toHaveBeenCalledTimes(2);
+    expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
+    expect(mockSet.mock.invocationCallOrder[1]).toBeLessThan(
+      (syncAdminMember as jest.Mock).mock.invocationCallOrder[0],
+    );
   });
 
   it('processes customer.subscription.updated transition from trialing to active on Day 15 seamlessly', async () => {
@@ -137,6 +158,7 @@ describe('Stripe Webhook Route Handler', () => {
       }),
       { merge: true }
     );
+    expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
   });
 
   it('processes customer.subscription.updated when canceled at period end while keeping hasAccess=true', async () => {
@@ -184,6 +206,7 @@ describe('Stripe Webhook Route Handler', () => {
       }),
       { merge: true }
     );
+    expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
   });
 
   it('processes customer.subscription.deleted when period ends setting status=canceled & hasAccess=false', async () => {
@@ -231,5 +254,113 @@ describe('Stripe Webhook Route Handler', () => {
       }),
       { merge: true }
     );
+    expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
+  });
+
+  it.each([
+    ['invoice.payment_succeeded', 'active', true],
+    ['invoice.payment_failed', 'past_due', false],
+  ])('syncs projection for %s after both billing writes', async (type, status, hasAccess) => {
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue({
+      type,
+      id: `evt_${type}`,
+      data: {
+        object: {
+          customer: mockCustomerId,
+          customer_email: 'billing@example.com',
+        },
+      },
+    });
+    const mockSet = jest.fn().mockResolvedValue(undefined);
+    (db.doc as jest.Mock).mockReturnValue({ set: mockSet });
+    (db.collectionGroup as jest.Mock).mockReturnValue({
+      where: () => ({
+        limit: () => ({
+          get: jest.fn().mockResolvedValue({
+            empty: false,
+            docs: [{ ref: { path: `users/${mockUid}/billing/current` } }],
+          }),
+        }),
+      }),
+    });
+
+    const res = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'sig_123' },
+      body: '{}',
+    }) as NextRequest);
+
+    expect(res.status).toBe(200);
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status, hasAccess }),
+      { merge: true },
+    );
+    expect(mockSet).toHaveBeenCalledTimes(2);
+    expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
+  });
+
+  it('acknowledges the webhook and logs no PII when projection synchronization fails', async () => {
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue({
+      type: 'customer.subscription.created',
+      id: 'evt_projection_failure',
+      data: {
+        object: {
+          id: 'sub_private',
+          customer: mockCustomerId,
+          status: 'active',
+          metadata: { platformUserId: mockUid },
+          items: { data: [{ price: { id: 'price_economy' } }] },
+        },
+      },
+    });
+    (db.doc as jest.Mock).mockReturnValue({ set: jest.fn().mockResolvedValue(undefined) });
+    (syncAdminMember as jest.Mock).mockRejectedValue(
+      Object.assign(new Error('private projection failure'), { code: 'unavailable' }),
+    );
+
+    const res = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'sig_123' },
+      body: '{}',
+    }) as NextRequest);
+
+    expect(res.status).toBe(200);
+    expect(logger.error).toHaveBeenCalledWith({
+      errorName: 'Error',
+      errorCode: 'unavailable',
+      msg: 'Admin member projection sync failed after billing persistence',
+    });
+    const logged = JSON.stringify((logger.error as jest.Mock).mock.calls);
+    expect(logged).not.toContain(mockUid);
+    expect(logged).not.toContain(mockCustomerId);
+    expect(logged).not.toContain('private projection failure');
+  });
+
+  it('returns 500 and does not sync projection when a billing write fails', async () => {
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue({
+      type: 'customer.subscription.created',
+      id: 'evt_billing_failure',
+      data: {
+        object: {
+          id: 'sub_123',
+          customer: mockCustomerId,
+          status: 'active',
+          metadata: { platformUserId: mockUid },
+          items: { data: [{ price: { id: 'price_economy' } }] },
+        },
+      },
+    });
+    (db.doc as jest.Mock).mockReturnValue({
+      set: jest.fn().mockRejectedValue(new Error('billing write failed')),
+    });
+
+    const res = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'sig_123' },
+      body: '{}',
+    }) as NextRequest);
+
+    expect(res.status).toBe(500);
+    expect(syncAdminMember).not.toHaveBeenCalled();
   });
 });

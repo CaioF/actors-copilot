@@ -1,6 +1,8 @@
 import { POST, GET } from './route';
 import { auth, db } from '@/lib/firebase.admin';
 import { setPlatformSession, getPlatformSession } from '@/lib/session';
+import { syncAdminMember } from '@/lib/admin-dashboard/sync';
+import { logger } from '@/lib/logger';
 import { NextRequest } from 'next/server';
 
 // --- STABLE DEPENDENCY MOCKS ---
@@ -19,10 +21,21 @@ jest.mock('@/lib/session', () => ({
     getPlatformSession: jest.fn(),
 }));
 
+jest.mock('@/lib/admin-dashboard/sync', () => ({
+    syncAdminMember: jest.fn(),
+}));
+
+jest.mock('@/lib/logger', () => ({
+    logger: {
+        error: jest.fn(),
+    },
+}));
+
 describe('Authentication Callback Route Handlers (Stripe & Firestore Integration)', () => {
     
     beforeEach(() => {
         jest.clearAllMocks();
+        (syncAdminMember as jest.Mock).mockResolvedValue(undefined);
     });
 
     describe('POST /api/auth/callback', () => {
@@ -115,6 +128,10 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                 stripePriceId: undefined,
                 currentPeriodEnd: undefined,
             });
+            expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
+            expect((setPlatformSession as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+                (syncAdminMember as jest.Mock).mock.invocationCallOrder[0],
+            );
         });
 
         /**
@@ -170,6 +187,43 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                 stripePriceId: mockBillingDocData.priceId,
                 currentPeriodEnd: mockBillingDocData.currentPeriodEnd,
             });
+            expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
+        });
+
+        it('keeps login successful and logs no PII when projection synchronization fails', async () => {
+            const mockUid = 'private-user-id';
+            const mockEmail = 'private@example.com';
+            (auth.verifyIdToken as jest.Mock).mockResolvedValue({
+                uid: mockUid,
+                email: mockEmail,
+            });
+            (db.doc as jest.Mock).mockReturnValue({
+                get: jest.fn().mockResolvedValue({ exists: false }),
+            });
+            (syncAdminMember as jest.Mock).mockRejectedValue(
+                Object.assign(new Error('contains private details'), { code: 'projection-down' }),
+            );
+
+            const req = new Request('http://localhost/api/auth/callback', {
+                method: 'POST',
+                body: JSON.stringify({ idToken: 'mock_firebase_id_token' }),
+            }) as NextRequest;
+
+            const res = await POST(req);
+
+            expect(res.status).toBe(200);
+            expect((setPlatformSession as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+                (syncAdminMember as jest.Mock).mock.invocationCallOrder[0],
+            );
+            expect(logger.error).toHaveBeenCalledWith({
+                errorName: 'Error',
+                errorCode: 'projection-down',
+                msg: 'Admin member projection sync failed after login',
+            });
+            const logged = JSON.stringify((logger.error as jest.Mock).mock.calls);
+            expect(logged).not.toContain(mockUid);
+            expect(logged).not.toContain(mockEmail);
+            expect(logged).not.toContain('contains private details');
         });
     });
 

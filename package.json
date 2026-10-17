@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest --forceExit",
+    "admin:backfill": "tsx scripts/backfill-admin-members.ts",
     "prepare": "husky"
   },
   "dependencies": {

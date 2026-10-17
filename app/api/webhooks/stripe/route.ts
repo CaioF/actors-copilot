@@ -4,6 +4,7 @@ import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 import { stripe } from '@/lib/stripe';
+import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,17 @@ function extractUidFromMetadata(metadata?: Stripe.Metadata | null): string | nul
         metadata.firebaseUserId ||
         null
     );
+}
+
+function projectionErrorDetails(error: unknown) {
+    const details = error as { name?: unknown; code?: unknown };
+    return {
+        errorName: typeof details?.name === 'string' ? details.name : 'UnknownError',
+        errorCode:
+            typeof details?.code === 'string' || typeof details?.code === 'number'
+                ? details.code
+                : undefined,
+    };
 }
 
 /**
@@ -155,6 +167,15 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
 
     // Sync root user document so direct queries on the users collection have billing status
     await userRef.set(sanitizeFirestorePayload(userPayload), { merge: true });
+
+    try {
+        await syncAdminMember(platformUserId);
+    } catch (error) {
+        logger.error({
+            ...projectionErrorDetails(error),
+            msg: 'Admin member projection sync failed after billing persistence',
+        });
+    }
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
