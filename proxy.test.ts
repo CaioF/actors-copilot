@@ -1,10 +1,15 @@
 import { proxy } from './proxy';
 import { NextRequest } from 'next/server';
 import { decryptSession } from './lib/session';
+import { decryptAdminSession } from './lib/admin-dashboard/session';
 
 // LAYER MOCKS 
 jest.mock('./lib/session', () => ({
     decryptSession: jest.fn(),
+}));
+
+jest.mock('./lib/admin-dashboard/session', () => ({
+    decryptAdminSession: jest.fn(),
 }));
 
 jest.mock('jose', () => ({
@@ -23,6 +28,67 @@ describe('Edge Middleware Gating Proxy Route Interceptor', () => {
 
     afterAll(() => {
         process.env = originalEnv;
+    });
+
+    describe('isolated admin access', () => {
+        it('allows the dashboard and login route to render without an admin session', async () => {
+            const dashboardResponse = await proxy(new NextRequest('http://localhost/admin-dashboard'));
+            const loginResponse = await proxy(new NextRequest('http://localhost/api/admin/login'));
+
+            expect(dashboardResponse.headers.get('x-middleware-next')).toBe('1');
+            expect(loginResponse.headers.get('x-middleware-next')).toBe('1');
+            expect(decryptAdminSession).not.toHaveBeenCalled();
+            expect(decryptSession).not.toHaveBeenCalled();
+        });
+
+        it('returns JSON 401 when a protected admin API has no admin cookie', async () => {
+            const response = await proxy(new NextRequest('http://localhost/api/admin/members'));
+
+            expect(response.status).toBe(401);
+            expect(await response.json()).toEqual({ error: 'Unauthorized' });
+            expect(decryptSession).not.toHaveBeenCalled();
+        });
+
+        it('returns JSON 401 for an invalid admin cookie', async () => {
+            (decryptAdminSession as jest.Mock).mockResolvedValue(null);
+            const request = new NextRequest('http://localhost/api/admin/members');
+            request.cookies.set('admin_session', 'invalid-admin-token');
+
+            const response = await proxy(request);
+
+            expect(response.status).toBe(401);
+            expect(decryptAdminSession).toHaveBeenCalledWith('invalid-admin-token');
+            expect(decryptSession).not.toHaveBeenCalled();
+        });
+
+        it('allows a protected admin API with a valid admin cookie', async () => {
+            (decryptAdminSession as jest.Mock).mockResolvedValue({ sub: 'admin' });
+            const request = new NextRequest('http://localhost/api/admin/members');
+            request.cookies.set('admin_session', 'valid-admin-token');
+
+            const response = await proxy(request);
+
+            expect(response.headers.get('x-middleware-next')).toBe('1');
+            expect(decryptSession).not.toHaveBeenCalled();
+        });
+
+        it('rejects an invalid admin cookie even when a valid member cookie is present', async () => {
+            (decryptAdminSession as jest.Mock).mockResolvedValue(null);
+            (decryptSession as jest.Mock).mockResolvedValue({
+                uid: 'business-member',
+                tier: 'business',
+                subscriptionStatus: 'active',
+            });
+            const request = new NextRequest('http://localhost/api/admin/members');
+            request.cookies.set('admin_session', 'invalid-admin-token');
+            request.cookies.set('platform_session', 'valid-member-token');
+
+            const response = await proxy(request);
+
+            expect(response.status).toBe(401);
+            expect(decryptAdminSession).toHaveBeenCalledWith('invalid-admin-token');
+            expect(decryptSession).not.toHaveBeenCalled();
+        });
     });
 
     describe('STRIPE Engine Gating (Modern Architecture Active)', () => {

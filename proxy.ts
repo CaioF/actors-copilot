@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { decryptSession } from './lib/session';
+import { decryptAdminSession } from './lib/admin-dashboard/session';
 
 /**
  * Active billing engine core descriptor feature flag.
@@ -24,6 +25,24 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     const isDashboardPath = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
     const isBusinessFeaturePath = pathname.startsWith('/profile') || pathname.startsWith('/acting-coach');
     const isBillingSuccessPath = pathname === '/api/billing/success' || pathname.startsWith('/api/billing/success/');
+
+    const isAdminDashboardPath = pathname === '/admin-dashboard' || pathname.startsWith('/admin-dashboard/');
+    const isAdminApiPath = pathname === '/api/admin' || pathname.startsWith('/api/admin/');
+
+    if (isAdminDashboardPath || pathname === '/api/admin/login') {
+        return NextResponse.next();
+    }
+
+    if (isAdminApiPath) {
+        const adminToken = request.cookies.get('admin_session')?.value;
+        const adminSession = adminToken ? await decryptAdminSession(adminToken) : null;
+
+        if (!adminSession) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        return NextResponse.next();
+    }
 
     if (isBillingSuccessPath) {
         return NextResponse.next();
@@ -114,7 +133,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
             }
         }
 
-    } catch (error) {
+    } catch {
         const response = NextResponse.redirect(loginUrl);
         response.cookies.delete('kajabi_session');
         return response;
@@ -128,6 +147,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
  */
 export const config = {
     matcher: [
+        '/admin-dashboard/:path*',
+        '/api/admin/:path*',
         '/api/billing/success',
         '/dashboard/:path*',
         '/chat/:path*',
