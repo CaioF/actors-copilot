@@ -1,6 +1,4 @@
 import type { UserRecord } from 'firebase-admin/auth';
-import { auth } from '@/lib/firebase.admin';
-import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 
 interface AuthUserPage {
   users: UserRecord[];
@@ -23,8 +21,8 @@ export interface BackfillSummary {
 }
 
 export async function backfillAdminMembers(
-  authClient: AuthListClient = auth,
-  syncMember: SyncMember = syncAdminMember,
+  authClient: AuthListClient,
+  syncMember: SyncMember,
 ): Promise<BackfillSummary> {
   const summary: BackfillSummary = { processed: 0, succeeded: 0, failed: 0 };
   let pageToken: string | undefined;
@@ -52,12 +50,19 @@ const scriptPath = process.argv[1] ?? '';
 const isCliEntry = /(?:^|[\\/])backfill-admin-members\.ts$/.test(scriptPath);
 
 if (isCliEntry) {
-  backfillAdminMembers()
+  Promise.all([
+    import('@/lib/firebase.admin'),
+    import('@/lib/admin-dashboard/sync'),
+  ])
+    .then(([firebaseAdmin, adminSync]) => (
+      backfillAdminMembers(firebaseAdmin.auth, adminSync.syncAdminMember)
+    ))
     .then((summary) => {
       process.stdout.write(`${JSON.stringify(summary)}\n`);
     })
-    .catch(() => {
-      console.error('Admin member backfill failed before completion.');
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Admin member backfill failed before completion: ${message}`);
       process.exitCode = 1;
     });
 }

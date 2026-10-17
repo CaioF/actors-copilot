@@ -1,5 +1,3 @@
-import 'server-only';
-
 import { db } from '@/lib/firebase.admin';
 import type { AdminMemberProjection } from './domain';
 

@@ -1,5 +1,3 @@
-import 'server-only';
-
 import type { UserRecord } from 'firebase-admin/auth';
 import { auth, db } from '@/lib/firebase.admin';
 import {
