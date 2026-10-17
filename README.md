@@ -16,6 +16,7 @@ An AI-powered self-tape audition preparation platform that extracts an actor's p
 - [Error Handling](#error-handling)
 - [Testing](#testing)
 - [Configuration](#configuration)
+- [Internal Admin Dashboard](#internal-admin-dashboard)
 - [Actor Profile Page](#actor-profile-page)
 - [Sidebar Navigation](#sidebar-navigation)
 - [Profile Components](#profile-components)
@@ -794,6 +795,37 @@ export function getDb(): Firestore {
 // lib/firebase.admin.ts - Server
 const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 ```
+
+---
+
+## Internal Admin Dashboard
+
+`/admin-dashboard` is a standalone, server-rendered internal operator view of the `adminMembers` reporting projection. It uses a separate Admin Session and does not use member authentication or fetch through the member `AuthContext`. The root `AuthProvider` remains mounted by `app/layout.tsx`; the dashboard does not consume it.
+
+Configure these server-only deployment variables with non-placeholder values. Do not prefix them with `NEXT_PUBLIC_` and do not commit real credentials:
+
+```dotenv
+ADMIN_USERNAME=<internal-operator-username>
+ADMIN_PASSWORD=<strong-internal-operator-password>
+ADMIN_JWT_SECRET=<independent-random-signing-secret>
+```
+
+After configuring Firebase Admin credentials, populate or repair the projection. The command is idempotent and reports counts only:
+
+```bash
+pnpm admin:backfill
+```
+
+Firestore rules are not deployed by this repository automatically. Deploy `firestore.rules` manually with the project's Firebase tooling, then use Firebase Console or an authenticated Firebase client probe to verify that reads and writes to `adminMembers/{uid}` are denied. Firebase Admin operations should remain available because the Admin SDK bypasses client security rules.
+
+Operator rollout checklist:
+
+1. Configure all three admin environment variables in the deployment environment.
+2. Deploy the application and the updated Firestore rules.
+3. Run `pnpm admin:backfill` and retain only its `{processed, succeeded, failed}` summary.
+4. Repeat the backfill to confirm stable counts and document IDs.
+5. Probe `adminMembers` with an authenticated Firebase client and confirm permission denial.
+6. Verify admin login, the member table, logout, and coexistence with a member session.
 
 ---
 
