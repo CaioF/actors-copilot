@@ -15,7 +15,8 @@ const PLAN_SELECTION_STORAGE_KEY = 'requested_plan_selection';
 /**
  * Public website display prices. These are NOT proof that a Stripe price exists
  * in the given currency; purchasability is verified separately against Stripe.
- * Annual prices are only defined where the app already had them configured (USD).
+ * Monthly values are charged per month; annual values are the full amount billed once per year
+ * and must match the Stripe Payment Links in ANNUAL_PAYMENT_LINKS.
  */
 const DISPLAY_PRICES: Record<DisplayBillingCycle, Partial<Record<RequestedCurrency, Record<RequestedPlan, number>>>> = {
   monthly: {
@@ -24,9 +25,57 @@ const DISPLAY_PRICES: Record<DisplayBillingCycle, Partial<Record<RequestedCurren
     gbp: { economy: 14, business: 22 },
   },
   annual: {
-    usd: { economy: 15, business: 23 },
+    usd: { economy: 190, business: 290 },
+    eur: { economy: 190, business: 290 },
+    gbp: { economy: 140, business: 220 },
   },
 };
+
+export const ANNUAL_PAYMENT_LINKS: Record<RequestedPlan, Record<RequestedCurrency, string>> = {
+  economy: {
+    usd: 'https://buy.stripe.com/3cIfZh2nC4kq57O6giaZi0c',
+    eur: 'https://buy.stripe.com/dRm14n5zO4kqcAgeMOaZi0d',
+    gbp: 'https://buy.stripe.com/28E4gzfao04a1VC6giaZi0e',
+  },
+  business: {
+    usd: 'https://buy.stripe.com/14A3cv9Q45ou7fW202aZi0f',
+    eur: 'https://buy.stripe.com/fZu6oHaU88AG6bSbACaZi0g',
+    gbp: 'https://buy.stripe.com/6oUeVd6DS18eas89suaZi0h',
+  },
+};
+
+/**
+ * Builds the annual Stripe Payment Link for the exact plan + currency. The user id and email
+ * are passed so the Stripe webhook can attach the subscription to the right account.
+ */
+export function getAnnualPaymentLink(
+  plan: RequestedPlan,
+  currency: RequestedCurrency,
+  customer?: { uid?: string | null; email?: string | null }
+): string {
+  const url = new URL(ANNUAL_PAYMENT_LINKS[plan][currency]);
+  if (customer?.uid) url.searchParams.set('client_reference_id', customer.uid);
+  if (customer?.email) url.searchParams.set('prefilled_email', customer.email);
+  return url.toString();
+}
+
+export function getAnnualMonthlyEquivalent(plan: RequestedPlan, currency: RequestedCurrency): number | null {
+  const annual = getDisplayPrice(plan, currency, 'annual');
+  return annual === null ? null : Math.round((annual / 12) * 100) / 100;
+}
+
+/** Largest whole-percent annual saving vs. 12 monthly payments, rounded down so it is never overstated. */
+export function getMaxAnnualSavingsPercent(currency: RequestedCurrency): number | null {
+  const plans: RequestedPlan[] = ['economy', 'business'];
+  const savings = plans
+    .map((plan) => {
+      const monthly = getDisplayPrice(plan, currency, 'monthly');
+      const annual = getDisplayPrice(plan, currency, 'annual');
+      return monthly && annual ? (1 - annual / (monthly * 12)) * 100 : null;
+    })
+    .filter((value): value is number => value !== null && value > 0);
+  return savings.length ? Math.floor(Math.max(...savings)) : null;
+}
 
 export function normalizePlan(raw: string | null | undefined): RequestedPlan | null {
   const value = raw?.trim().toLowerCase();
