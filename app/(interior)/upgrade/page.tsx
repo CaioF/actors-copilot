@@ -12,7 +12,10 @@ import {
   SUPPORTED_CURRENCIES,
   clearPlanSelection,
   formatDisplayPrice,
+  getAnnualMonthlyEquivalent,
+  getAnnualPaymentLink,
   getDisplayPrice,
+  getMaxAnnualSavingsPercent,
   parsePlanSelection,
   readPlanSelection,
   type RequestedCurrency,
@@ -37,6 +40,8 @@ const currencySupportFetcher = async (url: string): Promise<CurrencySupportMap |
 interface TierCardProps {
   badge: string;
   price: string | null;
+  priceUnit: string;
+  priceNote: string | null;
   description: string;
   features: string[];
   tierKey: RequestedPlan;
@@ -51,6 +56,8 @@ interface TierCardProps {
 function PricingCard({
   badge,
   price,
+  priceUnit,
+  priceNote,
   description,
   features,
   tierKey,
@@ -93,7 +100,7 @@ function PricingCard({
           )}
         </div>
 
-        <div className="flex items-baseline mb-4">
+        <div className={cn("flex items-baseline", priceNote ? "mb-1" : "mb-4")}>
           {price ? (
             <>
               <span
@@ -110,7 +117,7 @@ function PricingCard({
                   isFeatured ? "text-neutral-400" : "text-muted-foreground"
                 )}
               >
-                /month
+                {priceUnit}
               </span>
             </>
           ) : (
@@ -124,6 +131,16 @@ function PricingCard({
             </span>
           )}
         </div>
+        {price && priceNote && (
+          <p
+            className={cn(
+              "text-xs font-medium mb-4",
+              isFeatured ? "text-neutral-400" : "text-muted-foreground"
+            )}
+          >
+            {priceNote}
+          </p>
+        )}
 
         <p
           className={cn(
@@ -237,11 +254,24 @@ function UpgradeContent() {
     return amount === null ? null : formatDisplayPrice(amount, currency);
   };
 
-  // USD keeps the existing checkout behaviour; other currencies require a verified Stripe price.
+  const priceUnit = billingCycle === "annual" ? "/year" : "/month";
+
+  const priceNote = (plan: RequestedPlan): string | null => {
+    if (billingCycle !== "annual") return null;
+    const monthlyEquivalent = getAnnualMonthlyEquivalent(plan, currency);
+    if (monthlyEquivalent === null) return null;
+    return `Billed annually. Equivalent to ${formatDisplayPrice(monthlyEquivalent, currency)}/month.`;
+  };
+
+  const annualSavingsPercent = getMaxAnnualSavingsPercent(currency);
+
+  // Annual plans use fixed Stripe Payment Links for every currency. Monthly: USD keeps the
+  // existing checkout behaviour; other currencies require a verified Stripe price.
   const checkoutBlockedReason = (plan: RequestedPlan): string | null => {
+    if (billingCycle === "annual") return null;
     if (currency === "usd") return null;
     if (getDisplayPrice(plan, currency, billingCycle) === null) {
-      return `${billingCycle === "annual" ? "Annual" : "Monthly"} billing in ${currencyLabel} is not yet available.`;
+      return `Monthly billing in ${currencyLabel} is not yet available.`;
     }
     if (supportLoading) return "Checking payment availability...";
     if (!currencySupport?.[billingCycle]?.[plan]?.includes(currency)) {
@@ -254,6 +284,14 @@ function UpgradeContent() {
     if (actionLoading || checkoutBlockedReason(tier)) return;
     setActionLoading(true);
     setCheckoutError(null);
+
+    if (billingCycle === "annual") {
+      window.location.href = getAnnualPaymentLink(tier, currency, {
+        uid: user?.uid,
+        email: user?.email,
+      });
+      return;
+    }
 
     try {
       const response = await fetch("/api/billing/checkout", {
@@ -366,7 +404,9 @@ function UpgradeContent() {
               )}
             >
               <span>Annual</span>
-              <span className="text-primary font-bold text-[10px]">-20%</span>
+              {annualSavingsPercent !== null && (
+                <span className="text-primary font-bold text-[10px]">{`-${annualSavingsPercent}%`}</span>
+              )}
             </button>
           </div>
 
@@ -416,6 +456,8 @@ function UpgradeContent() {
           <PricingCard
             badge="ECONOMY CLASS"
             price={displayPrice("economy")}
+            priceUnit={priceUnit}
+            priceNote={priceNote("economy")}
             description="Perfect for actors expanding their base analytical workflows and audition setups."
             tierKey="economy"
             isActive={user?.tier === "economy"}
@@ -434,6 +476,8 @@ function UpgradeContent() {
           <PricingCard
             badge="BUSINESS CLASS"
             price={displayPrice("business")}
+            priceUnit={priceUnit}
+            priceNote={priceNote("business")}
             description="The complete experience offering advanced generative modules and expert system toolsets."
             tierKey="business"
             isFeatured={true}
