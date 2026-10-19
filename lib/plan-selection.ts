@@ -26,21 +26,21 @@ const DISPLAY_PRICES: Record<DisplayBillingCycle, Partial<Record<RequestedCurren
   },
   annual: {
     usd: { economy: 190, business: 290 },
-    eur: { economy: 190, business: 290 },
-    gbp: { economy: 140, business: 220 },
+    eur: { economy: 170, business: 260 },
+    gbp: { economy: 145, business: 220 },
   },
 };
 
 export const ANNUAL_PAYMENT_LINKS: Record<RequestedPlan, Record<RequestedCurrency, string>> = {
   economy: {
-    usd: 'https://buy.stripe.com/3cIfZh2nC4kq57O6giaZi0c',
-    eur: 'https://buy.stripe.com/dRm14n5zO4kqcAgeMOaZi0d',
-    gbp: 'https://buy.stripe.com/28E4gzfao04a1VC6giaZi0e',
+    usd: 'https://buy.stripe.com/9B628raU8aIOgQw0VYaZi0i',
+    eur: 'https://buy.stripe.com/14A9AT1jy8AG57OawyaZi0j',
+    gbp: 'https://buy.stripe.com/7sY7sL8M05oucAg346aZi0k',
   },
   business: {
-    usd: 'https://buy.stripe.com/14A3cv9Q45ou7fW202aZi0f',
-    eur: 'https://buy.stripe.com/fZu6oHaU88AG6bSbACaZi0g',
-    gbp: 'https://buy.stripe.com/6oUeVd6DS18eas89suaZi0h',
+    usd: 'https://buy.stripe.com/dRmeVd2nC6sy57O7kmaZi0l',
+    eur: 'https://buy.stripe.com/8x23cv5zO2ci2ZG202aZi0m',
+    gbp: 'https://buy.stripe.com/8x29AT5zO4kqas80VYaZi0n',
   },
 };
 
