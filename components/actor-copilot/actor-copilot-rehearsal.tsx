@@ -875,7 +875,9 @@ export function ActorCopilotRehearsal({
           const isActive = index === currentLineIndex;
           const isActorLine = line.character === actorCharacter;
           const isPastLine = index < currentLineIndex;
-          const activeVoice = characterVoices[line.character] || getVoiceForCharacter(line.character);
+          const activeVoice =
+            characterVoices[line.character] ||
+            getVoiceForCharacter(line.character, scene.characters.indexOf(line.character));
 
           return (
             <div
@@ -1163,7 +1165,8 @@ export function ActorCopilotRehearsal({
 
             <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1">
               {aiCharactersInScene.map((char) => {
-                const currentVoiceId = characterVoices[char] || getVoiceForCharacter(char);
+                const currentVoiceId =
+                  characterVoices[char] || getVoiceForCharacter(char, scene.characters.indexOf(char));
                 return (
                   <div key={char} className="p-4 rounded-2xl border border-border bg-muted/30">
                     <div className="flex items-center justify-between mb-2">

@@ -53,8 +53,70 @@ export const AVAILABLE_GEMINI_VOICES: VoiceOption[] = [
   { id: "Kore", name: "Kore", description: "Warm & Clear (Female)", gender: "female" },
   { id: "Fenrir", name: "Fenrir", description: "Intense & Dramatic (Male)", gender: "male" },
   { id: "Leda", name: "Leda", description: "Calm & Soft (Female)", gender: "female" },
-  { id: "Orpheus", name: "Orpheus", description: "Smooth & Melodic (Male)", gender: "male" },
+  { id: "Orus", name: "Orus", description: "Smooth & Melodic (Male)", gender: "male" },
 ];
+
+/**
+ * Every prebuilt voice name accepted by the Gemini TTS models.
+ *
+ * Gemini rejects unknown voice names with a 400 INVALID_ARGUMENT, and the
+ * Reader Copilot surfaces that as a failed voice, so the API layer validates
+ * the requested voice against this list before calling Gemini.
+ *
+ * @see https://ai.google.dev/gemini-api/docs/voice
+ */
+export const GEMINI_TTS_VOICE_IDS: readonly string[] = [
+  "Achernar",
+  "Achird",
+  "Algenib",
+  "Algieba",
+  "Alnilam",
+  "Aoede",
+  "Autonoe",
+  "Callirrhoe",
+  "Charon",
+  "Despina",
+  "Enceladus",
+  "Erinome",
+  "Fenrir",
+  "Gacrux",
+  "Iapetus",
+  "Kore",
+  "Laomedeia",
+  "Leda",
+  "Orus",
+  "Pulcherrima",
+  "Puck",
+  "Rasalgethi",
+  "Sadachbia",
+  "Sadaltager",
+  "Schedar",
+  "Sulafat",
+  "Umbriel",
+  "Vindemiatrix",
+  "Zephyr",
+  "Zubenelgenubi",
+];
+
+/** Voice used when the requested one is unknown to Gemini. */
+export const DEFAULT_GEMINI_VOICE_ID = "Puck";
+
+/**
+ * Returns the voice id to use for a Gemini TTS request.
+ *
+ * @param voiceName - The voice requested by the client.
+ * @returns {string} A voice name accepted by Gemini, or the default voice.
+ */
+export function resolveGeminiVoice(voiceName?: string | null): string {
+  if (!voiceName) return DEFAULT_GEMINI_VOICE_ID;
+
+  const normalized = voiceName.trim();
+  const match = GEMINI_TTS_VOICE_IDS.find(
+    (voiceId) => voiceId.toLowerCase() === normalized.toLowerCase()
+  );
+
+  return match ?? DEFAULT_GEMINI_VOICE_ID;
+}
 
 /**
  * Normalizes text for fuzzy comparison by lowercasing and removing punctuation.
@@ -149,17 +211,39 @@ export const CHARACTER_VOICE_MAP: Record<string, string> = {
   ELIZABETH: "Kore",
   DAVID: "Charon",
   AMANDA: "Leda",
-  MICHAEL: "Orpheus",
+  MICHAEL: "Orus",
 };
 
 /**
+ * Voice rotation used for characters without an explicit mapping.
+ *
+ * The order is kept stable so a given scene always resolves to the same voice
+ * for the same character position, and every entry must be a voice accepted by
+ * the Gemini TTS models.
+ */
+const VOICE_ROTATION: readonly string[] = [
+  "Puck",
+  "Aoede",
+  "Fenrir",
+  "Kore",
+  "Charon",
+  "Leda",
+  "Orus",
+];
+
+/**
  * Returns a suitable voice for an AI character name.
+ *
+ * @param characterName - Name of the AI character.
+ * @param index - Position of the character inside the scene, used to rotate
+ * voices for characters without an explicit mapping.
+ * @returns {string} A voice name accepted by the Gemini TTS models.
  */
 export function getVoiceForCharacter(characterName: string, index: number = 0): string {
   const upper = characterName.toUpperCase().trim();
   if (CHARACTER_VOICE_MAP[upper]) {
     return CHARACTER_VOICE_MAP[upper];
   }
-  const voices = ["Puck", "Aoede", "Fenrir", "Kore", "Charon", "Leda", "Orpheus"];
-  return voices[index % voices.length];
+  const safeIndex = Number.isFinite(index) && index > 0 ? Math.floor(index) : 0;
+  return VOICE_ROTATION[safeIndex % VOICE_ROTATION.length];
 }

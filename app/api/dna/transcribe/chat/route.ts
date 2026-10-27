@@ -28,8 +28,8 @@ export async function POST(request: Request) {
 
     // initialize fast AI
     const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
-    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
+    const { getAiApp } = await import("@/lib/firebase-ai");
+    const ai = getAI(await getAiApp(), { backend: new VertexAIBackend() });
     
     // transcription
     const transcriptionModel = getGenerativeModel(ai, {

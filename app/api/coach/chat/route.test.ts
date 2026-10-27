@@ -44,6 +44,10 @@ jest.mock("@/lib/firebase", () => ({
   getApp: jest.fn(),
 }));
 
+jest.mock("@/lib/firebase-ai", () => ({
+  getAiApp: jest.fn().mockResolvedValue({}),
+}));
+
 jest.mock("firebase/ai", () => {
   class MockVertexAIBackend {
     constructor(_location: string) {}

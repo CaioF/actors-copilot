@@ -323,9 +323,9 @@ export async function POST(request: Request) {
 
     // Initialize Vertex AI
     const { getAI, getGenerativeModel, VertexAIBackend } = await import('firebase/ai');
-    const { getApp: getFirebaseApp } = await import('@/lib/firebase');
+    const { getAiApp } = await import('@/lib/firebase-ai');
 
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
+    const ai = getAI(await getAiApp(), { backend: new VertexAIBackend() });
 
     // Prepare DNA context for AI
     const dnaContext = dnaData ? {

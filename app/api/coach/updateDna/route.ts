@@ -102,9 +102,9 @@ export async function POST(request: Request) {
 
     // 4. Vertex AI Initialization
     const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
-    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+    const { getAiApp } = await import("@/lib/firebase-ai");
 
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend('global') });
+    const ai = getAI(await getAiApp(), { backend: new VertexAIBackend('global') });
     
     // Explicit directive against acting terminology based on strict user constraints
     const CONVERSATION_ANALYSIS_PROMPT = `

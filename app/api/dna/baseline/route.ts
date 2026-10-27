@@ -135,9 +135,9 @@ export async function POST(request: Request) {
 
     // 3. INICIALIZAÇÃO DA VERTEX AI PARA EXTRAÇÃO EM LOTE
     const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
-    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+    const { getAiApp } = await import("@/lib/firebase-ai");
 
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
+    const ai = getAI(await getAiApp(), { backend: new VertexAIBackend() });
     
     // Prompt específico para dissecação de documentos completos
     const BULK_SYSTEM_PROMPT = `

@@ -74,9 +74,9 @@ export async function POST(request: Request) {
         });
 
         const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
-        const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+        const { getAiApp } = await import("@/lib/firebase-ai");
 
-        const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend() });
+        const ai = getAI(await getAiApp(), { backend: new VertexAIBackend() });
         const model = getGenerativeModel(ai, { 
             model: "gemini-2.5-flash",
             systemInstruction: { role: "user", parts: [{ text: SYNTHESIZER_PROMPT }] },
