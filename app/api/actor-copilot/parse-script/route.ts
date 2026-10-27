@@ -48,9 +48,9 @@ export async function POST(request: Request) {
 
     // 2. INITIALIZE VERTEX AI / GEMINI FOR STRUCTURED SCRIPT PARSING
     const { getAI, getGenerativeModel, VertexAIBackend, SchemaType } = await import("firebase/ai");
-    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+    const { getAiApp } = await import("@/lib/firebase-ai");
 
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend("global") });
+    const ai = getAI(await getAiApp(), { backend: new VertexAIBackend("global") });
 
     const parserModel = getGenerativeModel(ai, {
       model: "gemini-3-flash-preview",

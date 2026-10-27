@@ -2,6 +2,9 @@ import {
   normalizeText,
   matchActorLine,
   getVoiceForCharacter,
+  resolveGeminiVoice,
+  AVAILABLE_GEMINI_VOICES,
+  GEMINI_TTS_VOICE_IDS,
 } from "./script-parser";
 
 describe("script-parser utilities", () => {
@@ -69,6 +72,40 @@ describe("script-parser utilities", () => {
       expect(typeof voice1).toBe("string");
       expect(typeof voice2).toBe("string");
       expect(voice1).not.toBe("");
+    });
+
+    it("keeps a stable voice rotation for unmapped characters", () => {
+      expect(getVoiceForCharacter("DETECTIVE MILLER", 0)).toBe("Puck");
+      expect(getVoiceForCharacter("OFFICER SMITH", 1)).toBe("Aoede");
+      expect(getVoiceForCharacter("OFFICER SMITH", 2)).toBe("Fenrir");
+    });
+
+    it("never returns a voice that Gemini would reject", () => {
+      const characters = ["ALEX", "NORA", "DETECTIVE MILLER", "MICHAEL"];
+      characters.forEach((character, index) => {
+        const voice = getVoiceForCharacter(character, index);
+        expect(GEMINI_TTS_VOICE_IDS).toContain(voice);
+      });
+    });
+  });
+
+  describe("resolveGeminiVoice", () => {
+    it("keeps a valid prebuilt voice", () => {
+      expect(resolveGeminiVoice("Aoede")).toBe("Aoede");
+      expect(resolveGeminiVoice("puck")).toBe("Puck");
+    });
+
+    it("falls back to a valid voice for unknown names", () => {
+      // "Orpheus" is not a Gemini prebuilt voice, the API answers 400 for it.
+      expect(resolveGeminiVoice("Orpheus")).toBe("Puck");
+      expect(resolveGeminiVoice("")).toBe("Puck");
+      expect(resolveGeminiVoice(undefined)).toBe("Puck");
+    });
+
+    it("only ever returns voices accepted by Gemini", () => {
+      AVAILABLE_GEMINI_VOICES.forEach((voice) => {
+        expect(GEMINI_TTS_VOICE_IDS).toContain(voice.id);
+      });
     });
   });
 });

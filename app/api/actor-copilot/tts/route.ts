@@ -32,6 +32,28 @@ function wrapPcmInWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1, bi
 }
 
 /**
+ * TTS models to attempt, in order.
+ *
+ * `gemini-3.1-flash-tts-preview` is the model used by the current Firebase AI
+ * Logic text-to-speech guide. The 2.5 models are kept as fallbacks because
+ * they are the ones available on the Agent Platform (Vertex AI) endpoints and
+ * they are being retired during October 2026.
+ */
+const CANDIDATE_MODELS = [
+  "gemini-3.1-flash-tts-preview",
+  "gemini-2.5-flash-tts",
+  "gemini-2.5-pro-tts",
+];
+
+/**
+ * Gemini 3 models do not accept `temperature`, so it is only sent for the
+ * 2.5 generation.
+ */
+function supportsTemperature(modelName: string): boolean {
+  return modelName.includes("2.5");
+}
+
+/**
  * Generates expressive performance TTS audio using Gemini Flash models with automatic model fallback resilience.
  */
 export async function POST(request: Request) {
@@ -54,35 +76,45 @@ export async function POST(request: Request) {
     }
 
     const speakerName = character || "AI Character";
-    const selectedVoice = voiceName || "Puck";
+
+    // Gemini answers with 400 INVALID_ARGUMENT for unknown prebuilt voices, so
+    // the requested voice is validated against the official list before the
+    // request is sent.
+    const { resolveGeminiVoice } = await import("@/lib/actor-copilot/script-parser");
+    const selectedVoice = resolveGeminiVoice(voiceName);
 
     const performancePrompt = `Act as ${speakerName}. ${emotionNote ? `Tone: ${emotionNote}. ` : ""}Perform line naturally without extra commentary. Speak EXACTLY:\n"${text.trim()}"`;
 
     const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
-    const { getApp: getFirebaseApp } = await import("@/lib/firebase");
+    // `getAiApp` returns a Firebase Server App bound to an App Check token.
+    // Gemini TTS models are only reachable through Firebase AI Logic when the
+    // request carries that token, otherwise the proxy answers 403.
+    const { getAiApp } = await import("@/lib/firebase-ai");
 
-    const ai = getAI(getFirebaseApp(), { backend: new VertexAIBackend("global") });
-
-    // Models to attempt in sequence (Primary working TTS model for Vertex AI)
-    const candidateModels = ["gemini-2.5-flash-tts"];
+    const ai = getAI(await getAiApp(), { backend: new VertexAIBackend("global") });
 
     let lastError: any = null;
 
-    for (const modelName of candidateModels) {
+    for (const modelName of CANDIDATE_MODELS) {
       try {
-        const ttsModel = getGenerativeModel(ai, {
-          model: modelName,
-          generationConfig: {
-            temperature: 0.2,
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: selectedVoice,
-                },
+        const generationConfig: Record<string, unknown> = {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: selectedVoice,
               },
             },
-          } as any,
+          },
+        };
+
+        if (supportsTemperature(modelName)) {
+          generationConfig.temperature = 0.2;
+        }
+
+        const ttsModel = getGenerativeModel(ai, {
+          model: modelName,
+          generationConfig: generationConfig as any,
         });
 
         const result = await ttsModel.generateContent(performancePrompt);
@@ -119,6 +151,8 @@ export async function POST(request: Request) {
             modelUsed: modelName,
           });
         }
+
+        lastError = new Error(`Model ${modelName} returned no audio content.`);
       } catch (err: any) {
         lastError = err;
         logger.warn({
@@ -129,14 +163,44 @@ export async function POST(request: Request) {
       }
     }
 
-    // If all models failed, return clean 429/500 error payload
-    const isQuota = lastError?.message?.includes("Quota exceeded") || lastError?.message?.includes("429");
+    // If all models failed, surface the real reason instead of a generic 500.
+    const errorMessage: string =
+      lastError?.message || (lastError ? String(lastError) : "Unknown error");
+    const isQuota =
+      errorMessage.includes("Quota exceeded") ||
+      errorMessage.includes("RESOURCE_EXHAUSTED") ||
+      errorMessage.includes("429");
+    const isAppCheck =
+      errorMessage.includes("App Check") || errorMessage.includes("appcheck");
+
+    if (isAppCheck) {
+      logger.error({
+        msg: "Gemini TTS rejected the request because Firebase App Check is not enforced.",
+        err: errorMessage,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Voice synthesis requires Firebase App Check. Enforce App Check for the Firebase AI Logic API in the Firebase console and try again.",
+          code: "APP_CHECK_REQUIRED",
+        },
+        { status: 503 }
+      );
+    }
+
+    logger.error({
+      msg: "All Gemini TTS candidates failed.",
+      err: errorMessage,
+    });
+
     return NextResponse.json(
       {
         success: false,
         error: isQuota
           ? "Voice synthesis quota temporarily reached. Rehearsal will continue."
           : "Could not generate speech audio.",
+        detail: isQuota ? undefined : errorMessage,
       },
       { status: isQuota ? 429 : 500 }
     );
