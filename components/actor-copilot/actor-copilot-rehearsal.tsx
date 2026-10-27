@@ -33,6 +33,36 @@ import {
   AVAILABLE_GEMINI_VOICES,
 } from "@/lib/actor-copilot/script-parser";
 
+type PlaybackSpeed = "slow" | "normal" | "fast";
+
+const PLAYBACK_SPEEDS: { id: PlaybackSpeed; label: string; rate: number }[] = [
+  { id: "slow", label: "Slow", rate: 0.85 },
+  { id: "normal", label: "Normal", rate: 1.0 },
+  { id: "fast", label: "Fast", rate: 1.1 },
+];
+
+const DEFAULT_PAUSE_MS = 1000;
+const SHORT_LINE_PAUSE_MS = 800;
+const EMOTIONAL_PAUSE_MS = 1200;
+const TRAILING_OFF_PAUSE_MS = 1600;
+const ERROR_ADVANCE_DELAY_MS = 500;
+const MUTED_ADVANCE_DELAY_MS = 400;
+
+/**
+ * Pause applied after an AI line has finished playing, before the next AI line
+ * starts. No pause is needed when the actor speaks next: their turn begins
+ * as soon as the AI finishes.
+ */
+function getPauseAfterAiLine(line: ScriptLine, nextLine: ScriptLine | undefined, actorCharacter: string): number {
+  if (!nextLine || nextLine.character === actorCharacter) return 0;
+
+  const dialogue = line.dialogue.trim();
+  if (/(\.\.\.|…|—)\s*["”']?$/.test(dialogue)) return TRAILING_OFF_PAUSE_MS;
+  if (line.emotionNote) return EMOTIONAL_PAUSE_MS;
+  if (dialogue.split(/\s+/).length <= 2) return SHORT_LINE_PAUSE_MS;
+  return DEFAULT_PAUSE_MS;
+}
+
 interface ActorCopilotRehearsalProps {
   scene: SceneData;
   auditionId?: string;
@@ -95,6 +125,15 @@ export function ActorCopilotRehearsal({
   const speechRecognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAdvancingRef = useRef<boolean>(false);
+
+  // Playback pacing: speed preference, inter-line pause timer and session guards
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>("normal");
+  const [rehearsalSession, setRehearsalSession] = useState<number>(0);
+  const sessionRef = useRef<number>(0);
+  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startedLineKeyRef = useRef<string | null>(null);
+  const playbackRateRef = useRef<number>(1);
+  playbackRateRef.current = PLAYBACK_SPEEDS.find((s) => s.id === playbackSpeed)?.rate ?? 1;
 
   const micStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -191,13 +230,33 @@ export function ActorCopilotRehearsal({
     }
   }, [currentLineIndex]);
 
-  // Clean up audio playback on unmount
+  // Invalidates the current session, stops audio and clears any pending "next line" timer
+  const cancelPendingPlayback = useCallback(() => {
+    sessionRef.current += 1;
+    startedLineKeyRef.current = null;
+    if (pauseTimerRef.current) {
+      clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+    if (currentAudioRef.current) {
+      currentAudioRef.current.onended = null;
+      currentAudioRef.current.onerror = null;
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+  }, []);
+
+  // Apply speed changes immediately to a line that is already playing
+  useEffect(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.playbackRate = playbackRateRef.current;
+    }
+  }, [playbackSpeed]);
+
+  // Clean up audio playback and timers on unmount
   useEffect(() => {
     return () => {
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-      }
+      cancelPendingPlayback();
       if (micStreamRef.current) {
         micStreamRef.current.getTracks().forEach((t) => t.stop());
         micStreamRef.current = null;
@@ -305,12 +364,37 @@ export function ActorCopilotRehearsal({
 
   // --- AI LINE READING (TTS & PLAYBACK WITH INSTANT CACHE) ---
   const playAiLine = useCallback(
-    async (line: ScriptLine) => {
+    async (line: ScriptLine, lineIndex: number) => {
+      const sessionId = sessionRef.current;
+      const isStale = () => sessionRef.current !== sessionId;
+
+      // Moves to the next line only if this session is still current and the
+      // rehearsal is still on the line that just finished.
+      const advanceAfter = (delayMs: number) => {
+        const advance = () => {
+          pauseTimerRef.current = null;
+          if (isStale()) return;
+          setCurrentLineIndex((prev) => (prev === lineIndex ? prev + 1 : prev));
+        };
+        if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+        if (delayMs <= 0) {
+          advance();
+        } else {
+          pauseTimerRef.current = setTimeout(advance, delayMs);
+        }
+      };
+
       if (isAudioMuted) {
-        setTimeout(() => {
-          setCurrentLineIndex((prev) => Math.min(prev + 1, scene.lines.length));
-        }, 400);
+        advanceAfter(MUTED_ADVANCE_DELAY_MS);
         return;
+      }
+
+      // Never let two dialogue lines play at once
+      if (currentAudioRef.current) {
+        currentAudioRef.current.onended = null;
+        currentAudioRef.current.onerror = null;
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
       }
 
       setStatus("AI_READING");
@@ -365,37 +449,41 @@ export function ActorCopilotRehearsal({
           audioElementCacheRef.current.set(line.id, audioObj);
         }
 
+        // Rehearsal was restarted, stopped or unmounted while audio was loading
+        if (isStale()) return;
         if (!audioObj) throw new Error("No audio available for line.");
 
         currentAudioRef.current = audioObj;
 
+        // The pause starts only once the browser reports the line has finished playing
         audioObj.onended = () => {
+          if (isStale()) return;
           setIsProcessing(false);
-          setCurrentLineIndex((prev) => prev + 1);
+          advanceAfter(getPauseAfterAiLine(line, scene.lines[lineIndex + 1], actorCharacter ?? ""));
         };
 
         audioObj.onerror = (e) => {
           logger.warn({ err: e, msg: "Audio element playback error" });
+          if (isStale()) return;
           setIsProcessing(false);
-          setTimeout(() => {
-            setCurrentLineIndex((prev) => prev + 1);
-          }, 500);
+          advanceAfter(ERROR_ADVANCE_DELAY_MS);
         };
 
         audioObj.currentTime = 0;
+        audioObj.playbackRate = playbackRateRef.current;
+        audioObj.preservesPitch = true;
         await audioObj.play();
       } catch (err: any) {
+        if (isStale()) return;
         logger.warn({ msg: "AI TTS line playback warning/error", errMessage: err?.message });
         setErrorMessage(err.message || "Could not play AI line audio.");
         setIsProcessing(false);
 
         // Advance line after short fallback delay so scene progression is never blocked
-        setTimeout(() => {
-          setCurrentLineIndex((prev) => prev + 1);
-        }, 500);
+        advanceAfter(ERROR_ADVANCE_DELAY_MS);
       }
     },
-    [characterVoices, isAudioMuted, scene.characters, scene.lines.length, scene.title]
+    [actorCharacter, characterVoices, isAudioMuted, scene.characters, scene.lines, scene.title]
   );
 
   // --- PREVIEW A SPECIFIC VOICE ---
@@ -457,10 +545,14 @@ export function ActorCopilotRehearsal({
       // It's the actor's turn! Wait for microphone input.
       setStatus("WAITING_FOR_ACTOR");
     } else {
-      // It's the AI's turn!
-      void playAiLine(line);
+      // It's the AI's turn! Each line starts once per session, even if
+      // playAiLine is re-created (e.g. voice change or mute toggle mid-line).
+      const lineKey = `${sessionRef.current}:${currentLineIndex}`;
+      if (startedLineKeyRef.current === lineKey) return;
+      startedLineKeyRef.current = lineKey;
+      void playAiLine(line, currentLineIndex);
     }
-  }, [actorCharacter, currentLineIndex, playAiLine, scene.lines]);
+  }, [actorCharacter, currentLineIndex, playAiLine, scene.lines, rehearsalSession]);
 
   // --- HANDS-FREE AUTOMATIC LINE ADVANCE FUNCTION ---
   const completeActorTurn = useCallback(
@@ -497,8 +589,10 @@ export function ActorCopilotRehearsal({
       setLiveTranscript("");
       setStatus("MATCHING_LINE");
 
+      const sessionId = sessionRef.current;
       setTimeout(() => {
         isAdvancingRef.current = false;
+        if (sessionRef.current !== sessionId) return;
         setCurrentLineIndex((prev) => prev + 1);
       }, 250);
     },
@@ -719,9 +813,9 @@ export function ActorCopilotRehearsal({
   };
 
   const handleResetRehearsal = () => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-    }
+    cancelPendingPlayback();
+    setRehearsalSession(sessionRef.current);
+    setIsProcessing(false);
     if (isRecording) {
       stopRecording();
     }
@@ -841,6 +935,30 @@ export function ActorCopilotRehearsal({
             <span className="hidden sm:inline">Partner Voices</span>
           </button>
 
+          {/* AI PLAYBACK SPEED */}
+          <div
+            role="group"
+            aria-label="AI voice speed"
+            className="hidden sm:flex items-center rounded-full border border-border bg-card p-0.5 shadow-sm"
+          >
+            {PLAYBACK_SPEEDS.map((speed) => (
+              <button
+                key={speed.id}
+                type="button"
+                onClick={() => setPlaybackSpeed(speed.id)}
+                aria-pressed={playbackSpeed === speed.id}
+                title={`${speed.label} (${speed.rate}x)`}
+                className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  playbackSpeed === speed.id
+                    ? "bg-primary/15 text-primary font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {speed.label}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={() => setIsAudioMuted((prev) => !prev)}
             className="p-2.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -858,7 +976,11 @@ export function ActorCopilotRehearsal({
           </button>
 
           <button
-            onClick={() => setActorCharacter(null)}
+            onClick={() => {
+              cancelPendingPlayback();
+              setIsProcessing(false);
+              setActorCharacter(null);
+            }}
             className="text-xs font-medium text-muted-foreground hover:text-primary px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors"
           >
             Change Character
