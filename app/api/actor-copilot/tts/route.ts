@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     const { resolveGeminiVoice } = await import("@/lib/actor-copilot/script-parser");
     const selectedVoice = resolveGeminiVoice(voiceName);
 
-    const performancePrompt = `Act as ${speakerName}. ${emotionNote ? `Tone: ${emotionNote}. ` : ""}Perform line naturally without extra commentary. Speak EXACTLY:\n"${text.trim()}"`;
+    const performancePrompt = `Act as ${speakerName}. ${emotionNote ? `Tone: ${emotionNote}. ` : ""}Pace: a relaxed, slightly slower conversational pace with clear articulation. Perform line naturally without extra commentary. Speak EXACTLY:\n"${text.trim()}"`;
 
     const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
     // `getAiApp` returns a Firebase Server App bound to an App Check token.
