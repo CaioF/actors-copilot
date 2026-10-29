@@ -67,7 +67,9 @@ RULES:
 3. Preserve the exact dialogue wording, punctuation, and intent of each line.
 4. Extract all unique character names present in the scene.
 5. Provide a brief emotion/tone note for each line (e.g. "tense, defensive", "whispering", "sarcastic", "hopeful") based on scene context.
-6. Provide a descriptive title for the scene (e.g. "Scene 1: Living Room").`,
+6. Provide a descriptive title for the scene (e.g. "Scene 1: Living Room").
+7. Preserve EVERY stage direction / action description (non-dialogue narrative text such as "Emily takes out her phone and unlocks it slowly.") exactly as written. Never drop, merge, summarize, rewrite or translate them. Stage directions are NOT dialogue lines and are NOT assigned to any character.
+8. Put each stage direction in the "directionsBefore" array of the dialogue line that FOLLOWS it in the script, keeping the original order. If several stage directions appear in a row, list them all in order. Stage directions that appear after the last dialogue line go in the top-level "trailingDirections" array. Do not repeat a stage direction anywhere else. Do not include stage directions inside "dialogue".`,
           },
         ],
       },
@@ -89,9 +91,17 @@ RULES:
                   character: { type: SchemaType.STRING },
                   dialogue: { type: SchemaType.STRING },
                   emotionNote: { type: SchemaType.STRING },
+                  directionsBefore: {
+                    type: SchemaType.ARRAY,
+                    items: { type: SchemaType.STRING },
+                  },
                 },
                 required: ["character", "dialogue"],
               },
+            },
+            trailingDirections: {
+              type: SchemaType.ARRAY,
+              items: { type: SchemaType.STRING },
             },
           },
           required: ["sceneTitle", "characters", "lines"],
@@ -106,7 +116,18 @@ RULES:
     const parsed = JSON.parse(responseText) as {
       sceneTitle: string;
       characters: string[];
-      lines: Array<{ character: string; dialogue: string; emotionNote?: string }>;
+      lines: Array<{
+        character: string;
+        dialogue: string;
+        emotionNote?: string;
+        directionsBefore?: string[];
+      }>;
+      trailingDirections?: string[];
+    };
+
+    const cleanDirections = (directions?: string[]) => {
+      const cleaned = (directions ?? []).map((d) => d.trim()).filter(Boolean);
+      return cleaned.length > 0 ? cleaned : undefined;
     };
 
     const sceneId = auditionId || `scene_${Date.now()}`;
@@ -120,6 +141,7 @@ RULES:
       dialogue: item.dialogue.trim(),
       order: index,
       emotionNote: item.emotionNote || undefined,
+      directionsBefore: cleanDirections(item.directionsBefore),
     }));
 
     const scene: SceneData = {
@@ -127,6 +149,7 @@ RULES:
       title: parsed.sceneTitle || "Scene Rehearsal",
       characters: formattedCharacters,
       lines: formattedLines,
+      trailingDirections: cleanDirections(parsed.trailingDirections),
     };
 
     return NextResponse.json({

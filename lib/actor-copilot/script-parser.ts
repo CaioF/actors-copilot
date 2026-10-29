@@ -9,6 +9,11 @@ export interface ScriptLine {
   dialogue: string;
   order: number;
   emotionNote?: string;
+  /**
+   * Verbatim stage directions found in the script immediately before this line
+   * (after the previous dialogue line). Display-only: never spoken or matched.
+   */
+  directionsBefore?: string[];
 }
 
 export interface SceneData {
@@ -16,6 +21,8 @@ export interface SceneData {
   title: string;
   characters: string[];
   lines: ScriptLine[];
+  /** Verbatim stage directions found after the last dialogue line. Display-only. */
+  trailingDirections?: string[];
 }
 
 export type RehearsalStatus =

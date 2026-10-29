@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Fragment, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth } from "firebase/auth";
 import {
@@ -61,6 +61,24 @@ function getPauseAfterAiLine(line: ScriptLine, nextLine: ScriptLine | undefined,
   if (line.emotionNote) return EMOTIONAL_PAUSE_MS;
   if (dialogue.split(/\s+/).length <= 2) return SHORT_LINE_PAUSE_MS;
   return DEFAULT_PAUSE_MS;
+}
+
+/** Display-only script stage directions. Never spoken, matched, or assigned to a character. */
+function StageDirections({ directions }: { directions?: string[] }) {
+  if (!directions?.length) return null;
+  return (
+    <>
+      {directions.map((direction, index) => (
+        <p
+          key={index}
+          data-stage-direction
+          className="px-5 text-sm italic leading-relaxed text-muted-foreground"
+        >
+          {direction}
+        </p>
+      ))}
+    </>
+  );
 }
 
 interface ActorCopilotRehearsalProps {
@@ -1002,8 +1020,9 @@ export function ActorCopilotRehearsal({
             getVoiceForCharacter(line.character, scene.characters.indexOf(line.character));
 
           return (
+            <Fragment key={line.id}>
+            <StageDirections directions={line.directionsBefore} />
             <div
-              key={line.id}
               data-active-line={isActive}
               className={`p-5 rounded-2xl transition-all duration-300 ${
                 isActive
@@ -1119,8 +1138,11 @@ export function ActorCopilotRehearsal({
                 </div>
               )}
             </div>
+            </Fragment>
           );
         })}
+
+        <StageDirections directions={scene.trailingDirections} />
 
         {status === "FINISHED" && (
           <div className="p-8 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/30 text-center animate-in fade-in">
