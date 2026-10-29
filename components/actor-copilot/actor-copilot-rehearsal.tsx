@@ -29,6 +29,7 @@ import {
   ScriptLine,
   RehearsalStatus,
   matchActorLine,
+  getHandsFreeEndpointDelayMs,
   getVoiceForCharacter,
   AVAILABLE_GEMINI_VOICES,
 } from "@/lib/actor-copilot/script-parser";
@@ -105,7 +106,6 @@ export function ActorCopilotRehearsal({
 
   // Hands-Free Auto Flow mode state
   const [isHandsFreeMode, setIsHandsFreeMode] = useState<boolean>(true);
-  const [liveTranscript, setLiveTranscript] = useState<string>("");
   const [isHandsFreeListening, setIsHandsFreeListening] = useState<boolean>(false);
 
   // Custom AI character voice mappings
@@ -127,7 +127,7 @@ export function ActorCopilotRehearsal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Audio level meter & Mic permission state
-  const [audioVolume, setAudioVolume] = useState<number>(0);
+  const audioVolumeRef = useRef<number>(0);
   const [micPermissionError, setMicPermissionError] = useState<boolean>(false);
 
   // Background Audio Pre-fetch Cache for Zero-Latency AI turns
@@ -211,8 +211,7 @@ export function ActorCopilotRehearsal({
               sum += dataArray[i];
             }
             const average = sum / dataArray.length;
-            const normalizedVol = Math.min(100, Math.round((average / 128) * 100));
-            setAudioVolume(normalizedVol);
+            audioVolumeRef.current = Math.min(100, Math.round((average / 128) * 100));
 
             animFrameRef.current = requestAnimationFrame(updateVolume);
           };
@@ -604,7 +603,6 @@ export function ActorCopilotRehearsal({
         }));
       }
 
-      setLiveTranscript("");
       setStatus("MATCHING_LINE");
 
       const sessionId = sessionRef.current;
@@ -618,122 +616,153 @@ export function ActorCopilotRehearsal({
   );
 
   // --- HANDS-FREE AUTOMATIC SPEECH RECOGNITION ENGINE ---
+  // Latest line/handlers live in refs so the recognizer is only rebuilt when the
+  // turn itself changes, never on unrelated re-renders.
+  const currentLineRef = useRef<ScriptLine | undefined>(currentLine);
+  currentLineRef.current = currentLine;
+  const completeActorTurnRef = useRef(completeActorTurn);
+  completeActorTurnRef.current = completeActorTurn;
+
   useEffect(() => {
-    if (!actorCharacter || !isActorTurn || !isHandsFreeMode || isProcessing) {
-      if (speechRecognitionRef.current) {
-        try {
-          speechRecognitionRef.current.stop();
-        } catch (_) {
-          // Ignore errors if recognition already stopped
-        }
-        speechRecognitionRef.current = null;
-      }
+    const SpeechRecognitionAPI =
+      typeof window !== "undefined"
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    const isListeningTurn = !!actorCharacter && isActorTurn && isHandsFreeMode && !isProcessing;
+    if (!isListeningTurn) {
       setIsHandsFreeListening(false);
       return;
     }
-
-    const windowObj = typeof window !== "undefined" ? (window as any) : {};
-    const SpeechRecognitionAPI = windowObj.SpeechRecognition || windowObj.webkitSpeechRecognition;
 
     if (!SpeechRecognitionAPI) {
-      setIsHandsFreeListening(false);
+      setErrorMessage(
+        "Voice recognition is not supported in this browser. Turn off Auto-Flow to use the mic button."
+      );
       return;
     }
 
-    let recognition: any;
-    try {
-      recognition = new SpeechRecognitionAPI();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-      speechRecognitionRef.current = recognition;
+    const VOICE_ACTIVITY_VOLUME = 15;
+    const START_DELAY_MS = 300;
+    const RESTART_DELAY_MS = 250;
+    const MAX_QUICK_FAILURES = 5;
 
-      let currentAccumulatedSpeech = "";
+    let disposed = false;
+    let finished = false;
+    let fatal = false;
+    let recognition: any = null;
+    let committedText = "";
+    let sessionText = "";
+    let lastActivityAt = Date.now();
+    let quickFailures = 0;
+    let startTimer: ReturnType<typeof setTimeout> | null = null;
+    let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
-      recognition.onstart = () => {
+    const getSpokenText = () => `${committedText} ${sessionText}`.trim();
+
+    const startRecognition = () => {
+      if (disposed || fatal) return;
+
+      const instance = new SpeechRecognitionAPI();
+      instance.continuous = true;
+      instance.interimResults = true;
+      instance.lang = "en-US";
+      recognition = instance;
+      speechRecognitionRef.current = instance;
+      const startedAt = Date.now();
+      sessionText = "";
+
+      instance.onstart = () => {
         setIsHandsFreeListening(true);
         setErrorMessage(null);
       };
 
-      recognition.onresult = (event: any) => {
+      instance.onresult = (event: any) => {
         let transcript = "";
-        let isFinalResult = false;
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            isFinalResult = true;
-          }
         }
         const trimmed = transcript.trim();
         if (!trimmed) return;
-
-        currentAccumulatedSpeech = trimmed;
-        setLiveTranscript(trimmed);
-
-        if (currentLine) {
-          const matchResult = matchActorLine(currentLine.dialogue, trimmed, isFinalResult);
-          if (matchResult.isMatch) {
-            completeActorTurn(trimmed);
-            return;
-          }
-        }
-
-        // Natural pause silence detector: if actor spoke line & paused for 1.8s, auto-advance turn
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = setTimeout(() => {
-          if (currentAccumulatedSpeech && !isAdvancingRef.current) {
-            completeActorTurn(currentAccumulatedSpeech);
-          }
-        }, 1800);
+        sessionText = trimmed;
+        lastActivityAt = Date.now();
+        quickFailures = 0;
       };
 
-      recognition.onerror = (event: any) => {
-        if (event.error === "no-speech" || event.error === "aborted") {
-          return;
-        }
-        if (event.error === "not-allowed" || event.error === "audio-capture") {
+      instance.onerror = (event: any) => {
+        if (event.error === "no-speech" || event.error === "aborted") return;
+        if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "audio-capture") {
           setMicPermissionError(true);
+          fatal = true;
         }
         logger.warn({ msg: "Hands-free SpeechRecognition error", error: event.error });
       };
 
-      recognition.onend = () => {
+      instance.onend = () => {
         setIsHandsFreeListening(false);
-        // Automatically resume listening if scene is still waiting for actor turn in hands-free mode
-        if (
-          !isAdvancingRef.current &&
-          actorCharacter &&
-          isHandsFreeMode &&
-          isActorTurn
-        ) {
-          try {
-            recognition.start();
-          } catch (_) {
-            // Ignore errors if recognition already active
-          }
+        committedText = getSpokenText();
+        sessionText = "";
+        if (disposed || finished || fatal) return;
+
+        if (Date.now() - startedAt < 1000) quickFailures += 1;
+        if (quickFailures >= MAX_QUICK_FAILURES) {
+          fatal = true;
+          setErrorMessage("Voice recognition keeps stopping. Turn off Auto-Flow to use the mic button.");
+          return;
         }
+        restartTimer = setTimeout(startRecognition, RESTART_DELAY_MS);
       };
 
-      recognition.start();
-    } catch (err: any) {
-      logger.warn({ msg: "Could not start SpeechRecognition", errMessage: err?.message });
-      setIsHandsFreeListening(false);
-    }
+      try {
+        instance.start();
+      } catch (err: any) {
+        logger.warn({ msg: "Could not start SpeechRecognition", errMessage: err?.message });
+        setIsHandsFreeListening(false);
+      }
+    };
+
+    // End-of-speech detection: the turn only completes after the actor has been
+    // silent (no new words and no voice on the mic) for longer than the endpoint
+    // delay, which is long for unfinished lines so natural pauses never cut them off.
+    const endpointTimer = setInterval(() => {
+      if (disposed || finished) return;
+      if (audioVolumeRef.current > VOICE_ACTIVITY_VOLUME) {
+        lastActivityAt = Date.now();
+      }
+      const spoken = getSpokenText();
+      const line = currentLineRef.current;
+      if (!spoken || !line) return;
+
+      const endpointDelay = getHandsFreeEndpointDelayMs(line.dialogue, spoken);
+      if (Date.now() - lastActivityAt >= endpointDelay) {
+        finished = true;
+        completeActorTurnRef.current(spoken);
+      }
+    }, 150);
+
+    startTimer = setTimeout(startRecognition, START_DELAY_MS);
 
     return () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      disposed = true;
+      clearInterval(endpointTimer);
+      if (startTimer) clearTimeout(startTimer);
+      if (restartTimer) clearTimeout(restartTimer);
       if (recognition) {
         try {
+          recognition.onstart = null;
           recognition.onresult = null;
           recognition.onend = null;
           recognition.onerror = null;
           recognition.stop();
         } catch (_) {
-          // Ignore errors if recognition already stopped
+          // Recognition may already be stopped
+        }
+        if (speechRecognitionRef.current === recognition) {
+          speechRecognitionRef.current = null;
         }
       }
     };
-  }, [actorCharacter, currentLine, isActorTurn, isHandsFreeMode, isProcessing, completeActorTurn]);
+  }, [actorCharacter, currentLineIndex, isActorTurn, isHandsFreeMode, isProcessing]);
 
   // --- MICROPHONE RECORDING & STT ---
   const startRecording = async () => {
@@ -850,7 +879,6 @@ export function ActorCopilotRehearsal({
       silenceTimerRef.current = null;
     }
     isAdvancingRef.current = false;
-    setLiveTranscript("");
     setIsHandsFreeListening(false);
     setCurrentLineIndex(0);
     setTranscripts({});
@@ -912,99 +940,106 @@ export function ActorCopilotRehearsal({
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl mx-auto p-4 sm:p-6 bg-background">
       {/* HEADER CONTROL BAR */}
-      <div className="flex items-center justify-between border-b border-border pb-4 mb-4 gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary px-2.5 py-0.5 rounded-full bg-primary/10">
+      <header className="flex flex-col gap-4 border-b border-border pb-4 mb-4">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="max-w-full truncate text-xs font-semibold uppercase tracking-wider text-primary px-2.5 py-1 rounded-full bg-primary/10">
               {scene.title}
             </span>
-            {projectTitle && <span className="text-xs text-muted-foreground">• {projectTitle}</span>}
+            {projectTitle && (
+              <span className="truncate text-xs text-muted-foreground">{projectTitle}</span>
+            )}
           </div>
-          <h1 className="text-xl font-bold text-foreground mt-1 flex items-center gap-2">
-            Rehearsing as <span className="text-primary font-black">{actorCharacter}</span>
+          <h1 className="flex flex-wrap items-baseline gap-x-2 text-xl sm:text-2xl font-bold leading-tight text-foreground">
+            <span>Rehearsing as</span>
+            <span className="text-primary font-black">{actorCharacter}</span>
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* HANDS-FREE AUTO FLOW TOGGLE */}
-          <button
-            onClick={() => {
-              setIsHandsFreeMode((prev) => !prev);
-              setLiveTranscript("");
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-bold transition-all shadow-sm ${
-              isHandsFreeMode
-                ? "border-primary/50 bg-primary/15 text-primary hover:bg-primary/25 shadow-primary/10"
-                : "border-border bg-card text-muted-foreground hover:bg-muted"
-            }`}
-            title={isHandsFreeMode ? "Hands-Free Auto Flow Active" : "Switch to Hands-Free Auto Flow"}
-          >
-            <Zap size={15} className={isHandsFreeMode ? "text-primary fill-current animate-pulse" : "text-muted-foreground"} />
-            <span>{isHandsFreeMode ? "Auto-Flow ON" : "Auto-Flow OFF"}</span>
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* HANDS-FREE AUTO FLOW TOGGLE */}
+            <button
+              onClick={() => setIsHandsFreeMode((prev) => !prev)}
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2 rounded-full border text-xs font-bold transition-all shadow-sm ${
+                isHandsFreeMode
+                  ? "border-primary/50 bg-primary/15 text-primary hover:bg-primary/25 shadow-primary/10"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted"
+              }`}
+              title={isHandsFreeMode ? "Hands-Free Auto Flow Active" : "Switch to Hands-Free Auto Flow"}
+            >
+              <Zap size={15} className={isHandsFreeMode ? "text-primary fill-current animate-pulse" : "text-muted-foreground"} />
+              <span>{isHandsFreeMode ? "Auto-Flow ON" : "Auto-Flow OFF"}</span>
+            </button>
 
-          {/* VOICE CUSTOMIZATION BUTTON */}
-          <button
-            onClick={() => setIsVoiceModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-border bg-card text-xs font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
-            title="Configure Scene Partner Voices"
-          >
-            <Settings2 size={16} className="text-primary" />
-            <span className="hidden sm:inline">Partner Voices</span>
-          </button>
+            {/* VOICE CUSTOMIZATION BUTTON */}
+            <button
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2 rounded-full border border-border bg-card text-xs font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
+              title="Configure Scene Partner Voices"
+              aria-label="Partner Voices"
+            >
+              <Settings2 size={16} className="text-primary" />
+              <span className="hidden sm:inline">Partner Voices</span>
+            </button>
 
-          {/* AI PLAYBACK SPEED */}
-          <div
-            role="group"
-            aria-label="AI voice speed"
-            className="hidden sm:flex items-center rounded-full border border-border bg-card p-0.5 shadow-sm"
-          >
-            {PLAYBACK_SPEEDS.map((speed) => (
-              <button
-                key={speed.id}
-                type="button"
-                onClick={() => setPlaybackSpeed(speed.id)}
-                aria-pressed={playbackSpeed === speed.id}
-                title={`${speed.label} (${speed.rate}x)`}
-                className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  playbackSpeed === speed.id
-                    ? "bg-primary/15 text-primary font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {speed.label}
-              </button>
-            ))}
+            {/* AI PLAYBACK SPEED */}
+            <div
+              role="group"
+              aria-label="AI voice speed"
+              className="flex shrink-0 items-center rounded-full border border-border bg-card p-0.5 shadow-sm"
+            >
+              {PLAYBACK_SPEEDS.map((speed) => (
+                <button
+                  key={speed.id}
+                  type="button"
+                  onClick={() => setPlaybackSpeed(speed.id)}
+                  aria-pressed={playbackSpeed === speed.id}
+                  title={`${speed.label} (${speed.rate}x)`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    playbackSpeed === speed.id
+                      ? "bg-primary/15 text-primary font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {speed.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <button
-            onClick={() => setIsAudioMuted((prev) => !prev)}
-            className="p-2.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title={isAudioMuted ? "Unmute AI audio" : "Mute AI audio"}
-          >
-            {isAudioMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsAudioMuted((prev) => !prev)}
+              className="p-2.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title={isAudioMuted ? "Unmute AI audio" : "Mute AI audio"}
+              aria-label={isAudioMuted ? "Unmute AI audio" : "Mute AI audio"}
+            >
+              {isAudioMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
 
-          <button
-            onClick={handleResetRehearsal}
-            className="p-2.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Restart Scene"
-          >
-            <RotateCcw size={18} />
-          </button>
+            <button
+              onClick={handleResetRehearsal}
+              className="p-2.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Restart Scene"
+              aria-label="Restart Scene"
+            >
+              <RotateCcw size={18} />
+            </button>
 
-          <button
-            onClick={() => {
-              cancelPendingPlayback();
-              setIsProcessing(false);
-              setActorCharacter(null);
-            }}
-            className="text-xs font-medium text-muted-foreground hover:text-primary px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors"
-          >
-            Change Character
-          </button>
+            <button
+              onClick={() => {
+                cancelPendingPlayback();
+                setIsProcessing(false);
+                setActorCharacter(null);
+              }}
+              className="whitespace-nowrap text-xs font-medium text-muted-foreground hover:text-primary px-4 py-2.5 rounded-full border border-border hover:bg-muted transition-colors"
+            >
+              Change Character
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* SCRIPT DISPLAY CONTAINER (Visually Central) */}
       <div
@@ -1079,55 +1114,6 @@ export function ActorCopilotRehearsal({
                 <div className="mt-2 text-xs italic text-muted-foreground/80 flex items-center gap-1.5">
                   <Sparkles size={12} className="text-amber-500" />
                   <span>Direction: {line.emotionNote}</span>
-                </div>
-              )}
-
-              {/* Dynamic Live Audio Equalizer & Speech Feedback Indicator */}
-              {isActive && isActorLine && (
-                <div className="mt-4 p-4 rounded-2xl bg-primary/10 border border-primary/30 space-y-2.5 animate-in fade-in shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
-                      <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                      </span>
-                      <span>Microphone Active</span>
-                      {audioVolume > 6 && (
-                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 animate-pulse">
-                          Voice Detected
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Dynamic Equalizer Bar Visualizer */}
-                    <div className="flex items-end gap-1 h-6 px-2.5 py-1 bg-card/80 rounded-xl border border-border shadow-inner">
-                      {[0.4, 0.9, 0.6, 1.0, 0.5, 0.8, 0.7].map((multiplier, idx) => {
-                        const barHeight = Math.max(20, Math.min(100, audioVolume * multiplier * 1.6));
-                        return (
-                          <div
-                            key={idx}
-                            className={`w-1 rounded-full transition-all duration-75 ${
-                              audioVolume > 5 ? "bg-primary shadow-sm shadow-primary/50" : "bg-muted-foreground/30"
-                            }`}
-                            style={{ height: `${barHeight}%` }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Streaming Speech Text Feedback */}
-                  <div className="text-xs text-foreground/90 font-medium">
-                    {liveTranscript ? (
-                      <p className="italic font-serif text-base text-primary font-semibold">
-                        "{liveTranscript}"
-                      </p>
-                    ) : (
-                      <p className="text-muted-foreground text-xs italic">
-                        Speak your line out loud... line will match and advance automatically.
-                      </p>
-                    )}
-                  </div>
                 </div>
               )}
 
