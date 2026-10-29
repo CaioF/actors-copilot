@@ -208,6 +208,31 @@ export function matchActorLine(
 }
 
 /**
+ * How long (ms) the actor must stay silent before Hands-Free mode decides the
+ * line is finished. The closer the spoken text is to the script line, the
+ * shorter the wait; incomplete lines get a long grace period so natural
+ * pauses mid-line never cut the actor off.
+ */
+export function getHandsFreeEndpointDelayMs(expectedLine: string, spokenText: string): number {
+  if (matchActorLine(expectedLine, spokenText, false).isMatch) {
+    return 900;
+  }
+
+  const finalMatch = matchActorLine(expectedLine, spokenText, true);
+  if (finalMatch.isMatch && finalMatch.score >= 0.75) {
+    return 1500;
+  }
+
+  const expectedWordCount = normalizeText(expectedLine).split(" ").filter(Boolean).length;
+  const spokenWordCount = normalizeText(spokenText).split(" ").filter(Boolean).length;
+  if (spokenWordCount < expectedWordCount * 0.5) {
+    return 4500;
+  }
+
+  return 3000;
+}
+
+/**
  * Default prebuilt voice mapping for AI characters.
  */
 export const CHARACTER_VOICE_MAP: Record<string, string> = {
