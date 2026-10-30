@@ -13,7 +13,7 @@ jest.mock('@/lib/session', () => ({
 jest.mock('@/lib/stripe', () => ({
     stripe: {
         customers: { create: jest.fn() },
-        checkout: { sessions: { create: jest.fn() } },
+        checkout: { sessions: { create: jest.fn(), list: jest.fn() } },
     },
 }));
 
@@ -33,6 +33,10 @@ describe('Stripe Subscription Checkout Route Handler', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL = 'http://localhost:3000/dashboard';
+        // The checkout URLs depend on the public app URL. Pin it so the suite
+        // stays deterministic no matter which .env is loaded by the runner.
+        process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000';
+        (stripe.checkout.sessions.list as jest.Mock).mockResolvedValue({ data: [] });
     });
 
     /**
@@ -118,10 +122,15 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(data.url).toBe('https://checkout.stripe.com/pay/fake_session');
 
         // 3. Confirm Stripe API arguments match user criteria safely [cite: 91]
-        expect(stripe.customers.create).toHaveBeenCalledWith({
-            email: mockEmail,
-            metadata: { platformUserId: mockUid, firebaseUid: mockUid },
-        });
+        // The customer is minted with a deterministic idempotency key so that
+        // concurrent checkout requests resolve to the very same Stripe Customer.
+        expect(stripe.customers.create).toHaveBeenCalledWith(
+            {
+                email: mockEmail,
+                metadata: { platformUserId: mockUid, firebaseUid: mockUid },
+            },
+            { idempotencyKey: `cust_${mockUid}` },
+        );
 
         // 4. Verify baseline structural bindings flush down safely to Firestore
         expect(mockSet).toHaveBeenCalledWith(
@@ -191,7 +200,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'false',
             },
-        });
+        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_0` });
 
         // 3. Ensure no redundant customer objects get initialized during mapped flows
         expect(stripe.customers.create).not.toHaveBeenCalled();
@@ -221,7 +230,10 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(res.status).toBe(200);
         expect(data.url).toBe('https://checkout.stripe.com/pay/trial_session_link');
 
-        expect(mockSet).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalledWith(
+            expect.objectContaining({ customerId: expect.anything() }),
+            { merge: true }
+        );
 
         expect(stripe.checkout.sessions.create).toHaveBeenCalledWith({
             customer: 'cus_historical_888',
@@ -253,7 +265,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'true',
             },
-        });
+        }, { idempotencyKey: `checkout_${mockUid}_price_business_id_xyz_0` });
     });
 
     it('rejects trial requests with 400 Bad Request if the account has already redeemed a trial', async () => {
