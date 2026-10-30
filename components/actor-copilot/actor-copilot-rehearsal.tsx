@@ -1,12 +1,13 @@
 "use client";
 
-import { Fragment, useState, useEffect, useRef, useCallback } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth } from "firebase/auth";
 import {
   Mic,
   Square,
   Play,
+  Pause,
   RotateCcw,
   Volume2,
   VolumeX,
@@ -33,6 +34,12 @@ import {
   getVoiceForCharacter,
   AVAILABLE_GEMINI_VOICES,
 } from "@/lib/actor-copilot/script-parser";
+import {
+  ActorTake,
+  ActorTakeStore,
+  isUsableTake,
+  pickRecorderMimeType,
+} from "@/lib/actor-copilot/recordings";
 
 type PlaybackSpeed = "slow" | "normal" | "fast";
 
@@ -130,6 +137,19 @@ export function ActorCopilotRehearsal({
   const audioVolumeRef = useRef<number>(0);
   const [micPermissionError, setMicPermissionError] = useState<boolean>(false);
 
+  // --- ACTOR SELF-RECORDING TAKES ---
+  // The actor's own audio, kept per dialogue line so it can be played back
+  // without repeating the scene. Session-scoped: a reload clears the takes.
+  const takeStoreRef = useRef<ActorTakeStore | null>(null);
+  if (takeStoreRef.current === null) {
+    takeStoreRef.current = new ActorTakeStore();
+  }
+  const [takes, setTakes] = useState<ActorTake[]>([]);
+  const [playingTakeId, setPlayingTakeId] = useState<string | null>(null);
+  const [isMicReady, setIsMicReady] = useState<boolean>(false);
+  const [rerecordLineId, setRerecordLineId] = useState<string | null>(null);
+  const takePlaybackRef = useRef<HTMLAudioElement | null>(null);
+
   // Background Audio Pre-fetch Cache for Zero-Latency AI turns
   const audioCacheRef = useRef<Map<string, string>>(new Map());
   const audioElementCacheRef = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -143,6 +163,8 @@ export function ActorCopilotRehearsal({
   const speechRecognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAdvancingRef = useRef<boolean>(false);
+  const isUnmountedRef = useRef<boolean>(false);
+  const discardRecordingRef = useRef<boolean>(false);
 
   // Playback pacing: speed preference, inter-line pause timer and session guards
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>("normal");
@@ -163,7 +185,10 @@ export function ActorCopilotRehearsal({
 
   // --- REAL-TIME MICROPHONE STREAM & AUDIO LEVEL ANALYZER ---
   useEffect(() => {
-    if (!actorCharacter || status === "FINISHED") return;
+    if (!actorCharacter || status === "FINISHED") {
+      setIsMicReady(false);
+      return;
+    }
 
     let isSubscribed = true;
 
@@ -179,6 +204,7 @@ export function ActorCopilotRehearsal({
         }
 
         setMicPermissionError(false);
+        setIsMicReady(true);
 
         // Setup Web Audio API Analyser for real-time visual feedback
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -263,6 +289,98 @@ export function ActorCopilotRehearsal({
     }
   }, []);
 
+  // --- ACTOR TAKE PLAYBACK ---
+  // Plays the actor's own recording. It uses a dedicated audio element, so it
+  // never triggers AI speech and never advances the rehearsal.
+  const stopTakePlayback = useCallback(() => {
+    if (takePlaybackRef.current) {
+      takePlaybackRef.current.onended = null;
+      takePlaybackRef.current.onerror = null;
+      takePlaybackRef.current.pause();
+      takePlaybackRef.current.removeAttribute("src");
+      takePlaybackRef.current = null;
+    }
+    setPlayingTakeId(null);
+  }, []);
+
+  // Keeps the actor's captured audio for a dialogue line. A new recording for
+  // the same line replaces the previous one (take number goes up).
+  const storeTake = useCallback((lineId: string, blob: Blob, mimeType?: string) => {
+    if (!isUsableTake(blob)) return null;
+    const store = takeStoreRef.current;
+    if (!store) return null;
+    const take = store.put(lineId, blob, mimeType);
+    if (take) {
+      setTakes(store.list());
+      setRerecordLineId((prev) => (prev === lineId ? null : prev));
+    }
+    return take;
+  }, []);
+
+  const toggleTakePlayback = useCallback(
+    async (take: ActorTake) => {
+      const existing = takePlaybackRef.current;
+
+      if (existing && existing.dataset.lineId === take.lineId) {
+        if (existing.paused) {
+          try {
+            await existing.play();
+            setPlayingTakeId(take.lineId);
+          } catch (err) {
+            logger.warn({ msg: "Could not resume actor take playback", err });
+            setPlayingTakeId(null);
+          }
+        } else {
+          existing.pause();
+          setPlayingTakeId(null);
+        }
+        return;
+      }
+
+      stopTakePlayback();
+
+      const audio = new Audio(take.url);
+      audio.dataset.lineId = take.lineId;
+      audio.preload = "auto";
+      takePlaybackRef.current = audio;
+
+      audio.onended = () => {
+        if (takePlaybackRef.current === audio) takePlaybackRef.current = null;
+        setPlayingTakeId(null);
+      };
+
+      audio.onerror = () => {
+        logger.warn({ msg: "Actor take playback error" });
+        if (takePlaybackRef.current === audio) takePlaybackRef.current = null;
+        setPlayingTakeId(null);
+        setErrorMessage("Could not play your recording. Please record it again.");
+      };
+
+      try {
+        await audio.play();
+        setPlayingTakeId(take.lineId);
+      } catch (err) {
+        logger.warn({ msg: "Actor take playback could not start", err });
+        if (takePlaybackRef.current === audio) takePlaybackRef.current = null;
+        setPlayingTakeId(null);
+        setErrorMessage("Could not play your recording. Please record it again.");
+      }
+    },
+    [stopTakePlayback]
+  );
+
+  // Re-record: jump back to the line so the actor can capture a new take
+  // without replaying the whole scene. The new take replaces the old one.
+  const handleRerecord = useCallback(
+    (line: ScriptLine, lineIndex: number) => {
+      stopTakePlayback();
+      setRerecordLineId(line.id);
+      setCurrentLineIndex(lineIndex);
+      setStatus("WAITING_FOR_ACTOR");
+    },
+    [stopTakePlayback]
+  );
+
   // Apply speed changes immediately to a line that is already playing
   useEffect(() => {
     if (currentAudioRef.current) {
@@ -273,7 +391,10 @@ export function ActorCopilotRehearsal({
   // Clean up audio playback and timers on unmount
   useEffect(() => {
     return () => {
+      isUnmountedRef.current = true;
       cancelPendingPlayback();
+      stopTakePlayback();
+      takeStoreRef.current?.clear();
       if (micStreamRef.current) {
         micStreamRef.current.getTracks().forEach((t) => t.stop());
         micStreamRef.current = null;
@@ -414,6 +535,10 @@ export function ActorCopilotRehearsal({
         currentAudioRef.current = null;
       }
 
+      // The AI takes the floor: stop any actor take that was still playing so
+      // the two voices never overlap.
+      stopTakePlayback();
+
       setStatus("AI_READING");
       setIsProcessing(true);
       setErrorMessage(null);
@@ -500,7 +625,7 @@ export function ActorCopilotRehearsal({
         advanceAfter(ERROR_ADVANCE_DELAY_MS);
       }
     },
-    [actorCharacter, characterVoices, isAudioMuted, scene.characters, scene.lines, scene.title]
+    [actorCharacter, characterVoices, isAudioMuted, scene.characters, scene.lines, scene.title, stopTakePlayback]
   );
 
   // --- PREVIEW A SPECIFIC VOICE ---
@@ -764,12 +889,82 @@ export function ActorCopilotRehearsal({
     };
   }, [actorCharacter, currentLineIndex, isActorTurn, isHandsFreeMode, isProcessing]);
 
+  // --- ACTOR VOICE CAPTURE DURING HANDS-FREE ---
+  // Hands-Free only transcribes what the actor says; it never keeps the audio.
+  // We record the very same microphone stream in parallel so the actor can
+  // play back their own voice on the line they just delivered. Capture
+  // failures stay silent: they must never interrupt the recognition loop.
+  useEffect(() => {
+    if (!actorCharacter || !isActorTurn || !isHandsFreeMode || !isMicReady) return;
+
+    const line = currentLine;
+    const stream = micStreamRef.current;
+    if (!line || !stream || typeof MediaRecorder === "undefined") return;
+
+    const mimeType = pickRecorderMimeType();
+    let recorder: MediaRecorder;
+
+    try {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (err) {
+      logger.warn({ msg: "Could not create actor take recorder", err });
+      return;
+    }
+
+    const chunks: Blob[] = [];
+
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) chunks.push(event.data);
+    };
+
+    recorder.onstop = () => {
+      if (isUnmountedRef.current) return;
+      const blob = new Blob(chunks, {
+        type: recorder.mimeType || mimeType || "audio/webm",
+      });
+      storeTake(line.id, blob, blob.type);
+    };
+
+    recorder.onerror = () => {
+      logger.warn({ msg: "Actor take recorder error" });
+    };
+
+    try {
+      recorder.start();
+    } catch (err) {
+      logger.warn({ msg: "Could not start actor take recorder", err });
+      return;
+    }
+
+    return () => {
+      try {
+        if (recorder.state !== "inactive") recorder.stop();
+      } catch (_) {
+        // Recorder may already be stopped
+      }
+    };
+  }, [actorCharacter, currentLine, isActorTurn, isHandsFreeMode, isMicReady, storeTake]);
+
   // --- MICROPHONE RECORDING & STT ---
   const startRecording = async () => {
     setErrorMessage(null);
+
+    // The dialogue line is captured at recording time, so the audio can never
+    // end up attached to a different line if the rehearsal moves on meanwhile.
+    const recordedLine = currentLine;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = pickRecorderMimeType();
+      let mediaRecorder: MediaRecorder;
+
+      try {
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      } catch (err) {
+        logger.warn({ msg: "Recorder mime type rejected, using default", err });
+        mediaRecorder = new MediaRecorder(stream);
+      }
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -781,7 +976,17 @@ export function ActorCopilotRehearsal({
         setStatus("TRANSCRIBING");
         setIsProcessing(true);
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType || mimeType || "audio/webm",
+        });
+
+        // Keep the actor's own audio for this exact line so it can be played
+        // back later. This is the actor's voice, never AI-generated audio.
+        if (recordedLine && !discardRecordingRef.current) {
+          storeTake(recordedLine.id, audioBlob, audioBlob.type);
+        }
+        discardRecordingRef.current = false;
+
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
 
@@ -809,15 +1014,15 @@ export function ActorCopilotRehearsal({
             const data = await response.json();
             const transcribedText = data.text || "";
 
-            if (currentLine) {
+            if (recordedLine) {
               setTranscripts((prev) => ({
                 ...prev,
-                [currentLine.order]: transcribedText,
+                [recordedLine.order]: transcribedText,
               }));
 
               // Fuzzy match what was said with script line
               setStatus("MATCHING_LINE");
-              matchActorLine(currentLine.dialogue, transcribedText);
+              matchActorLine(recordedLine.dialogue, transcribedText);
             }
 
             // Advance rehearsal to next line
@@ -861,9 +1066,13 @@ export function ActorCopilotRehearsal({
 
   const handleResetRehearsal = () => {
     cancelPendingPlayback();
+    stopTakePlayback();
     setRehearsalSession(sessionRef.current);
     setIsProcessing(false);
     if (isRecording) {
+      // The pending recorder callback must not store a take for the session we
+      // are dropping right now.
+      discardRecordingRef.current = true;
       stopRecording();
     }
     if (speechRecognitionRef.current) {
@@ -884,10 +1093,20 @@ export function ActorCopilotRehearsal({
     setTranscripts({});
     setErrorMessage(null);
     setStatus("IDLE");
+
+    // A restart is a brand new session: the previous takes are dropped so no
+    // stale recording can be played back as part of the new rehearsal.
+    takeStoreRef.current?.clear();
+    setTakes([]);
+    setRerecordLineId(null);
   };
 
   // Filter non-actor AI characters in scene
   const aiCharactersInScene = scene.characters.filter((c) => c !== actorCharacter);
+
+  // Actor takes, kept in state so the UI re-renders when a take is stored,
+  // replaced or cleared.
+  const takesByLineId = useMemo(() => new Map(takes.map((take) => [take.lineId, take])), [takes]);
 
   // --- STEP 1: CHARACTER SELECTION UI ---
   if (!actorCharacter) {
@@ -1050,6 +1269,8 @@ export function ActorCopilotRehearsal({
           const isActive = index === currentLineIndex;
           const isActorLine = line.character === actorCharacter;
           const isPastLine = index < currentLineIndex;
+          const take = isActorLine ? takesByLineId.get(line.id) : undefined;
+          const isPlayingThisTake = !!take && playingTakeId === line.id;
           const activeVoice =
             characterVoices[line.character] ||
             getVoiceForCharacter(line.character, scene.characters.indexOf(line.character));
@@ -1123,6 +1344,49 @@ export function ActorCopilotRehearsal({
                   <span className="font-semibold text-foreground">You said:</span> "{transcripts[line.order]}"
                 </div>
               )}
+
+              {/* Actor's own recording of this line */}
+              {isActorLine && take && (
+                <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => void toggleTakePlayback(take)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors"
+                    title={
+                      isPlayingThisTake
+                        ? "Pause your own recording"
+                        : "Play your own recording of this line"
+                    }
+                    aria-label={
+                      isPlayingThisTake
+                        ? `Pause your recording of line ${line.order}`
+                        : `Play your recording of line ${line.order}`
+                    }
+                  >
+                    {isPlayingThisTake ? <Pause size={13} /> : <Play size={13} />}
+                    <span>{isPlayingThisTake ? "Pause" : "Play my take"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleRerecord(line, index)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-muted-foreground text-xs font-medium hover:text-foreground hover:bg-muted transition-colors"
+                    title="Record this line again. The new take replaces the previous one."
+                  >
+                    <RotateCcw size={13} />
+                    <span>Record again</span>
+                  </button>
+
+                  <span className="text-[10px] text-muted-foreground">
+                    Take {take.takeNumber} · your voice
+                    {take.takeNumber > 1 ? " (replaces the previous take)" : ""}
+                  </span>
+
+                  {rerecordLineId === line.id && (
+                    <span className="text-[10px] font-semibold text-primary">
+                      Re-recording — the new take replaces take {take.takeNumber}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             </Fragment>
           );
@@ -1135,6 +1399,58 @@ export function ActorCopilotRehearsal({
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <h3 className="text-2xl font-bold text-foreground mb-1">Scene Rehearsal Complete!</h3>
             <p className="text-muted-foreground text-sm mb-6">Great job working through the scene.</p>
+
+            {/* REVIEW: the actor's own recordings of this session */}
+            {takes.length > 0 && (
+              <div className="mb-6 text-left">
+                <h4 className="text-sm font-bold text-foreground mb-1">Your recordings</h4>
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  Play back your own voice line by line. Takes are kept for this session only —
+                  rehearsing again clears them.
+                </p>
+                <div className="space-y-2">
+                  {takes.map((take) => {
+                    const line = scene.lines.find((item) => item.id === take.lineId);
+                    const isPlayingThisTake = playingTakeId === take.lineId;
+
+                    return (
+                      <div
+                        key={take.lineId}
+                        className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card"
+                      >
+                        <button
+                          onClick={() => void toggleTakePlayback(take)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors shrink-0"
+                          title={
+                            isPlayingThisTake
+                              ? "Pause your own recording"
+                              : "Play your own recording of this line"
+                          }
+                          aria-label={
+                            isPlayingThisTake
+                              ? `Pause your recording of line ${line?.order ?? take.lineId}`
+                              : `Play your recording of line ${line?.order ?? take.lineId}`
+                          }
+                        >
+                          {isPlayingThisTake ? <Pause size={13} /> : <Play size={13} />}
+                          <span>{isPlayingThisTake ? "Pause" : "Play"}</span>
+                        </button>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {line ? `"${line.dialogue}"` : "Recorded line"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {line ? `${line.character} · ` : ""}Take {take.takeNumber} · your voice
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-center gap-4">
               <button
                 onClick={handleResetRehearsal}
