@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
+import { markBillingRecoveryResolved } from '@/lib/billing-recovery';
 import { logger } from '@/lib/logger';
 import { stripe } from '@/lib/stripe';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
@@ -167,6 +168,12 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
 
     // Sync root user document so direct queries on the users collection have billing status
     await userRef.set(sanitizeFirestorePayload(userPayload), { merge: true });
+
+    // The recovery flag exists only to re-open a failed checkout. Once a real
+    // subscription is in place there is nothing left to recover.
+    if (data.hasAccess === true) {
+        await markBillingRecoveryResolved(platformUserId);
+    }
 
     try {
         await syncAdminMember(platformUserId);

@@ -2,8 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin';
 import { setPlatformSession, getPlatformSession } from '@/lib/session';
 import { UserBilling, SubscriptionStatus } from '@/lib/billing';
+import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending } from '@/lib/billing-recovery';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
+import { normalizeCurrency } from '@/lib/plan-selection';
 import { logger } from '@/lib/logger';
+
+/**
+ * Upper bound of automatic checkout attempts for a single recovery flag.
+ *
+ * Prevents the login flow from trapping a user in a redirect loop when the
+ * checkout is abandoned on purpose: after the limit the account simply keeps
+ * using the regular upgrade page.
+ */
+const MAX_RECOVERY_ATTEMPTS = 3;
 
 function projectionErrorDetails(error: unknown) {
   const details = error as { name?: unknown; code?: unknown };
@@ -44,6 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let stripeSubscriptionId: string | undefined;
     let stripePriceId: string | undefined;
     let currentPeriodEnd: number | undefined;
+    let hasUsedTrial = false;
 
     const billingDocRef = db.doc(`users/${uid}/billing/current`);
     const billingDoc = await billingDocRef.get();
@@ -56,7 +68,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       stripeSubscriptionId = billingData.subscriptionId;
       stripePriceId = billingData.priceId;
       currentPeriodEnd = billingData.currentPeriodEnd;
+      hasUsedTrial = billingData.hasUsedTrial === true;
     }
+
+    // The root user document also carries the trial marker and the optional
+    // billing recovery flag.
+    const userDocRef = db.doc(`users/${uid}`);
+    const userDoc = await userDocRef.get();
+    const userData = (userDoc.exists ? userDoc.data() : null) ?? ({} as Record<string, unknown>);
+
+    if (userData.hasUsedTrial === true) {
+      hasUsedTrial = true;
+    }
+
+    const recoveryFlag = isRecoveryPending(userData.billingRecovery) ? userData.billingRecovery : null;
 
     // 3. Serialize and commit entitlement metadata into the secure platform session.
     await setPlatformSession({
@@ -79,9 +104,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      user: { uid, email, tier, subscriptionStatus } 
+    // 4. Billing recovery.
+    // Accounts whose previous checkout failed because of a server-side
+    // configuration fault are routed to a short interstitial that explains
+    // what happened before handing them over to Stripe. The entitlement is
+    // still granted by Stripe + webhook, never here.
+    const recoveryAttempts = recoveryFlag?.attempt ?? 0;
+    const recoveryEligible =
+      recoveryFlag !== null &&
+      recoveryAttempts < MAX_RECOVERY_ATTEMPTS &&
+      tier === 'free' &&
+      !stripeSubscriptionId &&
+      !hasUsedTrial;
+
+    const billingRecovery = recoveryEligible
+      ? {
+        required: true,
+        tier: recoveryFlag.tier || DEFAULT_RECOVERY_TIER,
+        currency: normalizeCurrency(recoveryFlag.currency ?? DEFAULT_RECOVERY_CURRENCY),
+      }
+      : undefined;
+
+    return NextResponse.json({
+      success: true,
+      user: { uid, email, tier, subscriptionStatus },
+      ...(billingRecovery ? { billingRecovery } : {}),
     }, { status: 200 });
 
   } catch (error) {

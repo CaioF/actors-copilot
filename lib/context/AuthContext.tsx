@@ -147,6 +147,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             setUser(result.user as AppUser);
+
+            // Billing recovery: this account still owes the activation of its
+            // free trial. Show the interstitial that explains what happened
+            // before handing over to Stripe.
+            if (data.billingRecovery?.required) {
+                window.location.href = "/start-trial";
+                return;
+            }
+
             await handlePostAuthRedirect();
 
         } catch (error: unknown) {
@@ -192,6 +201,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             setUser(result.user as AppUser);
+
+            // Billing recovery: this account still owes the activation of its
+            // free trial. Show the interstitial that explains what happened
+            // before handing over to Stripe.
+            if (data.billingRecovery?.required) {
+                window.location.href = "/start-trial";
+                return;
+            }
+
             await handlePostAuthRedirect();
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -238,6 +256,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             setUser(userWithBilling);
+
+            // Billing recovery: this account still owes the activation of its
+            // free trial. Show the interstitial that explains what happened
+            // before handing over to Stripe.
+            if (data.billingRecovery?.required) {
+                window.location.href = "/start-trial";
+                return;
+            }
+
             await handlePostAuthRedirect();
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
