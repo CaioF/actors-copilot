@@ -1,24 +1,29 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
-import { getStripePriceIdForTier } from '@/lib/billing';
+import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
 import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
 import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending } from '@/lib/billing-recovery';
-import { normalizeCurrency, type RequestedCurrency } from '@/lib/plan-selection';
+import { normalizeCurrency } from '@/lib/plan-selection';
 import { logger } from '@/lib/logger';
 
 /**
  * POST /api/billing/recovery
- * Opens (or reuses) the Stripe Checkout Session for an account flagged for billing recovery.
  *
- * The endpoint is the single place where the recovery session is created. It is
- * idempotent, so calling it twice - or refreshing the page - never produces a
- * second Stripe Session nor a second Stripe Customer.
+ * Two phase endpoint for the trial recovery flow:
+ *
+ * - Without a selection it only reports whether the signed in account still
+ *   owes the activation of its free trial.
+ * - With a selection (`tier`, `billingCycle`, `currency`) it opens (or reuses)
+ *   the Stripe Checkout Session for that choice.
+ *
+ * The session creation is idempotent, so calling it twice - or refreshing the
+ * page - never produces a second Stripe Session nor a second Stripe Customer.
  *
  * @returns A JSON payload with the pending state and, when applicable, the checkout URL.
  */
-export async function POST(): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const session = await getPlatformSession();
         if (!session?.uid) {
@@ -27,6 +32,14 @@ export async function POST(): Promise<NextResponse> {
 
         const uid = session.uid;
         const email = session.email;
+
+        let body: Record<string, unknown> = {};
+        try {
+            const parsed = await req.json();
+            body = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+        } catch {
+            // An empty body is valid: it only asks for the pending state.
+        }
 
         const userDocRef = db.doc(`users/${uid}`);
         const userDoc = await userDocRef.get();
@@ -46,26 +59,49 @@ export async function POST(): Promise<NextResponse> {
             return NextResponse.json({ pending: false }, { status: 200 });
         }
 
-        const tier = flag.tier || DEFAULT_RECOVERY_TIER;
-        const requestedCurrency = normalizeCurrency(flag.currency ?? DEFAULT_RECOVERY_CURRENCY);
+        const defaultTier: SubscriptionTier = flag.tier || DEFAULT_RECOVERY_TIER;
+        const defaultCurrency = normalizeCurrency(flag.currency ?? DEFAULT_RECOVERY_CURRENCY);
 
-        // The currency is only used when the target price really supports it.
-        let currency: RequestedCurrency | undefined;
-        try {
-            const priceId = getStripePriceIdForTier(tier, 'monthly');
-            const supported = await getPriceCurrencies(priceId);
-            if (requestedCurrency && supported.includes(requestedCurrency)) {
-                currency = requestedCurrency;
-            }
-        } catch (error) {
-            logger.warn({ err: error, msg: 'Could not verify the recovery price currency' });
+        // Phase 1: the caller only wants to know whether a checkout is pending.
+        const wantsSelection = body.tier !== undefined;
+        if (!wantsSelection) {
+            return NextResponse.json(
+                {
+                    pending: true,
+                    tier: defaultTier,
+                    currency: defaultCurrency,
+                },
+                { status: 200 },
+            );
         }
+
+        // Phase 2: the caller picked a plan, a cycle and a currency.
+        const tier: SubscriptionTier = body.tier === 'economy' ? 'economy' : 'business';
+        const billingCycle: BillingCycle = body.billingCycle === 'annual' ? 'annual' : 'monthly';
+        const requestedCurrency = normalizeCurrency(typeof body.currency === 'string' ? body.currency : null);
+
+        if (requestedCurrency) {
+            // The currency is only honoured when the target price supports it.
+            const priceId = getStripePriceIdForTier(tier, billingCycle);
+            const supported = await getPriceCurrencies(priceId);
+            if (!supported.includes(requestedCurrency)) {
+                return NextResponse.json(
+                    {
+                        error: `${requestedCurrency.toUpperCase()} is not available for this plan yet.`,
+                        code: 'currency_unavailable',
+                    },
+                    { status: 400 },
+                );
+            }
+        }
+
+        const currency = requestedCurrency ?? defaultCurrency;
 
         const checkoutSession = await createOrReuseCheckoutSession({
             uid,
             email,
             tier,
-            billingCycle: 'monthly',
+            billingCycle,
             ...(currency ? { currency } : {}),
             isTrial: true,
             appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
@@ -79,6 +115,7 @@ export async function POST(): Promise<NextResponse> {
         return NextResponse.json({
             pending: true,
             tier,
+            billingCycle,
             currency: currency ?? null,
             checkoutUrl: checkoutSession.url ?? null,
         }, { status: 200 });
