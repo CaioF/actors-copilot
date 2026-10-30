@@ -412,13 +412,19 @@ export class ActorTakeStore {
     return this.takes.has(lineId);
   }
 
-  /** Removes the take of a dialogue line and revokes its blob URL. */
+  /**
+   * Removes the take of a dialogue line and revokes its blob URL.
+   *
+   * The take counter is kept, so a later recording of the same line is
+   * numbered as the next take instead of restarting the count.
+   *
+   * @param lineId - Id of the dialogue line.
+   */
   remove(lineId: string): void {
     const take = this.takes.get(lineId);
     if (!take) return;
     this.factory.revoke(take.url);
     this.takes.delete(lineId);
-    this.counters.delete(lineId);
   }
 
   /** Removes every take and revokes every blob URL. */

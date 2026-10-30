@@ -30,6 +30,13 @@ jest.mock("@/lib/actor-copilot/recordings", () => {
   return { ...actual, decodeToWav: jest.fn() };
 });
 
+// The end-of-speech detection is not what these tests are about: a turn ends
+// as soon as the actor said something.
+jest.mock("@/lib/actor-copilot/script-parser", () => {
+  const actual = jest.requireActual("@/lib/actor-copilot/script-parser");
+  return { ...actual, getHandsFreeEndpointDelayMs: () => 0 };
+});
+
 import { ActorCopilotRehearsal } from "./actor-copilot-rehearsal";
 import { SceneData } from "@/lib/actor-copilot/script-parser";
 import { decodeToWav } from "@/lib/actor-copilot/recordings";
@@ -80,6 +87,29 @@ class MockMediaRecorder {
   }
 }
 
+/** Minimal SpeechRecognition double, so hands-free turns can be driven. */
+class MockSpeechRecognition {
+  static instances: MockSpeechRecognition[] = [];
+
+  onresult: ((event: unknown) => void) | null = null;
+  onend: (() => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  onstart: (() => void) | null = null;
+  continuous = false;
+  interimResults = false;
+  lang = "en-US";
+
+  constructor() {
+    MockSpeechRecognition.instances.push(this);
+  }
+
+  start() {
+    this.onstart?.();
+  }
+
+  stop() {}
+}
+
 const fakeStream = {
   getTracks: () => [{ stop: jest.fn() }],
 };
@@ -96,8 +126,11 @@ function decodedTake(overrides: Partial<{ durationMs: number; peak: number }> = 
 
 beforeEach(() => {
   MockMediaRecorder.emitAudio = false;
+  MockSpeechRecognition.instances = [];
   decodeToWavMock.mockReset();
   decodeToWavMock.mockResolvedValue(null);
+
+  (window as unknown as Record<string, unknown>).SpeechRecognition = MockSpeechRecognition;
 
   Object.defineProperty(global, "MediaRecorder", {
     writable: true,
@@ -206,6 +239,32 @@ describe("ActorCopilotRehearsal — actor recording playback", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps the take even when the browser cannot decode the capture", async () => {
+    MockMediaRecorder.emitAudio = true;
+    // A decoder that comes back with nothing usable must not cost the actor
+    // their recording: the original container is kept instead.
+    decodeToWavMock.mockResolvedValue(decodedTake({ durationMs: 0, peak: 0 }));
+
+    await startActorTurn();
+    await recordCurrentLine();
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Play my take/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("keeps the take when the capture cannot be decoded at all", async () => {
+    MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(null);
+
+    await startActorTurn();
+    await recordCurrentLine();
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Play my take/i).length).toBeGreaterThan(0);
+    });
+  });
+
   it("plays the actor's take with its own audio element, without advancing the scene", async () => {
     MockMediaRecorder.emitAudio = true;
     decodeToWavMock.mockResolvedValue(decodedTake());
@@ -251,22 +310,7 @@ describe("ActorCopilotRehearsal — actor recording playback", () => {
     });
   });
 
-  it("does not offer a playback control for a silent recording", async () => {
-    MockMediaRecorder.emitAudio = true;
-    decodeToWavMock.mockResolvedValue(decodedTake({ peak: 0 }));
-
-    await startActorTurn();
-    await recordCurrentLine();
-
-    await waitFor(() => {
-      expect(screen.getByText(/didn't hear anything/i)).toBeInTheDocument();
-    });
-
-    // Nothing worth keeping: no take, so no playback control.
-    expect(screen.queryByText(/Play my take/i)).not.toBeInTheDocument();
-  });
-
-  it("reports why a line could not be recognized and still moves the scene on", async () => {
+  it("drops the take when the endpoint confirms the capture held no speech", async () => {
     MockMediaRecorder.emitAudio = true;
     decodeToWavMock.mockResolvedValue(decodedTake());
 
@@ -287,14 +331,85 @@ describe("ActorCopilotRehearsal — actor recording playback", () => {
     await startActorTurn();
     await recordCurrentLine();
 
+    await waitFor(() => {
+      expect(screen.getByText(/didn't hear anything/i)).toBeInTheDocument();
+    });
+
+    // Nothing worth playing back: no playback control for this line.
+    expect(screen.queryByText(/Play my take/i)).not.toBeInTheDocument();
+  });
+
+  it("reports why a line could not be recognized and still moves the scene on", async () => {
+    MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(decodedTake());
+
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (String(url).includes("/api/dna/transcribe/chat")) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "Transcription service unavailable" }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ audioUrl: "https://example.test/ai-line.mp3" }),
+      };
+    });
+
+    await startActorTurn();
+    await recordCurrentLine();
+
     // The real reason from the server is shown instead of a generic message.
     await waitFor(() => {
-      expect(screen.getByText(/Audio too short or silent/i)).toBeInTheDocument();
+      expect(screen.getByText(/Transcription service unavailable/i)).toBeInTheDocument();
     });
 
     // The scene keeps moving: the AI partner's line is now the current one.
     await waitFor(() => {
       expect(activeLineText()).toContain("He's outside.");
     });
+  });
+
+  it("stores the take of a hands-free turn", async () => {
+    jest.useFakeTimers();
+
+    try {
+      MockMediaRecorder.emitAudio = true;
+      decodeToWavMock.mockResolvedValue(decodedTake());
+
+      render(<ActorCopilotRehearsal scene={scene} />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /EMILY/ }));
+      });
+
+      // Let the recognition engine start and the capture recorder open.
+      await act(async () => {
+        jest.advanceTimersByTime(500);
+      });
+
+      // The actor says the line out loud.
+      const recognition = MockSpeechRecognition.instances[MockSpeechRecognition.instances.length - 1];
+      expect(recognition).toBeDefined();
+
+      await act(async () => {
+        recognition.onresult?.({
+          results: [[{ transcript: "Where is he?" }]],
+        });
+        jest.advanceTimersByTime(500);
+      });
+
+      // The turn completes and the scene moves on.
+      await act(async () => {
+        jest.advanceTimersByTime(500);
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/Play my take/i).length).toBeGreaterThan(0);
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

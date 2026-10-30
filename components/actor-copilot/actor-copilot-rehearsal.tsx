@@ -37,11 +37,9 @@ import {
 import {
   ActorTake,
   ActorTakeStore,
-  MIN_TAKE_DURATION_MS,
   TAKE_MIME_TYPE,
   blobToBase64,
   decodeToWav,
-  isSilentOrTooShort,
   isUsableTake,
   pickRecorderMimeType,
 } from "@/lib/actor-copilot/recordings";
@@ -180,6 +178,11 @@ export function ActorCopilotRehearsal({
   // Which dialogue line the current error message belongs to, so a message
   // about one line does not linger on the next one.
   const errorLineIdRef = useRef<string | null>(null);
+  // Lines the actor actually delivered, per line id. The speech recognition
+  // (or the transcription API) is the ground truth for "did the actor say
+  // something": a capture is only worth keeping when it belongs to one of
+  // these lines.
+  const spokenLineIdsRef = useRef<Set<string>>(new Set());
   // Identifies the capture that is currently in flight, so a late answer can
   // never move a rehearsal that already moved on.
   const turnTokenRef = useRef<number>(0);
@@ -333,6 +336,15 @@ export function ActorCopilotRehearsal({
       setRerecordLineId((prev) => (prev === lineId ? null : prev));
     }
     return take;
+  }, []);
+
+  // Drops the take of a line, for example when the transcription endpoint
+  // confirms that the capture held no speech.
+  const removeTake = useCallback((lineId: string) => {
+    const store = takeStoreRef.current;
+    if (!store) return;
+    store.remove(lineId);
+    setTakes(store.list());
   }, []);
 
   const toggleTakePlayback = useCallback(
@@ -782,6 +794,13 @@ export function ActorCopilotRehearsal({
           ...prev,
           [currentLine.order]: spokenText || "Spoken line recognized",
         }));
+
+        // The browser heard the actor, so the capture of this line holds
+        // speech. This is the ground truth used to decide whether a take is
+        // worth keeping.
+        if ((spokenText || "").trim().length >= 2) {
+          spokenLineIdsRef.current.add(currentLine.id);
+        }
       }
 
       setStatus("MATCHING_LINE");
@@ -980,19 +999,34 @@ export function ActorCopilotRehearsal({
         type: recorder.mimeType || mimeType || "audio/webm",
       });
 
-      // Same treatment as the manual capture: re-encode to WAV and drop the
-      // take when the recording turns out to be silent or too short, so the
-      // playback control never appears for audio that plays nothing.
+      // Same treatment as the manual capture: the decoded WAV is preferred,
+      // but a quirky decoder must never cost the actor their recording, so
+      // the original container is kept when the decode comes back unusable.
       void decodeToWav(blob).then((decoded) => {
         if (isUnmountedRef.current || sessionRef.current !== sessionId) return;
 
-        if (!decoded) {
-          // The browser could not decode it; keep the original container.
-          storeTake(line.id, blob, blob.type);
+        logger.info({
+          msg: "Hands-free capture decoded",
+          lineId: line.id,
+          rawBytes: blob.size,
+          decodedOk: !!decoded,
+          durationMs: decoded?.durationMs,
+          peak: decoded?.peak,
+          spoken: spokenLineIdsRef.current.has(line.id),
+        });
+
+        // The browser heard the actor on this line, so the capture is worth
+        // keeping. Without that ground truth there is nothing to play back.
+        if (!spokenLineIdsRef.current.has(line.id)) {
+          logger.warn({ msg: "Hands-free capture dropped: no speech recognized", lineId: line.id });
           return;
         }
 
-        if (isSilentOrTooShort(decoded.peak, decoded.durationMs)) return;
+        if (!decoded || decoded.durationMs <= 0) {
+          // Keep the original container.
+          storeTake(line.id, blob, blob.type);
+          return;
+        }
 
         storeTake(line.id, decoded.blob, TAKE_MIME_TYPE);
       });
@@ -1051,6 +1085,14 @@ export function ActorCopilotRehearsal({
       };
 
       mediaRecorder.onstop = async () => {
+        // Release the microphone only now: the last chunk of the recording has
+        // been delivered, so the take is complete.
+        try {
+          mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+        } catch {
+          // The stream may already be closed.
+        }
+
         // The capture may already be superseded (a restart happened, or a
         // newer recording started). Bail out before touching any state.
         if (turnTokenRef.current !== captureToken) return;
@@ -1075,27 +1117,32 @@ export function ActorCopilotRehearsal({
         // the capture was being decoded.
         if (turnTokenRef.current !== captureToken) return;
 
-        const audioBlob = decoded?.blob ?? rawBlob;
-        const apiMimeType = decoded ? TAKE_MIME_TYPE : rawBlob.type || "audio/webm";
+        // Diagnostics: what did the microphone actually deliver?
+        logger.info({
+          msg: "Actor capture decoded",
+          lineId: recordedLine?.id,
+          rawBytes: rawBlob.size,
+          decodedOk: !!decoded,
+          durationMs: decoded?.durationMs,
+          peak: decoded?.peak,
+        });
 
-        if (decoded && isSilentOrTooShort(decoded.peak, decoded.durationMs)) {
-          // Nothing worth keeping: no take is stored, so no playback control
-          // is shown for a recording that would play silence.
+        // The decoded WAV is preferred (it plays in every browser and the
+        // transcription endpoint understands it). When the decode comes back
+        // unusable the original container is kept: a quirky decoder must never
+        // cost the actor their recording. The MIME type always describes the
+        // bytes that are actually sent.
+        const useDecoded = !!decoded && decoded.durationMs > 0;
+        const audioBlob = useDecoded ? decoded!.blob : rawBlob;
+        const apiMimeType = useDecoded ? TAKE_MIME_TYPE : rawBlob.type || "audio/webm";
+
+        if (!isUsableTake(audioBlob)) {
+          // The microphone delivered nothing at all.
           errorLineIdRef.current = recordedLine?.id ?? null;
-          setErrorMessage(
-            decoded.durationMs < MIN_TAKE_DURATION_MS
-              ? "That recording was too short. Hold the mic and speak the whole line."
-              : "I didn't hear anything. Speak closer to your microphone and try again."
-          );
+          setErrorMessage("The microphone did not deliver any audio. Check your mic and try again.");
           setIsProcessing(false);
           setCurrentLineIndex((prev) => prev + 1);
           return;
-        }
-
-        // Keep the actor's own audio for this exact line so it can be played
-        // back later. This is the actor's voice, never AI-generated audio.
-        if (recordedLine && !discard) {
-          storeTake(recordedLine.id, audioBlob, audioBlob.type);
         }
 
         try {
@@ -1132,9 +1179,21 @@ export function ActorCopilotRehearsal({
               [recordedLine.order]: transcribedText,
             }));
 
+            // The transcription is the ground truth: the actor spoke, so the
+            // recording is worth keeping and gets a playback control.
+            if (transcribedText.trim().length >= 2) {
+              spokenLineIdsRef.current.add(recordedLine.id);
+            }
+
             // Fuzzy match what was said with script line
             setStatus("MATCHING_LINE");
             matchActorLine(recordedLine.dialogue, transcribedText);
+          }
+
+          // Keep the actor's own audio for this exact line so it can be played
+          // back later. This is the actor's voice, never AI-generated audio.
+          if (recordedLine && !discard) {
+            storeTake(recordedLine.id, audioBlob, audioBlob.type);
           }
 
           // Advance rehearsal to next line
@@ -1144,9 +1203,24 @@ export function ActorCopilotRehearsal({
 
           logger.error({ err: error, msg: "Transcription error during rehearsal" });
           errorLineIdRef.current = recordedLine?.id ?? null;
-          setErrorMessage(
-            `Could not recognize that line: ${error?.message || "unknown error"}. Moving on.`
-          );
+
+          const reason = error?.message || "unknown error";
+          const wasSilent = /too short or silent|no audio provided/i.test(reason);
+
+          if (wasSilent) {
+            // The endpoint confirmed there was no speech: there is nothing to
+            // play back, so no playback control is shown for this line.
+            if (recordedLine) removeTake(recordedLine.id);
+            setErrorMessage("I didn't hear anything in that take. Speak closer to your microphone and try again.");
+          } else {
+            // The failure was on the way to the endpoint (network, auth), not
+            // in the audio itself: the take is still good, so it is kept.
+            if (recordedLine && !discard) {
+              storeTake(recordedLine.id, audioBlob, audioBlob.type);
+            }
+            setErrorMessage(`Could not recognize that line: ${reason}. Moving on.`);
+          }
+
           // Advance line anyway to avoid blocking actor
           setCurrentLineIndex((prev) => prev + 1);
         } finally {
@@ -1168,9 +1242,11 @@ export function ActorCopilotRehearsal({
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
       setIsRecording(false);
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      // The microphone is released in the recorder's own "stop" handler, once
+      // the final chunk has been delivered. Releasing it here truncates the
+      // recording and leaves an empty take behind.
+      mediaRecorderRef.current.stop();
     }
   };
 
