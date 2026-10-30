@@ -22,7 +22,7 @@ const DISPLAY_PRICES: Record<DisplayBillingCycle, Partial<Record<RequestedCurren
   monthly: {
     usd: { economy: 19, business: 29 },
     eur: { economy: 17, business: 26 },
-    gbp: { economy: 14, business: 22 },
+    gbp: { economy: 15, business: 22 },
   },
   annual: {
     usd: { economy: 190, business: 290 },
