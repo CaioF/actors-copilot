@@ -74,6 +74,12 @@ Specifically:
 - the extracted or inline text is sent to Gemini,
 - Firestore only receives the user’s message text, timestamp, and optionally `documentName`.
 
+Rehearsal voice takes are never persisted either:
+
+- `components/actor-copilot/actor-copilot-rehearsal.tsx` captures the actor's microphone input with `MediaRecorder`,
+- the captured audio is held in an in-memory store (`lib/actor-copilot/recordings.ts`) and can only be played back during the current browser session,
+- it is never written to Firestore, Firebase Storage, or any other backend, so no copy of an actor's voice is retained after the tab is closed.
+
 ### 3.3 What `CoachMessage` contains
 
 From `lib/chat-types.ts`:
@@ -126,6 +132,8 @@ The code is structured to delete:
 ### 4.3 No hidden retention windows in code
 
 There is no code path that stores raw confidential uploads permanently or copies them into long-term storage. Document payloads are only used for immediate prompt generation and then discarded.
+
+The rehearsal voice takes follow the same rule: they live only in the browser tab. Because they are never persisted, they need no retention window and no Firestore TTL policy, and there is nothing for the account-deletion flow to remove — an actor's voice simply stops existing when the tab is closed, reloaded, or when the scene is restarted.
 
 ## 5. Security Guarantees for Your Client
 
