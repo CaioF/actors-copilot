@@ -1,109 +1,199 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { redirectTo } from "@/lib/navigate"
 import Link from "next/link"
-import { Ticket } from "lucide-react"
-
-/**
- * Seconds shown before the automatic hand-off to the Stripe Checkout.
- * The user can always skip the wait with the primary button.
- */
-const COUNTDOWN_SECONDS = 15
-
-const RING_RADIUS = 26
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+import { Check, Lock, Ticket, Zap } from "lucide-react"
+import { redirectTo } from "@/lib/navigate"
+import {
+  DEFAULT_CURRENCY,
+  SUPPORTED_CURRENCIES,
+  formatDisplayPrice,
+  getAnnualMonthlyEquivalent,
+  getDisplayPrice,
+  getMaxAnnualSavingsPercent,
+  type RequestedCurrency,
+  type RequestedPlan,
+} from "@/lib/plan-selection"
+import type { BillingCycle } from "@/lib/billing"
 
 type ViewState = "loading" | "ready" | "error" | "skipped"
 
+type CurrencySupportMap = Record<
+  BillingCycle,
+  Record<RequestedPlan, RequestedCurrency[]>
+>
+
+interface PlanOption {
+  key: RequestedPlan
+  badge: string
+  description: string
+  features: string[]
+  featured?: boolean
+}
+
+const PLAN_OPTIONS: PlanOption[] = [
+  {
+    key: "economy",
+    badge: "ECONOMY CLASS",
+    description: "Perfect for actors expanding their base analytical workflows and audition setups.",
+    features: [
+      "Access to Personal DNA Extraction chats",
+      "Full Audition Breakdown generation features",
+      "Multi-step Audition Wizard access",
+      "Standard storage metrics limits",
+    ],
+  },
+  {
+    key: "business",
+    badge: "BUSINESS CLASS",
+    featured: true,
+    description: "The complete experience offering advanced generative modules and expert system toolsets.",
+    features: [
+      "Everything included in Economy Class",
+      "Exclusive access to the AI Acting Coach",
+      "Deep character lens profile analysis modules",
+      "Priority processing speeds on document extractions",
+      "Full Actor Profile management tools",
+    ],
+  },
+]
+
+const PLAN_LABELS: Record<RequestedPlan, string> = {
+  economy: "Economy Class",
+  business: "Business Class",
+}
+
+const TRIAL_DAYS = 14
+
 /**
- * Trial recovery interstitial.
+ * Trial recovery screen.
  *
  * Shown when an account still owes the activation of its free trial (for
- * example after a server side hiccup interrupted the first checkout). The
- * page explains what happened in a friendly way and then hands the user over
- * to the Stripe Checkout, either automatically after a short countdown or
- * immediately through the primary button.
+ * example after a server side fault interrupted the first checkout). The page
+ * explains what happened, lets the user choose the plan, the billing cycle
+ * and the currency, and then hands them over to the Stripe Checkout.
  *
- * @returns The branded recovery screen
+ * @returns The branded recovery and plan selection screen
  */
 export default function StartTrialPage() {
   const [view, setView] = useState<ViewState>("loading")
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null)
-  const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS)
+  const [support, setSupport] = useState<CurrencySupportMap | null>(null)
+  const [plan, setPlan] = useState<RequestedPlan>("business")
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
+  const [currency, setCurrency] = useState<RequestedCurrency>(DEFAULT_CURRENCY)
+  const [submitting, setSubmitting] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
-  // 1. Resolve the checkout session for the signed in account.
+  // 1. Check whether there is a pending recovery and load the currency map.
   useEffect(() => {
     let cancelled = false
 
-    const loadCheckout = async () => {
+    const load = async () => {
       try {
-        const response = await fetch("/api/billing/recovery", { method: "POST" })
+        const [recoveryRes, supportRes] = await Promise.all([
+          fetch("/api/billing/recovery", { method: "POST" }),
+          fetch("/api/billing/currencies"),
+        ])
 
-        // No session: send the visitor to the sign in screen instead of
-        // showing a confusing error. The view stays in its loading state
-        // because the browser is already navigating away.
-        if (response.status === 401) {
-          redirectTo("/login")
-          return
-        }
+        const recovery = await recoveryRes.json().catch(() => null)
+        const supportData = await supportRes.json().catch(() => null)
 
-        if (!response.ok) throw new Error("recovery request failed")
-
-        const data = await response.json()
         if (cancelled) return
 
-        if (!data?.pending || !data?.checkoutUrl) {
-          // Nothing to recover: the account is already in a good state.
+        if (supportData?.support) setSupport(supportData.support as CurrencySupportMap)
+
+        if (!recoveryRes.ok || !recovery?.pending) {
           setView("skipped")
-          window.setTimeout(() => {
-            redirectTo("/dashboard")
-          }, 1200)
+          window.setTimeout(() => redirectTo("/dashboard"), 1200)
           return
         }
 
-        setCheckoutUrl(data.checkoutUrl)
+        setPlan(recovery.tier === "economy" ? "economy" : "business")
+        if (recovery.currency) setCurrency(recovery.currency)
+
         setView("ready")
       } catch {
         if (!cancelled) setView("error")
       }
     }
 
-    loadCheckout()
+    load()
 
     return () => {
       cancelled = true
     }
   }, [])
 
-  // 2. Countdown.
-  useEffect(() => {
-    if (view !== "ready" || !checkoutUrl) return
+  const priceUnit = billingCycle === "annual" ? "/year" : "/month"
+  const annualSavingsPercent = getMaxAnnualSavingsPercent(currency)
 
-    const timer = window.setInterval(() => {
-      setSecondsLeft((current) => Math.max(0, current - 1))
-    }, 1000)
-
-    return () => window.clearInterval(timer)
-  }, [view, checkoutUrl])
-
-  // 3. Automatic hand-off when the countdown reaches zero.
-  useEffect(() => {
-    if (view !== "ready" || !checkoutUrl) return
-    if (secondsLeft > 0) return
-
-    redirectTo(checkoutUrl)
-  }, [view, secondsLeft, checkoutUrl])
-
-  const goToCheckout = () => {
-    if (checkoutUrl) redirectTo(checkoutUrl)
+  const displayPrice = (candidate: RequestedPlan): string | null => {
+    const amount = getDisplayPrice(candidate, currency, billingCycle)
+    return amount === null ? null : formatDisplayPrice(amount, currency)
   }
 
-  const progress = (COUNTDOWN_SECONDS - secondsLeft) / COUNTDOWN_SECONDS
+  const annualNote = (candidate: RequestedPlan): string | null => {
+    if (billingCycle !== "annual") return null
+    const monthlyEquivalent = getAnnualMonthlyEquivalent(candidate, currency)
+    if (monthlyEquivalent === null) return null
+    return `Billed annually. Equivalent to ${formatDisplayPrice(monthlyEquivalent, currency)}/month.`
+  }
+
+  /** Reason why this plan cannot be purchased with the selected currency, if any. */
+  const blockedReason = (candidate: RequestedPlan): string | null => {
+    if (getDisplayPrice(candidate, currency, billingCycle) === null) {
+      return `Not available in ${currency.toUpperCase()}.`
+    }
+    if (!support) return null
+    const available = support[billingCycle]?.[candidate]
+    if (!available) return null
+    if (!available.includes(currency)) {
+      return `${currency.toUpperCase()} is not available for ${PLAN_LABELS[candidate]} yet.`
+    }
+    return null
+  }
+
+  const selectedBlockedReason = blockedReason(plan)
+  const selectedPrice = displayPrice(plan)
+
+  const summary = useMemo(() => {
+    if (!selectedPrice) return null
+    const cycleLabel = billingCycle === "annual" ? "Annual" : "Monthly"
+    return `${PLAN_LABELS[plan]} · ${cycleLabel} · ${selectedPrice}${priceUnit}`
+  }, [plan, billingCycle, selectedPrice, priceUnit])
+
+  // 2. Open the checkout for the selected plan, cycle and currency.
+  const startTrial = async () => {
+    if (submitting || selectedBlockedReason) return
+
+    setSubmitting(true)
+    setCheckoutError(null)
+
+    try {
+      const response = await fetch("/api/billing/recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: plan, billingCycle, currency }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.checkoutUrl) {
+        setCheckoutError(data.error || "We could not start the checkout. Please try again.")
+        setSubmitting(false)
+        return
+      }
+
+      redirectTo(data.checkoutUrl)
+    } catch {
+      setCheckoutError("We could not start the checkout. Please try again.")
+      setSubmitting(false)
+    }
+  }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#152323] px-5 py-16">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#152323] px-5 py-12">
       {/* Ambient aurora lights, the signature of the landing page */}
       <div
         className="pointer-events-none absolute top-[15%] left-[-15%] h-[600px] w-[600px] rounded-full opacity-40 blur-[120px] md:h-[800px] md:w-[800px]"
@@ -135,25 +225,19 @@ export default function StartTrialPage() {
           }}
         />
         <div className="relative h-full w-full opacity-95">
-          <Image
-            src="/spotlight.png"
-            alt=""
-            fill
-            className="object-contain object-top"
-            priority
-          />
+          <Image src="/spotlight.png" alt="" fill className="object-contain object-top" priority />
         </div>
       </div>
 
       {/* Main card */}
-      <div className="relative z-10 w-full max-w-xl">
-        <div className="rounded-[28px] border border-white/10 bg-[#0e1919]/92 px-7 py-9 shadow-[0_24px_80px_-30px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:px-10 sm:py-11">
+      <div className="relative z-10 w-full max-w-2xl">
+        <div className="rounded-[28px] border border-white/10 bg-[#0e1919]/92 px-6 py-8 shadow-[0_24px_80px_-30px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:px-9 sm:py-10">
           <div className="flex flex-col items-center text-center">
-            <div className="relative h-24 w-24">
+            <div className="relative h-20 w-20">
               <Image src="/image.png" alt="The Actors Copilot" fill className="object-contain" priority />
             </div>
 
-            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#F2671A]">
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#F2671A]">
               One quick thing
             </p>
 
@@ -163,7 +247,7 @@ export default function StartTrialPage() {
                   Getting your trial ready
                 </h1>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-[#EFEADD]/70">
-                  One moment — we&apos;re opening your secure checkout.
+                  One moment — we&apos;re opening our secure checkout.
                 </p>
                 <div className="mt-7 h-1 w-40 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full w-1/3 animate-pulse rounded-full bg-[#F2671A]" />
@@ -215,82 +299,160 @@ export default function StartTrialPage() {
                   Your <span className="text-[#F2671A]">free trial</span> is ready to start
                 </h1>
 
-                <p className="mt-5 max-w-md text-sm leading-relaxed text-[#EFEADD]/75">
-                  A brief delay on our side meant your 14-day free trial never started. Nothing has been
-                  charged, and your account is ready — all that is left is to switch those 14 days on.
-                </p>
-                <p className="mt-3 max-w-md text-sm leading-relaxed text-[#EFEADD]/55">
-                  In a moment we&apos;ll take you to our secure checkout to activate it. It only takes a minute.
+                <p className="mt-4 max-w-lg text-sm leading-relaxed text-[#EFEADD]/75">
+                  A brief delay on our side meant your {TRIAL_DAYS}-day free trial never started. Nothing has been
+                  charged, and your account is ready. Pick the plan that fits you and we&apos;ll switch it on.
                 </p>
 
-                <ul className="mt-7 grid gap-3 text-left sm:grid-cols-3">
-                  {[
-                    { title: "14 days, on us", copy: "Full access to every feature from day one." },
-                    { title: "No charge today", copy: "You’re only billed once your trial ends." },
-                    { title: "Cancel anytime", copy: "Two clicks, no questions asked." },
-                  ].map((item) => (
-                    <li
-                      key={item.title}
-                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5"
+                {/* Billing cycle */}
+                <div className="mt-7 inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] p-1">
+                  {(["monthly", "annual"] as BillingCycle[]).map((cycle) => (
+                    <button
+                      key={cycle}
+                      type="button"
+                      onClick={() => setBillingCycle(cycle)}
+                      aria-pressed={billingCycle === cycle}
+                      className={`rounded-full px-5 py-2 text-xs font-semibold transition-all ${
+                        billingCycle === cycle
+                          ? "bg-[#F2671A] text-white"
+                          : "text-[#EFEADD]/60 hover:text-[#EFEADD]"
+                      }`}
                     >
-                      <p className="text-[13px] font-semibold text-[#EFEADD]">{item.title}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-[#EFEADD]/55">{item.copy}</p>
-                    </li>
+                      {cycle === "monthly" ? "Monthly" : "Annual"}
+                      {cycle === "annual" && annualSavingsPercent !== null && (
+                        <span className="ml-1.5 opacity-80">Save {annualSavingsPercent}%</span>
+                      )}
+                    </button>
                   ))}
-                </ul>
+                </div>
 
-                <div className="mt-9 flex flex-col items-center gap-5">
+                {/* Plan cards */}
+                <div className="mt-5 grid gap-4 text-left sm:grid-cols-2">
+                  {PLAN_OPTIONS.map((option) => {
+                    const isSelected = plan === option.key
+                    const price = displayPrice(option.key)
+                    const note = annualNote(option.key)
+                    const blocked = blockedReason(option.key)
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setPlan(option.key)}
+                        aria-pressed={isSelected}
+                        className={`relative flex flex-col rounded-2xl border px-5 py-5 text-left transition-all ${
+                          isSelected
+                            ? "border-[#F2671A] bg-[#F2671A]/[0.07] shadow-[0_16px_40px_-24px_rgba(242,103,26,0.9)]"
+                            : "border-white/10 bg-white/[0.03] hover:border-white/25"
+                        } ${blocked ? "opacity-60" : ""}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#F2671A]">
+                            {option.featured ? <Zap className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {option.badge}
+                          </span>
+                          {isSelected && (
+                            <span className="rounded-full bg-[#F2671A] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex items-baseline gap-1">
+                          {price ? (
+                            <>
+                              <span className="font-title text-3xl font-extrabold tracking-tight text-[#EFEADD]">
+                                {price}
+                              </span>
+                              <span className="text-xs font-medium text-[#EFEADD]/55">{priceUnit}</span>
+                            </>
+                          ) : (
+                            <span className="text-xs font-semibold text-[#EFEADD]/55">Not available</span>
+                          )}
+                        </div>
+                        {price && note && (
+                          <p className="mt-1 text-[11px] leading-relaxed text-[#EFEADD]/45">{note}</p>
+                        )}
+
+                        <p className="mt-3 text-xs leading-relaxed text-[#EFEADD]/55">{option.description}</p>
+
+                        <ul className="mt-3 space-y-1.5">
+                          {option.features.map((feature) => (
+                            <li key={feature} className="flex items-start gap-2 text-[11px] leading-relaxed text-[#EFEADD]/70">
+                              <Check className="mt-0.5 h-3 w-3 shrink-0 text-[#F2671A]" aria-hidden="true" />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {blocked && (
+                          <p className="mt-3 text-[11px] font-medium text-[#F2671A]/80">{blocked}</p>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Currency */}
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  <span className="text-[11px] uppercase tracking-wider text-[#EFEADD]/40">Pay in</span>
+                  {SUPPORTED_CURRENCIES.map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setCurrency(code)}
+                      aria-pressed={currency === code}
+                      className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
+                        currency === code
+                          ? "bg-[#EFEADD] text-[#152323]"
+                          : "border border-white/15 text-[#EFEADD]/60 hover:text-[#EFEADD]"
+                      }`}
+                    >
+                      {code.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Summary + call to action */}
+                <div className="mt-7 flex flex-col items-center gap-3">
+                  {summary && (
+                    <p className="text-xs text-[#EFEADD]/55">
+                      {summary} — {TRIAL_DAYS} days free
+                    </p>
+                  )}
+                  {billingCycle === "annual" && (
+                    <p className="max-w-md text-center text-[11px] leading-relaxed text-[#EFEADD]/45">
+                      Your {TRIAL_DAYS} days are free. The annual price applies when the trial ends.
+                    </p>
+                  )}
+
+                  {selectedBlockedReason && (
+                    <p className="text-[11px] font-medium text-[#F2671A]/80">{selectedBlockedReason}</p>
+                  )}
+
+                  {checkoutError && (
+                    <p role="alert" className="text-[11px] font-medium text-[#F2671A]/90">
+                      {checkoutError}
+                    </p>
+                  )}
+
                   <button
                     type="button"
-                    onClick={goToCheckout}
-                    className="w-full rounded-full bg-[#F2671A] px-8 py-4 text-base font-semibold text-white shadow-[0_14px_40px_-16px_rgba(242,103,26,0.9)] transition-all hover:brightness-110 active:scale-[0.98] sm:w-auto sm:min-w-[280px]"
+                    onClick={startTrial}
+                    disabled={submitting || Boolean(selectedBlockedReason)}
+                    className="mt-1 w-full rounded-full bg-[#F2671A] px-8 py-4 text-base font-semibold text-white shadow-[0_14px_40px_-16px_rgba(242,103,26,0.9)] transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[300px]"
                   >
-                    Start my free trial
+                    {submitting ? "Opening secure checkout..." : "Start my free trial"}
                   </button>
 
-                  <div className="flex items-center gap-3 text-xs text-[#EFEADD]/55" role="status" aria-live="polite">
-                    <span className="relative h-9 w-9">
-                      <svg viewBox="0 0 64 64" className="h-9 w-9 -rotate-90">
-                        <circle
-                          cx="32"
-                          cy="32"
-                          r={RING_RADIUS}
-                          fill="none"
-                          stroke="rgba(255,255,255,0.12)"
-                          strokeWidth="4"
-                        />
-                        <circle
-                          cx="32"
-                          cy="32"
-                          r={RING_RADIUS}
-                          fill="none"
-                          stroke="#F2671A"
-                          strokeWidth="4"
-                          strokeLinecap="round"
-                          strokeDasharray={RING_CIRCUMFERENCE}
-                          strokeDashoffset={RING_CIRCUMFERENCE * (1 - progress)}
-                          className="transition-[stroke-dashoffset] duration-1000 ease-linear"
-                        />
-                      </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-[#EFEADD]">
-                        {secondsLeft}
-                      </span>
-                    </span>
-                    <span>
-                      {secondsLeft > 0
-                        ? `Taking you to secure checkout in ${secondsLeft}s`
-                        : "Taking you to secure checkout now"}
-                    </span>
-                  </div>
-
-                  <p className="mt-5 flex items-center justify-center gap-2 text-xs text-[#EFEADD]/45">
+                  <p className="mt-2 flex items-center justify-center gap-2 text-[11px] text-[#EFEADD]/45">
                     <Ticket className="h-3.5 w-3.5" aria-hidden="true" />
                     Have a promo code? You can apply it at checkout.
                   </p>
 
                   <Link
                     href="/dashboard"
-                    className="mt-4 text-xs text-[#EFEADD]/45 underline-offset-4 transition-colors hover:text-[#EFEADD]/70 hover:underline"
+                    className="mt-1 text-xs text-[#EFEADD]/45 underline-offset-4 transition-colors hover:text-[#EFEADD]/70 hover:underline"
                   >
                     Not right now, take me to my dashboard
                   </Link>
@@ -300,7 +462,8 @@ export default function StartTrialPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-[#EFEADD]/35">
+        <p className="mt-6 flex items-center justify-center gap-2 text-center text-[11px] text-[#EFEADD]/35">
+          <Lock className="h-3 w-3" aria-hidden="true" />
           Secure checkout by Stripe. The Actors Copilot never sees your card details.
         </p>
       </div>
