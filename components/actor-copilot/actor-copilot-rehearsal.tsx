@@ -37,9 +37,21 @@ import {
 import {
   ActorTake,
   ActorTakeStore,
+  MIN_TAKE_DURATION_MS,
+  TAKE_MIME_TYPE,
+  blobToBase64,
+  decodeToWav,
+  isSilentOrTooShort,
   isUsableTake,
   pickRecorderMimeType,
 } from "@/lib/actor-copilot/recordings";
+
+/**
+ * How long a turn may stay in speech processing before the rehearsal frees
+ * itself and moves on. The actor must never be stuck waiting for a response
+ * that is not coming.
+ */
+const SPEECH_RECOVERY_TIMEOUT_MS = 20000;
 
 type PlaybackSpeed = "slow" | "normal" | "fast";
 
@@ -165,6 +177,12 @@ export function ActorCopilotRehearsal({
   const isAdvancingRef = useRef<boolean>(false);
   const isUnmountedRef = useRef<boolean>(false);
   const discardRecordingRef = useRef<boolean>(false);
+  // Which dialogue line the current error message belongs to, so a message
+  // about one line does not linger on the next one.
+  const errorLineIdRef = useRef<string | null>(null);
+  // Identifies the capture that is currently in flight, so a late answer can
+  // never move a rehearsal that already moved on.
+  const turnTokenRef = useRef<number>(0);
 
   // Playback pacing: speed preference, inter-line pause timer and session guards
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>("normal");
@@ -392,6 +410,7 @@ export function ActorCopilotRehearsal({
   useEffect(() => {
     return () => {
       isUnmountedRef.current = true;
+      turnTokenRef.current += 1;
       cancelPendingPlayback();
       stopTakePlayback();
       takeStoreRef.current?.clear();
@@ -541,7 +560,10 @@ export function ActorCopilotRehearsal({
 
       setStatus("AI_READING");
       setIsProcessing(true);
-      setErrorMessage(null);
+      // A message about the actor's own turn stays visible: the actor needs
+      // to know why their line was not recognized. Only AI-side errors are
+      // cleared when the AI takes the floor.
+      if (errorLineIdRef.current === null) setErrorMessage(null);
 
       try {
         let audioObj = audioElementCacheRef.current.get(line.id);
@@ -618,6 +640,7 @@ export function ActorCopilotRehearsal({
       } catch (err: any) {
         if (isStale()) return;
         logger.warn({ msg: "AI TTS line playback warning/error", errMessage: err?.message });
+        errorLineIdRef.current = null;
         setErrorMessage(err.message || "Could not play AI line audio.");
         setIsProcessing(false);
 
@@ -685,6 +708,18 @@ export function ActorCopilotRehearsal({
 
     if (line.character === actorCharacter) {
       // It's the actor's turn! Wait for microphone input.
+      //
+      // Clear the "already played" marker here: every actor turn must be
+      // answered by the AI partner, so the AI line that follows has to be
+      // delivered again. Without this, re-entering an AI line after a failed
+      // turn would be skipped and the rehearsal would freeze on a stale
+      // status instead of moving on.
+      startedLineKeyRef.current = null;
+      // A message about a different line is not relevant for this one.
+      if (errorLineIdRef.current !== null && errorLineIdRef.current !== line.id) {
+        errorLineIdRef.current = null;
+        setErrorMessage(null);
+      }
       setStatus("WAITING_FOR_ACTOR");
     } else {
       // It's the AI's turn! Each line starts once per session, even if
@@ -695,6 +730,27 @@ export function ActorCopilotRehearsal({
       void playAiLine(line, currentLineIndex);
     }
   }, [actorCharacter, currentLineIndex, playAiLine, scene.lines, rehearsalSession]);
+
+  // --- RECOVERY WATCHDOG ---
+  // The actor must never be left staring at a stalled turn. If the speech
+  // recognition never answers, the rehearsal frees itself and moves on.
+  useEffect(() => {
+    if (status !== "TRANSCRIBING" && status !== "MATCHING_LINE") return;
+
+    const token = turnTokenRef.current;
+
+    const timer = setTimeout(() => {
+      // A newer turn took over: its own watchdog is in charge.
+      if (turnTokenRef.current !== token) return;
+
+      logger.warn({ msg: "Speech recognition stalled, recovering the rehearsal" });
+      setIsProcessing(false);
+      setErrorMessage("Speech recognition took too long. Moving on.");
+      setCurrentLineIndex((prev) => prev + 1);
+    }, SPEECH_RECOVERY_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [status]);
 
   // --- HANDS-FREE AUTOMATIC LINE ADVANCE FUNCTION ---
   const completeActorTurn = useCallback(
@@ -923,7 +979,23 @@ export function ActorCopilotRehearsal({
       const blob = new Blob(chunks, {
         type: recorder.mimeType || mimeType || "audio/webm",
       });
-      storeTake(line.id, blob, blob.type);
+
+      // Same treatment as the manual capture: re-encode to WAV and drop the
+      // take when the recording turns out to be silent or too short, so the
+      // playback control never appears for audio that plays nothing.
+      void decodeToWav(blob).then((decoded) => {
+        if (isUnmountedRef.current || sessionRef.current !== sessionId) return;
+
+        if (!decoded) {
+          // The browser could not decode it; keep the original container.
+          storeTake(line.id, blob, blob.type);
+          return;
+        }
+
+        if (isSilentOrTooShort(decoded.peak, decoded.durationMs)) return;
+
+        storeTake(line.id, decoded.blob, TAKE_MIME_TYPE);
+      });
     };
 
     recorder.onerror = () => {
@@ -940,7 +1012,7 @@ export function ActorCopilotRehearsal({
     return () => {
       try {
         if (recorder.state !== "inactive") recorder.stop();
-      } catch (_) {
+      } catch {
         // Recorder may already be stopped
       }
     };
@@ -949,10 +1021,15 @@ export function ActorCopilotRehearsal({
   // --- MICROPHONE RECORDING & STT ---
   const startRecording = async () => {
     setErrorMessage(null);
+    errorLineIdRef.current = null;
 
     // The dialogue line is captured at recording time, so the audio can never
     // end up attached to a different line if the rehearsal moves on meanwhile.
     const recordedLine = currentLine;
+
+    // Identifies this capture from the moment it starts, so a late answer
+    // can never move a rehearsal that already moved on (or restarted).
+    const captureToken = ++turnTokenRef.current;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -974,69 +1051,109 @@ export function ActorCopilotRehearsal({
       };
 
       mediaRecorder.onstop = async () => {
+        // The capture may already be superseded (a restart happened, or a
+        // newer recording started). Bail out before touching any state.
+        if (turnTokenRef.current !== captureToken) return;
+
         setStatus("TRANSCRIBING");
         setIsProcessing(true);
 
-        const audioBlob = new Blob(audioChunksRef.current, {
+        const rawBlob = new Blob(audioChunksRef.current, {
           type: mediaRecorder.mimeType || mimeType || "audio/webm",
         });
 
-        // Keep the actor's own audio for this exact line so it can be played
-        // back later. This is the actor's voice, never AI-generated audio.
-        if (recordedLine && !discardRecordingRef.current) {
-          storeTake(recordedLine.id, audioBlob, audioBlob.type);
-        }
+        const discard = discardRecordingRef.current;
         discardRecordingRef.current = false;
 
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
+        // The container produced by the browser (WebM/Opus on Chromium) is not
+        // accepted by every transcription endpoint and is not guaranteed to
+        // play back either, so the capture is decoded and re-encoded as WAV.
+        // Decoding also proves the capture is intact.
+        const decoded = await decodeToWav(rawBlob);
 
-        reader.onloadend = async () => {
-          const base64data = (reader.result as string).split(",")[1];
-          try {
-            const auth = getAuth();
-            const idToken = await auth.currentUser?.getIdToken();
-            if (!idToken) throw new Error("Authentication token missing.");
+        // Same check after the await: the rehearsal may have moved on while
+        // the capture was being decoded.
+        if (turnTokenRef.current !== captureToken) return;
 
-            const response = await fetch("/api/dna/transcribe/chat", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${idToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ audioBase64: base64data, mimeType: audioBlob.type }),
-            });
+        const audioBlob = decoded?.blob ?? rawBlob;
+        const apiMimeType = decoded ? TAKE_MIME_TYPE : rawBlob.type || "audio/webm";
 
-            if (!response.ok) {
-              const errJson = await response.json().catch(() => ({}));
-              throw new Error(errJson.error || "Failed to transcribe audio.");
-            }
+        if (decoded && isSilentOrTooShort(decoded.peak, decoded.durationMs)) {
+          // Nothing worth keeping: no take is stored, so no playback control
+          // is shown for a recording that would play silence.
+          errorLineIdRef.current = recordedLine?.id ?? null;
+          setErrorMessage(
+            decoded.durationMs < MIN_TAKE_DURATION_MS
+              ? "That recording was too short. Hold the mic and speak the whole line."
+              : "I didn't hear anything. Speak closer to your microphone and try again."
+          );
+          setIsProcessing(false);
+          setCurrentLineIndex((prev) => prev + 1);
+          return;
+        }
 
-            const data = await response.json();
-            const transcribedText = data.text || "";
+        // Keep the actor's own audio for this exact line so it can be played
+        // back later. This is the actor's voice, never AI-generated audio.
+        if (recordedLine && !discard) {
+          storeTake(recordedLine.id, audioBlob, audioBlob.type);
+        }
 
-            if (recordedLine) {
-              setTranscripts((prev) => ({
-                ...prev,
-                [recordedLine.order]: transcribedText,
-              }));
+        try {
+          const base64data = await blobToBase64(audioBlob);
+          if (!base64data) throw new Error("The recording was empty.");
 
-              // Fuzzy match what was said with script line
-              setStatus("MATCHING_LINE");
-              matchActorLine(recordedLine.dialogue, transcribedText);
-            }
+          const auth = getAuth();
+          const idToken = await auth.currentUser?.getIdToken();
+          if (!idToken) throw new Error("Authentication token missing.");
 
-            // Advance rehearsal to next line
-            setCurrentLineIndex((prev) => prev + 1);
-          } catch (error: any) {
-            logger.error({ err: error, msg: "Transcription error during rehearsal" });
-            setErrorMessage("Failed to recognize speech. Advancing line...");
-            // Advance line anyway to avoid blocking actor
-            setCurrentLineIndex((prev) => prev + 1);
-          } finally {
+          const response = await fetch("/api/dna/transcribe/chat", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ audioBase64: base64data, mimeType: apiMimeType }),
+          });
+
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson.error || `Failed to transcribe audio (HTTP ${response.status}).`);
+          }
+
+          const data = await response.json();
+          const transcribedText = data.text || "";
+
+          // A newer turn took over while the request was in flight.
+          if (turnTokenRef.current !== captureToken) return;
+
+          if (recordedLine) {
+            setTranscripts((prev) => ({
+              ...prev,
+              [recordedLine.order]: transcribedText,
+            }));
+
+            // Fuzzy match what was said with script line
+            setStatus("MATCHING_LINE");
+            matchActorLine(recordedLine.dialogue, transcribedText);
+          }
+
+          // Advance rehearsal to next line
+          setCurrentLineIndex((prev) => prev + 1);
+        } catch (error: any) {
+          if (turnTokenRef.current !== captureToken) return;
+
+          logger.error({ err: error, msg: "Transcription error during rehearsal" });
+          errorLineIdRef.current = recordedLine?.id ?? null;
+          setErrorMessage(
+            `Could not recognize that line: ${error?.message || "unknown error"}. Moving on.`
+          );
+          // Advance line anyway to avoid blocking actor
+          setCurrentLineIndex((prev) => prev + 1);
+        } finally {
+          if (turnTokenRef.current === captureToken) {
             setIsProcessing(false);
           }
-        };
+        }
       };
 
       mediaRecorder.start();
@@ -1044,6 +1161,7 @@ export function ActorCopilotRehearsal({
       setStatus("ACTOR_RECORDING");
     } catch (error: any) {
       logger.error({ err: error, msg: "Microphone permission denied" });
+      errorLineIdRef.current = null;
       setErrorMessage("Microphone access denied. Please grant mic permissions.");
     }
   };
@@ -1068,6 +1186,9 @@ export function ActorCopilotRehearsal({
   const handleResetRehearsal = () => {
     cancelPendingPlayback();
     stopTakePlayback();
+    // Invalidate any capture that is still in flight: its answer must not
+    // move the rehearsal that is starting now.
+    turnTokenRef.current += 1;
     setRehearsalSession(sessionRef.current);
     setIsProcessing(false);
     if (isRecording) {
@@ -1093,6 +1214,7 @@ export function ActorCopilotRehearsal({
     setCurrentLineIndex(0);
     setTranscripts({});
     setErrorMessage(null);
+    errorLineIdRef.current = null;
     setStatus("IDLE");
 
     // A restart is a brand new session: the previous takes are dropped so no

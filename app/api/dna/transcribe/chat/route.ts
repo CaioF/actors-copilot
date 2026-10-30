@@ -3,6 +3,42 @@ import { auth } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 
 /**
+ * Audio containers the AI endpoint understands.
+ */
+const SUPPORTED_AUDIO_MIME_TYPES = [
+  'audio/wav',
+  'audio/x-wav',
+  'audio/wave',
+  'audio/mp3',
+  'audio/mpeg',
+  'audio/aiff',
+  'audio/aac',
+  'audio/ogg',
+  'audio/flac',
+  'audio/webm',
+  'audio/opus',
+  'audio/mp4',
+];
+
+/**
+ * Normalizes the MIME type reported by the client.
+ *
+ * Browsers report the container with codec parameters attached
+ * (`audio/webm;codecs=opus`). That parameterised form is not a valid media
+ * type for the AI endpoint, so it is stripped before the audio is sent.
+ *
+ * @param raw - The MIME type sent by the client.
+ * @returns The normalized MIME type, or an empty string when the format is
+ * not supported.
+ */
+function normalizeAudioMimeType(raw: unknown): string {
+  const base = typeof raw === 'string' ? raw.split(';')[0].trim().toLowerCase() : '';
+  if (!base) return 'audio/webm';
+  if (SUPPORTED_AUDIO_MIME_TYPES.includes(base)) return base;
+  return '';
+}
+
+/**
  * Transcribes audio input (typically voice recordings for chat input) to text using AI.
  * @param request - HTTP request with authorization token, base64-encoded audio, and mime type
  * @returns JSON response with transcribed text or error message
@@ -26,6 +62,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio provided' }, { status: 400 });
     }
 
+    const normalizedMimeType = normalizeAudioMimeType(mimeType);
+    if (!normalizedMimeType) {
+      return NextResponse.json(
+        { error: `Unsupported audio format: ${mimeType}` },
+        { status: 400 }
+      );
+    }
+
     // initialize fast AI
     const { getAI, getGenerativeModel, VertexAIBackend } = await import("firebase/ai");
     const { getAiApp } = await import("@/lib/firebase-ai");
@@ -38,7 +82,7 @@ export async function POST(request: Request) {
     } );
 
     const audioPart = {
-      inlineData: { data: audioBase64, mimeType: mimeType || "audio/webm" }
+      inlineData: { data: audioBase64, mimeType: normalizedMimeType }
     };
     
     const transcriptionResult = await transcriptionModel.generateContent([
@@ -49,7 +93,10 @@ export async function POST(request: Request) {
     const transcribedText = transcriptionResult.response.text().trim();
 
     if (transcribedText.length < 2) {
-      return NextResponse.json({ error: 'Audio too short or silent' }, { status: 400 });
+      return NextResponse.json(
+        { error: `Audio too short or silent (${normalizedMimeType})` },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ text: transcribedText }, { status: 200 });

@@ -23,8 +23,18 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
+// Only the browser-side decoder is replaced: the store and the pure helpers
+// stay real so the tests exercise the actual behaviour.
+jest.mock("@/lib/actor-copilot/recordings", () => {
+  const actual = jest.requireActual("@/lib/actor-copilot/recordings");
+  return { ...actual, decodeToWav: jest.fn() };
+});
+
 import { ActorCopilotRehearsal } from "./actor-copilot-rehearsal";
 import { SceneData } from "@/lib/actor-copilot/script-parser";
+import { decodeToWav } from "@/lib/actor-copilot/recordings";
+
+const decodeToWavMock = decodeToWav as jest.MockedFunction<typeof decodeToWav>;
 
 const scene: SceneData = {
   sceneId: "scene-1",
@@ -74,8 +84,20 @@ const fakeStream = {
   getTracks: () => [{ stop: jest.fn() }],
 };
 
+/** A decoded take as the browser would produce it from a real recording. */
+function decodedTake(overrides: Partial<{ durationMs: number; peak: number }> = {}) {
+  return {
+    blob: new Blob([new Uint8Array(32000)], { type: "audio/wav" }),
+    durationMs: overrides.durationMs ?? 2400,
+    peak: overrides.peak ?? 0.4,
+    sampleRate: 16000,
+  };
+}
+
 beforeEach(() => {
   MockMediaRecorder.emitAudio = false;
+  decodeToWavMock.mockReset();
+  decodeToWavMock.mockResolvedValue(null);
 
   Object.defineProperty(global, "MediaRecorder", {
     writable: true,
@@ -136,6 +158,27 @@ async function startActorTurn() {
   });
 }
 
+/** Records the current actor line with the mic button and stops it. */
+async function recordCurrentLine() {
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Start recording your line" }));
+  });
+
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Stop recording" })).toBeInTheDocument()
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+  });
+}
+
+/** The dialogue of the line the rehearsal is currently on. */
+function activeLineText() {
+  const active = document.querySelector('[data-active-line="true"]');
+  return active?.textContent ?? "";
+}
+
 describe("ActorCopilotRehearsal — actor recording playback", () => {
   it("does not show a playback control before anything is recorded", async () => {
     await startActorTurn();
@@ -146,21 +189,10 @@ describe("ActorCopilotRehearsal — actor recording playback", () => {
 
   it("keeps the actor's own recording on the line it belongs to and offers playback", async () => {
     MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(decodedTake());
 
     await startActorTurn();
-
-    // Record the actor line with the mic button.
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start recording your line" }));
-    });
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Stop recording" })).toBeInTheDocument()
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
-    });
+    await recordCurrentLine();
 
     // The take belongs to EMILY's line, never to the AI line.
     await waitFor(() => {
@@ -176,20 +208,10 @@ describe("ActorCopilotRehearsal — actor recording playback", () => {
 
   it("plays the actor's take with its own audio element, without advancing the scene", async () => {
     MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(decodedTake());
 
     await startActorTurn();
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start recording your line" }));
-    });
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Stop recording" })).toBeInTheDocument()
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
-    });
+    await recordCurrentLine();
 
     await waitFor(() => {
       expect(
@@ -211,5 +233,68 @@ describe("ActorCopilotRehearsal — actor recording playback", () => {
 
     // Playing a take never asks the AI for new speech.
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(ttsCallsBefore);
+  });
+
+  it("sends the recording to the transcription API as WAV", async () => {
+    MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(decodedTake());
+
+    await startActorTurn();
+    await recordCurrentLine();
+
+    await waitFor(() => {
+      const calls = (global.fetch as jest.Mock).mock.calls.filter((call) =>
+        String(call[0]).includes("/api/dna/transcribe/chat")
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      expect(JSON.parse(calls[0][1].body).mimeType).toBe("audio/wav");
+    });
+  });
+
+  it("does not offer a playback control for a silent recording", async () => {
+    MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(decodedTake({ peak: 0 }));
+
+    await startActorTurn();
+    await recordCurrentLine();
+
+    await waitFor(() => {
+      expect(screen.getByText(/didn't hear anything/i)).toBeInTheDocument();
+    });
+
+    // Nothing worth keeping: no take, so no playback control.
+    expect(screen.queryByText(/Play my take/i)).not.toBeInTheDocument();
+  });
+
+  it("reports why a line could not be recognized and still moves the scene on", async () => {
+    MockMediaRecorder.emitAudio = true;
+    decodeToWavMock.mockResolvedValue(decodedTake());
+
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (String(url).includes("/api/dna/transcribe/chat")) {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ error: "Audio too short or silent (audio/wav)" }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ audioUrl: "https://example.test/ai-line.mp3" }),
+      };
+    });
+
+    await startActorTurn();
+    await recordCurrentLine();
+
+    // The real reason from the server is shown instead of a generic message.
+    await waitFor(() => {
+      expect(screen.getByText(/Audio too short or silent/i)).toBeInTheDocument();
+    });
+
+    // The scene keeps moving: the AI partner's line is now the current one.
+    await waitFor(() => {
+      expect(activeLineText()).toContain("He's outside.");
+    });
   });
 });
