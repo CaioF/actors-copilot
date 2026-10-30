@@ -901,6 +901,7 @@ export function ActorCopilotRehearsal({
     const stream = micStreamRef.current;
     if (!line || !stream || typeof MediaRecorder === "undefined") return;
 
+    const sessionId = sessionRef.current;
     const mimeType = pickRecorderMimeType();
     let recorder: MediaRecorder;
 
@@ -918,7 +919,7 @@ export function ActorCopilotRehearsal({
     };
 
     recorder.onstop = () => {
-      if (isUnmountedRef.current) return;
+      if (isUnmountedRef.current || sessionRef.current !== sessionId) return;
       const blob = new Blob(chunks, {
         type: recorder.mimeType || mimeType || "audio/webm",
       });
