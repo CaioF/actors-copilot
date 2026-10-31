@@ -97,8 +97,31 @@ export function getStripePriceIdForTier(tier: SubscriptionTier, billingCycle: Bi
 }
 
 /**
+/**
+ * Stripe Prices that are no longer the ones configured in the environment but
+ * still have subscriptions attached to them.
+ *
+ * `mapStripePriceToTier` translates a Price back into a platform tier. A Price
+ * missing from that translation silently becomes the "free" tier, so every
+ * subscription still pointing at a retired Price is downgraded on its next
+ * renewal while the customer keeps being charged.
+ *
+ * Keep a retired Price here for as long as somebody is still subscribed to it.
+ * Remove it only after the last subscription on it is gone.
+ */
+const retiredPriceTiers: Record<string, SubscriptionTier> = {
+  // Economy Class, EUR, archived on 2026-10-19
+  price_1TuCshEnOTJRuCTXl1SD2vMr: 'economy',
+  price_1TwOUREnOTJRuCTXdUqc9fyK: 'economy',
+  // Business Class, EUR, archived on 2026-10-19
+  price_1TuCsvEnOTJRuCTXbaAzTSbO: 'business',
+  price_1TwO6vEnOTJRuCTXl4ilzwrn: 'business',
+};
+
+/**
  * Maps a Stripe Price ID back to the corresponding platform subscription tier.
- * * @param {string | undefined} priceId - The Stripe Price ID received from the API or Webhook.
+ *
+ * @param {string | undefined} priceId - The Stripe Price ID received from the API or Webhook.
  * @returns {SubscriptionTier} The resolved subscription tier ('free' if unmapped or empty).
  */
 export function mapStripePriceToTier(priceId: string | undefined): SubscriptionTier {
@@ -111,10 +134,21 @@ export function mapStripePriceToTier(priceId: string | undefined): SubscriptionT
     case businessPriceId:
     case businessAnnualPriceId:
       return 'business';
-    default:
+    default: {
+      const retiredTier = retiredPriceTiers[priceId];
+      if (retiredTier) {
+        // The Price is retired but subscriptions still point at it, so the tier
+        // is preserved: the customer must not be downgraded while paying.
+        console.warn(
+          `⚠️ Retired Stripe Price ID in use: ${priceId}. Keeping tier "${retiredTier}" for existing subscriptions.`
+        );
+        return retiredTier;
+      }
+
       // Graceful degradation: log unexpected price IDs but default to free to protect UX
       console.warn(`⚠️ Unmapped Stripe Price ID detected: ${priceId}. Defaulting to "free" tier.`);
       return 'free';
+    }
   }
 }
 
