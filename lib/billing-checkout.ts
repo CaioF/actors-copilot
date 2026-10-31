@@ -3,6 +3,7 @@ import { stripe } from '@/lib/stripe';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
+import { isSameAppOrigin } from '@/lib/app-origin';
 
 /**
  * Detects the Stripe "idempotency key is already in use" conflict.
@@ -157,6 +158,11 @@ export async function createIdempotentCheckoutSession(params: {
  * Prevents the accumulation of redundant Stripe Sessions when the same user
  * triggers the checkout more than once (double click, page reload, two tabs).
  *
+ * A session is only reusable when it sends the member back to the same origin
+ * they are on: a session created for another host would drop them on a domain
+ * that holds neither their platform cookie nor their Firebase session. Those
+ * stale sessions are expired so a single checkout attempt stays open.
+ *
  * @param params - The lookup criteria.
  * @returns {Promise<Stripe.Checkout.Session | null>} The reusable session, if any.
  */
@@ -165,8 +171,9 @@ export async function findOpenCheckoutSession(params: {
   tier: SubscriptionTier;
   billingCycle: BillingCycle;
   currency?: string;
+  appUrl: string;
 }): Promise<Stripe.Checkout.Session | null> {
-  const { customerId, tier, billingCycle, currency } = params;
+  const { customerId, tier, billingCycle, currency, appUrl } = params;
 
   try {
     const listed = await stripe.checkout.sessions.list({
@@ -176,15 +183,43 @@ export async function findOpenCheckoutSession(params: {
     });
 
     const now = Math.floor(Date.now() / 1000);
+    const sameOrigin = (session: Stripe.Checkout.Session) =>
+      isSameAppOrigin(session.success_url ?? '', appUrl);
+
     const match = listed.data.find(
       (session) =>
         session.metadata?.targetTier === tier &&
         session.metadata?.billingCycle === billingCycle &&
         session.expires_at > now &&
-        (!currency || session.currency === currency),
+        (!currency || session.currency === currency) &&
+        sameOrigin(session),
     );
 
-    return match ?? null;
+    if (match) return match;
+
+    // Sessions for a different origin would send the member to a host without
+    // their session, so they are expired instead of being reused.
+    for (const session of listed.data) {
+      const isSamePlan =
+        session.metadata?.targetTier === tier &&
+        session.metadata?.billingCycle === billingCycle &&
+        session.expires_at > now;
+      if (!isSamePlan || sameOrigin(session)) continue;
+
+      try {
+        await stripe.checkout.sessions.expire(session.id);
+        logger.warn({
+          msg: 'Expired a checkout session created for a different app origin',
+          sessionId: session.id,
+          sessionOrigin: session.success_url,
+          currentOrigin: appUrl,
+        });
+      } catch (error) {
+        logger.warn({ err: error, msg: 'Could not expire a stale checkout session', sessionId: session.id });
+      }
+    }
+
+    return null;
   } catch (error) {
     logger.warn({ err: error, msg: 'Could not look up an open checkout session' });
     return null;
@@ -226,7 +261,7 @@ export async function createOrReuseCheckoutSession(params: {
     knownCustomerId: billingData.customerId as string | undefined,
   });
 
-  const reusable = await findOpenCheckoutSession({ customerId, tier, billingCycle, currency });
+  const reusable = await findOpenCheckoutSession({ customerId, tier, billingCycle, currency, appUrl });
   if (reusable) return reusable;
 
   const session = await createIdempotentCheckoutSession({

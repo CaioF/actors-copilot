@@ -3,6 +3,7 @@ import { getPlatformSession } from '@/lib/session';
 import { db, auth } from '@/lib/firebase.admin';
 import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
 import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { resolveAppUrl } from '@/lib/app-origin';
 import { logger } from '@/lib/logger';
 import { normalizeCurrency, type RequestedCurrency } from '@/lib/plan-selection';
 
@@ -122,7 +123,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // 4. Resolve the Stripe Customer and open the checkout session.
         // Both steps are idempotent: concurrent requests for the same attempt
         // collapse into a single customer and a single Stripe Session.
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        //
+        // The redirect URLs are built from the origin of this request so that
+        // the member returns to the very host they started from: the platform
+        // cookie and the Firebase session live on that origin, and a different
+        // host would send them back to the login screen.
+        const appUrl = resolveAppUrl(req.headers);
 
         const checkoutSession = await createOrReuseCheckoutSession({
             uid,

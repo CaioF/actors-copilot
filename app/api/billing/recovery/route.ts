@@ -4,6 +4,7 @@ import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
 import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { resolveAppUrl } from '@/lib/app-origin';
 import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending } from '@/lib/billing-recovery';
 import { normalizeCurrency } from '@/lib/plan-selection';
 import { logger } from '@/lib/logger';
@@ -97,6 +98,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         const currency = requestedCurrency ?? defaultCurrency;
 
+        // The redirect URLs follow the origin of this request: the member must
+        // come back to the host where their session lives, otherwise the app
+        // sends them to the login screen instead of the dashboard.
+        const appUrl = resolveAppUrl(req.headers);
+
         const checkoutSession = await createOrReuseCheckoutSession({
             uid,
             email,
@@ -104,7 +110,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             billingCycle,
             ...(currency ? { currency } : {}),
             isTrial: true,
-            appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+            appUrl,
         });
 
         await userDocRef.update({

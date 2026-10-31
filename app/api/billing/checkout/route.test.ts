@@ -317,4 +317,43 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         expect(data.url).toBe('https://checkout.stripe.com/pay/idtoken_session');
         expect(auth.verifyIdToken).toHaveBeenCalledWith('valid_firebase_id_token');
     });
+
+    it('sends the member back to the host they started the checkout from', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+        (getStripePriceIdForTier as jest.Mock).mockReturnValue('price_business_id_xyz');
+
+        const mockGet = jest.fn().mockResolvedValue({
+            exists: true,
+            data: () => ({ customerId: 'cus_historical_888', tier: 'free', status: 'canceled', hasUsedTrial: false }),
+        });
+        const mockSet = jest.fn().mockResolvedValue(true);
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet, set: mockSet });
+
+        (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/origin_session' });
+
+        const req = new Request('https://app.theactorscopilot.com/api/billing/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-forwarded-host': 'app.theactorscopilot.com',
+                'x-forwarded-proto': 'https',
+            },
+            body: JSON.stringify({ tier: 'business' }),
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(data.url).toBe('https://checkout.stripe.com/pay/origin_session');
+
+        // The platform cookie and the Firebase session live on the origin the
+        // member started from, so the Stripe redirect has to point back to it.
+        // Returning to a different host drops them on the login screen.
+        const sessionArgs = (stripe.checkout.sessions.create as jest.Mock).mock.calls[0][0];
+        expect(sessionArgs.success_url).toBe(
+            'https://app.theactorscopilot.com/api/billing/success?session_id={CHECKOUT_SESSION_ID}',
+        );
+        expect(sessionArgs.cancel_url).toBe('https://app.theactorscopilot.com/api/billing/cancelled');
+    });
 });

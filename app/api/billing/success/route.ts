@@ -46,7 +46,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         // session based on persisted state and not on client-supplied values.
         const billingDocRef = db.doc(`users/${uid}/billing/current`);
         const billingDoc = await billingDocRef.get();
-        const billingData = billingDoc.exists ? billingDoc.data() : {};
+        let billingData = billingDoc.exists ? billingDoc.data() : {};
+
+        // The webhook that grants the entitlement can land a moment after
+        // Stripe redirects the member back. Waiting for it here avoids handing
+        // them a session that still says "free" right after they paid.
+        const subscriptionId =
+            typeof sessionDetails.subscription === 'string'
+                ? sessionDetails.subscription
+                : sessionDetails.subscription?.id;
+
+        if (subscriptionId) {
+            for (let attempt = 0; attempt < 4; attempt += 1) {
+                const tier = (billingData?.tier as string) || 'free';
+                const status = (billingData?.status as string) || 'canceled';
+                if (tier !== 'free' && status !== 'canceled') break;
+
+                await new Promise((resolve) => setTimeout(resolve, 500));
+                const retry = await billingDocRef.get();
+                billingData = retry.exists ? retry.data() : billingData;
+            }
+        }
 
         const currentTier = (billingData?.tier as string) || 'free';
         const subscriptionStatus = (billingData?.status as string) || 'canceled';
