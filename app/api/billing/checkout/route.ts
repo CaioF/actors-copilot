@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { db, auth } from '@/lib/firebase.admin';
 import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
-import { createOrReuseCheckoutSession, resolveAppUrl } from '@/lib/billing-checkout';
+import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { resolveAppUrl } from '@/lib/app-origin';
 import { logger } from '@/lib/logger';
 import { normalizeCurrency, type RequestedCurrency } from '@/lib/plan-selection';
 

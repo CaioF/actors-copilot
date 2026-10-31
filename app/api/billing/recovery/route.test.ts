@@ -4,7 +4,8 @@ import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
-import { createOrReuseCheckoutSession, resolveAppUrl } from '@/lib/billing-checkout';
+import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { resolveAppUrl } from '@/lib/app-origin';
 
 jest.mock('@/lib/session', () => ({
     getPlatformSession: jest.fn(),
@@ -24,6 +25,9 @@ jest.mock('@/lib/billing-currency', () => ({
 
 jest.mock('@/lib/billing-checkout', () => ({
     createOrReuseCheckoutSession: jest.fn(),
+}));
+
+jest.mock('@/lib/app-origin', () => ({
     resolveAppUrl: jest.fn(),
 }));
 

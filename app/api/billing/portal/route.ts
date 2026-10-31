@@ -3,7 +3,7 @@ import { getPlatformSession } from '@/lib/session';
 import { stripe } from '@/lib/stripe';
 import { db, auth } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
-import { resolveAppUrl } from '@/lib/billing-checkout';
+import { resolveAppUrl } from '@/lib/app-origin';
 
 /**
  * POST /api/billing/portal
