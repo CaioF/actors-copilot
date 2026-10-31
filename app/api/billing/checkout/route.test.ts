@@ -200,7 +200,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'false',
             },
-        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_0` });
+        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_default_0_localhost-3000` });
 
         // 3. Ensure no redundant customer objects get initialized during mapped flows
         expect(stripe.customers.create).not.toHaveBeenCalled();
@@ -265,7 +265,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'true',
             },
-        }, { idempotencyKey: `checkout_${mockUid}_price_business_id_xyz_0` });
+        }, { idempotencyKey: `checkout_${mockUid}_price_business_id_xyz_default_0_localhost-3000` });
     });
 
     it('rejects trial requests with 400 Bad Request if the account has already redeemed a trial', async () => {
