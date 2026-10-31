@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { verifyStripeWebhookEvent, mapStripePriceToTier } from '@/lib/billing';
+import { verifyStripeWebhookEvent, mapStripePriceToTier, type SubscriptionTier } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { markBillingRecoveryResolved } from '@/lib/billing-recovery';
 import { logger } from '@/lib/logger';
@@ -138,6 +138,28 @@ async function resolvePlatformUserId(params: {
 }
 
 /**
+ * Reads the tier currently stored for a platform user.
+ *
+ * It is the fallback used when a Stripe Price cannot be mapped: a paying
+ * customer keeps the tier they paid for instead of being downgraded to "free"
+ * while the mapping is being repaired.
+ *
+ * @param {string} platformUserId - The platform user identifier.
+ * @returns {Promise<SubscriptionTier | undefined>} The stored paid tier, if any.
+ */
+async function readStoredTier(platformUserId: string): Promise<SubscriptionTier | undefined> {
+    try {
+        const snap = await db.doc(`users/${platformUserId}/billing/current`).get();
+        if (!snap.exists) return undefined;
+
+        const storedTier = snap.data()?.tier as SubscriptionTier | undefined;
+        return storedTier && storedTier !== 'free' ? storedTier : undefined;
+    } catch (error) {
+        logger.warn({ err: error, msg: 'Could not read the stored tier for the billing fallback' });
+        return undefined;
+    }
+}
+/**
  * Idempotently updates the user's billing document and root user profile in Firestore.
  */
 async function syncUserBilling(platformUserId: string, data: Record<string, any>): Promise<void> {
@@ -244,7 +266,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     }
                 }
 
-                const tier = session.metadata?.targetTier || (priceId ? mapStripePriceToTier(priceId) : 'free');
+                const mappedTier = priceId ? mapStripePriceToTier(priceId) : null;
+                const tier = session.metadata?.targetTier
+                    || (mappedTier && mappedTier !== 'free'
+                        ? mappedTier
+                        : ((await readStoredTier(platformUserId)) ?? 'free'));
                 const isMigrationFlow = session.metadata?.flow === 'subscriber_migration';
                 const isTrialSession = session.metadata?.isTrial === 'true' || subscriptionObj?.status === 'trialing';
                 const subStatus = subscriptionObj?.status || (isTrialSession ? 'trialing' : 'active');
@@ -286,10 +312,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
                 const firstItem = subscription.items.data[0];
                 const priceId = firstItem?.price?.id || null;
-                const tier = priceId ? mapStripePriceToTier(priceId) : 'free';
                 const status = subscription.status;
                 const isDeleted = event.type === 'customer.subscription.deleted' || status === 'canceled' || status === 'unpaid';
                 const hasAccess = !isDeleted && ['trialing', 'active'].includes(status);
+
+                // A Price the tier mapping does not know must never downgrade a paying
+                // customer: keep the tier already stored until the mapping is repaired.
+                const mappedTier = priceId ? mapStripePriceToTier(priceId) : null;
+                const tier = mappedTier && mappedTier !== 'free'
+                    ? mappedTier
+                    : isDeleted
+                        ? 'free'
+                        : ((await readStoredTier(platformUserId)) ?? 'free');
 
                 const subscriptionWithPeriod = subscription as Stripe.Subscription & { current_period_end?: number };
                 const currentPeriodEnd =
