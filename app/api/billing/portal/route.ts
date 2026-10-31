@@ -3,6 +3,7 @@ import { getPlatformSession } from '@/lib/session';
 import { stripe } from '@/lib/stripe';
 import { db, auth } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
+import { resolveAppUrl } from '@/lib/billing-checkout';
 
 /**
  * POST /api/billing/portal
@@ -72,7 +73,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         // 4. Initialize hosted Stripe Customer Portal configuration returning to /settings or environment setting
-        const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        // The return URL follows the origin of this request: the portal sends
+        // the member back to a host, and only the origin they started from
+        // holds their session.
+        const appUrl = resolveAppUrl(req.headers);
         const returnUrl = process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL || `${appUrl}/settings`;
 
         const portalSession = await stripe.billingPortal.sessions.create({

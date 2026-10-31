@@ -18,6 +18,12 @@ jest.mock('@/lib/firebase.admin', () => ({
     db: { doc: jest.fn() },
 }));
 
+// The real module refuses to load without the Stripe Price IDs in the
+// environment, and CI does not provide them.
+jest.mock('@/lib/billing', () => ({
+    getStripePriceIdForTier: jest.fn(),
+}));
+
 describe('checkout origin helpers', () => {
     beforeEach(() => {
         jest.clearAllMocks();
