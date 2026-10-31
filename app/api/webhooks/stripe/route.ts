@@ -166,11 +166,18 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
     const billingRef = db.doc(`users/${platformUserId}/billing/current`);
     const userRef = db.doc(`users/${platformUserId}`);
 
-    const payload = sanitizeFirestorePayload({
-        ...data,
-        subscriptionStatus: data.status,
-        updatedAt: new Date().toISOString(),
-    });
+    // Events that do not carry a tier (invoice.*) must never wipe the tier that
+    // is already stored: the tier is the source of truth for the plan and the
+    // document is merged, so an absent tier has to stay absent.
+    const rawPayload: Record<string, any> = Object.fromEntries(
+        Object.entries({
+            ...data,
+            subscriptionStatus: data.status,
+            updatedAt: new Date().toISOString(),
+        }).filter(([key, value]) => key !== 'tier' || value !== undefined),
+    );
+
+    const payload = sanitizeFirestorePayload(rawPayload);
 
     await billingRef.set(payload, { merge: true });
 
@@ -178,10 +185,10 @@ async function syncUserBilling(platformUserId: string, data: Record<string, any>
         stripeCustomerId: data.customerId ?? null,
         subscriptionStatus: data.status ?? null,
         hasAccess: data.hasAccess ?? null,
-        tier: data.tier ?? null,
         cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
         cancelAt: data.cancelAt ?? null,
         updatedAt: new Date().toISOString(),
+        ...(data.tier !== undefined ? { tier: data.tier } : {}),
     };
 
     if (data.hasUsedTrial !== undefined) {

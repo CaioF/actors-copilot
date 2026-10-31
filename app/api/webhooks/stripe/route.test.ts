@@ -299,6 +299,47 @@ describe('Stripe Webhook Route Handler', () => {
     expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
   });
 
+  it('does not wipe the stored tier when an invoice event carries no tier', async () => {
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue({
+      type: 'invoice.payment_succeeded',
+      id: 'evt_invoice_without_tier',
+      data: {
+        object: {
+          customer: mockCustomerId,
+          customer_email: 'billing@example.com',
+        },
+      },
+    });
+    const mockSet = jest.fn().mockResolvedValue(undefined);
+    (db.doc as jest.Mock).mockReturnValue({ set: mockSet });
+    (db.collectionGroup as jest.Mock).mockReturnValue({
+      where: () => ({
+        limit: () => ({
+          get: jest.fn().mockResolvedValue({
+            empty: false,
+            docs: [{ ref: { path: `users/${mockUid}/billing/current` } }],
+          }),
+        }),
+      }),
+    });
+
+    const res = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'sig_123' },
+      body: '{}',
+    }) as NextRequest);
+
+    expect(res.status).toBe(200);
+
+    // Both documents are merged, so a tier that the event does not carry has to
+    // stay absent instead of being written as null: otherwise a payment would
+    // erase the plan of the customer that made it.
+    expect(mockSet).toHaveBeenCalledTimes(2);
+    for (const call of mockSet.mock.calls) {
+      expect(call[0]).not.toHaveProperty('tier');
+    }
+  });
+
   it('acknowledges the webhook and logs no PII when projection synchronization fails', async () => {
     (verifyStripeWebhookEvent as jest.Mock).mockReturnValue({
       type: 'customer.subscription.created',
