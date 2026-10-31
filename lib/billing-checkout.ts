@@ -90,11 +90,30 @@ export async function resolveStripeCustomerId(params: {
 }
 
 /**
+ * Builds a stable, readable slug of the origin host.
+ *
+ * @param appUrl - The origin the checkout session will return to.
+ * @returns {string} A slug safe to use inside an idempotency key.
+ */
+export function originSlug(appUrl: string): string {
+    try {
+        return new URL(appUrl).host.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    } catch {
+        return 'default';
+    }
+}
+
+/**
  * Creates a Stripe Checkout Session guarded by a deterministic idempotency key.
  *
- * The key is composed by platform user, price and attempt number. Concurrent
- * requests for the same attempt collapse into a single Stripe Session, while a
- * genuine new attempt (after an abandoned checkout) produces a fresh key.
+ * The key is composed by platform user, price, currency, attempt number and the
+ * origin the session returns to. Concurrent requests for the same attempt
+ * collapse into a single Stripe Session, while a genuine new attempt (after an
+ * abandoned checkout) or a different choice produces a fresh key.
+ *
+ * The origin and the currency have to be part of the key: Stripe rejects a key
+ * that is reused with different parameters, and the success and cancel URLs
+ * depend on the origin the member is browsing on.
  *
  * @param params - The checkout parameters.
  * @returns {Promise<Stripe.Checkout.Session>} The created (or reused) session.
@@ -146,7 +165,7 @@ export async function createIdempotentCheckoutSession(params: {
         isTrial: isTrial ? 'true' : 'false',
       },
     },
-    { idempotencyKey: `checkout_${uid}_${priceId}_${attempt}` },
+    { idempotencyKey: `checkout_${uid}_${priceId}_${currency || 'default'}_${attempt}_${originSlug(appUrl)}` },
   );
 
   return checkoutSession;
