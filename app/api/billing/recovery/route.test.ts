@@ -4,7 +4,7 @@ import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
-import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { createOrReuseCheckoutSession, resolveAppUrl } from '@/lib/billing-checkout';
 
 jest.mock('@/lib/session', () => ({
     getPlatformSession: jest.fn(),
@@ -24,6 +24,7 @@ jest.mock('@/lib/billing-currency', () => ({
 
 jest.mock('@/lib/billing-checkout', () => ({
     createOrReuseCheckoutSession: jest.fn(),
+    resolveAppUrl: jest.fn(),
 }));
 
 describe('POST /api/billing/recovery', () => {
@@ -74,6 +75,7 @@ describe('POST /api/billing/recovery', () => {
         (createOrReuseCheckoutSession as jest.Mock).mockResolvedValue({
             url: 'https://checkout.stripe.com/pay/cs_test_recovery',
         });
+        (resolveAppUrl as jest.Mock).mockReturnValue('https://app.theactorscopilot.com');
     });
 
     it('returns 401 Unauthorized when there is no platform session', async () => {
@@ -163,6 +165,20 @@ describe('POST /api/billing/recovery', () => {
             expect.objectContaining({
                 'billingRecovery.attempt': 1,
             }),
+        );
+    });
+
+    it('sends the member back to the origin of the request, not to a fixed host', async () => {
+        (resolveAppUrl as jest.Mock).mockReturnValue('https://app.theactorscopilot.com');
+
+        await POST(buildRequest({ tier: 'business', billingCycle: 'monthly', currency: 'usd' }));
+
+        // The Stripe success URL is built from this origin: a different host
+        // would hold neither the platform cookie nor the Firebase session and
+        // the member would land on the login screen instead of the dashboard.
+        expect(resolveAppUrl).toHaveBeenCalledTimes(1);
+        expect(createOrReuseCheckoutSession).toHaveBeenCalledWith(
+            expect.objectContaining({ appUrl: 'https://app.theactorscopilot.com' }),
         );
     });
 
