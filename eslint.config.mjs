@@ -14,6 +14,9 @@ export default [
       "build/**",
       "*.config.js",
       "jest.config.*",
+      // Local scratch scripts and reports (git-ignored). CI never sees them,
+      // so linting them here only reports drift between local and CI.
+      ".plans/**",
     ],
   },
   {
