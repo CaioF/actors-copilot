@@ -6,6 +6,7 @@ import { AuthProvider } from '@/lib/context/AuthContext'
 import { PostHogProvider } from '@/lib/analytics/posthog-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AffiliateCapture } from '@/components/affiliate-capture'
 
 const antonio = Antonio({ subsets: ['latin'], variable: '--font-antonio' })
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -30,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${antonio.variable}`}>
+        <AffiliateCapture />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <AuthProvider>
             <PostHogProvider>

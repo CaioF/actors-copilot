@@ -13,10 +13,13 @@ import { Input } from '@/components/ui/input';
 
 interface AdminLoginFormProps {
   navigate?: (path: string) => void;
+  /** Where the operator lands once the credentials are accepted. */
+  redirectTo?: string;
 }
 
 export function AdminLoginForm({
   navigate = (path) => window.location.assign(path),
+  redirectTo = '/admin-dashboard',
 }: AdminLoginFormProps = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +41,7 @@ export function AdminLoginForm({
       });
 
       if (response.ok) {
-        navigate('/admin-dashboard');
+        navigate(redirectTo);
         return;
       }
 

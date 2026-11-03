@@ -225,6 +225,126 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
             expect(logged).not.toContain(mockEmail);
             expect(logged).not.toContain('contains private details');
         });
+
+        /**
+         * Affiliate attribution.
+         *
+         * The referral code is written once, when the account is created. A
+         * member that already exists keeps its original attribution, and a
+         * referral that is outside the window is never written.
+         */
+        describe('affiliate attribution', () => {
+            const mockUid = 'referred_actor_001';
+            const mockEmail = 'referred@example.com';
+
+            function mockDocs(existingRoot: boolean) {
+                const sets: Array<[string, unknown]> = [];
+
+                (db.doc as jest.Mock).mockImplementation((path: string) => ({
+                    get: jest.fn().mockResolvedValue({
+                        exists: path === `users/${mockUid}` && existingRoot,
+                        data: () => (path === `users/${mockUid}` ? { tier: 'business' } : null),
+                    }),
+                    set: jest.fn().mockImplementation((payload: unknown) => {
+                        sets.push([path, payload]);
+                        return Promise.resolve();
+                    }),
+                }));
+
+                return sets;
+            }
+
+            beforeEach(() => {
+                (auth.verifyIdToken as jest.Mock).mockResolvedValue({
+                    uid: mockUid,
+                    email: mockEmail,
+                });
+            });
+
+            it('writes the referral when the account is created', async () => {
+                const sets = mockDocs(false);
+                const capturedAt = Date.now() - 60_000;
+
+                const req = new Request('http://localhost/api/auth/callback', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        idToken: 'mock_firebase_id_token',
+                        affiliateCode: 'Tracey',
+                        affiliateCapturedAt: capturedAt,
+                    }),
+                }) as NextRequest;
+
+                const res = await POST(req);
+                const data = await res.json();
+
+                expect(res.status).toBe(200);
+                expect(data.affiliateAttributed).toBe(true);
+                expect(sets).toEqual([
+                    [`users/${mockUid}`, { affiliateCode: 'tracey', affiliateCapturedAt: capturedAt }],
+                ]);
+            });
+
+            it('keeps the attribution of an account that already exists', async () => {
+                const sets = mockDocs(true);
+
+                const req = new Request('http://localhost/api/auth/callback', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        idToken: 'mock_firebase_id_token',
+                        affiliateCode: 'tracey',
+                        affiliateCapturedAt: Date.now() - 60_000,
+                    }),
+                }) as NextRequest;
+
+                const res = await POST(req);
+                const data = await res.json();
+
+                expect(res.status).toBe(200);
+                expect(data.affiliateAttributed).toBeUndefined();
+                expect(sets).toHaveLength(0);
+            });
+
+            it('does not write a referral that is outside the window', async () => {
+                const sets = mockDocs(false);
+                const expired = Date.now() - 61 * 24 * 60 * 60 * 1000;
+
+                const req = new Request('http://localhost/api/auth/callback', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        idToken: 'mock_firebase_id_token',
+                        affiliateCode: 'tracey',
+                        affiliateCapturedAt: expired,
+                    }),
+                }) as NextRequest;
+
+                const res = await POST(req);
+                const data = await res.json();
+
+                expect(res.status).toBe(200);
+                expect(data.affiliateAttributed).toBeUndefined();
+                expect(sets).toHaveLength(0);
+            });
+
+            it('does not write a referral with an invalid code', async () => {
+                const sets = mockDocs(false);
+
+                const req = new Request('http://localhost/api/auth/callback', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        idToken: 'mock_firebase_id_token',
+                        affiliateCode: 'not a code',
+                        affiliateCapturedAt: Date.now(),
+                    }),
+                }) as NextRequest;
+
+                const res = await POST(req);
+                const data = await res.json();
+
+                expect(res.status).toBe(200);
+                expect(data.affiliateAttributed).toBeUndefined();
+                expect(sets).toHaveLength(0);
+            });
+        });
     });
 
     describe('GET /api/auth/callback', () => {
