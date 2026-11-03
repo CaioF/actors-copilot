@@ -5,6 +5,7 @@ import { UserBilling, SubscriptionStatus } from '@/lib/billing';
 import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending } from '@/lib/billing-recovery';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 import { normalizeCurrency } from '@/lib/plan-selection';
+import { buildAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { logger } from '@/lib/logger';
 
 /**
@@ -35,7 +36,7 @@ function projectionErrorDetails(error: unknown) {
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { idToken } = await req.json();
+    const { idToken, affiliateCode, affiliateCapturedAt } = await req.json();
 
     if (!idToken) {
       return NextResponse.json({ error: 'Missing Identity ID Token' }, { status: 400 });
@@ -79,6 +80,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (userData.hasUsedTrial === true) {
       hasUsedTrial = true;
+    }
+
+    // Affiliate attribution is written once, when the account is created, and
+    // only when the root document does not exist yet. A later visit carrying
+    // another referral link must not move the credit of a member that is
+    // already paying.
+    //
+    // The capture timestamp is stored with it so the commission only counts
+    // the payments that happened after the referral.
+    let affiliateAttributed = false;
+
+    if (!userDoc.exists) {
+      const attribution = buildAffiliateAttribution(affiliateCode, affiliateCapturedAt);
+
+      if (attribution) {
+        await userDocRef.set(
+          {
+            affiliateCode: attribution.code,
+            affiliateCapturedAt: attribution.capturedAt,
+          },
+          { merge: true },
+        );
+
+        affiliateAttributed = true;
+      }
     }
 
     const recoveryFlag = isRecoveryPending(userData.billingRecovery) ? userData.billingRecovery : null;
@@ -129,6 +155,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       success: true,
       user: { uid, email, tier, subscriptionStatus },
       ...(billingRecovery ? { billingRecovery } : {}),
+      ...(affiliateAttributed ? { affiliateAttributed: true } : {}),
     }, { status: 200 });
 
   } catch (error) {

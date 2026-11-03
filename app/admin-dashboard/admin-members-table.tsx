@@ -93,15 +93,23 @@ export function AdminMembersTable({
               Member dashboard
             </h1>
           </div>
-          <Button
-            className="self-start border-[#3D4A3C]/30 text-[#3D4A3C] sm:self-auto"
-            disabled={isLoggingOut}
-            onClick={handleLogout}
-            type="button"
-            variant="outline"
-          >
-            {isLoggingOut ? 'Logging out...' : 'Log out'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <a
+              className="inline-flex h-9 items-center rounded-md border border-[#3D4A3C]/30 px-4 text-sm font-medium text-[#3D4A3C] hover:bg-[#3D4A3C]/5"
+              href="/admin-dashboard/affiliates"
+            >
+              Affiliates
+            </a>
+            <Button
+              className="self-start border-[#3D4A3C]/30 text-[#3D4A3C] sm:self-auto"
+              disabled={isLoggingOut}
+              onClick={handleLogout}
+              type="button"
+              variant="outline"
+            >
+              {isLoggingOut ? 'Logging out...' : 'Log out'}
+            </Button>
+          </div>
         </header>
 
         <div aria-live="polite" className="text-sm text-red-700" role={logoutError ? 'alert' : undefined}>

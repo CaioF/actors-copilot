@@ -6,6 +6,33 @@ import { getApp } from "@/lib/firebase";
 import { logger } from '@/lib/logger';
 import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
 import { buildUpgradeUrl, readPlanSelection } from '@/lib/plan-selection';
+import { clearAffiliateAttribution, readAffiliateAttribution } from '@/lib/affiliate-attribution';
+
+/**
+ * Reads the referral attribution captured on the landing page.
+ *
+ * The attribution is sent to the server, which stores it only when the account
+ * is created. It never influences the entitlement.
+ */
+function readAffiliatePayload(): { affiliateCode?: string; affiliateCapturedAt?: number } {
+    if (typeof window === 'undefined') return {};
+
+    const attribution = readAffiliateAttribution();
+    if (!attribution) return {};
+
+    return { affiliateCode: attribution.code, affiliateCapturedAt: attribution.capturedAt };
+}
+
+/**
+ * Drops the stored referral once the server confirmed it was written.
+ *
+ * Without this the same code would be sent again on every later login.
+ */
+function clearAffiliateAfterAttribution(data: unknown): void {
+    if (data && typeof data === 'object' && (data as { affiliateAttributed?: unknown }).affiliateAttributed === true) {
+        clearAffiliateAttribution();
+    }
+}
 
 /**
  * Extends the default Firebase User to include modern Stripe billing context attributes.
@@ -136,10 +163,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ idToken })
+                body: JSON.stringify({ idToken, ...readAffiliatePayload() })
             }); 
 
             const data = await response.json();
+            clearAffiliateAfterAttribution(data);
             
             if (!response.ok) {
                 await signOut(auth);
@@ -190,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const response = await fetch('/api/auth/callback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken })
+                body: JSON.stringify({ idToken, ...readAffiliatePayload() })
             });
 
             const data = await response.json();
@@ -240,11 +268,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const response = await fetch('/api/auth/callback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken })
+                body: JSON.stringify({ idToken, ...readAffiliatePayload() })
             });
             
             const data = await response.json();
-
+            clearAffiliateAfterAttribution(data);
+            
             if (!response.ok) {
                 await signOut(auth);
                 throw new Error(data.error || "Failed to establish platform registration session.");
