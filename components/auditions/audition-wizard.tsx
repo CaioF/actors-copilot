@@ -15,6 +15,8 @@ import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, setDoc, updateDoc, getDoc, getDocs, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { loadSavedAudition } from "@/lib/auditions/audition-repository";
+import { resolveUserPath } from "@/lib/auditions/user-path";
 import { StepResultBrief } from "./step/step-result-brief";
 import { logger } from '@/lib/logger';
 import { calculateLocalDeadline } from "@/lib/time-utils";
@@ -45,13 +47,20 @@ interface AuditionAnalysisResult {
 interface AuditionWizardProps {
   mode: "sides" | "brief";
   auditionId?: string;
+  /**
+   * Opens an existing audition and shows the breakdown already stored for it
+   * instead of starting from a blank scene. Used by Scene Study when a member
+   * picks one of their saved auditions; the Attach Sides flow leaves it off
+   * so its behaviour is unchanged.
+   */
+  loadSavedResult?: boolean;
 }
 /**
  * AuditionWizard Component
  * Multi-step wizard for creating character breakdowns. Handles project info collection,
  * sides/brief upload, review, AI generation, and saving to Firestore.
  */
-export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
+export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: AuditionWizardProps) {
   const router = useRouter(); // Used for redirecting after saving
   const [currentStep, setCurrentStep] = useState<AuditionStep>(1);
   const [formData, setFormData] = useState<AuditionFormData>(initialAuditionData);
@@ -97,34 +106,49 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   useEffect(() => {
     if (!auditionId || !currentUser) return;
 
-    const firstName = currentUser.displayName
-      ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
-      : "Actor";
-    const userPath = `${currentUser.uid}_${firstName}`;
+    const userPath = resolveUserPath(currentUser);
+    if (!userPath) return;
 
     const prefillAudition = async () => {
       try {
-        const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
-        const docSnap = await getDoc(docRef);
+        // Shared read path: the same document My Auditions and Scene Study
+        // list, so an audition always resolves to one authoritative record.
+        const existing = await loadSavedAudition(userPath, auditionId);
 
-        if (!docSnap.exists()) return;
+        if (!existing) return;
 
-        const data = docSnap.data();
         setFormData((prev) => ({
           ...prev,
-          project: data.project || "",
-          role: data.role || "",
-          deadline: data.deadline || "",
-          auditionTimezone: data.auditionTimezone || "",
-          castingDirectorName: data.castingDirectorName || "",
+          project: existing.project || "",
+          role: existing.role || "",
+          deadline: existing.deadline || "",
+          auditionTimezone: existing.auditionTimezone || "",
+          castingDirectorName: existing.castingDirectorName || "",
+          projectType: existing.projectType || prev.projectType,
+          breakdownDepth: existing.breakdownDepth || prev.breakdownDepth,
         }));
+
+        // Scene Study resumes an audition the member already saved: show the
+        // breakdown that is stored for it instead of an empty scene. The
+        // Attach Sides flow keeps its own behaviour because it never sets
+        // loadSavedResult.
+        if (loadSavedResult) {
+          const savedMap =
+            existing.sidesPerformanceMap ??
+            (existing.hasSides ? existing.performanceMap : null);
+
+          if (savedMap) {
+            setResultData(savedMap);
+            setCurrentStep(4);
+          }
+        }
       } catch (error) {
         logger.warn({ err: error, msg: "Failed to pre-fill audition enrichment data" });
       }
     };
 
     void prefillAudition();
-  }, [auditionId, currentUser]);
+  }, [auditionId, currentUser, loadSavedResult]);
 
   // Handlers para navegação
   /**
@@ -246,10 +270,14 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       }
 
       const actorName = currentUser.displayName ? currentUser.displayName.split(" ")[0] : "Actor";
-      const firstName = currentUser.displayName
-        ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
-        : "Actor";
-      const userPath = `${currentUser.uid}_${firstName}`;
+      const userPath = resolveUserPath(currentUser);
+
+      if (!userPath) {
+        logger.error({ msg: "Could not resolve the user path for the audition save" });
+        setCurrentStep(3);
+        setIsGenerating(false);
+        return;
+      }
 
       const token = await currentUser.getIdToken();
 
@@ -259,16 +287,10 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
 
       if (auditionId) {
         try {
-          const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
-          const docSnap = await getDoc(docRef);
+          // Shared read path — the same document the Scene Study picker lists.
+          const existing = await loadSavedAudition(userPath, auditionId);
 
-          if (docSnap.exists()) {
-            const existing = docSnap.data() as {
-              sidesPerformanceMap?: AuditionAnalysisResult | null;
-              briefPerformanceMap?: AuditionAnalysisResult | null;
-              criticalBriefFacts?: CriticalBriefFact[] | null;
-            };
-
+          if (existing) {
             const complementaryMap = mode === "brief"
               ? existing.sidesPerformanceMap
               : existing.briefPerformanceMap;
@@ -414,13 +436,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     }
   };
 
-  const getUserPath = () => {
-    if (!currentUser) return null;
-    const firstName = currentUser.displayName
-      ? currentUser.displayName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "")
-      : "Actor";
-    return `${currentUser.uid}_${firstName}`;
-  };
+  const getUserPath = () => resolveUserPath(currentUser);
 
   /**
    * Saves the current resultData (previous take) as V1 before generating a new alternative.
@@ -456,6 +472,8 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   const newAuditionDoc = () => ({
     project: formData.project.trim(),
     role: formData.role.trim(),
+    // Stored so Scene Study can restore the scene the breakdown was made for.
+    projectType: formData.projectType,
     deadline: formData.deadline || null,
     auditionTimezone: formData.auditionTimezone || null,
     actorLocalDeadline: localDeadlineStr,
@@ -523,6 +541,7 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       // Keep metadata in sync with any edits made during enrichment
       project: formData.project.trim(),
       role: formData.role.trim(),
+      projectType: formData.projectType,
       deadline: formData.deadline || null,
       auditionTimezone: formData.auditionTimezone || null,
       actorLocalDeadline: localDeadlineStr,

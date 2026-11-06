@@ -35,6 +35,7 @@ export interface BriefAnalysisResult extends PerformanceMap {
 export interface AuditionDocument {
   project: string;
   role: string;
+  projectType?: "cinematic" | "commercial" | "theater";
   deadline?: string | null;
   auditionTimezone?: string | null;
   actorLocalDeadline?: string | null;

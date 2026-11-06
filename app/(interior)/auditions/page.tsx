@@ -19,8 +19,9 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { collection, query, orderBy, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { listSavedAuditions } from "@/lib/auditions/audition-repository";
 import { useToast } from "@/hooks/use-toast";
 
 type AuditionStatus = "Completed" | "Processing" | "Draft"
@@ -107,6 +108,8 @@ export default function AuditionsPage() {
 
   /**
    * Fetches all audition documents from Firestore for the specified user path.
+   * Uses the shared repository, so this list and Scene Study always show the
+   * exact same records.
    * @param path - The user's unique path (uid_firstName format)
    * @returns void (side effects: updates auditionList and isLoading state)
    * @async
@@ -114,42 +117,27 @@ export default function AuditionsPage() {
   const fetchAuditions = async (path: string) => {
     try {
       setIsLoading(true);
-      const db = getDb();
-      const auditionsRef = collection(db, `users/${path}/auditions`);
-      
-      // We order by createdAt so the newest auditions appear at the top
-      const q = query(auditionsRef, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(q);
 
-      const fetchedData: Audition[] = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        
-        // Format the Firestore Timestamp into a readable string (e.g., "Oct 14, 2025")
-        let formattedDate = "Unknown Date";
-        if (data.createdAt) {
-          const dateObj = data.createdAt.toDate();
-          formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-        }
+      const saved = await listSavedAuditions(path);
 
-        // Standardize status text (Firestore may store lowercase or title-case)
-        const rawStatus = (data.status || "").toLowerCase();
-        let statusStr: AuditionStatus = "Draft";
-        if (rawStatus === "completed") statusStr = "Completed";
-        else if (rawStatus === "processing") statusStr = "Processing";
-
-        return {
-          id: docSnap.id,
-          project: data.project || "Untitled Project",
-          role: data.role || "Unknown Role",
-          date: formattedDate,
-          status: statusStr,
-          projectType: data.projectType || "cinematic",
-          analysisType: data.analysisType || "sides",
-          castingDirectorName: data.castingDirectorName || "",
-          hasSides: data.hasSides ?? (data.analysisType === "sides"),
-          hasBrief: data.hasBrief ?? (data.analysisType === "brief")
-        };
-      });
+      const fetchedData: Audition[] = saved.map((audition) => ({
+        id: audition.id,
+        project: audition.project,
+        role: audition.role,
+        date: audition.createdAt
+          ? audition.createdAt.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : "Unknown Date",
+        status: audition.status,
+        projectType: audition.projectType,
+        analysisType: audition.analysisType,
+        castingDirectorName: audition.castingDirectorName,
+        hasSides: audition.hasSides,
+        hasBrief: audition.hasBrief,
+      }));
 
       setAuditionList(fetchedData);
     } catch (error) {
