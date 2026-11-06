@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --forceExit",
     "admin:backfill": "tsx --env-file=.env scripts/backfill-admin-members.ts",
+    "admin:reconcile": "tsx --env-file=.env scripts/reconcile-admin-members.ts",
     "prepare": "husky"
   },
   "dependencies": {
