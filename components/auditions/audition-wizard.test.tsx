@@ -3,6 +3,11 @@ import { render, screen, fireEvent, act, waitFor } from "@testing-library/react"
 import "@testing-library/jest-dom";
 
 const mockPush = jest.fn();
+const mockToast = jest.fn();
+
+jest.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: (...args: unknown[]) => mockToast(...args) }),
+}));
 
 jest.mock("@/lib/firebase", () => ({
   getDb: jest.fn(),
@@ -21,6 +26,7 @@ jest.mock("firebase/auth", () => ({
 jest.mock("firebase/firestore", () => ({
   collection: jest.fn(),
   addDoc: jest.fn(),
+  setDoc: jest.fn(),
   updateDoc: jest.fn(),
   getDoc: jest.fn(),
   getDocs: jest.fn(),
@@ -312,6 +318,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockReset();
+    mockToast.mockReset();
     Object.defineProperty(global, "fetch", {
       writable: true,
       value: mockFetch,
@@ -329,6 +336,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     firestoreModule.where.mockReturnValue({ id: "where-clause" });
     firestoreModule.getDocs.mockResolvedValue({ docs: [] });
     firestoreModule.addDoc.mockResolvedValue({ id: "new-doc-id" });
+    firestoreModule.setDoc.mockResolvedValue(undefined);
     firestoreModule.updateDoc.mockResolvedValue(undefined);
     firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
   });
@@ -440,6 +448,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     });
 
     expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.setDoc).not.toHaveBeenCalled();
     expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
       { path: "users/user123_Actor/auditions/audition-brief" },
       expect.objectContaining({
@@ -496,6 +505,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     });
 
     expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.setDoc).not.toHaveBeenCalled();
     expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
       { path: "users/user123_Actor/auditions/audition-sides" },
       expect.objectContaining({
@@ -521,12 +531,13 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     });
 
     await waitFor(() => {
-      expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
     });
 
     expect(firestoreModule.updateDoc).not.toHaveBeenCalled();
-    expect(firestoreModule.addDoc).toHaveBeenCalledWith(
-      { id: "auditions-ref" },
+    expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.setDoc).toHaveBeenCalledWith(
+      { path: expect.stringContaining("users/user123_Actor/auditions/save-") },
       expect.objectContaining({
         project: "Hamlet",
         role: "Ophelia",
@@ -538,7 +549,8 @@ describe("AuditionWizard enrichment (Task 3)", () => {
         hasBrief: false,
         createdAt: "SERVER_TS",
         status: "completed",
-      })
+      }),
+      { merge: true }
     );
     expect(mockPush).toHaveBeenCalledWith("/auditions");
   });
@@ -569,18 +581,19 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     });
 
     await waitFor(() => {
-      expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
     });
 
-    expect(firestoreModule.addDoc).toHaveBeenCalledWith(
-      { id: "auditions-ref" },
+    expect(firestoreModule.setDoc).toHaveBeenCalledWith(
+      { path: expect.stringContaining("users/user123_Actor/auditions/save-") },
       expect.objectContaining({
         briefPerformanceMap: briefResultWithFacts,
         criticalBriefFacts: [
           { label: "Character Age", value: "Late 30s", importance: "critical" },
           { label: "Accent", value: "Northern English", importance: "important" },
         ],
-      })
+      }),
+      { merge: true }
     );
   });
 
@@ -755,6 +768,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockReset();
+    mockToast.mockReset();
     Object.defineProperty(global, "fetch", {
       writable: true,
       value: mockFetch,
@@ -772,6 +786,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
     firestoreModule.where.mockReturnValue({ id: "where-clause" });
     firestoreModule.getDocs.mockResolvedValue({ docs: [] });
     firestoreModule.addDoc.mockResolvedValue({ id: "new-doc-id" });
+    firestoreModule.setDoc.mockResolvedValue(undefined);
     firestoreModule.updateDoc.mockResolvedValue(undefined);
     firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
   });
@@ -815,10 +830,11 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
         expect(mockPush).toHaveBeenCalledWith("/auditions/new/brief?enrichAuditionId=duplicate-id");
       });
       expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+      expect(firestoreModule.setDoc).not.toHaveBeenCalled();
       expect(firestoreModule.updateDoc).not.toHaveBeenCalled();
     });
 
-    it("proceeds with addDoc when user clicks Create new anyway (Save Output path)", async () => {
+    it("proceeds with the idempotent write when user clicks Create new anyway (Save Output path)", async () => {
       firestoreModule.getDocs.mockResolvedValue({ docs: [duplicateDoc] });
 
       await goToGeneratedResult("sides", generatedSidesResult);
@@ -836,12 +852,12 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
       });
 
       await waitFor(() => {
-        expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+        expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
       });
       expect(mockPush).toHaveBeenCalledWith("/auditions");
     });
 
-    it("proceeds directly to addDoc without dialog when project/role do not match existing", async () => {
+    it("proceeds directly to the idempotent write without dialog when project/role do not match existing", async () => {
       firestoreModule.getDocs.mockResolvedValue({ docs: [] });
 
       await goToGeneratedResult("sides", generatedSidesResult);
@@ -851,7 +867,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
       });
 
       await waitFor(() => {
-        expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+        expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
       });
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
@@ -861,7 +877,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
     // so those branches are no longer reachable through the wizard. The empty-string
     // guard inside `findDuplicateId` remains as defense-in-depth.
 
-    it("gracefully falls back to addDoc when Firestore query throws (index not ready)", async () => {
+    it("gracefully falls back to the idempotent write when Firestore query throws (index not ready)", async () => {
       firestoreModule.getDocs.mockRejectedValue(new Error("Firestore index not ready"));
 
       await goToGeneratedResult("sides", generatedSidesResult);
@@ -871,7 +887,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
       });
 
       await waitFor(() => {
-        expect(firestoreModule.addDoc).toHaveBeenCalledTimes(1);
+        expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
       });
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
@@ -975,6 +991,7 @@ describe("AuditionWizard deduplication guard (Task 3b)", () => {
         expect(mockPush).toHaveBeenCalledWith("/auditions/new/brief?enrichAuditionId=duplicate-id");
       });
       expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+      expect(firestoreModule.setDoc).not.toHaveBeenCalled();
       expect(firestoreModule.updateDoc).not.toHaveBeenCalled();
     });
 
@@ -1191,5 +1208,241 @@ describe("MemoryRecordingBanner", () => {
       expect(idleButton).toBeInTheDocument();
       expect(screen.getByText("Capture a Memory")).toBeInTheDocument();
     });
+  });
+});
+
+describe("AuditionWizard duplicate-submission guard (Save Output)", () => {
+  const generatedResult = {
+    intro: "Sides intro",
+    sections: [{ title: "Objective", items: ["Play the truth"] }],
+    outro: "Sides outro",
+  };
+  const mockUser = { uid: "user123", displayName: "Actor Test", getIdToken: jest.fn().mockResolvedValue("token") };
+  const firebaseModule = require("@/lib/firebase");
+  const authModule = require("firebase/auth");
+  const firestoreModule = require("firebase/firestore");
+  const mockFetch = jest.fn();
+
+  const createResponse = (body: unknown, ok = true) => ({
+    ok,
+    json: jest.fn().mockResolvedValue(body),
+    text: jest.fn().mockResolvedValue(JSON.stringify(body)),
+  });
+
+  /** Walks the wizard to the generated result screen where Save Output lives. */
+  const goToGeneratedResult = async () => {
+    render(<AuditionWizard mode="sides" />);
+
+    fireEvent.change(screen.getByPlaceholderText("e.g., The Morning Show Season 5"), {
+      target: { value: "Hamlet" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g., Dr. Sarah Chen"), {
+      target: { value: "Ophelia" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
+      target: { value: "Hamlet sides text" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    mockFetch
+      .mockResolvedValueOnce(createResponse({ ok: true }))
+      .mockResolvedValueOnce(createResponse({ data: generatedResult }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /generate breakdown/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save output/i })).toBeInTheDocument();
+    });
+  };
+
+  /**
+   * Keeps the deduplication query pending so the save stays in flight, and
+   * returns the function that releases it.
+   */
+  const holdDedupeQuery = () => {
+    let release: (() => void) | undefined;
+    firestoreModule.getDocs.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ docs: [] });
+        })
+    );
+    return () => release?.();
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPush.mockReset();
+    mockToast.mockReset();
+    Object.defineProperty(global, "fetch", {
+      writable: true,
+      value: mockFetch,
+    });
+
+    firebaseModule.getDb.mockReturnValue({});
+    authModule.getAuth.mockReturnValue({ currentUser: mockUser });
+    authModule.onAuthStateChanged.mockImplementation((_auth: unknown, cb: (u: typeof mockUser | null) => void) => {
+      cb(mockUser);
+      return jest.fn();
+    });
+    firestoreModule.collection.mockReturnValue({ id: "auditions-ref" });
+    firestoreModule.doc.mockImplementation((_db: unknown, path: string) => ({ path }));
+    firestoreModule.query.mockReturnValue({ id: "query-ref" });
+    firestoreModule.where.mockReturnValue({ id: "where-clause" });
+    firestoreModule.getDocs.mockResolvedValue({ docs: [] });
+    firestoreModule.addDoc.mockResolvedValue({ id: "new-doc-id" });
+    firestoreModule.setDoc.mockResolvedValue(undefined);
+    firestoreModule.updateDoc.mockResolvedValue(undefined);
+    firestoreModule.serverTimestamp.mockReturnValue("SERVER_TS");
+  });
+
+  it("disables the button and shows the Saving... state immediately on the first click", async () => {
+    await goToGeneratedResult();
+    const release = holdDedupeQuery();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    const savingButton = screen.getByRole("button", { name: /saving/i });
+    expect(savingButton).toBeDisabled();
+    expect(savingButton).toHaveTextContent("Saving...");
+    expect(firestoreModule.setDoc).not.toHaveBeenCalled();
+
+    await act(async () => {
+      release();
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("runs a single save when the button is clicked repeatedly and rapidly", async () => {
+    await goToGeneratedResult();
+    const release = holdDedupeQuery();
+
+    const saveButton = screen.getByRole("button", { name: /save output/i });
+    await act(async () => {
+      fireEvent.click(saveButton);
+      fireEvent.click(saveButton);
+      fireEvent.click(saveButton);
+    });
+
+    await act(async () => {
+      release();
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
+    });
+    expect(firestoreModule.getDocs).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith("/auditions");
+  });
+
+  it("ignores a click while the save is already processing", async () => {
+    await goToGeneratedResult();
+    const release = holdDedupeQuery();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    const savingButton = screen.getByRole("button", { name: /saving/i });
+    expect(savingButton).toBeDisabled();
+
+    await act(async () => {
+      fireEvent.click(savingButton);
+    });
+
+    await act(async () => {
+      release();
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
+    });
+    expect(firestoreModule.getDocs).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the Save Output label and confirms the save on success", async () => {
+    await goToGeneratedResult();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Audition saved" })
+    );
+    expect(mockPush).toHaveBeenCalledWith("/auditions");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save output/i })).toBeEnabled();
+    });
+    expect(screen.queryByRole("button", { name: /saving/i })).not.toBeInTheDocument();
+  });
+
+  it("shows an English error and re-enables the button when the save fails", async () => {
+    await goToGeneratedResult();
+
+    firestoreModule.setDoc.mockRejectedValueOnce(new Error("Firestore write failed"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "destructive",
+          title: "Couldn't save your audition",
+        })
+      );
+    });
+
+    expect(mockPush).not.toHaveBeenCalled();
+
+    const saveButton = screen.getByRole("button", { name: /save output/i });
+    expect(saveButton).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /saving/i })).not.toBeInTheDocument();
+  });
+
+  it("retries the same document so a failed save cannot leave a duplicate record", async () => {
+    await goToGeneratedResult();
+
+    firestoreModule.setDoc.mockRejectedValueOnce(new Error("Firestore write failed"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "destructive" })
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+
+    await waitFor(() => {
+      expect(firestoreModule.setDoc).toHaveBeenCalledTimes(2);
+    });
+
+    const firstPath = firestoreModule.setDoc.mock.calls[0][0].path;
+    const secondPath = firestoreModule.setDoc.mock.calls[1][0].path;
+    expect(secondPath).toBe(firstPath);
+    expect(firstPath).toMatch(/^users\/user123_Actor\/auditions\/save-/);
+    expect(mockPush).toHaveBeenCalledWith("/auditions");
   });
 });
