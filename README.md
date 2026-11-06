@@ -800,7 +800,24 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 ## Internal Admin Dashboard
 
-`/admin-dashboard` is a standalone, server-rendered internal operator view of the `adminMembers` reporting projection. It uses a separate Admin Session and does not use member authentication or fetch through the member `AuthContext`. The root `AuthProvider` remains mounted by `app/layout.tsx`; the dashboard does not consume it.
+`/admin-dashboard` is a standalone, server-rendered internal operator view of the member accounts. It uses a separate Admin Session and does not use member authentication or fetch through the member `AuthContext`. The root `AuthProvider` remains mounted by `app/layout.tsx`; the dashboard does not consume it.
+
+### Data sources
+
+The dashboard reads the same records the application does, so it cannot disagree with it:
+
+| Fact | Source |
+|------|--------|
+| Which accounts exist | Firebase Authentication (`auth.listUsers`) |
+| Tier, status and dates | `users/{uid}/billing/current` (the Stripe-derived source of truth) |
+| Display name | the `adminMembers` projection, resolved from the actor profile and the Auth display name |
+
+The `adminMembers` collection stays a write-through projection (`lib/admin-dashboard/sync.ts`), but the dashboard no longer renders it as the source of truth. A projection row only refreshes on sign-in, on a display-name change and on a Stripe webhook, so a membership granted outside those flows used to show a stale `Canceled / Free` row next to a member who actually had Business benefits and an open trial.
+
+Two details the dashboard derives on its own:
+
+- A trial is a trial while its window is open. The Stripe webhook promotes a trialing subscription to `active` when the $0 trial invoice is paid, so the stored status alone reports a trial as a paid plan. `resolveMembershipState()` in `lib/admin-dashboard/domain.ts` gives the open trial window precedence over a stored `active` status.
+- Accounts deleted outside the application leave a projection row behind. Those rows are listed apart from the members, under "Archived accounts", so a deleted account cannot be mistaken for the live one with the same email — and so a deleted account that still holds a renewing Stripe subscription stays visible.
 
 ### Local verification
 

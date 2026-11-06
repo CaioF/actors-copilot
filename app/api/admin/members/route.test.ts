@@ -1,11 +1,11 @@
 import type { AdminMemberProjection } from '@/lib/admin-dashboard/domain';
-import { listAdminMembers } from '@/lib/admin-dashboard/repository';
+import { listAdminMemberSnapshot } from '@/lib/admin-dashboard/members';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
 import { logger } from '@/lib/logger';
 import { GET, serializeAdminMember } from './route';
 
-jest.mock('@/lib/admin-dashboard/repository', () => ({
-  listAdminMembers: jest.fn(),
+jest.mock('@/lib/admin-dashboard/members', () => ({
+  listAdminMemberSnapshot: jest.fn(),
 }));
 
 jest.mock('@/lib/admin-dashboard/session', () => ({
@@ -47,7 +47,10 @@ describe('GET /api/admin/members', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (getAdminSession as jest.Mock).mockResolvedValue({ sub: 'admin' });
-    (listAdminMembers as jest.Mock).mockResolvedValue([]);
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [],
+      archived: [],
+    });
   });
 
   it.each([
@@ -64,37 +67,40 @@ describe('GET /api/admin/members', () => {
     expect(await response.json()).toEqual({ error: 'Unauthorized' });
     expect(response.headers.get('cache-control')).toBe(cacheControl);
     expect(getAdminSession).toHaveBeenCalledTimes(1);
-    expect(listAdminMembers).not.toHaveBeenCalled();
+    expect(listAdminMemberSnapshot).not.toHaveBeenCalled();
   });
 
   it('verifies the Admin Session before making exactly one list call', async () => {
     await GET();
 
     expect(getAdminSession).toHaveBeenCalledTimes(1);
-    expect(listAdminMembers).toHaveBeenCalledTimes(1);
+    expect(listAdminMemberSnapshot).toHaveBeenCalledTimes(1);
     expect((getAdminSession as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
-      (listAdminMembers as jest.Mock).mock.invocationCallOrder[0],
+      (listAdminMemberSnapshot as jest.Mock).mock.invocationCallOrder[0],
     );
   });
 
-  it('returns an empty JSON array with private no-store caching', async () => {
+  it('returns an empty JSON payload with private no-store caching', async () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([]);
+    expect(await response.json()).toEqual({ members: [], archived: [] });
     expect(response.headers.get('cache-control')).toBe(cacheControl);
   });
 
   it('sorts with fixed English case-insensitive displayName, email, then UID ordering', async () => {
-    (listAdminMembers as jest.Mock).mockResolvedValue([
-      projection({ uid: 'user-z', displayName: 'Bob', email: 'first@example.com' }),
-      projection({ uid: 'user-c', displayName: 'alice', email: 'same@example.com' }),
-      projection({ uid: 'user-b', displayName: 'ALICE', email: 'Same@example.com' }),
-      projection({ uid: 'user-a', displayName: 'Alice', email: 'alpha@example.com' }),
-    ]);
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [
+        projection({ uid: 'user-z', displayName: 'Bob', email: 'first@example.com' }),
+        projection({ uid: 'user-c', displayName: 'alice', email: 'same@example.com' }),
+        projection({ uid: 'user-b', displayName: 'ALICE', email: 'Same@example.com' }),
+        projection({ uid: 'user-a', displayName: 'Alice', email: 'alpha@example.com' }),
+      ],
+      archived: [],
+    });
 
     const response = await GET();
-    const members = await response.json();
+    const { members } = await response.json();
 
     expect(members.map((member: { uid: string }) => member.uid)).toEqual([
       'user-a',
@@ -106,15 +112,16 @@ describe('GET /api/admin/members', () => {
 
   it('returns only the exact public DTO allowlist', async () => {
     const member = projection();
-    (listAdminMembers as jest.Mock).mockResolvedValue([
-      { ...member, privateProfile: { fullName: 'Private Name' } },
-    ]);
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [{ ...member, privateProfile: { fullName: 'Private Name' } }],
+      archived: [],
+    });
 
     const response = await GET();
     const body = await response.json();
 
-    expect(body).toEqual([serializeAdminMember(member)]);
-    expect(Object.keys(body[0])).toEqual([
+    expect(body.members).toEqual([serializeAdminMember(member)]);
+    expect(Object.keys(body.members[0])).toEqual([
       'uid',
       'displayName',
       'email',
@@ -128,12 +135,37 @@ describe('GET /api/admin/members', () => {
     expect(JSON.stringify(body)).not.toContain('cus_123');
     expect(JSON.stringify(body)).not.toContain('sub_123');
     expect(JSON.stringify(body)).not.toContain('price_123');
-    expect(body[0]).not.toHaveProperty('trialStart');
-    expect(body[0]).not.toHaveProperty('cancelAt');
-    expect(body[0]).not.toHaveProperty('authCreatedAt');
-    expect(body[0]).not.toHaveProperty('createdAt');
-    expect(body[0]).not.toHaveProperty('updatedAt');
-    expect(body[0]).not.toHaveProperty('privateProfile');
+    expect(body.members[0]).not.toHaveProperty('trialStart');
+    expect(body.members[0]).not.toHaveProperty('cancelAt');
+    expect(body.members[0]).not.toHaveProperty('authCreatedAt');
+    expect(body.members[0]).not.toHaveProperty('createdAt');
+    expect(body.members[0]).not.toHaveProperty('updatedAt');
+    expect(body.members[0]).not.toHaveProperty('privateProfile');
+  });
+
+  it('returns the archived accounts in their own list', async () => {
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [projection()],
+      archived: [
+        projection({
+          uid: 'deleted-user',
+          email: 'deleted@example.com',
+          membershipState: 'canceled',
+          tier: 'free',
+        }),
+      ],
+    });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.members).toHaveLength(1);
+    expect(body.archived).toHaveLength(1);
+    expect(body.archived[0]).toMatchObject({
+      uid: 'deleted-user',
+      email: 'deleted@example.com',
+      membershipState: 'canceled',
+    });
   });
 
   it('returns and logs a generic sanitized 500 on repository failure', async () => {
@@ -141,7 +173,7 @@ describe('GET /api/admin/members', () => {
       new TypeError('secret raw message for actor@example.com'),
       { code: 'firestore/internal' },
     );
-    (listAdminMembers as jest.Mock).mockRejectedValue(failure);
+    (listAdminMemberSnapshot as jest.Mock).mockRejectedValue(failure);
 
     const response = await GET();
     const responseText = await response.text();

@@ -4,32 +4,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { serializeAdminMember } from '@/app/api/admin/members/route';
 import type { AdminMemberProjection } from '@/lib/admin-dashboard/domain';
-import { listAdminMembers } from '@/lib/admin-dashboard/repository';
+import { listAdminMemberSnapshot } from '@/lib/admin-dashboard/members';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
 import AdminDashboardPage, { dynamic } from './page';
 
-jest.mock('@/lib/admin-dashboard/repository', () => ({
-  listAdminMembers: jest.fn(),
+jest.mock('@/lib/admin-dashboard/members', () => ({
+  listAdminMemberSnapshot: jest.fn(),
 }));
 
 jest.mock('@/lib/admin-dashboard/session', () => ({
   getAdminSession: jest.fn(),
 }));
 
-jest.mock('@/app/api/admin/members/route', () => ({
-  serializeAdminMember: jest.fn((member: AdminMemberProjection) => ({
-    uid: member.uid,
-    displayName: member.displayName,
-    email: member.email,
-    tier: member.tier,
-    subscriptionStatus: member.subscriptionStatus,
-    membershipState: member.membershipState,
-    trialEnd: member.trialEnd,
-    currentPeriodEnd: member.currentPeriodEnd,
-    cancelAtPeriodEnd: member.cancelAtPeriodEnd,
-  })),
+// The dashboard renders the same payload the API route builds, so the route
+// module is loaded for real. Only the response helper is stubbed: jsdom has
+// no `Request` for `next/server` to extend.
+jest.mock('next/server', () => ({
+  NextResponse: { json: jest.fn() },
 }));
 
 const projection: AdminMemberProjection = {
@@ -56,7 +48,10 @@ describe('AdminDashboardPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (getAdminSession as jest.Mock).mockResolvedValue(null);
-    (listAdminMembers as jest.Mock).mockResolvedValue([]);
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [],
+      archived: [],
+    });
   });
 
   it('is always rendered dynamically', () => {
@@ -69,29 +64,55 @@ describe('AdminDashboardPage', () => {
     expect(screen.getByRole('heading', { name: 'Admin access' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
-    expect(listAdminMembers).not.toHaveBeenCalled();
+    expect(listAdminMemberSnapshot).not.toHaveBeenCalled();
   });
 
   it('loads projections directly and renders only the Task5 DTO fields', async () => {
     (getAdminSession as jest.Mock).mockResolvedValue({ sub: 'admin' });
-    (listAdminMembers as jest.Mock).mockResolvedValue([projection]);
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [projection],
+      archived: [],
+    });
 
     const { container } = render(await AdminDashboardPage());
 
-    expect(listAdminMembers).toHaveBeenCalledTimes(1);
-    expect(serializeAdminMember).toHaveBeenCalledWith(projection);
+    expect(listAdminMemberSnapshot).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.getByText('Member Name')).toBeInTheDocument();
     expect(screen.getByText('member@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Paid')).toBeInTheDocument();
     expect(container).not.toHaveTextContent('private-uid');
     expect(container).not.toHaveTextContent('cus_private');
     expect(container).not.toHaveTextContent('sub_private');
     expect(container).not.toHaveTextContent('price_private');
   });
 
+  it('renders the archived accounts apart from the live members', async () => {
+    (getAdminSession as jest.Mock).mockResolvedValue({ sub: 'admin' });
+    (listAdminMemberSnapshot as jest.Mock).mockResolvedValue({
+      members: [projection],
+      archived: [
+        {
+          ...projection,
+          uid: 'archived-uid',
+          email: 'archived@example.com',
+          displayName: 'Archived Actor',
+          membershipState: 'canceled',
+          tier: 'free',
+        },
+      ],
+    });
+
+    render(await AdminDashboardPage());
+
+    expect(screen.getByText('Archived accounts')).toBeInTheDocument();
+    expect(screen.getByText('Archived Actor')).toBeInTheDocument();
+    expect(screen.getByText('Deleted account')).toBeInTheDocument();
+  });
+
   it('renders a retryable generic failure without leaking repository details or PII', async () => {
     (getAdminSession as jest.Mock).mockResolvedValue({ sub: 'admin' });
-    (listAdminMembers as jest.Mock).mockRejectedValue(
+    (listAdminMemberSnapshot as jest.Mock).mockRejectedValue(
       new Error('Firestore denied member@example.com cus_private'),
     );
 

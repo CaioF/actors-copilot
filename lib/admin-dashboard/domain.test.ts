@@ -1,7 +1,9 @@
 import {
   type AdminMemberProjection,
   classifyMembership,
+  isTrialWindowOpen,
   resolveAdminDisplayName,
+  resolveMembershipState,
 } from './domain';
 
 describe('classifyMembership', () => {
@@ -21,6 +23,85 @@ describe('classifyMembership', () => {
     { status: 'future_stripe_status', cancelAtPeriodEnd: false, expected: 'inactive' },
   ])('maps $status to $expected', ({ status, cancelAtPeriodEnd, expected }) => {
     expect(classifyMembership(status, cancelAtPeriodEnd)).toBe(expected);
+  });
+});
+
+describe('isTrialWindowOpen', () => {
+  const now = 1_800_000_000;
+
+  it.each([
+    { trialStart: now - 86_400, trialEnd: now + 86_400, expected: true },
+    { trialStart: null, trialEnd: now + 86_400, expected: true },
+    { trialStart: now - 86_400, trialEnd: now, expected: false },
+    { trialStart: now - 86_400, trialEnd: now - 1, expected: false },
+    { trialStart: now + 86_400, trialEnd: now + 172_800, expected: false },
+    { trialStart: null, trialEnd: null, expected: false },
+    { trialStart: now - 86_400, trialEnd: undefined, expected: false },
+  ])(
+    'reports the window $trialStart -> $trialEnd as $expected',
+    ({ trialStart, trialEnd, expected }) => {
+      expect(isTrialWindowOpen(trialStart, trialEnd, now)).toBe(expected);
+    },
+  );
+});
+
+describe('resolveMembershipState', () => {
+  const now = 1_800_000_000;
+
+  it('keeps a trialing status as a trial', () => {
+    expect(
+      resolveMembershipState({
+        status: 'trialing',
+        trialStart: now - 86_400,
+        trialEnd: now + 86_400,
+        now,
+      }),
+    ).toBe('trial');
+  });
+
+  it('reports an active subscription with an open trial window as a trial', () => {
+    expect(
+      resolveMembershipState({
+        status: 'active',
+        trialStart: now - 86_400,
+        trialEnd: now + 86_400,
+        now,
+      }),
+    ).toBe('trial');
+  });
+
+  it('reports an active subscription without a trial window as paid', () => {
+    expect(
+      resolveMembershipState({
+        status: 'active',
+        trialStart: now - 86_400 * 30,
+        trialEnd: now - 86_400,
+        now,
+      }),
+    ).toBe('paid');
+  });
+
+  it('reports an active subscription that will cancel as paid and canceling', () => {
+    expect(
+      resolveMembershipState({
+        status: 'active',
+        cancelAtPeriodEnd: true,
+        now,
+      }),
+    ).toBe('paid_cancelling');
+  });
+
+  it('never overrides a status that is not active', () => {
+    expect(
+      resolveMembershipState({
+        status: 'canceled',
+        trialStart: now - 86_400,
+        trialEnd: now + 86_400,
+        now,
+      }),
+    ).toBe('canceled');
+    expect(resolveMembershipState({ status: 'past_due', now })).toBe('past_due');
+    expect(resolveMembershipState({ status: null, now })).toBe('no_plan');
   });
 });
 
