@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Printer, Trash2, Save, CalendarDays, User as UserIcon , RefreshCcw} from "lucide-react";
+import { Printer, Trash2, Save, CalendarDays, User as UserIcon , RefreshCcw, Loader2} from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { AuditionFormData, initialAuditionData, AuditionStep, CriticalBriefFact } from "@/lib/audition-types";
 import { Stepper } from "./stepper";
@@ -13,7 +13,7 @@ import { StepReview } from "./step/step-review";
 import { PerformanceMapPrintBlock } from "./step/performance-map-print-block";
 import { StepResultSides } from "./step/step-result";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { collection, addDoc, updateDoc, getDoc, getDocs, doc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, setDoc, updateDoc, getDoc, getDocs, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { StepResultBrief } from "./step/step-result-brief";
 import { logger } from '@/lib/logger';
@@ -64,6 +64,16 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     nextAction: "save" | "coach";
   } | null>(null);
   const { toast } = useToast();
+
+  // --- SAVE STATE / DUPLICATE-SUBMISSION GUARD ---
+  const [isSaving, setIsSaving] = useState(false);
+  // Synchronous in-flight guard. React state alone is not enough: two clicks
+  // inside the same tick both read the pre-update state, so both would start a
+  // request and create two records.
+  const saveInFlightRef = useRef(false);
+  // Document id owned by the current save operation. It is generated once per
+  // result and reused by every retry, which makes the write idempotent.
+  const saveOperationIdRef = useRef<string | null>(null);
 
   const isStandaloneScene = mode === "sides" && !auditionId;
 
@@ -463,6 +473,38 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   });
 
   /**
+   * Returns the document id owned by the current save operation.
+   *
+   * The id is generated once per result and reused by every retry, so a repeated
+   * save request (double click, retry after a failed request) always targets the
+   * same document instead of creating a second one.
+   */
+  const getSaveOperationId = () => {
+    if (!saveOperationIdRef.current) {
+      const randomId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      saveOperationIdRef.current = `save-${randomId}`;
+    }
+    return saveOperationIdRef.current;
+  };
+
+  /**
+   * Writes the audition document of the current save operation.
+   *
+   * The write is idempotent: because the document id is bound to the operation,
+   * saving the same result twice updates a single document rather than adding a
+   * duplicate record.
+   */
+  const persistNewAudition = async (userPath: string) => {
+    const operationId = getSaveOperationId();
+    const docRef = doc(getDb(), `users/${userPath}/auditions/${operationId}`);
+    await setDoc(docRef, newAuditionDoc(), { merge: true });
+    return operationId;
+  };
+
+  /**
    * Builds the Firestore update payload for enrichment mode.
    * Merges updated audition metadata (project/role/deadline/timezone/castingDirectorName)
    * with the new performance map so enrichment saves keep the full doc in sync.
@@ -516,14 +558,14 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
       if (dedupeSnap.docs.length > 0) return dedupeSnap.docs[0].id;
       return null;
     } catch (error) {
-      // Firestore index not ready — gracefully fall back to addDoc
-      logger.warn({ err: error, msg: 'Dedupe query failed, proceeding with addDoc' });
+      // Firestore index not ready — gracefully fall back to the save
+      logger.warn({ err: error, msg: 'Dedupe query failed, proceeding with the save' });
       return null;
     }
   };
 
   /**
-   * Persist the audition (addDoc or merge updateDoc) and redirect to the auditions list.
+   * Persist the audition (idempotent write or merge updateDoc) and redirect to the auditions list.
    * Assumes dedupe has already been resolved.
    */
   const performSave = async () => {
@@ -531,8 +573,6 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     if (!userPath) return;
 
     try {
-      const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
-
       if (auditionId) {
         const docRef = doc(getDb(), `users/${userPath}/auditions/${auditionId}`);
         const docSnap = await getDoc(docRef);
@@ -541,10 +581,10 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
           const existing = docSnap.data();
           await updateDoc(docRef, buildMergeUpdate(existing));
         } else {
-          await addDoc(auditionsRef, newAuditionDoc());
+          await persistNewAudition(userPath);
         }
       } else {
-        await addDoc(auditionsRef, newAuditionDoc());
+        await persistNewAudition(userPath);
       }
 
       toast({
@@ -612,27 +652,49 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
   };
 
   /**
+   * Runs a save operation behind the duplicate-submission guard.
+   *
+   * The guard is a ref (not only state) so two clicks inside the same tick
+   * cannot both start a request. It is released as soon as the operation
+   * settles, which restores the button and lets a failed save be retried.
+   */
+  const runSaveOperation = async (operation: () => Promise<void>) => {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+
+    try {
+      await operation();
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  /**
    * Saves the generated character breakdown to Firestore and redirects to the auditions page.
    * Runs deduplication first; if a duplicate exists, opens the AlertDialog and pauses.
    */
   const handleSaveAndFinish = async () => {
-    if (!currentUser) {
-      toast({
-        variant: "destructive",
-        title: "Please log in to save",
-        description: "Your auditions are tied to your account — log in and try again.",
-      });
-      return;
-    }
-    const userPath = getUserPath();
-    if (!userPath) return;
-    const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
-    const existingId = await findDuplicateId(auditionsRef);
-    if (existingId) {
-      setPendingDup({ existingId, nextAction: "save" });
-      return;
-    }
-    await performSave();
+    await runSaveOperation(async () => {
+      if (!currentUser) {
+        toast({
+          variant: "destructive",
+          title: "Please log in to save",
+          description: "Your auditions are tied to your account — log in and try again.",
+        });
+        return;
+      }
+      const userPath = getUserPath();
+      if (!userPath) return;
+      const auditionsRef = collection(getDb(), `users/${userPath}/auditions`);
+      const existingId = await findDuplicateId(auditionsRef);
+      if (existingId) {
+        setPendingDup({ existingId, nextAction: "save" });
+        return;
+      }
+      await performSave();
+    });
   };
 
   const handleCoachClick = async () => {
@@ -669,8 +731,12 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
     if (!pendingDup) return;
     const next = pendingDup.nextAction;
     setPendingDup(null);
-    if (next === "save") await performSave();
-    else await performCoach();
+    if (next === "save") {
+      // Guarded as well: the dialog can be confirmed while another save is in flight.
+      await runSaveOperation(performSave);
+    } else {
+      await performCoach();
+    }
   };
 
 
@@ -818,12 +884,24 @@ export function AuditionWizard({ mode, auditionId }: AuditionWizardProps) {
                    </button>
                    
                    {/* Save Action */}
-                   <button 
+                   <button
+                     type="button"
                      onClick={handleSaveAndFinish}
-                     className="flex items-center gap-2 px-6 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
+                     disabled={isSaving}
+                     aria-busy={isSaving}
+                     className="flex items-center gap-2 px-6 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-primary"
                    >
-                    <Save className="w-4 h-4" />
-                     Save Output
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Output
+                      </>
+                    )}
                    </button>
                  </div>
                </div>
