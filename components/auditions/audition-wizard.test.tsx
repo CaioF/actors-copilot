@@ -1194,6 +1194,102 @@ describe("AuditionWizard enrichment prefill (Task 7)", () => {
   });
 });
 
+describe("AuditionWizard resume from a saved audition (Scene Study)", () => {
+  const mockUser = { uid: "user123", displayName: "Actor Test", getIdToken: jest.fn().mockResolvedValue("token") };
+  const firebaseModule = require("@/lib/firebase");
+  const authModule = require("firebase/auth");
+  const firestoreModule = require("firebase/firestore");
+
+  const savedSidesMap = {
+    intro: "Saved sides intro",
+    sections: [{ title: "Saved Objective", items: ["Hold the silence"] }],
+    outro: "Saved sides outro",
+  };
+
+  const savedDoc = {
+    project: "Romeo and Juliet",
+    role: "Ophelia",
+    projectType: "theater",
+    deadline: null,
+    auditionTimezone: null,
+    castingDirectorName: null,
+    sidesPerformanceMap: savedSidesMap,
+    briefPerformanceMap: null,
+    criticalBriefFacts: null,
+    hasSides: true,
+    hasBrief: false,
+    analysisType: "sides",
+    status: "completed",
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    firebaseModule.getDb.mockReturnValue({});
+    authModule.getAuth.mockReturnValue({ currentUser: mockUser });
+    authModule.onAuthStateChanged.mockImplementation((_auth: unknown, cb: (user: typeof mockUser | null) => void) => {
+      cb(mockUser);
+      return jest.fn();
+    });
+    firestoreModule.doc.mockImplementation((_db: unknown, path: string) => ({ path }));
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => savedDoc,
+    });
+  });
+
+  it("opens the saved audition with its scene and its stored breakdown", async () => {
+    render(<AuditionWizard mode="sides" auditionId="audition-1" loadSavedResult />);
+
+    await waitFor(() => {
+      // The intro shows in the result view and again in the print template.
+      expect(screen.getAllByText("Saved sides intro").length).toBeGreaterThan(0);
+    });
+
+    // The scene details travel with it.
+    expect(screen.getByRole("heading", { name: "Ophelia" })).toBeInTheDocument();
+    expect(screen.getAllByText("Romeo and Juliet").length).toBeGreaterThan(0);
+    // The result view is reached without generating anything new.
+    expect(screen.getByRole("button", { name: /save output/i })).toBeInTheDocument();
+    expect(firestoreModule.setDoc).not.toHaveBeenCalled();
+    expect(firestoreModule.addDoc).not.toHaveBeenCalled();
+  });
+
+  it("does not open the stored breakdown in enrichment mode (Attach Sides compatibility)", async () => {
+    render(<AuditionWizard mode="sides" auditionId="audition-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("e.g., Dr. Sarah Chen")).toHaveValue("Ophelia");
+    });
+
+    // The Attach Sides flow still starts on the scene details, not on a result.
+    expect(screen.queryByText("Saved sides intro")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save output/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the scene details when the saved audition only has a brief", async () => {
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        ...savedDoc,
+        sidesPerformanceMap: null,
+        briefPerformanceMap: { intro: "Brief intro", sections: [{ title: "Checklist", items: ["Prep"] }] },
+        hasSides: false,
+        hasBrief: true,
+        analysisType: "brief",
+      }),
+    });
+
+    render(<AuditionWizard mode="sides" auditionId="audition-brief" loadSavedResult />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("e.g., Dr. Sarah Chen")).toHaveValue("Ophelia");
+    });
+
+    // A brief-only audition has no sides breakdown to show, so the scene form stays.
+    expect(screen.queryByText("Brief intro")).not.toBeInTheDocument();
+  });
+});
+
 describe("MemoryRecordingBanner", () => {
   describe("renderButton", () => {
     beforeEach(() => {
