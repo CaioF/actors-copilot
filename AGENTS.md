@@ -13,14 +13,18 @@ Package manager: **pnpm 9** (CI and Vercel both read `pnpm-lock.yaml`).
 1. Branch off `main` (`git checkout -b feat/...`).
 2. Commit and push the branch.
 3. Open a Pull Request targeting `main`.
-4. Merge the PR. GitHub Actions (`.github/workflows/ci.yml`) runs lint + tests + typecheck, and the
-   Vercel Git integration auto-deploys `main` to production.
+4. **Wait for the user's explicit approval before merging.** GitHub Actions
+   (`.github/workflows/ci.yml`) runs lint + tests + typecheck, and the Vercel Git integration
+   auto-deploys `main` to production the moment the PR is merged. Report the PR number, the CI
+   result and the commit, then ask to merge. Never merge on your own initiative: merging is the
+   user's decision, because merging is what ships to production.
 
-`vercel deploy --prod` is reserved for **production incidents (hotfixes)**.
+`vercel deploy --prod` is reserved for **production incidents (hotfixes)**, and it is a
+production write: describe the incident, ask for permission, and run it only after the answer.
 
-> If you ship a hotfix with `vercel deploy --prod`, you **must** open a PR with the same changes and
-> merge it into `main` right after. Otherwise the next automatic deploy triggered by a push to `main`
-> silently reverts the hotfix.
+> If you ship a hotfix with `vercel deploy --prod`, you **must** open a PR with the same changes
+> and merge it into `main` right after (with the user's approval, like any other PR). Otherwise
+> the next automatic deploy triggered by a push to `main` silently reverts the hotfix.
 
 Production domains: `app.theactorscopilot.com`, `actors-copilot.vercel.app`,
 `v0-self-tape-copilot.vercel.app`.
