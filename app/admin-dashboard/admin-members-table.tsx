@@ -43,6 +43,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-GB', {
 
 interface AdminMembersTableProps {
   members: AdminMemberDto[];
+  archived?: AdminMemberDto[];
   loading?: boolean;
   reload?: () => void;
 }
@@ -59,6 +60,7 @@ function endDate(member: AdminMemberDto): number | null {
 
 export function AdminMembersTable({
   members,
+  archived = [],
   loading = false,
   reload = () => window.location.reload(),
 }: AdminMembersTableProps) {
@@ -175,6 +177,62 @@ export function AdminMembersTable({
             )}
           </CardContent>
         </Card>
+
+        {archived.length > 0 && (
+          <Card className="overflow-hidden border-[#3D4A3C]/15 bg-white">
+            <CardHeader className="border-b border-[#3D4A3C]/10">
+              <CardTitle className="text-lg text-[#3D4A3C]">
+                Archived accounts
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Accounts deleted from Firebase. They keep their Stripe
+                subscription, so a renewal can still charge them.
+              </p>
+            </CardHeader>
+            <CardContent className="px-0">
+              <Table className="min-w-[640px]">
+                <TableHeader>
+                  <TableRow className="bg-[#3D4A3C]/5 hover:bg-[#3D4A3C]/5">
+                    <TableHead className="px-6 text-[#3D4A3C]">Name</TableHead>
+                    <TableHead className="px-6 text-[#3D4A3C]">Email</TableHead>
+                    <TableHead className="px-6 text-[#3D4A3C]">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {archived.map((member) => {
+                    const membershipEnd = endDate(member);
+                    return (
+                      <TableRow key={member.uid}>
+                        <TableCell className="px-6 font-medium text-[#283228]">
+                          {member.displayName}
+                        </TableCell>
+                        <TableCell className="px-6 text-muted-foreground">
+                          {member.email}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              className="border-[#E8721A]/25 bg-[#E8721A]/10 text-[#9A4308]"
+                              variant="outline"
+                            >
+                              Deleted account
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {titleCase(member.tier)}
+                              {membershipEnd
+                                ? ` · Ends ${dateFormatter.format(new Date(membershipEnd * 1000))}`
+                                : ''}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   );

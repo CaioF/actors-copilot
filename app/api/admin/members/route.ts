@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { AdminMemberProjection } from '@/lib/admin-dashboard/domain';
-import { listAdminMembers } from '@/lib/admin-dashboard/repository';
+import {
+  listAdminMemberSnapshot,
+  type AdminMemberSnapshot,
+} from '@/lib/admin-dashboard/members';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
 import { logger } from '@/lib/logger';
 
@@ -20,6 +23,11 @@ export type AdminMemberDto = Pick<
   | 'cancelAtPeriodEnd'
 >;
 
+export interface AdminMembersResponse {
+  members: AdminMemberDto[];
+  archived: AdminMemberDto[];
+}
+
 export function serializeAdminMember(
   member: AdminMemberProjection,
 ): AdminMemberDto {
@@ -33,6 +41,34 @@ export function serializeAdminMember(
     trialEnd: member.trialEnd,
     currentPeriodEnd: member.currentPeriodEnd,
     cancelAtPeriodEnd: member.cancelAtPeriodEnd,
+  };
+}
+
+export function sortAdminMembers(
+  members: AdminMemberProjection[],
+): AdminMemberProjection[] {
+  return [...members].sort((left, right) =>
+    memberCollator.compare(left.displayName, right.displayName)
+    || memberCollator.compare(left.email, right.email)
+    || memberCollator.compare(left.uid, right.uid));
+}
+
+/**
+ * Builds the public payload of the member list.
+ *
+ * The dashboard page and the API render the same list, so both go through
+ * this builder: one sort order and one field allowlist.
+ */
+export function buildAdminMembersResponse(
+  snapshot: AdminMemberSnapshot,
+): AdminMembersResponse {
+  return {
+    members: sortAdminMembers(snapshot.members).map((member) =>
+      serializeAdminMember(member),
+    ),
+    archived: sortAdminMembers(snapshot.archived).map((member) =>
+      serializeAdminMember(member),
+    ),
   };
 }
 
@@ -57,13 +93,8 @@ export async function GET(): Promise<NextResponse> {
       );
     }
 
-    const members = await listAdminMembers();
-    const body = [...members]
-      .sort((left, right) =>
-        memberCollator.compare(left.displayName, right.displayName)
-        || memberCollator.compare(left.email, right.email)
-        || memberCollator.compare(left.uid, right.uid))
-      .map(serializeAdminMember);
+    const snapshot = await listAdminMemberSnapshot();
+    const body = buildAdminMembersResponse(snapshot);
 
     return NextResponse.json(body, { headers: RESPONSE_HEADERS });
   } catch (error) {

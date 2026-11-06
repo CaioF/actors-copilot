@@ -1,25 +1,20 @@
 import {
-  serializeAdminMember,
+  buildAdminMembersResponse,
   type AdminMemberDto,
 } from '@/app/api/admin/members/route';
-import { listAdminMembers } from '@/lib/admin-dashboard/repository';
+import { listAdminMemberSnapshot } from '@/lib/admin-dashboard/members';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
 import { AdminLoginForm } from './admin-login-form';
 import { AdminMembersTable } from './admin-members-table';
 
 export const dynamic = 'force-dynamic';
 
-const memberCollator = new Intl.Collator('en', { sensitivity: 'base' });
-
-async function loadMembers(): Promise<AdminMemberDto[] | null> {
+async function loadMembers(): Promise<{
+  members: AdminMemberDto[];
+  archived: AdminMemberDto[];
+} | null> {
   try {
-    const projections = await listAdminMembers();
-    return [...projections]
-      .sort((left, right) =>
-        memberCollator.compare(left.displayName, right.displayName)
-        || memberCollator.compare(left.email, right.email)
-        || memberCollator.compare(left.uid, right.uid))
-      .map((member) => serializeAdminMember(member));
+    return buildAdminMembersResponse(await listAdminMemberSnapshot());
   } catch {
     return null;
   }
@@ -55,5 +50,5 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  return <AdminMembersTable members={members} />;
+  return <AdminMembersTable members={members.members} archived={members.archived} />;
 }

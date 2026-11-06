@@ -136,8 +136,13 @@ jest.mock('next/headers', () => ({
 }));
 
 jest.mock('@/lib/firebase.admin', () => ({
+  auth: {
+    listUsers: jest.fn(),
+  },
   db: {
     collection: jest.fn(),
+    doc: jest.fn(),
+    getAll: jest.fn(),
   },
 }));
 
@@ -244,7 +249,7 @@ describe('admin dashboard integration flow', () => {
       { POST: login },
       { GET: listMembers },
       { ADMIN_SESSION_COOKIE_NAME },
-      { db },
+      { db, auth },
     ] = await Promise.all([
       import('@/app/admin-dashboard/page'),
       import('@/app/api/admin/login/route'),
@@ -261,6 +266,39 @@ describe('admin dashboard integration flow', () => {
         })),
       }),
     });
+
+    (auth.listUsers as jest.Mock).mockResolvedValue({
+      users: projections.map(({ uid, email, displayName }) => ({
+        uid,
+        email,
+        displayName,
+        metadata: { creationTime: '2026-01-01T00:00:00.000Z' },
+      })),
+    });
+
+    (db.doc as jest.Mock).mockImplementation((path: string) => ({ path }));
+    (db.getAll as jest.Mock).mockImplementation(
+      async (...references: Array<{ path: string }>) =>
+        references.map((reference) => {
+          const uid = reference.path.split('/')[1];
+          const projection = projections.find((entry) => entry.uid === uid);
+
+          return {
+            exists: Boolean(projection),
+            data: () =>
+              projection
+                ? {
+                    tier: projection.tier,
+                    status: projection.subscriptionStatus,
+                    trialStart: projection.trialStart,
+                    trialEnd: projection.trialEnd,
+                    currentPeriodEnd: projection.currentPeriodEnd,
+                    cancelAtPeriodEnd: projection.cancelAtPeriodEnd,
+                  }
+                : {},
+          };
+        }),
+    );
 
     const loginResponse = await login(new Request('http://localhost/api/admin/login', {
       method: 'POST',
@@ -283,11 +321,13 @@ describe('admin dashboard integration flow', () => {
 
     const membersResponse = await listMembers();
     expect(membersResponse.status).toBe(200);
-    expect(await membersResponse.json()).toEqual(expect.arrayContaining([
+    const membersBody = await membersResponse.json();
+    expect(membersBody.members).toEqual(expect.arrayContaining([
       expect.objectContaining({ membershipState: 'trial' }),
       expect.objectContaining({ membershipState: 'paid' }),
       expect.objectContaining({ membershipState: 'no_plan' }),
     ]));
+    expect(membersBody.archived).toEqual([]);
 
     render(await AdminDashboardPage());
 

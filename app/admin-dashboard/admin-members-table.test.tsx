@@ -91,6 +91,32 @@ describe('AdminMembersTable', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
+  it('does not render the archived section when there are no archived accounts', () => {
+    render(<AdminMembersTable members={[member('paid')]} />);
+
+    expect(screen.getAllByRole('table')).toHaveLength(1);
+    expect(screen.queryByText('Archived accounts')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deleted account')).not.toBeInTheDocument();
+  });
+
+  it('renders the archived accounts apart from the live members', () => {
+    render(
+      <AdminMembersTable
+        members={[member('paid')]}
+        archived={[member('trial', 1)]}
+      />,
+    );
+
+    const tables = screen.getAllByRole('table');
+    expect(tables).toHaveLength(2);
+    expect(screen.getByText('Archived accounts')).toBeInTheDocument();
+
+    const archivedRow = screen.getByText('Actor 1').closest('tr') as HTMLTableRowElement;
+    expect(within(archivedRow).getByText('Deleted account')).toBeInTheDocument();
+    expect(archivedRow).not.toHaveTextContent('Trial');
+    expect(archivedRow).toHaveTextContent('Ends');
+  });
+
   it('logs out through the admin endpoint and hard-refreshes', async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true });
     const reload = jest.fn();
