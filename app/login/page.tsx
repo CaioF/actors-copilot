@@ -20,11 +20,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { buildUpgradeUrl, parsePlanSelection, readPlanSelection, savePlanSelection } from "@/lib/plan-selection";
+import { redirectTo } from "@/lib/navigate";
 
 interface FirebaseError {
   code: string;
   message: string;
 }
+
+/**
+ * How long an account counts as brand new. A Firebase record created moments
+ * ago belongs to a member who has just signed up and has no plan yet.
+ */
+const FRESH_ACCOUNT_WINDOW_MS = 5 * 60 * 1000;
 
 function isFirebaseError(error: unknown): error is FirebaseError {
   return (
@@ -55,6 +62,7 @@ function LoginContent() {
   const trialParam = searchParams.get("trial");
   const planParam = searchParams.get("plan");
   const initialModeParam = searchParams.get("mode");
+  const referralParam = searchParams.get("ref");
   const currencyParam = searchParams.get("currency");
   const requestedSelection = parsePlanSelection(planParam, currencyParam);
   const requestedPlanKey = requestedSelection?.plan;
@@ -91,10 +99,20 @@ function LoginContent() {
         }
       }
       setMode("signup");
-    } else if (initialModeParam === "signup" || planParam) {
+    } else if (initialModeParam === "signup" || planParam || referralParam) {
+      // A referral link means the visitor came to sign up, not to sign in:
+      // the account is credited to the affiliate when it is created, so the
+      // wrong tab would only send a new member down the wrong path.
       setMode("signup");
     }
-  }, [initialModeParam, planParam, trialParam]);
+  }, [initialModeParam, planParam, trialParam, referralParam]);
+
+  // An account whose Firebase record was created moments ago is a brand new
+  // member: it has no plan yet and still owes the activation of its trial.
+  const accountCreatedAt = user?.metadata?.creationTime;
+  const isFreshAccount =
+    typeof accountCreatedAt === 'string' &&
+    Date.now() - new Date(accountCreatedAt).getTime() < FRESH_ACCOUNT_WINDOW_MS;
 
   useEffect(() => {
     if (!loading && user) {
@@ -112,21 +130,27 @@ function LoginContent() {
               if (data.url) {
                 sessionStorage.removeItem('trial_intent');
                 sessionStorage.removeItem('trial_tier');
-                window.location.href = data.url;
+                redirectTo(data.url);
               } else {
                 console.error("Trial checkout creation failed:", data.error);
-                window.location.href = '/dashboard';
+                redirectTo('/dashboard');
               }
             })
             .catch((err) => {
               console.error("Error creating trial checkout:", err);
-              window.location.href = '/dashboard';
+              redirectTo('/dashboard');
             });
         }).catch(() => {
-          window.location.href = '/dashboard';
+          redirectTo('/dashboard');
         });
       } else if (requestedPlanKey && requestedCurrencyKey) {
-        window.location.href = buildUpgradeUrl({ plan: requestedPlanKey, currency: requestedCurrencyKey });
+        redirectTo(buildUpgradeUrl({ plan: requestedPlanKey, currency: requestedCurrencyKey }));
+      } else if (!readPlanSelection()) {
+        // Nobody picked a plan. A brand new account still owes the activation
+        // of its free trial, so it goes to the trial screen to choose one; an
+        // account that has been around belongs on the dashboard. Without this
+        // the member is left on the login page, signed in, with nowhere to go.
+        redirectTo(isFreshAccount ? '/start-trial' : '/dashboard');
       }
     }
   }, [user, loading, requestedPlanKey, requestedCurrencyKey]);
@@ -135,7 +159,7 @@ function LoginContent() {
     const trialIntent = typeof window !== 'undefined' ? sessionStorage.getItem('trial_intent') : null;
     const selection = requestedSelection ?? readPlanSelection();
     if (!trialIntent && selection) {
-      window.location.href = buildUpgradeUrl(selection);
+      redirectTo(buildUpgradeUrl(selection));
     }
   };
 

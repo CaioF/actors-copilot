@@ -3,7 +3,7 @@ import { stripe } from '@/lib/stripe';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
-import { findAffiliateByCode } from '@/lib/admin-dashboard/affiliates';
+import { findAffiliateByCode, type AffiliateRecord } from '@/lib/admin-dashboard/affiliates';
 import { isSameAppOrigin } from '@/lib/app-origin';
 
 /**
@@ -280,6 +280,37 @@ export async function findOpenCheckoutSession(params: {
  * @param params - The checkout parameters.
  * @returns {Promise<Stripe.Checkout.Session>} The session to redirect to.
  */
+/**
+ * Finds the affiliate a member belongs to.
+ *
+ * The member's own document is the source of truth: the referral code is
+ * written there when the account is created, and it survives the browser
+ * session that carried it. A member who signed up through a referral link
+ * therefore gets the discount on whichever checkout they start, even when
+ * the code is no longer in the URL.
+ *
+ * The code sent by the browser is the fallback: it covers the customer who
+ * types the affiliate code at checkout on an account that has no referral
+ * yet. The webhook stores it on the member once the checkout completes.
+ *
+ * @param uid - The member the checkout belongs to.
+ * @param requestedCode - The affiliate code sent by the browser, if any.
+ * @returns The affiliate, or null when the member has none.
+ */
+async function resolveMemberAffiliate(
+  uid: string,
+  requestedCode?: string,
+): Promise<AffiliateRecord | null> {
+  const userSnapshot = await db.doc(`users/${uid}`).get();
+  const stored = (userSnapshot.data() as { affiliateCode?: unknown } | undefined)?.affiliateCode;
+
+  const code =
+    typeof stored === 'string' && stored.length > 0 ? stored : requestedCode;
+  if (!code) return null;
+
+  return findAffiliateByCode(code);
+}
+
 export async function createOrReuseCheckoutSession(params: {
   uid: string;
   email: string;
@@ -310,7 +341,7 @@ export async function createOrReuseCheckoutSession(params: {
   // The affiliate is resolved on the server: the code sent by the browser is
   // only a candidate, and it is only used when it belongs to an active
   // affiliate that already has a Stripe promotion code.
-  const affiliate = affiliateCode ? await findAffiliateByCode(affiliateCode) : null;
+  const affiliate = await resolveMemberAffiliate(uid, affiliateCode);
   const affiliateRef = affiliate?.promotionCodeId
     ? { code: affiliate.code, promotionCodeId: affiliate.promotionCodeId }
     : null;
