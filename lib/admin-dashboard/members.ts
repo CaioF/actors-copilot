@@ -104,12 +104,43 @@ async function readBillingDocuments(
   return billing;
 }
 
+/**
+ * Reads the affiliate that brought each account in.
+ *
+ * The referral lives on the member document, not on the billing document and
+ * not on the projection, so it is read from the member itself. That way it
+ * can never be a stale snapshot: the projection only keeps it for accounts
+ * whose member document is gone.
+ */
+async function readReferralDocuments(
+  uids: string[],
+): Promise<Map<string, string>> {
+  const referrals = new Map<string, string>();
+
+  for (let index = 0; index < uids.length; index += BILLING_BATCH_SIZE) {
+    const chunk = uids.slice(index, index + BILLING_BATCH_SIZE);
+    const references = chunk.map((uid) => db.doc(`users/${uid}`));
+    const snapshots = await db.getAll(...references);
+
+    snapshots.forEach((snapshot, position) => {
+      const uid = chunk[position];
+      const code = snapshot.data()?.affiliateCode;
+      if (uid && typeof code === 'string' && code.length > 0) {
+        referrals.set(uid, code);
+      }
+    });
+  }
+
+  return referrals;
+}
+
 function buildMember(params: {
   uid: string;
   email: string;
   displayName: string;
   billing: SourceData | undefined;
   projection: AdminMemberProjection | undefined;
+  referredBy: string | null;
   authCreatedAt: string;
   now: number;
 }): AdminMemberProjection {
@@ -125,6 +156,7 @@ function buildMember(params: {
     uid: params.uid,
     email: params.email,
     displayName: params.displayName,
+    referredBy: params.referredBy,
     tier: tier(billing.tier),
     subscriptionStatus,
     membershipState: resolveMembershipState({
@@ -155,6 +187,9 @@ function buildMember(params: {
  *
  * - Firebase Authentication decides which accounts exist.
  * - `users/{uid}/billing/current` decides the tier, the status and the dates.
+ * - `users/{uid}` decides the affiliate that brought the member in. The
+ *   referral is read from the member itself and not from the projection, so
+ *   it can never be a stale snapshot.
  * - The `adminMembers` projection only supplies the display name and the
  *   rows of accounts that were deleted outside the application.
  *
@@ -187,6 +222,11 @@ export async function listAdminMemberSnapshot(
     ...archivedUids,
   ]);
 
+  const referrals = await readReferralDocuments([
+    ...liveUids,
+    ...archivedUids,
+  ]);
+
   const members: AdminMemberProjection[] = authUsers.map((user) => {
     const projection = projectionByUid.get(user.uid);
     const authCreatedAt = authCreationTime(
@@ -201,6 +241,7 @@ export async function listAdminMemberSnapshot(
         ?? resolveAdminDisplayName(null, user.displayName),
       billing: billing.get(user.uid),
       projection,
+      referredBy: referrals.get(user.uid) ?? projection?.referredBy ?? null,
       authCreatedAt,
       now,
     });
@@ -215,6 +256,9 @@ export async function listAdminMemberSnapshot(
       displayName: projection?.displayName ?? 'Actor',
       billing: billing.get(uid),
       projection,
+      // An account whose member document is gone keeps its referral in the
+      // projection, which is the only place it is left.
+      referredBy: referrals.get(uid) ?? projection?.referredBy ?? null,
       authCreatedAt: projection?.authCreatedAt ?? new Date(now * 1000).toISOString(),
       now,
     });

@@ -58,16 +58,21 @@ function authUser(
 }
 
 /**
- * Mocks the batch read of `users/{uid}/billing/current` documents.
+ * Mocks the batched reads of `users/{uid}/billing/current` and `users/{uid}`.
+ *
+ * The two documents are told apart by the length of their path, so a test can
+ * give a member a referral without touching its billing document.
  */
-function mockBillingDocuments(
-  documents: Record<string, Record<string, unknown>>,
+function mockDocuments(
+  billing: Record<string, Record<string, unknown>>,
+  members: Record<string, Record<string, unknown>> = {},
 ): void {
   (db.doc as jest.Mock).mockImplementation((path: string) => ({ path }));
   (db.getAll as jest.Mock).mockImplementation(async (...references: Array<{ path: string }>) =>
     references.map((reference) => {
-      const uid = reference.path.split('/')[1];
-      const data = documents[uid];
+      const segments = reference.path.split('/');
+      const uid = segments[1];
+      const data = segments.length === 2 ? members[uid] : billing[uid];
 
       return {
         exists: Boolean(data),
@@ -75,6 +80,15 @@ function mockBillingDocuments(
       };
     }),
   );
+}
+
+/**
+ * Mocks the batch read of `users/{uid}/billing/current` documents.
+ */
+function mockBillingDocuments(
+  documents: Record<string, Record<string, unknown>>,
+): void {
+  mockDocuments(documents);
 }
 
 describe('listAdminMemberSnapshot', () => {
@@ -263,7 +277,7 @@ describe('listAdminMemberSnapshot', () => {
     expect(snapshot.members.map((member) => member.uid)).toEqual(['page-1', 'page-2']);
   });
 
-  it('reads the billing documents in batches', async () => {
+  it('reads the billing documents and the referrals in batches', async () => {
     (auth.listUsers as jest.Mock).mockResolvedValue({
       users: Array.from({ length: 120 }, (_value, index) =>
         authUser(`user-${index}`, `user-${index}@example.com`),
@@ -272,8 +286,37 @@ describe('listAdminMemberSnapshot', () => {
 
     await listAdminMemberSnapshot(NOW);
 
-    expect(db.getAll).toHaveBeenCalledTimes(2);
+    // 120 accounts: two batches for the billing documents, two for the referrals.
+    expect(db.getAll).toHaveBeenCalledTimes(4);
     expect((db.getAll as jest.Mock).mock.calls[0]).toHaveLength(100);
     expect((db.getAll as jest.Mock).mock.calls[1]).toHaveLength(20);
+    expect((db.getAll as jest.Mock).mock.calls[2]).toHaveLength(100);
+    expect((db.getAll as jest.Mock).mock.calls[3]).toHaveLength(20);
+  });
+
+  it('reads the referral from the member document, not from the projection', async () => {
+    (auth.listUsers as jest.Mock).mockResolvedValue({
+      users: [authUser('live-uid', 'live@example.com')],
+    });
+    (listAdminMembers as jest.Mock).mockResolvedValue([
+      projection({ uid: 'live-uid', referredBy: null }),
+    ]);
+    mockDocuments({}, { 'live-uid': { affiliateCode: 'lucas' } });
+
+    const snapshot = await listAdminMemberSnapshot(NOW);
+
+    expect(snapshot.members[0].referredBy).toBe('lucas');
+  });
+
+  it('falls back to the projection for an account whose member document is gone', async () => {
+    (auth.listUsers as jest.Mock).mockResolvedValue({ users: [] });
+    (listAdminMembers as jest.Mock).mockResolvedValue([
+      projection({ uid: 'gone-uid', email: 'gone@example.com', referredBy: 'lucas' }),
+    ]);
+    mockDocuments({});
+
+    const snapshot = await listAdminMemberSnapshot(NOW);
+
+    expect(snapshot.archived[0].referredBy).toBe('lucas');
   });
 });

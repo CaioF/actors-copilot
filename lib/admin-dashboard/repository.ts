@@ -11,6 +11,7 @@ function toAdminMember(
     uid,
     email: data.email as string,
     displayName: data.displayName as string,
+    referredBy: typeof data.referredBy === 'string' ? data.referredBy : null,
     tier: data.tier as AdminMemberProjection['tier'],
     subscriptionStatus: data.subscriptionStatus as string | null,
     membershipState: data.membershipState as AdminMemberProjection['membershipState'],
