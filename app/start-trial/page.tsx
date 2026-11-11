@@ -84,6 +84,9 @@ export default function StartTrialPage() {
   const [currency, setCurrency] = useState<RequestedCurrency>(DEFAULT_CURRENCY)
   const [submitting, setSubmitting] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  // "recovery" means the first checkout was interrupted; "trial" means the
+  // member has not picked a plan yet. The copy has to match.
+  const [reason, setReason] = useState<"recovery" | "trial">("trial")
 
   // 1. Check whether there is a pending recovery and load the currency map.
   useEffect(() => {
@@ -109,6 +112,7 @@ export default function StartTrialPage() {
           return
         }
 
+        if (recovery.reason === "recovery") setReason("recovery")
         setPlan(recovery.tier === "economy" ? "economy" : "business")
         if (recovery.currency) setCurrency(recovery.currency)
 
@@ -300,8 +304,18 @@ export default function StartTrialPage() {
                 </h1>
 
                 <p className="mt-4 max-w-lg text-sm leading-relaxed text-[#EFEADD]/75">
-                  A brief delay on our side meant your {TRIAL_DAYS}-day free trial never started. Nothing has been
-                  charged, and your account is ready. Pick the plan that fits you and we&apos;ll switch it on.
+                  {reason === "recovery" ? (
+                    <>
+                      A brief delay on our side meant your {TRIAL_DAYS}-day free trial never started. Nothing has
+                      been charged, and your account is ready. Pick the plan that fits you and we&apos;ll switch it
+                      on.
+                    </>
+                  ) : (
+                    <>
+                      Your account is ready. Pick the plan that fits you and we&apos;ll switch on your{" "}
+                      {TRIAL_DAYS}-day free trial. Nothing is charged until the trial ends.
+                    </>
+                  )}
                 </p>
 
                 {/* Billing cycle */}
