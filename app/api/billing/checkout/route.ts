@@ -23,7 +23,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: 'Malformed JSON request body' }, { status: 400 });
         }
 
-        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken, currency }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string; currency?: unknown } = body;
+        const { tier, billingCycle, isTrial: reqIsTrial, trial, idToken, currency, affiliateCode }: { tier?: SubscriptionTier | 'trial'; billingCycle?: BillingCycle; isTrial?: boolean; trial?: boolean; idToken?: string; currency?: unknown; affiliateCode?: unknown } = body;
 
         // 1. Enforce authentication via platform session cookie or Firebase ID Token fallback
         let uid: string | undefined;
@@ -138,6 +138,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             ...(checkoutCurrency ? { currency: checkoutCurrency } : {}),
             isTrial,
             appUrl,
+            // The referral code is only a candidate: the server resolves it
+            // against the affiliate registry and ignores it when it does not
+            // belong to an active affiliate.
+            ...(typeof affiliateCode === 'string' && affiliateCode.trim().length > 0
+                ? { affiliateCode: affiliateCode.trim() }
+                : {}),
         });
 
         // Return URL object target for secure frontend execution routing

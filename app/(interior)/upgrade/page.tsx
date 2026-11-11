@@ -22,6 +22,7 @@ import {
   type RequestedPlan,
 } from "@/lib/plan-selection";
 import type { CurrencySupportMap } from "@/lib/billing-currency";
+import { readAffiliateAttribution } from "@/lib/affiliate-attribution";
 
 type BillingCycle = "monthly" | "annual";
 
@@ -294,6 +295,10 @@ function UpgradeContent() {
     }
 
     try {
+      // The referral code captured on the landing page travels with the
+      // checkout so the affiliate's promotion code is applied for the member.
+      const attribution = readAffiliateAttribution();
+
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -301,6 +306,7 @@ function UpgradeContent() {
           tier,
           billingCycle,
           ...(currency !== "usd" ? { currency } : {}),
+          ...(attribution ? { affiliateCode: attribution.code } : {}),
         }),
       });
 

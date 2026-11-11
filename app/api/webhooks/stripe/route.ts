@@ -6,6 +6,7 @@ import { markBillingRecoveryResolved } from '@/lib/billing-recovery';
 import { logger } from '@/lib/logger';
 import { stripe } from '@/lib/stripe';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
+import { attributeAffiliateFromSession } from '@/lib/admin-dashboard/affiliates';
 
 export const dynamic = 'force-dynamic';
 
@@ -249,6 +250,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 if (!platformUserId) {
                     logger.warn(`[checkout.session.completed] Could not resolve platformUserId for Session ID: ${session.id}`);
                     break;
+                }
+
+                // Affiliate attribution. The code is validated against the
+                // affiliate registry before it is stored, and an existing
+                // attribution is never replaced: the first touch wins.
+                try {
+                    const affiliate = await attributeAffiliateFromSession(platformUserId, session);
+                    if (affiliate) {
+                        logger.info(
+                            `[checkout.session.completed] Attributed checkout ${session.id} to affiliate ${affiliate.code}`,
+                        );
+                    }
+                } catch (attributionError) {
+                    logger.warn({
+                        err: attributionError,
+                        msg: 'Affiliate attribution failed for a completed checkout',
+                        sessionId: session.id,
+                    });
                 }
 
                 const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;

@@ -3,6 +3,7 @@ import { stripe } from '@/lib/stripe';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
+import { findAffiliateByCode } from '@/lib/admin-dashboard/affiliates';
 import { isSameAppOrigin } from '@/lib/app-origin';
 
 /**
@@ -128,8 +129,9 @@ export async function createIdempotentCheckoutSession(params: {
   customerId: string;
   attempt: number;
   appUrl: string;
+  affiliate?: { code: string; promotionCodeId: string } | null;
 }): Promise<Stripe.Checkout.Session> {
-  const { uid, tier, billingCycle, currency, isTrial, customerId, attempt, appUrl } = params;
+  const { uid, tier, billingCycle, currency, isTrial, customerId, attempt, appUrl, affiliate } = params;
   const priceId = getStripePriceIdForTier(tier, billingCycle);
 
   const checkoutSession = await stripe.checkout.sessions.create(
@@ -137,7 +139,6 @@ export async function createIdempotentCheckoutSession(params: {
       customer: customerId,
       client_reference_id: uid,
       mode: 'subscription',
-      allow_promotion_codes: true,
       billing_address_collection: 'required',
       ...(currency ? { currency } : {}),
       line_items: [
@@ -146,6 +147,13 @@ export async function createIdempotentCheckoutSession(params: {
           quantity: 1,
         },
       ],
+      // Stripe accepts either `allow_promotion_codes` or `discounts`, never
+      // both. When the member arrived through a referral link their
+      // affiliate's code is applied for them; otherwise any active
+      // promotion code can be typed at checkout.
+      ...(affiliate?.promotionCodeId
+        ? { discounts: [{ promotion_code: affiliate.promotionCodeId }] }
+        : { allow_promotion_codes: true }),
       subscription_data: {
         metadata: {
           firebaseUid: uid,
@@ -163,9 +171,22 @@ export async function createIdempotentCheckoutSession(params: {
         targetTier: tier,
         billingCycle,
         isTrial: isTrial ? 'true' : 'false',
+        ...(affiliate?.code ? { affiliateCode: affiliate.code } : {}),
       },
     },
-    { idempotencyKey: `checkout_${uid}_${priceId}_${currency || 'default'}_${attempt}_${originSlug(appUrl)}` },
+    {
+      idempotencyKey: [
+        'checkout',
+        uid,
+        priceId,
+        currency || 'default',
+        attempt,
+        originSlug(appUrl),
+        // The affiliate changes the session parameters, so it belongs in the
+        // key: Stripe rejects a key reused with different parameters.
+        ...(affiliate?.code ? [affiliate.code] : []),
+      ].join('_'),
+    },
   );
 
   return checkoutSession;
@@ -191,8 +212,9 @@ export async function findOpenCheckoutSession(params: {
   billingCycle: BillingCycle;
   currency?: string;
   appUrl: string;
+  affiliateCode?: string;
 }): Promise<Stripe.Checkout.Session | null> {
-  const { customerId, tier, billingCycle, currency, appUrl } = params;
+  const { customerId, tier, billingCycle, currency, appUrl, affiliateCode } = params;
 
   try {
     const listed = await stripe.checkout.sessions.list({
@@ -211,6 +233,10 @@ export async function findOpenCheckoutSession(params: {
         session.metadata?.billingCycle === billingCycle &&
         session.expires_at > now &&
         (!currency || session.currency === currency) &&
+        // A session created without the affiliate must not be reused for a
+        // member who arrived through a referral link: it would carry no
+        // discount and no attribution.
+        (!affiliateCode || session.metadata?.affiliateCode === affiliateCode) &&
         sameOrigin(session),
     );
 
@@ -262,8 +288,9 @@ export async function createOrReuseCheckoutSession(params: {
   currency?: string;
   isTrial: boolean;
   appUrl: string;
+  affiliateCode?: string;
 }): Promise<Stripe.Checkout.Session> {
-  const { uid, email, tier, billingCycle, currency, isTrial, appUrl } = params;
+  const { uid, email, tier, billingCycle, currency, isTrial, appUrl, affiliateCode } = params;
 
   const billingDocRef = db.doc(`users/${uid}/billing/current`);
   const billingDoc = await billingDocRef.get();
@@ -280,7 +307,22 @@ export async function createOrReuseCheckoutSession(params: {
     knownCustomerId: billingData.customerId as string | undefined,
   });
 
-  const reusable = await findOpenCheckoutSession({ customerId, tier, billingCycle, currency, appUrl });
+  // The affiliate is resolved on the server: the code sent by the browser is
+  // only a candidate, and it is only used when it belongs to an active
+  // affiliate that already has a Stripe promotion code.
+  const affiliate = affiliateCode ? await findAffiliateByCode(affiliateCode) : null;
+  const affiliateRef = affiliate?.promotionCodeId
+    ? { code: affiliate.code, promotionCodeId: affiliate.promotionCodeId }
+    : null;
+
+  const reusable = await findOpenCheckoutSession({
+    customerId,
+    tier,
+    billingCycle,
+    currency,
+    appUrl,
+    ...(affiliateRef ? { affiliateCode: affiliateRef.code } : {}),
+  });
   if (reusable) return reusable;
 
   const session = await createIdempotentCheckoutSession({
@@ -293,6 +335,7 @@ export async function createOrReuseCheckoutSession(params: {
     customerId,
     attempt,
     appUrl,
+    affiliate: affiliateRef,
   });
 
   await billingDocRef.set(

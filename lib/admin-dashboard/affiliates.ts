@@ -1,6 +1,11 @@
+import type Stripe from 'stripe';
 import { db } from '@/lib/firebase.admin';
 import { stripe } from '@/lib/stripe';
 import { DEFAULT_COMMISSION_RATE, normalizeAffiliateCode } from '@/lib/affiliate-attribution';
+import {
+  ensureAffiliatePromotionCode,
+  readPromotionCodeAffiliateCode,
+} from '@/lib/affiliate-promotion-codes';
 
 /**
  * Affiliate program, server side.
@@ -31,6 +36,12 @@ export interface AffiliateRecord {
   rate: number;
   active: boolean;
   notes: string;
+  /** Customer-facing Stripe promotion code, e.g. `LUCAS`. */
+  promotionCode: string;
+  /** Stripe id of the promotion code. */
+  promotionCodeId: string;
+  /** Id of the shared coupon the promotion code belongs to. */
+  couponId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -83,6 +94,8 @@ export interface AffiliateReportRow {
   rate: number;
   active: boolean;
   notes: string;
+  /** Customer-facing Stripe promotion code, e.g. `LUCAS`. */
+  promotionCode: string;
   referredCount: number;
   convertedCount: number;
   totals: AffiliateCurrencyTotals[];
@@ -195,6 +208,9 @@ function toAffiliateRecord(code: string, data: Record<string, unknown>): Affilia
     rate: typeof data.rate === 'number' ? data.rate : DEFAULT_COMMISSION_RATE,
     active: data.active !== false,
     notes: typeof data.notes === 'string' ? data.notes : '',
+    promotionCode: typeof data.promotionCode === 'string' ? data.promotionCode : '',
+    promotionCodeId: typeof data.promotionCodeId === 'string' ? data.promotionCodeId : '',
+    couponId: typeof data.couponId === 'string' ? data.couponId : '',
     createdAt: typeof data.createdAt === 'string' ? data.createdAt : '',
     updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : '',
   };
@@ -211,6 +227,10 @@ export interface UpsertAffiliateInput {
 
 /**
  * Creates or updates an affiliate.
+ *
+ * The Stripe promotion code is created here, so adding an affiliate is a
+ * single action: the code, the link and the commission rate all become
+ * available at once, with no manual step in Stripe.
  *
  * @param input - The affiliate data.
  * @returns The stored affiliate.
@@ -235,6 +255,10 @@ export async function upsertAffiliate(input: UpsertAffiliateInput): Promise<Affi
       ? (existing.data()?.createdAt as string)
       : now;
 
+  // The promotion code is what a customer types at checkout, and it carries
+  // the affiliate in its metadata so the webhook can attribute the sale.
+  const promotion = await ensureAffiliatePromotionCode(code);
+
   const record: AffiliateRecord = {
     code,
     name: input.name ?? '',
@@ -242,6 +266,9 @@ export async function upsertAffiliate(input: UpsertAffiliateInput): Promise<Affi
     rate,
     active: input.active !== false,
     notes: input.notes ?? '',
+    promotionCode: promotion.promotionCode,
+    promotionCodeId: promotion.promotionCodeId,
+    couponId: promotion.couponId,
     createdAt,
     updatedAt: now,
   };
@@ -249,6 +276,140 @@ export async function upsertAffiliate(input: UpsertAffiliateInput): Promise<Affi
   await reference.set(record, { merge: true });
 
   return record;
+}
+
+/**
+ * Finds an affiliate by its code.
+ *
+ * @param code - The affiliate code, in any case.
+ * @returns The affiliate, or null when no active affiliate owns the code.
+ */
+export async function findAffiliateByCode(code: string): Promise<AffiliateRecord | null> {
+  const normalized = normalizeAffiliateCode(code);
+  if (!normalized) return null;
+
+  const snapshot = await db.doc(`${AFFILIATES_COLLECTION}/${normalized}`).get();
+  if (!snapshot.exists) return null;
+
+  const affiliate = toAffiliateRecord(normalized, snapshot.data() ?? {});
+  return affiliate.active ? affiliate : null;
+}
+
+/**
+ * Extracts the affiliate candidates carried by a completed Checkout Session.
+ *
+ * Two sources: the code we put in the session metadata when the member
+ * arrived through a referral link, and the promotion code the customer typed
+ * at checkout.
+ *
+ * @param session - The completed Checkout Session.
+ * @returns The affiliate codes and the Stripe promotion code ids to resolve.
+ */
+export function extractSessionAffiliateCandidates(session: {
+  metadata?: Stripe.Metadata | null;
+  discounts?: Array<{ promotion_code?: string | Stripe.PromotionCode | null }> | null;
+}): { codes: string[]; promotionCodeIds: string[] } {
+  const codes: string[] = [];
+  const promotionCodeIds: string[] = [];
+
+  const metadataCode = session.metadata?.affiliateCode;
+  if (typeof metadataCode === 'string' && metadataCode.length > 0) {
+    codes.push(metadataCode);
+  }
+
+  for (const discount of session.discounts ?? []) {
+    const promotion = discount?.promotion_code;
+
+    if (typeof promotion === 'string' && promotion.length > 0) {
+      promotionCodeIds.push(promotion);
+      continue;
+    }
+
+    // The promotion code can come back expanded instead of as an id. When it
+    // does, its metadata already carries the affiliate, so there is nothing
+    // left to look up.
+    if (promotion && typeof promotion === 'object') {
+      const expandedCode = promotion.metadata?.affiliateCode;
+      if (typeof expandedCode === 'string' && expandedCode.length > 0) {
+        codes.push(expandedCode);
+      }
+    }
+  }
+
+  return { codes, promotionCodeIds };
+}
+
+/**
+ * Attributes a completed checkout to an affiliate.
+ *
+ * The attribution is only written when the member has none yet: the first
+ * touch wins, so a later code never moves the credit of a member who already
+ * arrived through a referral link.
+ *
+ * The code is validated against the affiliate registry before it is stored, so
+ * a promotion code that is not one of ours never ends up on a member record.
+ *
+ * The read and the write happen in a Firestore transaction: two checkouts
+ * completing at the same time would otherwise both see an empty attribution
+ * and the later write would move the credit.
+ *
+ * @param platformUserId - The member the checkout belongs to.
+ * @param session - The completed Checkout Session.
+ * @returns The affiliate credited, or null when nothing was attributed.
+ */
+export async function attributeAffiliateFromSession(
+  platformUserId: string,
+  session: {
+    created?: number;
+    metadata?: Stripe.Metadata | null;
+    discounts?: Array<{ promotion_code?: string | Stripe.PromotionCode | null }> | null;
+  },
+): Promise<AffiliateRecord | null> {
+  const { codes, promotionCodeIds } = extractSessionAffiliateCandidates(session);
+
+  for (const promotionCodeId of promotionCodeIds) {
+    const code = await readPromotionCodeAffiliateCode(promotionCodeId);
+    if (code) codes.push(code);
+  }
+
+  if (codes.length === 0) return null;
+
+  // The affiliate is resolved before the transaction starts: a transaction
+  // must not perform reads it does not own.
+  let affiliate: AffiliateRecord | null = null;
+  for (const raw of codes) {
+    affiliate = await findAffiliateByCode(raw);
+    if (affiliate) break;
+  }
+
+  if (!affiliate) return null;
+
+  const userRef = db.doc(`${USERS_COLLECTION}/${platformUserId}`);
+
+  // The clock starts when the code was applied, so the payment that carries
+  // the discount counts towards the commission.
+  const capturedAt = typeof session.created === 'number' ? session.created * 1000 : Date.now();
+
+  const attributed = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    const existing = (snapshot.data() as { affiliateCode?: unknown } | undefined)?.affiliateCode;
+
+    // First touch wins: an existing attribution is never replaced.
+    if (typeof existing === 'string' && existing.length > 0) return false;
+
+    transaction.set(
+      userRef,
+      {
+        affiliateCode: affiliate?.code,
+        affiliateCapturedAt: capturedAt,
+      },
+      { merge: true },
+    );
+
+    return true;
+  });
+
+  return attributed ? affiliate : null;
 }
 
 /**
@@ -425,6 +586,7 @@ export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
       rate: affiliate.rate,
       active: affiliate.active,
       notes: affiliate.notes,
+      promotionCode: affiliate.promotionCode,
       referredCount: members.length,
       convertedCount: members.filter((member) => member.converted).length,
       totals,
