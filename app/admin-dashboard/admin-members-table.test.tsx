@@ -28,6 +28,7 @@ function member(
     uid: `user-${index}`,
     displayName: `Actor ${index}`,
     email: `actor-${index}@example.com`,
+    referredBy: null,
     tier: membershipState === 'no_plan' ? 'free' : 'business',
     subscriptionStatus: null,
     membershipState,
@@ -42,17 +43,35 @@ describe('AdminMembersTable', () => {
     jest.clearAllMocks();
   });
 
-  it('renders exactly Name, Email, and Status as semantic column headers', () => {
+  it('renders exactly Name, Email, Referred by, and Status as semantic column headers', () => {
     const { container } = render(<AdminMembersTable members={[member('paid')]} />);
     const table = screen.getByRole('table');
 
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
       'Name',
       'Email',
+      'Referred by',
       'Status',
     ]);
     expect(container.querySelector('[data-slot="table-container"]')).toHaveClass('overflow-x-auto');
     expect(container.querySelector('[data-slot="table-container"] table')).toBe(table);
+  });
+
+  it('shows the affiliate that brought the member in', () => {
+    render(
+      <AdminMembersTable members={[{ ...member('trial'), referredBy: 'lucas' }]} />,
+    );
+
+    const row = screen.getByText('Actor 0').closest('tr') as HTMLTableRowElement;
+    expect(within(row).getByText('lucas')).toBeInTheDocument();
+  });
+
+  it('shows a dash when nobody referred the member', () => {
+    render(<AdminMembersTable members={[member('trial')]} />);
+
+    const row = screen.getByText('Actor 0').closest('tr') as HTMLTableRowElement;
+    const cells = within(row).getAllByRole('cell');
+    expect(cells[2]).toHaveTextContent('—');
   });
 
   it('renders stable labels for every membership state', () => {
@@ -75,9 +94,9 @@ describe('AdminMembersTable', () => {
     const row = screen.getByText('Actor 0').closest('tr') as HTMLTableRowElement;
     const cells = within(row).getAllByRole('cell');
 
-    expect(cells).toHaveLength(3);
-    expect(cells[2]).toHaveTextContent('Business');
-    expect(cells[2]).toHaveTextContent('Ends');
+    expect(cells).toHaveLength(4);
+    expect(cells[3]).toHaveTextContent('Business');
+    expect(cells[3]).toHaveTextContent('Ends');
   });
 
   it('renders loading and empty states without an empty table', () => {

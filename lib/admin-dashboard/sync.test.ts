@@ -52,6 +52,7 @@ function projection(
     uid,
     email: 'auth@example.com',
     displayName: 'Profile Actor',
+    referredBy: null,
     tier: 'business',
     subscriptionStatus: 'active',
     membershipState: 'paid',

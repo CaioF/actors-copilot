@@ -67,6 +67,22 @@ const PLAN_LABELS: Record<RequestedPlan, string> = {
 const TRIAL_DAYS = 14
 
 /**
+ * Formats an amount with cents.
+ *
+ * The plan cards use the shared formatter, which drops the decimals. A
+ * discount line is about a specific charge, so it states the exact amount
+ * the member will be billed.
+ */
+function formatExactAmount(amount: number, currency: RequestedCurrency): string {
+  return new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+/**
  * Trial recovery screen.
  *
  * Shown when an account still owes the activation of its free trial (for
@@ -90,6 +106,13 @@ export default function StartTrialPage() {
   // Why the server could not answer. "unauthorized" means the session was
   // gone, "unreachable" means the call itself failed.
   const [failure, setFailure] = useState<"unauthorized" | "unreachable" | null>(null)
+  // The affiliate offer that applies to this member, so the discount is
+  // visible before the member hands over to Stripe.
+  const [affiliate, setAffiliate] = useState<{
+    code: string;
+    promotionCode: string;
+    percentOff: number;
+  } | null>(null)
 
   // 1. Check whether there is a pending recovery and load the currency map.
   useEffect(() => {
@@ -97,17 +120,20 @@ export default function StartTrialPage() {
 
     const load = async () => {
       try {
-        const [recoveryRes, supportRes] = await Promise.all([
+        const [recoveryRes, supportRes, affiliateRes] = await Promise.all([
           fetch("/api/billing/recovery", { method: "POST" }),
           fetch("/api/billing/currencies"),
+          fetch("/api/billing/affiliate"),
         ])
 
         const recovery = await recoveryRes.json().catch(() => null)
         const supportData = await supportRes.json().catch(() => null)
+        const affiliateData = await affiliateRes.json().catch(() => null)
 
         if (cancelled) return
 
         if (supportData?.support) setSupport(supportData.support as CurrencySupportMap)
+        if (affiliateData?.affiliate) setAffiliate(affiliateData.affiliate)
 
         // The server could not answer. That is not the same as "there is
         // nothing to do": sending the member to the dashboard would leave
@@ -174,6 +200,20 @@ export default function StartTrialPage() {
 
   const selectedBlockedReason = blockedReason(plan)
   const selectedPrice = displayPrice(plan)
+
+  /**
+   * The amount of the first real payment once the affiliate discount is
+   * applied. The trial itself is free, so this is what the member will
+   * actually be charged when it ends.
+   *
+   * The display prices are in whole currency units, so the discount is
+   * applied there and the cents are kept.
+   */
+  const listPrice = getDisplayPrice(plan, currency, billingCycle)
+  const firstPayment =
+    affiliate && listPrice !== null
+      ? listPrice * (1 - affiliate.percentOff / 100)
+      : null
 
   const summary = useMemo(() => {
     if (!selectedPrice) return null
@@ -468,6 +508,16 @@ export default function StartTrialPage() {
                   {summary && (
                     <p className="text-xs text-[#EFEADD]/55">
                       {summary} — {TRIAL_DAYS} days free
+                    </p>
+                  )}
+                  {affiliate && firstPayment && selectedPrice && (
+                    <p className="max-w-md text-center text-xs leading-relaxed text-[#EFEADD]/75">
+                      <span className="font-semibold text-[#F2671A]">{affiliate.promotionCode}</span>{" "}
+                      applied — {affiliate.percentOff}% off your first payment:{" "}
+                      <span className="font-semibold text-[#EFEADD]">
+                        {formatExactAmount(firstPayment, currency)}
+                      </span>{" "}
+                      instead of {formatExactAmount(listPrice ?? 0, currency)}.
                     </p>
                   )}
                   {billingCycle === "annual" && (

@@ -137,6 +137,7 @@ export function AdminMembersTable({
                   <TableRow className="bg-[#3D4A3C]/5 hover:bg-[#3D4A3C]/5">
                     <TableHead className="px-6 text-[#3D4A3C]">Name</TableHead>
                     <TableHead className="px-6 text-[#3D4A3C]">Email</TableHead>
+                    <TableHead className="px-6 text-[#3D4A3C]">Referred by</TableHead>
                     <TableHead className="px-6 text-[#3D4A3C]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -150,6 +151,18 @@ export function AdminMembersTable({
                         </TableCell>
                         <TableCell className="px-6 text-muted-foreground">
                           {member.email}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          {member.referredBy ? (
+                            <Badge
+                              className="border-[#F2671A]/30 bg-[#F2671A]/10 text-[#9A4308]"
+                              variant="outline"
+                            >
+                              {member.referredBy}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="px-6">
                           <div className="flex flex-wrap items-center gap-2">
@@ -195,6 +208,7 @@ export function AdminMembersTable({
                   <TableRow className="bg-[#3D4A3C]/5 hover:bg-[#3D4A3C]/5">
                     <TableHead className="px-6 text-[#3D4A3C]">Name</TableHead>
                     <TableHead className="px-6 text-[#3D4A3C]">Email</TableHead>
+                    <TableHead className="px-6 text-[#3D4A3C]">Referred by</TableHead>
                     <TableHead className="px-6 text-[#3D4A3C]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -208,6 +222,18 @@ export function AdminMembersTable({
                         </TableCell>
                         <TableCell className="px-6 text-muted-foreground">
                           {member.email}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          {member.referredBy ? (
+                            <Badge
+                              className="border-[#F2671A]/30 bg-[#F2671A]/10 text-[#9A4308]"
+                              variant="outline"
+                            >
+                              {member.referredBy}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="px-6">
                           <div className="flex flex-wrap items-center gap-2">

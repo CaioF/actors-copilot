@@ -40,14 +40,16 @@ export async function syncAdminMember(
 ): Promise<AdminMemberProjection> {
   const actorProfilePromise = db.doc(`actorProfiles/${uid}`).get();
   const billingPromise = db.doc(`users/${uid}/billing/current`).get();
+  const userPromise = db.doc(`users/${uid}`).get();
   const authUserPromise = overrides.authUser
     ? Promise.resolve(overrides.authUser)
     : auth.getUser(uid);
 
-  const [authUser, actorProfile, billing, existing] = await Promise.all([
+  const [authUser, actorProfile, billing, user, existing] = await Promise.all([
     authUserPromise,
     actorProfilePromise,
     billingPromise,
+    userPromise,
     getAdminMember(uid),
   ]);
 
@@ -55,6 +57,7 @@ export async function syncAdminMember(
     ? (actorProfile.data() ?? {})
     : {};
   const billingData: SourceData = billing.exists ? (billing.data() ?? {}) : {};
+  const userData: SourceData = user.exists ? (user.data() ?? {}) : {};
   const synchronizedAt = new Date().toISOString();
   const subscriptionStatus = nullableString(billingData.status);
   const cancelAtPeriodEnd = billingData.cancelAtPeriodEnd === true;
@@ -66,6 +69,7 @@ export async function syncAdminMember(
       nullableString(actorData.fullName),
       authUser.displayName,
     ),
+    referredBy: nullableString(userData.affiliateCode),
     tier: tier(billingData.tier),
     subscriptionStatus,
     membershipState: classifyMembership(
