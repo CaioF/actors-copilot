@@ -10,6 +10,15 @@
 jest.mock('@/lib/firebase.admin', () => {
   const store = new Map<string, Record<string, unknown>>();
 
+  const readRef = (path: string) => ({
+    exists: store.has(path),
+    data: () => store.get(path),
+  });
+
+  const writeRef = (path: string, data: Record<string, unknown>) => {
+    store.set(path, { ...(store.get(path) ?? {}), ...data });
+  };
+
   return {
     db: {
       __seed: (path: string, data: Record<string, unknown>) => {
@@ -18,11 +27,15 @@ jest.mock('@/lib/firebase.admin', () => {
       __read: (path: string) => store.get(path),
       __clear: () => store.clear(),
       doc: (path: string) => ({
-        get: async () => ({ exists: store.has(path), data: () => store.get(path) }),
-        set: async (data: Record<string, unknown>) => {
-          store.set(path, { ...(store.get(path) ?? {}), ...data });
-        },
+        path,
+        get: async () => readRef(path),
+        set: async (data: Record<string, unknown>) => writeRef(path, data),
       }),
+      runTransaction: async (fn: (transaction: unknown) => Promise<boolean>) =>
+        fn({
+          get: async (ref: { path: string }) => readRef(ref.path),
+          set: (ref: { path: string }, data: Record<string, unknown>) => writeRef(ref.path, data),
+        }),
     },
   };
 });
@@ -36,6 +49,7 @@ jest.mock('@/lib/affiliate-promotion-codes', () => ({
   ),
 }));
 
+import type Stripe from 'stripe';
 import { db } from '@/lib/firebase.admin';
 import { attributeAffiliateFromSession, extractSessionAffiliateCandidates } from './affiliates';
 
@@ -76,6 +90,24 @@ describe('extractSessionAffiliateCandidates', () => {
     expect(candidates.codes).toEqual([]);
     expect(candidates.promotionCodeIds).toEqual([]);
   });
+
+  it('reads the affiliate from an expanded promotion code', () => {
+    const candidates = extractSessionAffiliateCandidates({
+      metadata: {},
+      discounts: [
+        {
+          promotion_code: {
+            id: 'promo_lucas',
+            code: 'LUCAS',
+            metadata: { affiliateCode: 'lucas' },
+          } as unknown as Stripe.PromotionCode,
+        },
+      ],
+    });
+
+    expect(candidates.codes).toEqual(['lucas']);
+    expect(candidates.promotionCodeIds).toEqual([]);
+  });
 });
 
 describe('attributeAffiliateFromSession', () => {
@@ -111,6 +143,27 @@ describe('attributeAffiliateFromSession', () => {
 
     expect(affiliate).toBeNull();
     expect(mockDb.__read('users/member-2')?.affiliateCode).toBeUndefined();
+  });
+
+  it('credits the affiliate from an expanded promotion code', async () => {
+    mockDb.__seed('users/member-4', { email: 'member@example.com' });
+
+    const affiliate = await attributeAffiliateFromSession('member-4', {
+      created: 1_700_000_000,
+      metadata: {},
+      discounts: [
+        {
+          promotion_code: {
+            id: 'promo_lucas',
+            code: 'LUCAS',
+            metadata: { affiliateCode: 'lucas' },
+          } as unknown as Stripe.PromotionCode,
+        },
+      ],
+    });
+
+    expect(affiliate?.code).toBe('lucas');
+    expect(mockDb.__read('users/member-4')?.affiliateCode).toBe('lucas');
   });
 
   it('keeps the first attribution when a second code arrives later', async () => {

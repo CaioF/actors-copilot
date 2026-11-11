@@ -319,8 +319,20 @@ export function extractSessionAffiliateCandidates(session: {
 
   for (const discount of session.discounts ?? []) {
     const promotion = discount?.promotion_code;
+
     if (typeof promotion === 'string' && promotion.length > 0) {
       promotionCodeIds.push(promotion);
+      continue;
+    }
+
+    // The promotion code can come back expanded instead of as an id. When it
+    // does, its metadata already carries the affiliate, so there is nothing
+    // left to look up.
+    if (promotion && typeof promotion === 'object') {
+      const expandedCode = promotion.metadata?.affiliateCode;
+      if (typeof expandedCode === 'string' && expandedCode.length > 0) {
+        codes.push(expandedCode);
+      }
     }
   }
 
@@ -336,6 +348,10 @@ export function extractSessionAffiliateCandidates(session: {
  *
  * The code is validated against the affiliate registry before it is stored, so
  * a promotion code that is not one of ours never ends up on a member record.
+ *
+ * The read and the write happen in a Firestore transaction: two checkouts
+ * completing at the same time would otherwise both see an empty attribution
+ * and the later write would move the credit.
  *
  * @param platformUserId - The member the checkout belongs to.
  * @param session - The completed Checkout Session.
@@ -358,33 +374,42 @@ export async function attributeAffiliateFromSession(
 
   if (codes.length === 0) return null;
 
-  const userRef = db.doc(`${USERS_COLLECTION}/${platformUserId}`);
-  const userSnapshot = await userRef.get();
-  const existing = (userSnapshot.data() as { affiliateCode?: unknown } | undefined)?.affiliateCode;
-
-  // First touch wins: an existing attribution is never replaced.
-  if (typeof existing === 'string' && existing.length > 0) return null;
-
+  // The affiliate is resolved before the transaction starts: a transaction
+  // must not perform reads it does not own.
+  let affiliate: AffiliateRecord | null = null;
   for (const raw of codes) {
-    const affiliate = await findAffiliateByCode(raw);
-    if (!affiliate) continue;
+    affiliate = await findAffiliateByCode(raw);
+    if (affiliate) break;
+  }
 
-    // The clock starts when the code was applied, so the payment that carries
-    // the discount counts towards the commission.
-    const capturedAt = typeof session.created === 'number' ? session.created * 1000 : Date.now();
+  if (!affiliate) return null;
 
-    await userRef.set(
+  const userRef = db.doc(`${USERS_COLLECTION}/${platformUserId}`);
+
+  // The clock starts when the code was applied, so the payment that carries
+  // the discount counts towards the commission.
+  const capturedAt = typeof session.created === 'number' ? session.created * 1000 : Date.now();
+
+  const attributed = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    const existing = (snapshot.data() as { affiliateCode?: unknown } | undefined)?.affiliateCode;
+
+    // First touch wins: an existing attribution is never replaced.
+    if (typeof existing === 'string' && existing.length > 0) return false;
+
+    transaction.set(
+      userRef,
       {
-        affiliateCode: affiliate.code,
+        affiliateCode: affiliate?.code,
         affiliateCapturedAt: capturedAt,
       },
       { merge: true },
     );
 
-    return affiliate;
-  }
+    return true;
+  });
 
-  return null;
+  return attributed ? affiliate : null;
 }
 
 /**
