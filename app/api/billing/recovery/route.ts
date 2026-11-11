@@ -28,6 +28,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const session = await getPlatformSession();
         if (!session?.uid) {
+            logger.warn({
+                msg: 'Billing recovery request without a platform session',
+                hasCookie: Boolean(req.headers.get('cookie')?.includes('platform_session=')),
+            });
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -55,6 +59,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const billingData = (billingDoc.exists ? billingDoc.data() : null) ?? ({} as Record<string, unknown>);
 
         if (billingData.subscriptionId || billingData.hasUsedTrial === true) {
+            logger.info(
+                {
+                    uid,
+                    hasSubscription: Boolean(billingData.subscriptionId),
+                    hasUsedTrial: billingData.hasUsedTrial === true,
+                    pendingRecovery,
+                },
+                'Trial screen skipped: the member already has a plan',
+            );
             return NextResponse.json({ pending: false }, { status: 200 });
         }
 
@@ -74,6 +87,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // Phase 1: the caller only wants to know whether a checkout is pending.
         const wantsSelection = body.tier !== undefined;
         if (!wantsSelection) {
+            logger.info(
+                {
+                    uid,
+                    reason: pendingRecovery ? 'recovery' : 'trial',
+                    tier: defaultTier,
+                    currency: defaultCurrency,
+                    hasBillingDocument: billingDoc.exists,
+                },
+                'Trial screen state resolved',
+            );
             return NextResponse.json(
                 {
                     pending: true,
