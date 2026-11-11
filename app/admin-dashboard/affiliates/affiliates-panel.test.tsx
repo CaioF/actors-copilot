@@ -61,7 +61,7 @@ describe('AffiliatesPanel', () => {
     render(<AffiliatesPanel report={[affiliate()]} payouts={[]} />);
 
     expect(screen.getByText('TRACEY')).toBeInTheDocument();
-    expect(screen.getByText(/\?ref=tracey$/)).toBeInTheDocument();
+    expect(screen.getByText(/\/login\?ref=tracey$/)).toBeInTheDocument();
   });
 
   it('renders the empty state when there is no affiliate', () => {

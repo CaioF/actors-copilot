@@ -46,6 +46,10 @@ const dateFormatter = new Intl.DateTimeFormat('en-GB', {
 /**
  * The origin the referral links point at. It has to be the app domain: the
  * referral capture only runs in the app, never on the marketing site.
+ *
+ * The link points at the sign-up page rather than the welcome page: the
+ * capture of the code runs when the page loads, and on a form the member has
+ * to fill the page is always loaded before they can click anything.
  */
 const APP_ORIGIN =
   (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '') ||
@@ -246,7 +250,7 @@ export function AffiliatesPanel({
                         ) : null}
                         <div className="mt-1 break-all text-xs text-muted-foreground">
                           <span className="font-mono">
-                            {`${APP_ORIGIN}/?ref=${affiliate.code}`}
+                            {`${APP_ORIGIN}/login?ref=${affiliate.code}`}
                           </span>
                         </div>
                       </TableCell>
