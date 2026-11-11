@@ -47,15 +47,20 @@ export const ANNUAL_PAYMENT_LINKS: Record<RequestedPlan, Record<RequestedCurrenc
 /**
  * Builds the annual Stripe Payment Link for the exact plan + currency. The user id and email
  * are passed so the Stripe webhook can attach the subscription to the right account.
+ *
+ * The affiliate promotion code is passed as well: Stripe Payment Links accept a
+ * `prefilled_promo_code` parameter, so the code is already filled in and visible
+ * on the Stripe page instead of the member having to type it.
  */
 export function getAnnualPaymentLink(
   plan: RequestedPlan,
   currency: RequestedCurrency,
-  customer?: { uid?: string | null; email?: string | null }
+  customer?: { uid?: string | null; email?: string | null; promotionCode?: string | null }
 ): string {
   const url = new URL(ANNUAL_PAYMENT_LINKS[plan][currency]);
   if (customer?.uid) url.searchParams.set('client_reference_id', customer.uid);
   if (customer?.email) url.searchParams.set('prefilled_email', customer.email);
+  if (customer?.promotionCode) url.searchParams.set('prefilled_promo_code', customer.promotionCode);
   return url.toString();
 }
 

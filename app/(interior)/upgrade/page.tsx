@@ -38,6 +38,19 @@ const currencySupportFetcher = async (url: string): Promise<CurrencySupportMap |
   return data.support;
 };
 
+interface AffiliateOffer {
+  code: string;
+  promotionCode: string;
+  percentOff: number;
+}
+
+const affiliateOfferFetcher = async (url: string): Promise<AffiliateOffer | null> => {
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = (await res.json()) as { affiliate: AffiliateOffer | null };
+  return data.affiliate;
+};
+
 interface TierCardProps {
   badge: string;
   price: string | null;
@@ -244,6 +257,15 @@ function UpgradeContent() {
     { revalidateOnFocus: false }
   );
 
+  // The affiliate offer that applies to this member. It is used to prefill
+  // the promotion code on the annual Payment Link, so the code and the
+  // discount are visible to the member instead of hidden.
+  const { data: affiliateOffer } = useSWR(
+    "/api/billing/affiliate",
+    affiliateOfferFetcher,
+    { revalidateOnFocus: false }
+  );
+
   const currencyLabel = currency.toUpperCase();
   const currentTier = user?.tier && user.tier !== "free" ? user.tier : null;
   const hasActivePlan =
@@ -290,6 +312,7 @@ function UpgradeContent() {
       window.location.href = getAnnualPaymentLink(tier, currency, {
         uid: user?.uid,
         email: user?.email,
+        promotionCode: affiliateOffer?.promotionCode ?? null,
       });
       return;
     }
