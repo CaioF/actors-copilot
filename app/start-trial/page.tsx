@@ -87,6 +87,9 @@ export default function StartTrialPage() {
   // "recovery" means the first checkout was interrupted; "trial" means the
   // member has not picked a plan yet. The copy has to match.
   const [reason, setReason] = useState<"recovery" | "trial">("trial")
+  // Why the server could not answer. "unauthorized" means the session was
+  // gone, "unreachable" means the call itself failed.
+  const [failure, setFailure] = useState<"unauthorized" | "unreachable" | null>(null)
 
   // 1. Check whether there is a pending recovery and load the currency map.
   useEffect(() => {
@@ -106,7 +109,18 @@ export default function StartTrialPage() {
 
         if (supportData?.support) setSupport(supportData.support as CurrencySupportMap)
 
-        if (!recoveryRes.ok || !recovery?.pending) {
+        // The server could not answer. That is not the same as "there is
+        // nothing to do": sending the member to the dashboard would leave
+        // them with no plan, no checkout and no explanation of what happened.
+        if (!recoveryRes.ok) {
+          setFailure(recoveryRes.status === 401 ? "unauthorized" : "unreachable")
+          setView("error")
+          return
+        }
+
+        // The server answered and the member already has a plan. The
+        // dashboard is where they belong.
+        if (!recovery?.pending) {
           setView("skipped")
           window.setTimeout(() => redirectTo("/dashboard"), 1200)
           return
@@ -273,25 +287,47 @@ export default function StartTrialPage() {
             {view === "error" && (
               <>
                 <h1 className="font-title mt-3 text-4xl font-bold leading-[1.05] tracking-tight text-[#EFEADD] sm:text-5xl">
-                  We couldn&apos;t open your checkout
+                  {failure === "unauthorized" ? (
+                    <>Let&apos;s sign you in again</>
+                  ) : (
+                    <>We couldn&apos;t open your checkout</>
+                  )}
                 </h1>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-[#EFEADD]/70">
-                  Nothing is lost — your trial is still waiting for you. Try once more, or pick a plan from the
-                  upgrade page.
+                  {failure === "unauthorized" ? (
+                    <>
+                      Your session ended before you could pick your plan. Nothing is lost and no trial
+                      has been used. Sign in again and we will take you straight back here.
+                    </>
+                  ) : (
+                    <>
+                      Nothing is lost, your trial is still waiting for you. Try once more, or pick a plan from the
+                      upgrade page.
+                    </>
+                  )}
                 </p>
                 <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="w-full rounded-full bg-[#F2671A] px-7 py-3.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] sm:w-auto"
-                  >
-                    Try again
-                  </button>
+                  {failure === "unauthorized" ? (
+                    <Link
+                      href="/login"
+                      className="w-full rounded-full bg-[#F2671A] px-7 py-3.5 text-center text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] sm:w-auto"
+                    >
+                      Sign in again
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="w-full rounded-full bg-[#F2671A] px-7 py-3.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] sm:w-auto"
+                    >
+                      Try again
+                    </button>
+                  )}
                   <Link
                     href="/upgrade"
                     className="w-full rounded-full border border-white/20 px-7 py-3.5 text-center text-sm font-semibold text-[#EFEADD] transition-all hover:bg-white/10 active:scale-[0.98] sm:w-auto"
                   >
-                    See all plans
+                    Pick my plan
                   </Link>
                 </div>
               </>

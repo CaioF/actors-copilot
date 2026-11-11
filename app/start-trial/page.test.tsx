@@ -46,10 +46,11 @@ describe("StartTrialPage", () => {
   /**
    * Mocks the two calls the page makes on mount plus the checkout call.
    */
-  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial' }) => {
+  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial'; status?: number }) => {
     const pending = options?.pending ?? true;
     const ok = options?.ok ?? true;
     const reason = options?.reason ?? 'recovery';
+    const status = options?.status ?? (pending ? 200 : 401);
 
     const fetchMock = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -64,7 +65,7 @@ describe("StartTrialPage", () => {
 
       return Promise.resolve({
         ok,
-        status: pending ? 200 : 401,
+        status,
         json: async () => (pending ? { pending: true, tier: "business", currency: "usd", reason } : { error: "Unauthorized" }),
       });
     });
@@ -141,6 +142,35 @@ describe("StartTrialPage", () => {
     expect(screen.getByRole("button", { name: /start my free trial/i })).toBeInTheDocument();
   });
 
+  /**
+   * The server could not answer. That is not the same as "there is nothing to
+   * do": sending the member to the dashboard leaves them with no plan, no
+   * checkout and no explanation.
+   */
+  it("never sends the member to the dashboard when the server cannot answer", async () => {
+    mockFetches({ ok: false, status: 500 });
+    await renderPage();
+
+    expect(screen.getByText(/we couldn.t open your checkout/i)).toBeInTheDocument();
+    // There is always a way forward.
+    expect(screen.getByRole("link", { name: /pick my plan/i })).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(60000);
+    });
+
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("offers a sign in again when the session was the problem", async () => {
+    mockFetches({ ok: false, status: 401 });
+    await renderPage();
+
+    expect(screen.getByText(/let.s sign you in again/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign in again/i })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: /pick my plan/i })).toHaveAttribute("href", "/upgrade");
+  });
+
   it("never redirects on its own: the user always chooses when to continue", async () => {
     mockFetches();
     await renderPage();
@@ -171,6 +201,6 @@ describe("StartTrialPage", () => {
 
     expect(screen.getByText(/couldn.t open your checkout/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /see all plans/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /pick my plan/i })).toBeInTheDocument();
   });
 });
