@@ -14,6 +14,7 @@ function affiliate(overrides: Partial<AffiliateReportRow> = {}): AffiliateReport
     rate: 0.3,
     active: true,
     notes: '',
+    promotionCode: 'TRACEY',
     referredCount: 2,
     convertedCount: 1,
     totals: [
@@ -54,6 +55,13 @@ describe('AffiliatesPanel', () => {
     expect(screen.getByText('8.70 USD')).toBeInTheDocument();
     expect(screen.getByText('3.00 USD')).toBeInTheDocument();
     expect(screen.getByText('5.70 USD')).toBeInTheDocument();
+  });
+
+  it('shows the coupon code and the referral link the operator hands out', () => {
+    render(<AffiliatesPanel report={[affiliate()]} payouts={[]} />);
+
+    expect(screen.getByText('TRACEY')).toBeInTheDocument();
+    expect(screen.getByText(/\?ref=tracey$/)).toBeInTheDocument();
   });
 
   it('renders the empty state when there is no affiliate', () => {

@@ -43,6 +43,14 @@ const dateFormatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 
+/**
+ * The origin the referral links point at. It has to be the app domain: the
+ * referral capture only runs in the app, never on the marketing site.
+ */
+const APP_ORIGIN =
+  (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '') ||
+  'https://app.theactorscopilot.com';
+
 interface AffiliatesPanelProps {
   report: AffiliateReportRow[];
   payouts: AffiliatePayoutRecord[];
@@ -228,6 +236,19 @@ export function AffiliatesPanel({
                         >
                           {Math.round(affiliate.rate * 100)}%
                         </Badge>
+                        {affiliate.promotionCode ? (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            Coupon code:{" "}
+                            <span className="font-mono font-medium text-[#283228]">
+                              {affiliate.promotionCode}
+                            </span>
+                          </div>
+                        ) : null}
+                        <div className="mt-1 break-all text-xs text-muted-foreground">
+                          <span className="font-mono">
+                            {`${APP_ORIGIN}/?ref=${affiliate.code}`}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="px-6 align-top text-sm text-muted-foreground">
                         {affiliate.referredCount} referred · {affiliate.convertedCount} converted
