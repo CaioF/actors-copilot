@@ -272,15 +272,6 @@ export async function findOpenCheckoutSession(params: {
 }
 
 /**
- * Creates (or reuses) a checkout session for a platform user in one step.
- *
- * This is the single entry point used by both the checkout endpoint and the
- * login recovery flow, so both benefit from the same idempotency guarantees.
- *
- * @param params - The checkout parameters.
- * @returns {Promise<Stripe.Checkout.Session>} The session to redirect to.
- */
-/**
  * Finds the affiliate a member belongs to.
  *
  * The member's own document is the source of truth: the referral code is
@@ -311,6 +302,15 @@ async function resolveMemberAffiliate(
   return findAffiliateByCode(code);
 }
 
+/**
+ * Creates (or reuses) a checkout session for a platform user in one step.
+ *
+ * This is the single entry point used by both the checkout endpoint and the
+ * login recovery flow, so both benefit from the same idempotency guarantees.
+ *
+ * @param params - The checkout parameters.
+ * @returns {Promise<Stripe.Checkout.Session>} The session to redirect to.
+ */
 export async function createOrReuseCheckoutSession(params: {
   uid: string;
   email: string;

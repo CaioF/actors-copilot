@@ -152,7 +152,8 @@ describe("StartTrialPage", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("sends the user to the dashboard when there is nothing to recover", async () => {    mockFetches({ pending: false });
+  it("sends the user to the dashboard when there is nothing to recover", async () => {
+    mockFetches({ pending: false });
     await renderPage();
 
     expect(screen.getByText(/you.re all set/i)).toBeInTheDocument();

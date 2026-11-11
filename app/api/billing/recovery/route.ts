@@ -125,10 +125,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             appUrl,
         });
 
-        await userDocRef.update({
-            'billingRecovery.attempt': (flag?.attempt ?? 0) + 1,
-            'billingRecovery.lastAttemptAt': new Date().toISOString(),
-        } as Record<string, unknown>);
+        // The attempt counter belongs to the recovery flow. An account that
+        // simply has not picked a plan yet is not recovering from anything,
+        // and writing a partial flag on it would only leave a half record
+        // behind on an account that never had one.
+        if (pendingRecovery) {
+            await userDocRef.update({
+                'billingRecovery.attempt': (flag?.attempt ?? 0) + 1,
+                'billingRecovery.lastAttemptAt': new Date().toISOString(),
+            } as Record<string, unknown>);
+        }
 
         return NextResponse.json({
             pending: true,
