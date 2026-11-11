@@ -18,6 +18,7 @@ const member: AdminMemberProjection = {
   uid: 'user-123',
   email: 'actor@example.com',
   displayName: 'Example Actor',
+  referredBy: 'lucas',
   tier: 'business',
   subscriptionStatus: 'active',
   membershipState: 'paid',
