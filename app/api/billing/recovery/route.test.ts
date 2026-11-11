@@ -92,15 +92,36 @@ describe('POST /api/billing/recovery', () => {
         expect(data.error).toBe('Unauthorized');
     });
 
-    it('reports pending:false when the account has no recovery flag', async () => {
+    it('reports pending:true for an account that still owes its trial, without a recovery flag', async () => {
         mockUserGet.mockResolvedValue({ exists: true, data: () => ({ email: mockEmail }) });
 
         const res = await POST(buildRequest());
         const data = await res.json();
 
         expect(res.status).toBe(200);
-        expect(data.pending).toBe(false);
+        expect(data.pending).toBe(true);
+        // No interruption happened: the member simply has not picked a plan.
+        expect(data.reason).toBe('trial');
         expect(createOrReuseCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('does not write a recovery flag on an account that simply has not picked a plan', async () => {
+        mockUserGet.mockResolvedValue({ exists: true, data: () => ({ email: mockEmail }) });
+
+        await POST(buildRequest({ tier: 'economy', billingCycle: 'monthly', currency: 'usd' }));
+
+        // The attempt counter belongs to the recovery flow. Writing it here
+        // would leave a half flag on an account that never had one.
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('reports the recovery reason when the first checkout was interrupted', async () => {
+        const res = await POST(buildRequest());
+        const data = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(data.pending).toBe(true);
+        expect(data.reason).toBe('recovery');
     });
 
     it('reports pending:false when the account already redeemed the trial', async () => {

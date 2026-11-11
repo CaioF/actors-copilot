@@ -46,9 +46,10 @@ describe("StartTrialPage", () => {
   /**
    * Mocks the two calls the page makes on mount plus the checkout call.
    */
-  const mockFetches = (options?: { pending?: boolean; ok?: boolean }) => {
+  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial' }) => {
     const pending = options?.pending ?? true;
     const ok = options?.ok ?? true;
+    const reason = options?.reason ?? 'recovery';
 
     const fetchMock = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -64,7 +65,7 @@ describe("StartTrialPage", () => {
       return Promise.resolve({
         ok,
         status: pending ? 200 : 401,
-        json: async () => (pending ? { pending: true, tier: "business", currency: "usd" } : { error: "Unauthorized" }),
+        json: async () => (pending ? { pending: true, tier: "business", currency: "usd", reason } : { error: "Unauthorized" }),
       });
     });
 
@@ -128,6 +129,16 @@ describe("StartTrialPage", () => {
     expect(checkoutCall?.[1]?.body).toBe(
       JSON.stringify({ tier: "economy", billingCycle: "annual", currency: "eur" }),
     );
+  });
+
+  it("explains the fresh trial differently when nothing was interrupted", async () => {
+    mockFetches({ reason: 'trial' });
+    await renderPage();
+
+    expect(screen.getByText(/your account is ready/i)).toBeInTheDocument();
+    expect(screen.queryByText(/a brief delay on our side/i)).not.toBeInTheDocument();
+    // The plan choice is still there: the member has to pick one.
+    expect(screen.getByRole("button", { name: /start my free trial/i })).toBeInTheDocument();
   });
 
   it("never redirects on its own: the user always chooses when to continue", async () => {

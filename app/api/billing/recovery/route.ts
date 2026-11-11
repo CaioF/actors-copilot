@@ -47,9 +47,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const userData = (userDoc.exists ? userDoc.data() : null) ?? ({} as Record<string, unknown>);
 
         const flag = userData.billingRecovery;
-        if (!isRecoveryPending(flag)) {
-            return NextResponse.json({ pending: false }, { status: 200 });
-        }
+        const pendingRecovery = isRecoveryPending(flag);
 
         // Never re-open a checkout for an account that already has a subscription
         // or already redeemed its trial.
@@ -60,8 +58,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ pending: false }, { status: 200 });
         }
 
-        const defaultTier: SubscriptionTier = flag.tier || DEFAULT_RECOVERY_TIER;
-        const defaultCurrency = normalizeCurrency(flag.currency ?? DEFAULT_RECOVERY_CURRENCY);
+        // An account that still owes the activation of its free trial may open
+        // the checkout. That is not only the account whose first checkout was
+        // interrupted by a server side fault: it is also the member who signed
+        // up and never chose a plan, whoever brought them in.
+        const owesTrial = !billingData.subscriptionId && billingData.hasUsedTrial !== true;
+
+        if (!pendingRecovery && !owesTrial) {
+            return NextResponse.json({ pending: false }, { status: 200 });
+        }
+
+        const defaultTier: SubscriptionTier = flag?.tier || DEFAULT_RECOVERY_TIER;
+        const defaultCurrency = normalizeCurrency(flag?.currency ?? DEFAULT_RECOVERY_CURRENCY);
 
         // Phase 1: the caller only wants to know whether a checkout is pending.
         const wantsSelection = body.tier !== undefined;
@@ -69,6 +77,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
                 {
                     pending: true,
+                    // "recovery" means the first checkout was interrupted and
+                    // the member is owed an apology; "trial" means the member
+                    // simply has not picked a plan yet.
+                    reason: pendingRecovery ? 'recovery' : 'trial',
                     tier: defaultTier,
                     currency: defaultCurrency,
                 },
@@ -113,13 +125,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             appUrl,
         });
 
-        await userDocRef.update({
-            'billingRecovery.attempt': (flag.attempt ?? 0) + 1,
-            'billingRecovery.lastAttemptAt': new Date().toISOString(),
-        } as Record<string, unknown>);
+        // The attempt counter belongs to the recovery flow. An account that
+        // simply has not picked a plan yet is not recovering from anything,
+        // and writing a partial flag on it would only leave a half record
+        // behind on an account that never had one.
+        if (pendingRecovery) {
+            await userDocRef.update({
+                'billingRecovery.attempt': (flag?.attempt ?? 0) + 1,
+                'billingRecovery.lastAttemptAt': new Date().toISOString(),
+            } as Record<string, unknown>);
+        }
 
         return NextResponse.json({
             pending: true,
+            reason: pendingRecovery ? 'recovery' : 'trial',
             tier,
             billingCycle,
             currency: currency ?? null,
