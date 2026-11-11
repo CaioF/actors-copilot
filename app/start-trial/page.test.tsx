@@ -46,17 +46,22 @@ describe("StartTrialPage", () => {
   /**
    * Mocks the two calls the page makes on mount plus the checkout call.
    */
-  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial'; status?: number }) => {
+  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial'; status?: number; affiliate?: { code: string; promotionCode: string; percentOff: number } | null }) => {
     const pending = options?.pending ?? true;
     const ok = options?.ok ?? true;
     const reason = options?.reason ?? 'recovery';
     const status = options?.status ?? (pending ? 200 : 401);
+    const affiliate = options?.affiliate ?? null;
 
     const fetchMock = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
 
       if (url.includes("/api/billing/currencies")) {
         return Promise.resolve({ ok: true, json: async () => CURRENCY_SUPPORT });
+      }
+
+      if (url.includes("/api/billing/affiliate")) {
+        return Promise.resolve({ ok: true, json: async () => ({ affiliate }) });
       }
 
       if (init?.body) {
@@ -147,6 +152,21 @@ describe("StartTrialPage", () => {
    * do": sending the member to the dashboard leaves them with no plan, no
    * checkout and no explanation.
    */
+  /**
+   * The discount is applied by Stripe on the first real invoice. During the
+   * trial the amount due today is zero, so the offer has to be shown here or
+   * the member never learns about it.
+   */
+  it("shows the affiliate discount on the first payment", async () => {
+    mockFetches({ reason: 'trial', affiliate: { code: 'lucas', promotionCode: 'LUCAS', percentOff: 20 } });
+    await renderPage();
+
+    expect(screen.getByText('LUCAS')).toBeInTheDocument();
+    expect(screen.getByText(/20% off your first payment/i)).toBeInTheDocument();
+    // Business is $29.00, so the first payment is $23.20.
+    expect(screen.getByText(/\$23\.20/)).toBeInTheDocument();
+    expect(screen.getByText(/instead of \$29\.00/)).toBeInTheDocument();  });
+
   it("never sends the member to the dashboard when the server cannot answer", async () => {
     mockFetches({ ok: false, status: 500 });
     await renderPage();

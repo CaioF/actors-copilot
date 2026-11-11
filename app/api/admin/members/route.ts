@@ -21,7 +21,10 @@ export type AdminMemberDto = Pick<
   | 'trialEnd'
   | 'currentPeriodEnd'
   | 'cancelAtPeriodEnd'
->;
+> & {
+  /** The affiliate code that brought this member in, when there is one. */
+  referredBy: string | null;
+};
 
 export interface AdminMembersResponse {
   members: AdminMemberDto[];
@@ -35,6 +38,7 @@ export function serializeAdminMember(
     uid: member.uid,
     displayName: member.displayName,
     email: member.email,
+    referredBy: member.referredBy ?? null,
     tier: member.tier,
     subscriptionStatus: member.subscriptionStatus,
     membershipState: member.membershipState,

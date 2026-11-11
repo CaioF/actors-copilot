@@ -15,6 +15,8 @@ export interface AdminMemberProjection {
   uid: string;
   email: string;
   displayName: string;
+  /** The affiliate code that brought this member in, when there is one. */
+  referredBy?: string | null;
   tier: 'free' | 'economy' | 'business';
   subscriptionStatus: string | null;
   membershipState: AdminMembershipState;

@@ -335,6 +335,7 @@ describe('admin dashboard integration flow', () => {
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
       'Name',
       'Email',
+      'Referred by',
       'Status',
     ]);
     expect(within(table).getByText('Trial')).toBeInTheDocument();
