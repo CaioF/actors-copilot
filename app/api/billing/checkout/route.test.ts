@@ -12,7 +12,7 @@ jest.mock('@/lib/session', () => ({
 
 jest.mock('@/lib/stripe', () => ({
     stripe: {
-        customers: { create: jest.fn() },
+        customers: { create: jest.fn(), retrieve: jest.fn() },
         checkout: { sessions: { create: jest.fn(), list: jest.fn() } },
     },
 }));
@@ -37,6 +37,8 @@ describe('Stripe Subscription Checkout Route Handler', () => {
         // stays deterministic no matter which .env is loaded by the runner.
         process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000';
         (stripe.checkout.sessions.list as jest.Mock).mockResolvedValue({ data: [] });
+        // The customer stored in Firestore is validated before it is reused.
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({ id: 'cus_test', deleted: false });
     });
 
     /**
@@ -144,6 +146,64 @@ describe('Stripe Subscription Checkout Route Handler', () => {
     });
 
     /**
+     * The customer stored in Firestore was deleted in Stripe. Every checkout
+     * used to fail with "No such customer", which is what turned the checkout
+     * into an endless retry loop. The account must recover by itself.
+     */
+    it('replaces a customer that no longer exists in Stripe instead of failing', async () => {
+        (getPlatformSession as jest.Mock).mockResolvedValue({ uid: mockUid, email: mockEmail });
+        (getStripePriceIdForTier as jest.Mock).mockReturnValue('price_business_id_xyz');
+
+        // 1. The billing document still points at the deleted customer.
+        const mockGet = jest.fn().mockResolvedValue({
+            exists: true,
+            data: () => ({ customerId: 'cus_deleted_999', tier: 'free', status: 'canceled', hasUsedTrial: false }),
+        });
+        const mockSet = jest.fn().mockResolvedValue(true);
+        (db.doc as jest.Mock).mockReturnValue({ get: mockGet, set: mockSet });
+
+        // 2. Stripe knows the customer only as a tombstone.
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({ id: 'cus_deleted_999', deleted: true });
+        (stripe.customers.create as jest.Mock).mockResolvedValue({ id: 'cus_replacement_222' });
+        (stripe.checkout.sessions.create as jest.Mock).mockResolvedValue({ url: 'https://checkout.stripe.com/pay/fake_session' });
+
+        const req = new Request('http://localhost/api/billing/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ tier: 'business' }),
+        }) as NextRequest;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        // 3. The checkout succeeds instead of returning a 500.
+        expect(res.status).toBe(200);
+        expect(data.url).toBe('https://checkout.stripe.com/pay/fake_session');
+
+        // 4. A fresh customer is minted, under a key that is not the one that
+        //    produced the deleted customer.
+        expect(stripe.customers.create).toHaveBeenCalledWith(
+            {
+                email: mockEmail,
+                metadata: { platformUserId: mockUid, firebaseUid: mockUid },
+            },
+            { idempotencyKey: `cust_${mockUid}_replacing_cus_deleted_999` },
+        );
+
+        // 5. The session is created against the customer that exists.
+        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+            expect.objectContaining({ customer: 'cus_replacement_222' }),
+            expect.anything(),
+        );
+
+        // 6. The dead id is replaced in Firestore, so the next request reuses
+        //    the customer that actually exists.
+        expect(mockSet).toHaveBeenCalledWith(
+            expect.objectContaining({ customerId: 'cus_replacement_222' }),
+            { merge: true },
+        );
+    });
+
+    /**
      * Test suite verifying structural parameter configurations on successful existing workflows[cite: 91].
      */
     it('resolves checkout variables and returns an explicit redirection URL on happy path execution for accounts with prior trials', async () => {
@@ -200,7 +260,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'false',
             },
-        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_default_0_localhost-3000` });
+        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_default_0_localhost-3000_cus_historical_888` });
 
         // 3. Ensure no redundant customer objects get initialized during mapped flows
         expect(stripe.customers.create).not.toHaveBeenCalled();
@@ -265,7 +325,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'true',
             },
-        }, { idempotencyKey: `checkout_${mockUid}_price_business_id_xyz_default_0_localhost-3000` });
+        }, { idempotencyKey: `checkout_${mockUid}_price_business_id_xyz_default_0_localhost-3000_cus_historical_888` });
     });
 
     it('rejects trial requests with 400 Bad Request if the account has already redeemed a trial', async () => {

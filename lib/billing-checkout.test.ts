@@ -1,10 +1,11 @@
-import { createIdempotentCheckoutSession, findOpenCheckoutSession, originSlug } from './billing-checkout';
+import { createIdempotentCheckoutSession, findOpenCheckoutSession, originSlug, resolveStripeCustomerId } from './billing-checkout';
 import { stripe } from '@/lib/stripe';
 import { getStripePriceIdForTier } from '@/lib/billing';
+import { db } from '@/lib/firebase.admin';
 
 jest.mock('@/lib/stripe', () => ({
     stripe: {
-        customers: { create: jest.fn() },
+        customers: { create: jest.fn(), retrieve: jest.fn() },
         checkout: {
             sessions: {
                 create: jest.fn(),
@@ -59,7 +60,28 @@ describe('createIdempotentCheckoutSession', () => {
         const options = (stripe.checkout.sessions.create as jest.Mock).mock.calls[0][1];
         // Stripe rejects a key reused with different parameters, and the
         // success and cancel URLs depend on the origin.
-        expect(options.idempotencyKey).toBe('checkout_uid_1_price_business_default_0_app-theactorscopilot-com');
+        expect(options.idempotencyKey).toBe(
+            'checkout_uid_1_price_business_default_0_app-theactorscopilot-com_cus_1',
+        );
+    });
+
+    it('produces a different key for a different customer', async () => {
+        // The customer is a parameter of the session. An account whose stored
+        // customer is gone gets a fresh one, and a reused key with different
+        // parameters is rejected by Stripe.
+        await createIdempotentCheckoutSession({
+            ...baseParams,
+            customerId: 'cus_1',
+            appUrl: 'https://app.theactorscopilot.com',
+        });
+        await createIdempotentCheckoutSession({
+            ...baseParams,
+            customerId: 'cus_2',
+            appUrl: 'https://app.theactorscopilot.com',
+        });
+
+        const calls = (stripe.checkout.sessions.create as jest.Mock).mock.calls;
+        expect(calls[0][1].idempotencyKey).not.toBe(calls[1][1].idempotencyKey);
     });
 
     it('produces a different key for a different currency', async () => {
@@ -158,5 +180,119 @@ describe('findOpenCheckoutSession', () => {
 
         expect(session).toBeNull();
         expect(stripe.checkout.sessions.expire).not.toHaveBeenCalled();
+    });
+});
+
+describe('resolveStripeCustomerId', () => {
+    const setMock = jest.fn();
+    const getMock = jest.fn();
+    const billingDocRef = { set: setMock, get: getMock };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        (db.doc as jest.Mock).mockReturnValue(billingDocRef);
+        setMock.mockResolvedValue(undefined);
+        getMock.mockResolvedValue({ data: () => ({}) });
+    });
+
+    it('reuses the stored customer when Stripe still knows it', async () => {
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({ id: 'cus_alive', deleted: false });
+
+        const customerId = await resolveStripeCustomerId({
+            uid: 'uid_1',
+            email: 'member@example.com',
+            knownCustomerId: 'cus_alive',
+        });
+
+        expect(customerId).toBe('cus_alive');
+        expect(stripe.customers.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a fresh customer when the stored one was deleted', async () => {
+        // Stripe answers a deleted customer with a tombstone instead of an error.
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({ id: 'cus_gone', deleted: true });
+        (stripe.customers.create as jest.Mock).mockResolvedValue({ id: 'cus_new' });
+
+        const customerId = await resolveStripeCustomerId({
+            uid: 'uid_1',
+            email: 'member@example.com',
+            knownCustomerId: 'cus_gone',
+        });
+
+        expect(customerId).toBe('cus_new');
+        expect(stripe.customers.create).toHaveBeenCalledTimes(1);
+        // The dead id is replaced in Firestore, so the next request reuses the
+        // customer that actually exists.
+        expect(setMock).toHaveBeenCalledWith(
+            expect.objectContaining({ customerId: 'cus_new' }),
+            { merge: true },
+        );
+    });
+
+    it('creates a fresh customer when the stored one does not exist at all', async () => {
+        // A customer created in test mode is invisible to the live key.
+        (stripe.customers.retrieve as jest.Mock).mockRejectedValue(
+            Object.assign(new Error("No such customer: 'cus_test'"), { code: 'resource_missing' }),
+        );
+        (stripe.customers.create as jest.Mock).mockResolvedValue({ id: 'cus_new' });
+
+        const customerId = await resolveStripeCustomerId({
+            uid: 'uid_1',
+            email: 'member@example.com',
+            knownCustomerId: 'cus_test',
+        });
+
+        expect(customerId).toBe('cus_new');
+        expect(stripe.customers.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not swallow an unexpected Stripe failure', async () => {
+        (stripe.customers.retrieve as jest.Mock).mockRejectedValue(
+            Object.assign(new Error('API connection error'), { statusCode: 503 }),
+        );
+
+        await expect(
+            resolveStripeCustomerId({
+                uid: 'uid_1',
+                email: 'member@example.com',
+                knownCustomerId: 'cus_alive',
+            }),
+        ).rejects.toThrow('API connection error');
+
+        expect(stripe.customers.create).not.toHaveBeenCalled();
+    });
+
+    it('creates the customer when none is stored yet', async () => {
+        (stripe.customers.create as jest.Mock).mockResolvedValue({ id: 'cus_fresh' });
+
+        const customerId = await resolveStripeCustomerId({
+            uid: 'uid_1',
+            email: 'member@example.com',
+        });
+
+        expect(customerId).toBe('cus_fresh');
+        expect(stripe.customers.retrieve).not.toHaveBeenCalled();
+        expect(stripe.customers.create).toHaveBeenCalledWith(
+            expect.objectContaining({ email: 'member@example.com' }),
+            { idempotencyKey: 'cust_uid_1' },
+        );
+    });
+
+    it('creates the replacement customer under a different idempotency key', async () => {
+        // Stripe replays the stored response of a key for 24 hours. Reusing
+        // `cust_uid_1` would hand back the customer that was deleted.
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({ id: 'cus_gone', deleted: true });
+        (stripe.customers.create as jest.Mock).mockResolvedValue({ id: 'cus_new' });
+
+        await resolveStripeCustomerId({
+            uid: 'uid_1',
+            email: 'member@example.com',
+            knownCustomerId: 'cus_gone',
+        });
+
+        expect(stripe.customers.create).toHaveBeenCalledWith(
+            expect.objectContaining({ email: 'member@example.com' }),
+            { idempotencyKey: 'cust_uid_1_replacing_cus_gone' },
+        );
     });
 });
