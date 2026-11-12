@@ -29,11 +29,81 @@ function isIdempotencyConflict(error: unknown): boolean {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Detects a Stripe error that means the object does not exist.
+ *
+ * Stripe answers a request for a customer that was deleted (or that never
+ * existed in live mode) with `resource_missing`. The customer is not
+ * recoverable, so the caller has to mint a new one instead of retrying.
+ *
+ * @param error - The rejected error object.
+ * @returns {boolean} True when the error means the object is gone.
+ */
+function isMissingResource(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: string; statusCode?: number; raw?: { code?: string } };
+  return (
+    candidate.code === 'resource_missing' ||
+    candidate.raw?.code === 'resource_missing' ||
+    candidate.statusCode === 404
+  );
+}
+
+/**
+ * Checks that a stored Stripe Customer is still usable.
+ *
+ * A customer can disappear from live Stripe while Firestore still points at
+ * it: the customer was deleted, or it was created in test mode and the live
+ * key cannot see it. Handing such an id to the checkout makes every session
+ * call fail with `resource_missing`, which is what turns a checkout into a
+ * retry loop.
+ *
+ * @param customerId - The customer id persisted in Firestore.
+ * @returns {Promise<boolean>} True when the customer exists in live Stripe.
+ */
+async function isLiveCustomer(customerId: string): Promise<boolean> {
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    return !customer.deleted;
+  } catch (error) {
+    if (isMissingResource(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Builds the idempotency key used to create the Stripe Customer of an account.
+ *
+ * The first customer of an account uses `cust_{uid}`. When that customer no
+ * longer exists in Stripe the replacement must use a different key: Stripe
+ * replays the stored response of a key for 24 hours, so reusing
+ * `cust_{uid}` would hand back the very customer that was deleted.
+ *
+ * The key carries the id of the customer being replaced, so it stays
+ * deterministic: two concurrent requests that both found the same dead
+ * customer ask for the same key and therefore collapse into one new customer.
+ * A customer that is replaced a second time produces a second, different key.
+ *
+ * @param uid - The platform user identifier.
+ * @param replacedCustomerId - The customer id being replaced, if any.
+ * @returns {string} The idempotency key for the customer creation.
+ */
+function customerIdempotencyKey(uid: string, replacedCustomerId?: string): string {
+  return replacedCustomerId ? `cust_${uid}_replacing_${replacedCustomerId}` : `cust_${uid}`;
+}
+
+/**
  * Resolves the Stripe Customer for a platform user, creating it at most once.
  *
  * The customer is created with a deterministic idempotency key derived from the
  * platform user id. Two concurrent checkout requests therefore resolve to the
  * same Stripe Customer instead of minting an orphan duplicate.
+ *
+ * A customer id that no longer exists in Stripe is never reused: the account
+ * gets a fresh customer instead, and the new id replaces the dead one in
+ * Firestore. Reusing it would make every checkout fail with
+ * `resource_missing` ("No such customer"), because the session is created
+ * against a customer Stripe has already forgotten. That is what turned a
+ * checkout into an endless retry loop.
  *
  * @param params - The platform user identity.
  * @param params.uid - The platform user identifier.
@@ -47,7 +117,24 @@ export async function resolveStripeCustomerId(params: {
   knownCustomerId?: string;
 }): Promise<string> {
   const { uid, email, knownCustomerId } = params;
-  if (knownCustomerId) return knownCustomerId;
+
+  // The stored customer is reused only when Stripe still knows it. A dead id
+  // is dropped here so the account is repaired instead of failing forever.
+  let reuseCustomerId: string | undefined;
+  let replacedCustomerId: string | undefined;
+  if (knownCustomerId) {
+    if (await isLiveCustomer(knownCustomerId)) {
+      reuseCustomerId = knownCustomerId;
+    } else {
+      replacedCustomerId = knownCustomerId;
+      logger.warn({
+        msg: 'Stored Stripe customer no longer exists; a fresh one will be created',
+        uid,
+        customerId: knownCustomerId,
+      });
+    }
+  }
+  if (reuseCustomerId) return reuseCustomerId;
 
   const billingDocRef = db.doc(`users/${uid}/billing/current`);
 
@@ -60,16 +147,24 @@ export async function resolveStripeCustomerId(params: {
           firebaseUid: uid,
         },
       },
-      { idempotencyKey: `cust_${uid}` },
+      { idempotencyKey: customerIdempotencyKey(uid, replacedCustomerId) },
     );
 
+    // A brand new account is seeded with the free tier. A replacement customer
+    // only replaces the pointer: the entitlement of an account that already
+    // has a plan is owned by Stripe and the webhook, never by this path.
     await billingDocRef.set(
-      {
-        customerId: customer.id,
-        tier: 'free',
-        status: 'canceled',
-        updatedAt: new Date().toISOString(),
-      },
+      replacedCustomerId
+        ? {
+            customerId: customer.id,
+            updatedAt: new Date().toISOString(),
+          }
+        : {
+            customerId: customer.id,
+            tier: 'free',
+            status: 'canceled',
+            updatedAt: new Date().toISOString(),
+          },
       { merge: true },
     );
 
@@ -114,7 +209,9 @@ export function originSlug(appUrl: string): string {
  *
  * The origin and the currency have to be part of the key: Stripe rejects a key
  * that is reused with different parameters, and the success and cancel URLs
- * depend on the origin the member is browsing on.
+ * depend on the origin the member is browsing on. The customer belongs there
+ * for the same reason: it is a parameter of the session, and an account whose
+ * stored customer no longer exists in Stripe gets a fresh one.
  *
  * @param params - The checkout parameters.
  * @returns {Promise<Stripe.Checkout.Session>} The created (or reused) session.
@@ -182,6 +279,10 @@ export async function createIdempotentCheckoutSession(params: {
         currency || 'default',
         attempt,
         originSlug(appUrl),
+        // The customer is a parameter of the session too. An account whose
+        // stored customer is gone gets a fresh one, and Stripe rejects a key
+        // that is reused with different parameters.
+        customerId,
         // The affiliate changes the session parameters, so it belongs in the
         // key: Stripe rejects a key reused with different parameters.
         ...(affiliate?.code ? [affiliate.code] : []),
