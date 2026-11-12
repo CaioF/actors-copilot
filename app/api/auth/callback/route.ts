@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { canRestartInvalidBillingTrial } from '@/lib/verified-trial-restart';
 import { auth, db } from '@/lib/firebase.admin';
 import { setPlatformSession, getPlatformSession } from '@/lib/session';
 import { UserBilling, SubscriptionStatus } from '@/lib/billing';
@@ -108,6 +109,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const recoveryFlag = isRecoveryPending(userData.billingRecovery) ? userData.billingRecovery : null;
+    const invalidBillingRestart = await canRestartInvalidBillingTrial(
+      uid, userData.billingRecovery, billingDoc.exists ? billingDoc.data() ?? {} : {}, true,
+    );
+    if (invalidBillingRestart) {
+      // A reviewed test-mode subscription is not a live entitlement. Normalize
+      // the session only; the webhook owns the stored entitlement fields.
+      tier = 'free';
+      subscriptionStatus = 'canceled';
+      stripeSubscriptionId = undefined;
+      stripePriceId = undefined;
+      currentPeriodEnd = undefined;
+      hasUsedTrial = false;
+    }
 
     // 3. Serialize and commit entitlement metadata into the secure platform session.
     await setPlatformSession({
