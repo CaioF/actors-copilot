@@ -336,6 +336,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     break;
                 }
 
+                // A reverted direct trial can be delivered again after recovery
+                // was re-armed. It must not restore the canceled subscription ID
+                // (which blocks recovery), grant access, or overwrite a new plan.
+                if (subscription.metadata?.migrationSource === 'trial_recovery') {
+                    const [user, billing] = await Promise.all([
+                        db.doc(`users/${platformUserId}`).get(),
+                        db.doc(`users/${platformUserId}/billing/current`).get(),
+                    ]);
+                    const currentSubscriptionId = billing.data()?.subscriptionId;
+                    const isSuperseded = currentSubscriptionId && currentSubscriptionId !== subscription.id;
+                    const recovery = user.data()?.billingRecovery;
+                    // Expiry controls the login prompt, not whether an old
+                    // migration is allowed to reclaim this billing document.
+                    const isRearmed = !currentSubscriptionId && recovery?.required === true && !recovery.resolvedAt;
+                    if (isSuperseded || isRearmed) {
+                        logger.info({ platformUserId, subscriptionId: subscription.id }, 'Ignored a reverted trial migration event');
+                        break;
+                    }
+                }
+
                 const firstItem = subscription.items.data[0];
                 const priceId = firstItem?.price?.id || null;
                 const status = subscription.status;

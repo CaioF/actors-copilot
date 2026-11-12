@@ -7,6 +7,8 @@ import { logger } from '@/lib/logger';
 import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
 import { buildUpgradeUrl, readPlanSelection } from '@/lib/plan-selection';
 import { clearAffiliateAttribution, readAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { consumeTrialIntent } from '@/lib/trial-intent';
+import { redirectTo } from '@/lib/navigate';
 
 /**
  * Reads the referral attribution captured on the landing page.
@@ -105,10 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      */
     const handlePostAuthRedirect = async () => {
         if (typeof window !== 'undefined') {
-            const trialIntent = sessionStorage.getItem('trial_intent');
-            const trialTier = sessionStorage.getItem('trial_tier') || 'business';
+            const trialTier = consumeTrialIntent();
 
-            if (trialIntent) {
+            if (trialTier) {
                 try {
                     const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : undefined;
                     const checkoutRes = await fetch('/api/billing/checkout', {
@@ -123,9 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                     const checkoutData = await checkoutRes.json();
                     if (checkoutRes.ok && checkoutData.url) {
-                        sessionStorage.removeItem('trial_intent');
-                        sessionStorage.removeItem('trial_tier');
-                        window.location.href = checkoutData.url;
+                        redirectTo(checkoutData.url);
                         return;
                     } else {
                         logger.error({ msg: 'Failed to initiate trial checkout session post-auth', error: checkoutData?.error });
@@ -133,10 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 } catch (err) {
                     logger.error({ err, msg: 'Failed to initiate trial checkout session post-auth' });
                 }
+                // Retry only after the member chooses to start checkout again.
+                redirectTo('/start-trial');
+                return;
             }
 
             const requestedPlan = readPlanSelection();
-            if (!trialIntent && requestedPlan) {
+            if (requestedPlan) {
                 window.location.href = buildUpgradeUrl(requestedPlan);
                 return;
             }

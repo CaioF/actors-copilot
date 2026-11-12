@@ -54,6 +54,7 @@ function freshMember() {
  */
 describe('LoginPage', () => {
   beforeEach(() => {
+    sessionStorage.clear();
     Array.from(mockSearchParams.keys()).forEach((key) => mockSearchParams.delete(key));
     mockUseAuth.mockReturnValue(signedOut());
     mockRedirectTo.mockReset();
@@ -107,5 +108,43 @@ describe('LoginPage', () => {
     render(<LoginPage />);
 
     await waitFor(() => expect(mockRedirectTo).toHaveBeenCalledWith('/dashboard'));
+  });
+
+  it.each(['http', 'network', 'token'])('stops automatic trial retries after a %s failure', async (failure) => {
+    const member = freshMember();
+    if (failure === 'token') member.user.getIdToken.mockRejectedValue(new Error('token unavailable'));
+    mockUseAuth.mockReturnValue(member);
+    sessionStorage.setItem('trial_intent', '14d');
+    sessionStorage.setItem('trial_tier', 'economy');
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    if (failure === 'network') fetchMock.mockRejectedValue(new Error('offline'));
+    else fetchMock.mockResolvedValue({ ok: false, json: async () => ({ error: 'Checkout failed' }) });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { rerender } = render(<LoginPage />);
+      await waitFor(() => expect(mockRedirectTo).toHaveBeenCalledWith('/start-trial'));
+      expect(sessionStorage.getItem('trial_intent')).toBeNull();
+      expect(sessionStorage.getItem('trial_tier')).toBeNull();
+      mockUseAuth.mockReturnValue({ ...member, loading: true });
+      rerender(<LoginPage />);
+      mockUseAuth.mockReturnValue({ ...member, loading: false });
+      rerender(<LoginPage />);
+      expect(fetchMock).toHaveBeenCalledTimes(failure === 'token' ? 0 : 1);
+      expect(mockRedirectTo).not.toHaveBeenCalledWith('/dashboard');
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it('redirects a successful trial checkout once, preserving the chosen tier', async () => {
+    mockUseAuth.mockReturnValue(freshMember());
+    sessionStorage.setItem('trial_intent', '14d');
+    sessionStorage.setItem('trial_tier', 'economy');
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ url: 'https://checkout.stripe.com/example' }) });
+    render(<LoginPage />);
+    await waitFor(() => expect(mockRedirectTo).toHaveBeenCalledWith('https://checkout.stripe.com/example'));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).tier).toBe('economy');
   });
 });

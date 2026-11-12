@@ -192,7 +192,7 @@ describe('resolveStripeCustomerId', () => {
         jest.clearAllMocks();
         (db.doc as jest.Mock).mockReturnValue(billingDocRef);
         setMock.mockResolvedValue(undefined);
-        getMock.mockResolvedValue({ data: () => ({}) });
+        getMock.mockReset().mockResolvedValue({ data: () => ({}) });
     });
 
     it('reuses the stored customer when Stripe still knows it', async () => {
@@ -294,5 +294,34 @@ describe('resolveStripeCustomerId', () => {
             expect.objectContaining({ email: 'member@example.com' }),
             { idempotencyKey: 'cust_uid_1_replacing_cus_gone' },
         );
+    });
+
+    it('waits for a live replacement when a concurrent request still sees the deleted pointer', async () => {
+        (stripe.customers.retrieve as jest.Mock).mockImplementation(async (id: string) => ({
+            id, deleted: id !== 'cus_new',
+        }));
+        (stripe.customers.create as jest.Mock).mockRejectedValue(
+            Object.assign(new Error('in progress'), { code: 'idempotency_key_in_use' }),
+        );
+        getMock.mockResolvedValueOnce({ data: () => ({ customerId: 'cus_gone' }) })
+            .mockResolvedValueOnce({ data: () => ({ customerId: 'cus_other_deleted' }) })
+            .mockResolvedValue({ data: () => ({ customerId: 'cus_new' }) });
+
+        await expect(resolveStripeCustomerId({
+            uid: 'uid_1', email: 'member@example.com', knownCustomerId: 'cus_gone',
+        })).resolves.toBe('cus_new');
+        expect(getMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('fails instead of returning the deleted pointer if the concurrent replacement never lands', async () => {
+        (stripe.customers.retrieve as jest.Mock).mockResolvedValue({ id: 'cus_gone', deleted: true });
+        (stripe.customers.create as jest.Mock).mockRejectedValue(
+            Object.assign(new Error('in progress'), { code: 'idempotency_key_in_use' }),
+        );
+        getMock.mockResolvedValue({ data: () => ({ customerId: 'cus_gone' }) });
+
+        await expect(resolveStripeCustomerId({
+            uid: 'uid_1', email: 'member@example.com', knownCustomerId: 'cus_gone',
+        })).rejects.toThrow('in progress');
     });
 });

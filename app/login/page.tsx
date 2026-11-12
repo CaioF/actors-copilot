@@ -15,12 +15,13 @@ import {
   LogIn,
   UserPlus
 } from "lucide-react";
-import { useState, useEffect, ReactNode, Suspense } from "react";
+import { useState, useEffect, useRef, ReactNode, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { buildUpgradeUrl, parsePlanSelection, readPlanSelection, savePlanSelection } from "@/lib/plan-selection";
 import { redirectTo } from "@/lib/navigate";
+import { consumeTrialIntent } from "@/lib/trial-intent";
 
 interface FirebaseError {
   code: string;
@@ -110,38 +111,42 @@ function LoginContent() {
   // An account whose Firebase record was created moments ago is a brand new
   // member: it has no plan yet and still owes the activation of its trial.
   const accountCreatedAt = user?.metadata?.creationTime;
+  const trialCheckoutStarted = useRef(false);
   const isFreshAccount =
     typeof accountCreatedAt === 'string' &&
     Date.now() - new Date(accountCreatedAt).getTime() < FRESH_ACCOUNT_WINDOW_MS;
 
   useEffect(() => {
     if (!loading && user) {
-      const trialIntent = typeof window !== 'undefined' ? sessionStorage.getItem('trial_intent') : null;
-      if (trialIntent) {
-        const trialTier = sessionStorage.getItem('trial_tier') || 'business';
+      if (trialCheckoutStarted.current) return;
+      const trialTier = consumeTrialIntent();
+      if (trialTier) {
+        trialCheckoutStarted.current = true;
         user.getIdToken().then((idToken) => {
           fetch('/api/billing/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tier: trialTier, isTrial: true, idToken }),
           })
-            .then((res) => res.json())
+            .then(async (res) => {
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || 'Could not open checkout');
+              return data;
+            })
             .then((data) => {
               if (data.url) {
-                sessionStorage.removeItem('trial_intent');
-                sessionStorage.removeItem('trial_tier');
                 redirectTo(data.url);
               } else {
                 console.error("Trial checkout creation failed:", data.error);
-                redirectTo('/dashboard');
+                redirectTo('/start-trial');
               }
             })
             .catch((err) => {
               console.error("Error creating trial checkout:", err);
-              redirectTo('/dashboard');
+              redirectTo('/start-trial');
             });
         }).catch(() => {
-          redirectTo('/dashboard');
+          redirectTo('/start-trial');
         });
       } else if (requestedPlanKey && requestedCurrencyKey) {
         redirectTo(buildUpgradeUrl({ plan: requestedPlanKey, currency: requestedCurrencyKey }));
