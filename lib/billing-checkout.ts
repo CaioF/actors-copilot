@@ -178,7 +178,12 @@ export async function resolveStripeCustomerId(params: {
       await sleep(250);
       const snap = await billingDocRef.get();
       const persisted = snap.data()?.customerId as string | undefined;
-      if (persisted) return persisted;
+      // The old pointer remains stored until the winning request commits.
+      // Never hand that known-deleted customer back to checkout, and validate
+      // a different pointer in case another replacement was deleted too.
+      if (persisted && persisted !== replacedCustomerId && await isLiveCustomer(persisted)) {
+        return persisted;
+      }
     }
 
     throw error;

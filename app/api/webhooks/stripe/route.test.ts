@@ -49,6 +49,64 @@ describe('Stripe Webhook Route Handler', () => {
     (syncAdminMember as jest.Mock).mockResolvedValue(undefined);
   });
 
+  it.each(['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'])(
+    'ignores a replayed %s from a direct migration after recovery is re-armed', async (type) => {
+      const event = { id: 'evt_replayed_migration', type, data: { object: {
+        id: 'sub_reverted', customer: mockCustomerId, status: type.endsWith('deleted') ? 'canceled' : 'trialing',
+        metadata: { platformUserId: mockUid, migrationSource: 'trial_recovery' },
+      } } };
+      (verifyStripeWebhookEvent as jest.Mock).mockReturnValue(event);
+      const set = jest.fn();
+      (db.doc as jest.Mock).mockImplementation((path: string) => ({ set, get: async () => ({
+        data: () => path.endsWith('/billing/current') ? { subscriptionId: null, hasUsedTrial: false }
+          : { billingRecovery: { required: true, resolvedAt: null } },
+      }) }));
+      const response = await POST(new Request('http://localhost/api/webhooks/stripe', {
+        method: 'POST', headers: { 'stripe-signature': 'sig' }, body: JSON.stringify(event),
+      }) as NextRequest);
+      expect(response.status).toBe(200);
+      expect(set).not.toHaveBeenCalled();
+      expect(syncAdminMember).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not let an old migration cancellation overwrite a subscription completed through Checkout', async () => {
+    const event = { id: 'evt_old_cancel', type: 'customer.subscription.deleted', data: { object: {
+      id: 'sub_reverted', customer: mockCustomerId, status: 'canceled',
+      metadata: { platformUserId: mockUid, migrationSource: 'trial_recovery' },
+    } } };
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue(event);
+    const set = jest.fn();
+    (db.doc as jest.Mock).mockReturnValue({ set, get: async () => ({ data: () => ({
+      subscriptionId: 'sub_real_checkout', billingRecovery: { required: false },
+    }) }) });
+    const response = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST', headers: { 'stripe-signature': 'sig' }, body: JSON.stringify(event),
+    }) as NextRequest);
+    expect(response.status).toBe(200);
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it('still handles cancellation when the migration is the account’s current subscription', async () => {
+    const event = { id: 'evt_current_cancel', type: 'customer.subscription.deleted', data: { object: {
+      id: 'sub_current', customer: mockCustomerId, status: 'canceled',
+      metadata: { platformUserId: mockUid, migrationSource: 'trial_recovery' },
+      items: { data: [{ price: { id: 'price_economy' } }] },
+    } } };
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue(event);
+    const set = jest.fn().mockResolvedValue(undefined);
+    (db.doc as jest.Mock).mockReturnValue({ set, get: async () => ({ data: () => ({
+      subscriptionId: 'sub_current', billingRecovery: { required: true },
+    }) }) });
+    const response = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST', headers: { 'stripe-signature': 'sig' }, body: JSON.stringify(event),
+    }) as NextRequest);
+    expect(response.status).toBe(200);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptionId: 'sub_current', hasAccess: false, status: 'canceled',
+    }), { merge: true });
+  });
+
   it('returns 400 Bad Request if stripe-signature header is missing', async () => {
     const req = new Request('http://localhost/api/webhooks/stripe', {
       method: 'POST',

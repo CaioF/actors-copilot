@@ -2,8 +2,11 @@
 import { render, waitFor, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
-import { signOut, onAuthStateChanged, getAuth, Auth, User } from 'firebase/auth';
+import { signOut, onAuthStateChanged, getAuth, signInWithEmailAndPassword, Auth, User } from 'firebase/auth';
 import { logger } from '@/lib/logger';
+import { redirectTo } from '@/lib/navigate';
+
+jest.mock('@/lib/navigate', () => ({ redirectTo: jest.fn() }));
 
 class ResizeObserver {
   observe() {}
@@ -68,18 +71,20 @@ describe('AuthContext', () => {
     let consoleErrorSpy: jest.SpyInstance;
 
     const TestComponent = () => {
-        const { logout, loading, user } = useAuth();
+        const { logout, loginWithEmail, loading, user } = useAuth();
         return (
             <div>
                 <span data-testid="loading">{loading.toString()}</span>
                 <span data-testid="user">{user ? 'has-user' : 'no-user'}</span>
                 <button onClick={() => logout()} data-testid="logout-btn">Logout</button>
+                <button onClick={() => loginWithEmail('member@example.com', 'password')} data-testid="login-btn">Login</button>
             </div>
         );
     };
 
     beforeEach(() => {
         jest.clearAllMocks();
+        sessionStorage.clear();
         consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
         mockGetAuth.mockReturnValue({} as Auth);
@@ -95,6 +100,26 @@ describe('AuthContext', () => {
 
     afterEach(() => {
         consoleErrorSpy.mockRestore();
+    });
+
+    it.each([false, true])('consumes a trial intent before checkout and sends a failed request to manual recovery (network=%s)', async (networkFailure) => {
+        const user = { getIdToken: jest.fn().mockResolvedValue('token') } as unknown as User;
+        mockGetAuth.mockReturnValue({ currentUser: user } as Auth);
+        jest.mocked(signInWithEmailAndPassword).mockResolvedValue({ user } as never);
+        sessionStorage.setItem('trial_intent', '14d');
+        sessionStorage.setItem('trial_tier', 'economy');
+        (global.fetch as jest.Mock).mockImplementation(async (path: string) => {
+            if (path === '/api/auth/callback') return { ok: true, json: async () => ({}) };
+            expect(sessionStorage.getItem('trial_intent')).toBeNull();
+            if (networkFailure) throw new Error('offline');
+            return { ok: false, json: async () => ({ error: 'Checkout failed' }) };
+        });
+        const { getByTestId } = render(<AuthProvider><TestComponent /></AuthProvider>);
+        await waitFor(() => expect(getByTestId('loading').textContent).toBe('false'));
+        await act(async () => { fireEvent.click(getByTestId('login-btn')); });
+        expect(redirectTo).toHaveBeenCalledWith('/start-trial');
+        expect((global.fetch as jest.Mock).mock.calls.filter(([path]) => path === '/api/billing/checkout')).toHaveLength(1);
+        expect(sessionStorage.getItem('trial_intent')).toBeNull();
     });
 
     describe('logout', () => {
