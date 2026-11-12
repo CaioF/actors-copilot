@@ -1,4 +1,6 @@
 import { POST, GET } from './route';
+import { canRestartInvalidBillingTrial } from '@/lib/verified-trial-restart';
+jest.mock('@/lib/verified-trial-restart', () => ({ canRestartInvalidBillingTrial: jest.fn() }));
 import { auth, db } from '@/lib/firebase.admin';
 import { setPlatformSession, getPlatformSession } from '@/lib/session';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
@@ -35,10 +37,28 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
     
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.mocked(canRestartInvalidBillingTrial).mockResolvedValue(false);
         (syncAdminMember as jest.Mock).mockResolvedValue(undefined);
     });
 
     describe('POST /api/auth/callback', () => {
+
+        it('routes a verified legacy test-mode record to trial signup with a free session', async () => {
+            jest.mocked(canRestartInvalidBillingTrial).mockResolvedValue(true);
+            jest.mocked(auth.verifyIdToken).mockResolvedValue({uid:'legacy_uid',email:'legacy@example.com'} as never);
+            const recovery = {required:true,tier:'business',attempt:0,invalidBillingRestart:{subscriptionId:'sub_testmode'}};
+            (db.doc as jest.Mock).mockImplementation((path:string)=>({get:async()=>({exists:true,data:()=>
+                path.endsWith('/billing/current') ? {tier:'business',status:'active',customerId:'cus_testmode',subscriptionId:'sub_testmode',hasUsedTrial:true}
+                  : {billingRecovery:recovery,hasUsedTrial:true},
+            })}));
+            const res = await POST(new Request('http://localhost/api/auth/callback',{
+                method:'POST',body:JSON.stringify({idToken:'token'}),
+            }) as NextRequest);
+            const body = await res.json();
+            expect(res.status).toBe(200);
+            expect(body.billingRecovery.required).toBe(true);
+            expect(setPlatformSession).toHaveBeenCalledWith(expect.objectContaining({tier:'free',subscriptionStatus:'canceled',stripeSubscriptionId:undefined}));
+        });
         
         /**
          * Test suite validating robust guard behavior on missing identity parameters.

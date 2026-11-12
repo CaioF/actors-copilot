@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { canRestartInvalidBillingTrial } from '@/lib/verified-trial-restart';
 import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
@@ -57,8 +58,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // or already redeemed its trial.
         const billingDoc = await db.doc(`users/${uid}/billing/current`).get();
         const billingData = (billingDoc.exists ? billingDoc.data() : null) ?? ({} as Record<string, unknown>);
+        const invalidBillingRestart = await canRestartInvalidBillingTrial(uid, flag, billingData);
 
-        if (billingData.subscriptionId || billingData.hasUsedTrial === true) {
+        if (!invalidBillingRestart && (billingData.subscriptionId || billingData.hasUsedTrial === true)) {
             logger.info(
                 {
                     uid,

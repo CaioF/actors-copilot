@@ -23,6 +23,8 @@ export interface BillingRecoveryFlag {
   lastAttemptAt?: string | null;
   expiresAt?: string | null;
   resolvedAt?: string | null;
+  /** Operator-reviewed legacy pointer, verified against live Stripe on use. */
+  invalidBillingRestart?: { subscriptionId: string };
 }
 
 export const DEFAULT_RECOVERY_TIER: SubscriptionTier = 'business';

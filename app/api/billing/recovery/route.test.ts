@@ -1,4 +1,6 @@
 import { POST } from './route';
+import { canRestartInvalidBillingTrial } from '@/lib/verified-trial-restart';
+jest.mock('@/lib/verified-trial-restart', () => ({ canRestartInvalidBillingTrial: jest.fn() }));
 import { NextRequest } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
@@ -48,6 +50,7 @@ describe('POST /api/billing/recovery', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.mocked(canRestartInvalidBillingTrial).mockResolvedValue(false);
 
         mockUserGet = jest.fn().mockResolvedValue({
             exists: true,
@@ -149,6 +152,18 @@ describe('POST /api/billing/recovery', () => {
 
         expect(res.status).toBe(200);
         expect(data.pending).toBe(false);
+    });
+
+    it('offers a real trial for a verified legacy test-mode binding without changing entitlements', async () => {
+        jest.mocked(canRestartInvalidBillingTrial).mockResolvedValue(true);
+        mockBillingGet.mockResolvedValue({ exists: true, data: () => ({
+            tier: 'business', status: 'active', customerId: 'cus_testmode', subscriptionId: 'sub_testmode', hasUsedTrial: true,
+        }) });
+        const res = await POST(buildRequest({ tier: 'business', currency: 'usd' }));
+        expect(res.status).toBe(200);
+        expect((await res.json()).checkoutUrl).toBe('https://checkout.stripe.com/pay/cs_test_recovery');
+        expect(createOrReuseCheckoutSession).toHaveBeenCalledWith(expect.objectContaining({isTrial:true}));
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({'billingRecovery.attempt':1}));
     });
 
     it('reports the pending state without opening a session when no selection is sent', async () => {
