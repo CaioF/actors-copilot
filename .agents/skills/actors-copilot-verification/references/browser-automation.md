@@ -26,6 +26,8 @@ With `AC_CHECK_READER=1` and `/reader-copilot`, the inspector submits a fictiona
 
 With `AC_MOBILE=1` the viewport is 390×844. Add `AC_CHECK_NAV=1` and `/dashboard` to open the mobile menu, navigate to Auditions and verify the menu closes. This checks one navigation path, not general responsive or accessibility compliance.
 
+With `AC_CHECK_HEADER=1` and `/dashboard` at the default desktop viewport, the inspector opens and closes Support, checks its email link, selects Dark and reloads to check persistence within the temporary browser profile, selects Light, then navigates to Settings and checks the active sidebar link. It does not send email or change the account profile. Chrome's temporary profile is discarded on exit; this is not a cross-device theme test.
+
 With `AC_CHECK_DNA=1` and `/chat`, it types a uniquely marked fictional message, waits for the real DNA endpoint, processing to finish and an assistant bubble, then reloads and checks the exchange again. It persists test conversation data and may cause extractions; use an authorized disposable identity. See the DNA map for observed evidence. Do not automatically retry submission after a timeout: the message or response may already have been saved.
 
 With `AC_CHECK_VAULT=1` and `/dna-vault`, it waits for the empty, populated or error state. For a populated vault it opens Overview, Profiler Insights and Verbatim Memory Bank, tests nonmatching search where entries exist and clears both searches. It reports state and empty-list flags, not personal text; it does not trigger extraction, export or writes.

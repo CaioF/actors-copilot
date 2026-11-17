@@ -74,6 +74,27 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_HEADER === '1' && path === '/dashboard') {
+      if (process.env.AC_MOBILE === '1') throw new Error('Header check requires the desktop viewport');
+      await page.locator('[aria-label="Support"]').click();
+      await page.locator('h2 ::-p-text(Need Help?)').wait();
+      if (!await page.$eval('h2::-p-text(Need Help?)', e => !!e.parentElement.querySelector('a[href="mailto:support@theactorscopilot.com"]'))) throw new Error('Support email link is missing from the modal');
+      await page.$eval('h2::-p-text(Need Help?)', e => e.parentElement.querySelector('button').click());
+      await page.waitForFunction(() => ![...document.querySelectorAll('h2')].some(e => e.textContent.includes('Need Help?')));
+      await page.locator('[aria-label="Select theme"]').click();
+      await page.locator('button ::-p-text(Dark)').click();
+      await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForSelector('[aria-label="Select theme"]', {visible:true, timeout:30000});
+      await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+      await page.locator('[aria-label="Select theme"]').click();
+      await page.locator('button ::-p-text(Light)').click();
+      await page.waitForFunction(() => document.documentElement.classList.contains('light'));
+      await page.locator('header a[aria-label="Settings"]').click();
+      await page.waitForFunction(() => location.pathname === '/settings', {timeout:30000});
+      await page.waitForSelector('nav a[href="/settings"][aria-current="page"]', {timeout:30000});
+      console.log(JSON.stringify({journey:'desktop-header', supportOpenClose:true, darkAfterReload:true, lightSelected:true, settingsNavigation:true, settingsActive:true}));
+    }
     if (process.env.AC_CHECK_VAULT === '1' && path === '/dna-vault') {
       const state = await page.waitForFunction(() => {
         const text = document.body.innerText;

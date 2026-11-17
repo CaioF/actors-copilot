@@ -22,6 +22,8 @@ Source: `app/(interior)/dashboard/page.tsx`, `app/(interior)/profile/page.tsx`, 
 
 Observed on production 2026-11-17 with the seeded Economy session, Chrome 157 at 390×844: Open menu → Auditions reached the tracker and the sidebar closed. This is one mobile path, not a full responsive sweep.
 
+Observed on production 2026-11-17 with the seeded Economy session, Chrome 157 at 1440×900: Support opened “Need Help?” with a support email link and its close button dismissed it. Selecting Dark changed the document theme and survived a reload in the same isolated browser profile; selecting Light changed it again. Header Settings navigated to `/settings`, and the sidebar marked Settings as the active page. The mail link was not opened, theme behavior in another browser or account was not tested, and the test profile was discarded when Chrome closed. The modal close button has no accessible name in the reviewed source; the inspector uses its position within the modal as a fallback, not a stable accessibility selector.
+
 Profile sections include photos, basic and physical details, bio, agent, showreels, credits, training, external profiles, skills and CV. File uploads and IMDb autofill cross Storage or external scraping/AI boundaries. Inspect validation and preview, then reload; tests of form rendering alone do not verify upload or public exposure. For every mutation, note whether a test fixture remains and verify only that fixture.
 
 ### Profile form coverage
