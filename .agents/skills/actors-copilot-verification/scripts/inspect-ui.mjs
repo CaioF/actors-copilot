@@ -23,6 +23,14 @@ try {
   console.log(JSON.stringify({origin:url.origin, browser:await browser.version(), viewport, sessionSeeded:process.env.AC_SEED_SESSION === '1'}));
   const page = await browser.newPage();
   await page.setViewport(viewport);
+  const authResponses = {};
+  page.on('response', response => {
+    const responseUrl = new URL(response.url());
+    if (responseUrl.origin === url.origin && responseUrl.pathname === '/api/auth/callback') {
+      const key = `${response.request().method()} ${response.status()}`;
+      authResponses[key] = (authResponses[key] || 0) + 1;
+    }
+  });
   if (process.env.AC_SEED_SESSION === '1') {
     const apiKey = process.env.AC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey) throw new Error('AC_FIREBASE_API_KEY is required for session seeding');
@@ -45,7 +53,12 @@ try {
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button ::-p-text(Sign In)').click();
-  await page.waitForFunction(() => location.pathname !== '/login', {timeout: 30000});
+  try {
+    await page.waitForFunction(() => location.pathname !== '/login', {timeout: 30000});
+  } catch (error) {
+    console.error(JSON.stringify({journey:'login', finalPath:new URL(page.url()).pathname, authResponses}));
+    throw error;
+  }
   for (const path of paths) {
     await page.goto(new URL(path, url).href, {waitUntil: 'domcontentloaded'});
     // The interior auth guard initially renders a branded loading screen.
