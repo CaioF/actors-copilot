@@ -239,6 +239,7 @@ describe("POST /api/auditions/analyzeSides", () => {
       expect(response.status).toBe(200);
       expect(payload.success).toBe(true);
       expect(payload.data.intro).toBe("Mocked AI Introduction");
+      expect(payload.sidesText).toBe("To be, or not to be.");
     });
 
     it("should successfully extract text from a DOCX file using Mammoth", async () => {
@@ -253,10 +254,12 @@ describe("POST /api/auditions/analyzeSides", () => {
 
       // Act
       const response = await POST(request);
+      const payload = await response.json();
 
       // Assert
       expect(response.status).toBe(200);
       expect(mockedMammothExtract).toHaveBeenCalled();
+      expect(payload.sidesText).toBe("Extracted DOCX content");
     });
 
     it("should successfully extract text from a PDF file using pdf2json", async () => {
@@ -275,6 +278,7 @@ describe("POST /api/auditions/analyzeSides", () => {
       // Assert
       expect(response.status).toBe(200);
       expect(payload.success).toBe(true);
+      expect(payload.sidesText).toBe("Mocked PDF text content");
     });
 
     it("should return 502 Bad Gateway if the AI returns malformed JSON", async () => {
