@@ -1,0 +1,22 @@
+# Verification workflow
+
+## Preflight and isolation
+
+- Record repo, branch, commit, target URL, browser, viewport, account/tier, backend project and test-data ownership. `git status --short --branch` and `git rev-parse HEAD` identify the checkout. Check whether the server on the port is this checkout before using it.
+- CI uses Node 22 and pnpm 9: `pnpm install --frozen-lockfile`, `pnpm run lint`, `pnpm test`, `pnpm run typecheck`. Local dependencies may have been installed by bun; the Stripe API-version type error can reflect lockfile drift. Verify dependencies or CI before editing source to fix it.
+- Local `.env` and `.env.local` can point at real services. `pnpm run dev` loads them; localhost is not proof of isolation. Inspect variable *names* and configuration privately, never print secrets. Establish an explicitly non-production Firebase project, Stripe test mode, and disposable accounts before writes; verify both client and Admin SDK destinations and all server integrations. The repository currently has no established emulator wiring or browser E2E harness. Do not assume setting emulator variables alone connects the SDKs. If isolation cannot be proved, stick to read-only public paths and mocked tests, and report the missing coverage.
+- AI requests, transcription, TTS, scraping and email may call external services and incur costs or send data. Use synthetic inputs and suitable test services; record the boundary and any stub. Never place real scripts, credentials, cookies or account data in committed fixtures, screenshots, traces or logs.
+
+## Choosing checks
+
+- Start with relevant existing tests, e.g. `pnpm test -- --runInBand proxy.test.ts app/login/page.test.tsx app/start-trial/page.test.tsx app/api/billing/checkout/route.test.ts app/api/webhooks/stripe/route.test.ts`. Jest uses `next/jest` and a Node default environment; individual UI tests opt into jsdom. The `test` script includes `--forceExit`.
+- For UI changes, launch the intended checkout (`pnpm run dev`), navigate by user-visible labels, verify loading then final state, and inspect console/network errors. Exercise relevant empty, success, error, cancel and reload states, and desktop/mobile where layout is affected. Wait on an observable condition rather than a fixed sleep; AI output is nondeterministic, so assert structure and consequences, not exact prose.
+- Browser automation is not yet a repository dependency or CI job. Use an available browser driver to explore. If adding a repeatable E2E suite, choose the driver for the task, pin dependencies through pnpm, configure an isolated target and deterministic fixtures, then run it locally and in CI. No Puppeteer/CDP installation is required merely to use this guide. Prefer role/name/label locators, use stable test IDs when needed, and avoid brittle CSS and coordinates. Keep credentials outside source and prevent auth state/trace artifacts from being committed.
+- Boundary mocks should replace unavailable external services at their actual boundary while retaining the UI, API, authorization and persistence relevant to the claim. State precisely which parts were mocked. Unit/route tests do not prove a real browser, provider, webhook delivery, microphone or payment flow.
+- For persistence, create only named disposable fixtures in a verified test environment, reload or reopen, then verify the persisted state. Clean up only those fixtures when the cleanup mechanism is known. Never delete an unknown account or production data.
+
+## Reporting and maintenance
+
+Record action → expected result → observed result, plus commit, URL/environment, account tier, test command and pass/fail/skip; attach sanitized screenshots or logs only when useful. Record browser and device details for UI failures. For inaccessible paths, identify the missing account, backend, permission or tool and the nearest test actually run. Distinguish a product failure from an unconfigured environment. Never treat a loading screen, successful HTTP response or a mocked test as proof of the whole journey.
+
+Update [feature map](features/README.md) when routes, entry points, gating, persistence or relevant tests change. Mark source-derived information separately from runtime observations. Re-run targeted checks and verify local links after editing. Avoid hardcoding transient credentials, exact generated AI text or selectors not observed in the current UI.
