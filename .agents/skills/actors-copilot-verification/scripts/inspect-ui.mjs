@@ -75,6 +75,35 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_PLAN_CONTROLS === '1' && path === '/upgrade') {
+      let checkoutRequests = 0;
+      const countCheckout = request => {
+        const target = new URL(request.url());
+        if (target.origin === url.origin && target.pathname === '/api/billing/checkout' && request.method() === 'POST') checkoutRequests++;
+      };
+      page.on('request', countCheckout);
+      await page.waitForSelector('[role="radiogroup"][aria-label="Currency"]', {visible:true, timeout:30000});
+      await page.waitForFunction(() => document.body.innerText.includes('/month'), {timeout:30000});
+      const radio = code => `[role="radiogroup"][aria-label="Currency"] [role="radio"]::-p-text(${code})`;
+      for (const currency of ['EUR', 'GBP', 'USD']) {
+        await page.locator(radio(currency)).click();
+        await page.waitForFunction(code => [...document.querySelectorAll('[role="radiogroup"][aria-label="Currency"] [role="radio"]')].some(e => e.textContent.trim() === code && e.getAttribute('aria-checked') === 'true'), {}, currency);
+        const symbol = {EUR:'€', GBP:'£', USD:'$'}[currency];
+        await page.waitForFunction(expected => {
+          const badges = [...document.querySelectorAll('span')].filter(e => ['ECONOMY CLASS', 'BUSINESS CLASS'].includes(e.textContent.trim()));
+          return badges.length === 2 && badges.every(e => e.closest('div.flex.flex-col.justify-between')?.innerText.includes(expected));
+        }, {}, symbol);
+      }
+      await page.locator('button ::-p-text(Annual)').click();
+      await page.waitForFunction(() => document.body.innerText.includes('/year') && document.body.innerText.includes('Billed annually.'));
+      await page.locator(radio('EUR')).click();
+      await page.waitForFunction(() => [...document.querySelectorAll('[role="radio"]')].some(e => e.textContent.trim() === 'EUR' && e.getAttribute('aria-checked') === 'true'));
+      await page.locator('button ::-p-text(Monthly)').click();
+      await page.waitForFunction(() => document.body.innerText.includes('/month') && !document.body.innerText.includes('Billed annually.'));
+      page.off('request', countCheckout);
+      if (checkoutRequests) throw new Error('Unexpected checkout request during plan controls check');
+      console.log(JSON.stringify({journey:'plan-controls', currenciesAndPriceSymbols:true, annualAndMonthly:true, checkoutRequests}));
+    }
     if (process.env.AC_CHECK_BASELINE_SHORT === '1' && path === '/dashboard') {
       const draft = 'Synthetic short text.';
       const input = 'textarea[placeholder="Paste your details here..."]';
