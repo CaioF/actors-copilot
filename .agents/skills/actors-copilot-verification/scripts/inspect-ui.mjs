@@ -93,6 +93,29 @@ try {
         buttons:[...document.querySelectorAll('button')].filter(e=>e.getClientRects().length).map(e=>(e.getAttribute('aria-label') || e.innerText).trim()).filter(Boolean),
       }));
       console.log(JSON.stringify({journey:'saved-audition-detail', ...detail}));
+      if (process.env.AC_CHECK_LINKED_READER === '1') {
+        const detailPath = new URL(page.url()).pathname;
+        await page.locator('button ::-p-text(Rehearse Scene)').click();
+        await page.waitForFunction(() => /^\/reader-copilot\/[^/]+$/.test(location.pathname), {timeout:30000});
+        const state = await page.waitForFunction(() => {
+          if (document.querySelector('[aria-label="Partner Voices"]')) return 'ready';
+          if (document.body.innerText.includes('Rehearsal Unavailable')) return 'unavailable';
+          return false;
+        }, {timeout:90000});
+        if (await state.jsonValue() === 'unavailable') {
+          const missingSides = await page.evaluate(() => document.body.innerText.includes('No script sides text found in this audition.'));
+          console.log(JSON.stringify({journey:'linked-reader', unavailable:true, missingSides}));
+          throw new Error('Linked reader is unavailable for the named fixture');
+        }
+        const actorHeading = await page.$eval('h1', e => e.innerText);
+        await page.locator('[aria-label="Mute AI audio"]').click();
+        await page.locator('[aria-label="Unmute AI audio"]').wait();
+        await page.locator('button ::-p-text(Change Character)').click();
+        await page.locator('h2 ::-p-text(Choose Your Character)').wait();
+        await page.locator('button ::-p-text(Return to auditions)').click();
+        await page.waitForFunction(p => location.pathname === p, {timeout:30000}, detailPath);
+        console.log(JSON.stringify({journey:'linked-reader', actorHeading, muteToggle:true, changeCharacter:true, returnedToSameDetail:true}));
+      }
       if (process.env.AC_CHECK_ENRICH === '1') {
         const detailPath = new URL(page.url()).pathname;
         await page.locator('button ::-p-text(Attach Sides)').click();
