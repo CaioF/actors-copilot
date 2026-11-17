@@ -40,6 +40,13 @@ jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
     push: mockPush,
   })),
+  useParams: jest.fn(() => ({ id: "audition-for-reader" })),
+}));
+
+jest.mock("@/components/actor-copilot/actor-copilot-rehearsal", () => ({
+  ActorCopilotRehearsal: ({ initialActorCharacter }: { initialActorCharacter?: string }) => (
+    <div>Rehearsal ready for {initialActorCharacter}</div>
+  ),
 }));
 
 jest.mock("react-to-print", () => ({
@@ -284,8 +291,8 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     text: jest.fn().mockResolvedValue(JSON.stringify(body)),
   });
 
-  const goToGeneratedResult = async (mode: "sides" | "brief", result: typeof generatedSidesResult, auditionId?: string) => {
-    render(<AuditionWizard mode={mode} auditionId={auditionId} />);
+  const goToGeneratedResult = async (mode: "sides" | "brief", result: typeof generatedSidesResult, auditionId?: string, extractedFileText?: string) => {
+    const { container, unmount } = render(<AuditionWizard mode={mode} auditionId={auditionId} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g., The Morning Show Season 5"), {
       target: { value: "Hamlet" },
@@ -296,15 +303,20 @@ describe("AuditionWizard enrichment (Task 3)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
-      target: { value: mode === "sides" ? "Hamlet sides text" : "Casting brief body" },
-    });
+    if (extractedFileText) {
+      const input = container.querySelector('input[type="file"]')!;
+      fireEvent.change(input, { target: { files: [new File(["document"], "sides.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })] } });
+    } else {
+      fireEvent.change(screen.getByPlaceholderText(/paste your details here/i), {
+        target: { value: mode === "sides" ? "Hamlet sides text" : "Casting brief body" },
+      });
+    }
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     mockFetch
       .mockResolvedValueOnce(createResponse({ ok: true }))
-      .mockResolvedValueOnce(createResponse({ data: result }));
+      .mockResolvedValueOnce(createResponse({ data: result, ...(extractedFileText ? { sidesText: extractedFileText } : {}) }));
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /generate breakdown/i }));
@@ -313,6 +325,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /save output/i })).toBeInTheDocument();
     });
+    return unmount;
   };
 
   beforeEach(() => {
@@ -428,6 +441,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
         castingDirectorName: "Nina Gold",
         performanceMap: existingSidesMap,
         sidesPerformanceMap: existingSidesMap,
+        sidesText: "Existing rehearsal script",
         briefPerformanceMap: null,
         hasSides: true,
         hasBrief: false,
@@ -455,6 +469,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
         analysisType: "sides",
         performanceMap: existingSidesMap,
         sidesPerformanceMap: existingSidesMap,
+        sidesText: "Existing rehearsal script",
         briefPerformanceMap: generatedBriefResult,
         hasSides: true,
         hasBrief: true,
@@ -513,6 +528,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
         performanceMap: existingBriefMap,
         sidesPerformanceMap: generatedSidesResult,
         briefPerformanceMap: existingBriefMap,
+        sidesText: "Hamlet sides text",
         hasSides: true,
         hasBrief: true,
         castingDirectorName: "Nina Gold",
@@ -542,6 +558,7 @@ describe("AuditionWizard enrichment (Task 3)", () => {
         project: "Hamlet",
         role: "Ophelia",
         performanceMap: generatedSidesResult,
+        sidesText: "Hamlet sides text",
         analysisType: "sides",
         sidesPerformanceMap: generatedSidesResult,
         briefPerformanceMap: null,
@@ -553,6 +570,61 @@ describe("AuditionWizard enrichment (Task 3)", () => {
       { merge: true }
     );
     expect(mockPush).toHaveBeenCalledWith("/auditions");
+  });
+
+  it("saves the extracted text of an uploaded sides document for rehearsal", async () => {
+    await goToGeneratedResult("sides", generatedSidesResult, undefined, "Extracted scene dialogue");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save output/i }));
+    });
+    await waitFor(() => expect(firestoreModule.setDoc).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({ sidesText: "Extracted scene dialogue" }), { merge: true }
+    ));
+  });
+
+  it("stores extracted document text when attaching sides to a saved brief", async () => {
+    firestoreModule.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ project: "Hamlet", role: "Ophelia", hasBrief: true, briefPerformanceMap: generatedBriefResult }),
+    });
+    await goToGeneratedResult("sides", generatedSidesResult, "brief-id", "Extracted scene dialogue");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /save output/i })); });
+    await waitFor(() => expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
+      { path: "users/user123_Actor/auditions/brief-id" },
+      expect.objectContaining({ sidesText: "Extracted scene dialogue", briefPerformanceMap: generatedBriefResult })
+    ));
+  });
+
+  it("opens Reader with the sides saved from a new audition", async () => {
+    const unmount = await goToGeneratedResult("sides", generatedSidesResult);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /save output/i })); });
+    await waitFor(() => expect(firestoreModule.setDoc).toHaveBeenCalledTimes(1));
+    const savedAudition = firestoreModule.setDoc.mock.calls[0][1];
+    firestoreModule.getDoc.mockResolvedValue({ exists: () => true, data: () => savedAudition });
+    mockFetch.mockResolvedValueOnce(createResponse({ scene: { characters: ["OPHELIA"], lines: [] } }));
+    unmount();
+    const ReaderPage = require("@/app/(interior)/reader-copilot/[id]/page").default;
+    render(<ReaderPage />);
+    await screen.findByText("Rehearsal ready for OPHELIA");
+    const readerRequest = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/actor-copilot/parse-script");
+    expect(JSON.parse(readerRequest[1].body)).toEqual(expect.objectContaining({ sidesText: "Hamlet sides text" }));
+  });
+
+  it("opens Reader after adding sides to an existing brief", async () => {
+    const existingBrief = { project: "Hamlet", role: "Ophelia", hasBrief: true, briefPerformanceMap: generatedBriefResult };
+    firestoreModule.getDoc.mockResolvedValue({ exists: () => true, data: () => existingBrief });
+    const unmount = await goToGeneratedResult("sides", generatedSidesResult, "audition-for-reader");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /save output/i })); });
+    await waitFor(() => expect(firestoreModule.updateDoc).toHaveBeenCalledTimes(1));
+    const savedAudition = firestoreModule.updateDoc.mock.calls[0][1];
+    firestoreModule.getDoc.mockResolvedValue({ exists: () => true, data: () => savedAudition });
+    mockFetch.mockResolvedValueOnce(createResponse({ scene: { characters: ["OPHELIA"], lines: [] } }));
+    unmount();
+    const ReaderPage = require("@/app/(interior)/reader-copilot/[id]/page").default;
+    render(<ReaderPage />);
+    await screen.findByText("Rehearsal ready for OPHELIA");
+    const readerRequest = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/actor-copilot/parse-script");
+    expect(JSON.parse(readerRequest[1].body)).toEqual(expect.objectContaining({ sidesText: "Hamlet sides text" }));
   });
 
   it("accepts auditionId prop without breaking render in both modes", () => {
@@ -1209,6 +1281,7 @@ describe("AuditionWizard resume from a saved audition (Scene Study)", () => {
   const savedDoc = {
     project: "Romeo and Juliet",
     role: "Ophelia",
+    sidesText: "OPHELIA\nHello again.",
     projectType: "theater",
     deadline: null,
     auditionTimezone: null,
@@ -1264,6 +1337,16 @@ describe("AuditionWizard resume from a saved audition (Scene Study)", () => {
     // The Attach Sides flow still starts on the scene details, not on a result.
     expect(screen.queryByText("Saved sides intro")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save output/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the rehearsal script when saving a resumed breakdown", async () => {
+    firestoreModule.updateDoc.mockResolvedValue(undefined);
+    render(<AuditionWizard mode="sides" auditionId="audition-1" loadSavedResult />);
+    await screen.findByRole("button", { name: /save output/i });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /save output/i })); });
+    await waitFor(() => expect(firestoreModule.updateDoc).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({ sidesText: "OPHELIA\nHello again." })
+    ));
   });
 
   it("keeps the scene details when the saved audition only has a brief", async () => {

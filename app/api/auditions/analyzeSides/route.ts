@@ -315,6 +315,7 @@ export async function POST(request: Request) {
       success: true,
       message: "Performance Map generated successfully.",
       data: performanceMap,
+      sidesText,
     });
 
   } catch (error) {
