@@ -221,6 +221,30 @@ try {
         const extractionLink = await page.$('a[href="/chat"]');
         if (!extractionLink) throw new Error('Empty vault did not link to DNA chat');
       } else {
+        const checkSections = async kind => {
+          const all = await page.$('button::-p-text(All Sections)');
+          if (!all) return {checked:false};
+          const first = (await all.evaluateHandle(e => e.nextElementSibling)).asElement();
+          if (!first) return {checked:false};
+          const section = await first.evaluate(e => e.textContent.trim());
+          const readCards = () => page.evaluate(type => {
+            if (type === 'insights') return [...document.querySelectorAll('div.relative.pl-6.space-y-6 > div')].map(e => [...e.querySelectorAll('span')].find(s => s.textContent.startsWith('Section: '))?.textContent.slice(9).trim() || null);
+            return [...document.querySelectorAll('p.font-serif')].map(e => e.closest('div.flex.flex-col.justify-between')?.querySelector('div.border-t span')?.textContent.trim() || null);
+          }, kind);
+          const before = await readCards();
+          if (!before.length) throw new Error('Section filter has no rendered entries');
+          await first.click();
+          await page.waitForFunction((type, selected) => {
+            const labels = type === 'insights'
+              ? [...document.querySelectorAll('div.relative.pl-6.space-y-6 > div')].map(e => [...e.querySelectorAll('span')].find(s => s.textContent.startsWith('Section: '))?.textContent.slice(9).trim())
+              : [...document.querySelectorAll('p.font-serif')].map(e => e.closest('div.flex.flex-col.justify-between')?.querySelector('div.border-t span')?.textContent.trim());
+            return labels.length > 0 && labels.every(label => label === selected);
+          }, {timeout:10000}, kind, section);
+          const selectedCount = (await readCards()).length;
+          await all.click();
+          await page.waitForFunction((type, count) => (type === 'insights' ? document.querySelectorAll('div.relative.pl-6.space-y-6 > div').length : document.querySelectorAll('p.font-serif').length) === count, {timeout:10000}, kind, before.length);
+          return {checked:true, narrowed:selectedCount < before.length};
+        };
         await page.locator('button ::-p-text(Profiler Insights)').click();
         await page.waitForSelector('input[placeholder="Filter deductions..."]', {visible:true});
         const noInsights = await page.evaluate(() => document.body.innerText.includes('No Profiler Deductions Yet'));
@@ -229,6 +253,7 @@ try {
         if (!noInsights) await page.waitForFunction(() => document.body.innerText.includes('No deductions match your search filter'));
         await page.locator('[aria-label="Clear search"]').click();
         await page.waitForFunction(() => document.querySelector('input[placeholder="Filter deductions..."]')?.value === '');
+        const insightsSection = await checkSections('insights');
         await page.locator('button ::-p-text(Verbatim Memory Bank)').click();
         await page.waitForSelector('input[placeholder="Search actor quotes..."]', {visible:true});
         const noQuotes = await page.evaluate(() => document.body.innerText.includes('No Recorded Quotes Yet'));
@@ -237,8 +262,9 @@ try {
         if (!noQuotes) await page.waitForFunction(() => document.body.innerText.includes('No memory quotes match your search filter'));
         await page.locator('[aria-label="Clear search"]').click();
         await page.waitForFunction(() => document.querySelector('input[placeholder="Search actor quotes..."]')?.value === '');
+        const memorySection = await checkSections('memory');
         await page.locator('button ::-p-text(Overview & Core Traits)').click();
-        console.log(JSON.stringify({journey:'dna-vault-filters', noInsights, noQuotes, searchCleared:true}));
+        console.log(JSON.stringify({journey:'dna-vault-filters', noInsights, noQuotes, searchCleared:true, insightsSection, memorySection}));
       }
       console.log(JSON.stringify({journey:'dna-vault', state:vaultState, tabsVisited:vaultState === 'populated'}));
     }

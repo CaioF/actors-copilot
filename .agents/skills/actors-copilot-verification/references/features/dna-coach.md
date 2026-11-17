@@ -24,7 +24,7 @@
 
 Open `/dna-vault`. Production Economy showed “Personal DNA Vault”, Refresh, Export and Extract More DNA; data-dependent tabs may appear after loading. Source provides Overview, Insights and Memory tabs; populated Insights has section filters and `Filter deductions...`, Memory has section filters and `Search actor quotes...`, both with Clear search. Test empty/error/populated states and confirm filtering is reversible; Refresh fetches data and Export calls print, not a persistent database export. The empty state links to `/chat`. Verify a new extraction independently of the chat response. Source: `app/(interior)/dna-vault/page.tsx`, `components/dna-vault/`.
 
-Observed 2026-11-17 in production, Chrome 157 headless at 1440×900, using the seeded Economy test session: the populated vault opened all three tabs. Insights and Memory each contained entries; a synthetic nonmatching search showed the corresponding no-match state, and Clear search emptied each input. This did not verify the correctness of the entries, section filters, Refresh, Export or a new extraction.
+Observed 2026-11-17 in production, Chrome 157 headless at 1440×900, using the seeded Economy test session: the populated vault opened all three tabs. Insights and Memory each contained entries; a synthetic nonmatching search showed the corresponding no-match state, and Clear search emptied each input. In both tabs, selecting the first available section showed entries labeled with that section, and All Sections restored the original count. Neither selection reduced the count for this account, so exclusion of entries from other sections remains unverified. This did not verify entry correctness, Refresh, Export or a new extraction.
 
 ## Acting Coach
 
