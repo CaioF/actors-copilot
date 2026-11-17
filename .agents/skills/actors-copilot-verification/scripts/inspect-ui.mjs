@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Disposable Chrome session. Credentials are supplied only through environment variables.
 import puppeteer from 'puppeteer-core';
+import {fileURLToPath} from 'node:url';
 
 const origin = process.env.AC_BASE_URL || 'http://localhost:3000';
 const chrome = process.env.AC_CHROME_PATH;
@@ -74,6 +75,37 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_BASELINE_FORM === '1' && path === '/dashboard') {
+      let submissions = 0;
+      const countBaseline = request => {
+        const target = new URL(request.url());
+        if (target.origin === url.origin && target.pathname === '/api/dna/baseline' && request.method() === 'POST') submissions++;
+      };
+      page.on('request', countBaseline);
+      const textarea = 'textarea[placeholder="Paste your details here..."]';
+      await page.locator('button ::-p-text(Upload Baseline)').click();
+      await page.locator('h2 ::-p-text(Upload Your Baseline History)').wait();
+      const saveButton = await page.locator('button ::-p-text(Save Baseline)').waitHandle();
+      if (!await saveButton.evaluate(e => e.disabled)) throw new Error('Empty baseline form should not be submittable');
+      await page.locator(textarea).fill('Synthetic baseline draft for verification.');
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(e => e.textContent.trim() === 'Save Baseline' && !e.disabled));
+      await page.locator('button ::-p-text(Cancel)').click();
+      await page.waitForFunction(() => ![...document.querySelectorAll('h2')].some(e => e.textContent.includes('Upload Your Baseline History')));
+      await page.locator('button ::-p-text(Upload Baseline)').click();
+      await page.waitForSelector(textarea, {visible:true});
+      if (await page.$eval(textarea, e => e.value)) throw new Error('Canceled baseline draft was retained');
+      const fileInput = await page.$('input[type="file"][accept=".pdf,.docx"]');
+      if (!fileInput) throw new Error('Baseline file input not found');
+      await fileInput.uploadFile(fileURLToPath(new URL('../fixtures/synthetic-sides.docx', import.meta.url)));
+      await page.locator('button[title="Remove file"]').wait();
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(e => e.textContent.trim() === 'Save Baseline' && !e.disabled));
+      await page.locator('button[title="Remove file"]').click();
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(e => e.textContent.trim() === 'Save Baseline' && e.disabled));
+      await page.locator('button ::-p-text(Cancel)').click();
+      page.off('request', countBaseline);
+      if (submissions) throw new Error('Unexpected baseline request during cancellation check');
+      console.log(JSON.stringify({journey:'baseline-form', emptyDisabled:true, textEnabled:true, cancelCleared:true, fileEnabled:true, removeDisabled:true, submissions}));
+    }
     if (process.env.AC_CHECK_HEADER === '1' && path === '/dashboard') {
       if (process.env.AC_MOBILE === '1') throw new Error('Header check requires the desktop viewport');
       await page.locator('[aria-label="Support"]').click();
