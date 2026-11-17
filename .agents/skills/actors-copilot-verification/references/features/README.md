@@ -6,13 +6,15 @@ Behavior-level index for deciding what to exercise. Source inventory: `8ab8fe2af
 - [DNA and coach](dna-coach.md): Personal DNA, vault, chat and acting coach.
 - [Auditions and reader](auditions-reader.md): brief, sides, enrichment, saved auditions and rehearsal.
 - [Profile and navigation](profile-navigation.md): dashboard, sidebar, actor profile, public profile and settings.
+- [Administration and affiliates](admin.md): separate operator access, members and payout records.
 - [Cross-feature journeys](journeys.md): persistence and integration checks across surfaces.
+- [Routes and data](routes-data.md): page inventory, API families and boundaries.
 
 ## Evidence recorded during initial mapping
 
 On the preceding feature-branch checkout `b68a6ce08b998006d58a0da8b8dfd05a9b455573` (no content diff against mapped main), local Next dev on 2026-11-17: `/login` rendered sign-in controls; navigating signed out to `/dashboard` returned to `/login`; selecting Create Account displayed the trial sign-up form. No form was submitted. Focused Jest command in [verification](../verification.md) passed 5 suites / 54 tests. These are point-in-time observations, not a full regression or production certification. Authenticated, Stripe, AI, media and authenticated admin journeys were not browser-tested.
 
-On 2026-11-17, the production origin `https://app.theactorscopilot.com` rendered sign-in and registration modes at `/login`, and an independent admin login form at `/admin-dashboard`. The deployed commit was not established. No account was created and the admin login was not submitted; these observations do not establish authenticated behavior.
+On 2026-11-17, the production origin `https://app.theactorscopilot.com` rendered sign-in and registration modes at `/login`, and an independent admin login form at `/admin-dashboard`. The deployed commit was not established. A real-session-seeded Economy browser inspection and one synthetic brief generation/save/reload are documented in the relevant feature maps. No account was created and admin login was not submitted. Session seeding does not prove normal sign-in.
 
 ## Entry convention
 

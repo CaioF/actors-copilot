@@ -9,3 +9,15 @@
 ## Boundaries and checks
 
 Source: `app/(interior)/dashboard/page.tsx`, `app/(interior)/profile/page.tsx`, `components/profile/`, `app/actors/[slug]/`, `app/(interior)/settings/page.tsx`, `app/api/profile/`. Tests include `app/(interior)/dashboard/page.test.tsx`, `components/profile/profile-live-preview.test.tsx`, `lib/get-public-profile.test.ts`, `app/api/profile/autofill/route.test.ts`, `app/api/profile/display-name/route.test.ts` and `app/api/account/delete/route.test.ts`. A component preview test is not proof that a published profile is reachable.
+
+## Practical interaction map
+
+| Surface | How to drive it | Observable outcome and persistence |
+| --- | --- | --- |
+| Interior frame | Desktop sidebar links and Quick Actions; mobile header `Open menu`, then link or `Close menu`. Header has theme selector, Support, Settings and Profile. | Route changes, one matching sidebar link has `aria-current=page`; mobile navigation closes the menu. Support opens “Need Help?” modal. Use visible controls rather than sidebar CSS classes. |
+| Dashboard | Open `/dashboard`; links lead to chat, brief and sides. `Capture a Memory` and `Upload Baseline` open separate interactions. | On an unseen account the intro modal can appear and the seen flag is persisted; dismiss and reload. The 2026-11-17 Economy browser showed My Self Tape Copilot, My Acting Copilot, three preparation cards and memory/baseline actions. |
+| Profile editor | Open `/profile` with Business access; edit sections and inspect live preview. Name changes can generate a slug; Save, Publish, Unpublish and copied link appear in the header. | Profile is written to `actorProfiles/{uid}`. Check saving/error feedback and reload. A published slug is queried by `/actors/[slug]` and `/actors/[slug]/index.md`; published content is public. Business editor was not exercised in the recorded Economy run. |
+| Settings | Open `/settings`; Profile, Subscription & Billing, Privacy & Data and Danger Zone are visible. Change display name and Save Changes calls `/api/profile/display-name`; email is disabled. Change photo uploads; Change password sends a reset email. | Use a disposable account. A display-name change affects Firebase identity and user-path migration, so reload and check existing DNA/auditions remain reachable. Do not use reset, upload, portal or deletion as read-only smoke checks. |
+| Public profile | Open `/actors/<slug>` in a fresh context after publishing a synthetic profile. Check draft/unpublished and missing slug separately. | Public read is gated by published status; verify both HTML and `index.md` when affected. Never publish real personal data for a test. |
+
+Profile sections include photos, basic and physical details, bio, agent, showreels, credits, training, external profiles, skills and CV. File uploads and IMDb autofill cross Storage or external scraping/AI boundaries. Inspect validation and preview, then reload; tests of form rendering alone do not verify upload or public exposure. For every mutation, note whether a test fixture remains and verify only that fixture.
