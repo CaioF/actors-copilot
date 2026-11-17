@@ -109,6 +109,48 @@ try {
       }
       console.log(JSON.stringify({journey:'dna-vault', state:vaultState, tabsVisited:vaultState === 'populated'}));
     }
+    if (process.env.AC_CHECK_TRACKER === '1' && path === '/auditions') {
+      const search = 'input[placeholder="Search auditions by project or role..."]';
+      await page.waitForFunction(() => document.querySelector('main h3') || document.body.innerText.includes('No auditions found'), {timeout:30000});
+      const fixture = process.env.AC_TEST_PROJECT || await page.evaluate(() => [...document.querySelectorAll('main h3')].map(e => e.textContent.trim()).find(t => /^Verification Fixture \d+$/i.test(t)));
+      if (!fixture) throw new Error('AC_TEST_PROJECT is required for the tracker check');
+      await page.locator(search).fill(fixture);
+      await page.waitForFunction(p => [...document.querySelectorAll('main h3')].some(e => e.textContent.trim().toLowerCase() === p.toLowerCase()), {timeout:30000}, fixture);
+      const findCard = () => page.evaluateHandle(p => [...document.querySelectorAll('main h3')].find(e => e.textContent.trim().toLowerCase() === p.toLowerCase())?.closest('div.relative'), fixture);
+      let card = (await findCard()).asElement();
+      if (!card) throw new Error('Fixture card not found');
+      const status = await card.evaluate(e => ['Draft', 'Processing', 'Completed'].find(s => [...e.querySelectorAll('span')].some(el => el.textContent.trim() === s)));
+      if (!status) throw new Error('Fixture status not found');
+      const role = await card.$eval('h3 + p', e => e.textContent.trim());
+      if (!role) throw new Error('Fixture role not found');
+      await page.locator(search).fill('zz-nonmatching-test-47391');
+      await page.locator('h3 ::-p-text(No auditions found)').wait();
+      await page.locator(search).fill(role.toLowerCase());
+      await page.waitForFunction(p => [...document.querySelectorAll('main h3')].some(e => e.textContent.trim().toLowerCase() === p.toLowerCase()), {timeout:10000}, fixture);
+      await page.locator(search).fill(fixture);
+      const otherStatus = ['Draft', 'Processing', 'Completed'].find(s => s !== status);
+      await page.locator(`main button ::-p-text(${otherStatus})`).click();
+      await page.locator('h3 ::-p-text(No auditions found)').wait();
+      await page.locator(`main button ::-p-text(${status})`).click();
+      await page.waitForFunction(p => [...document.querySelectorAll('main h3')].some(e => e.textContent.trim().toLowerCase() === p.toLowerCase()), {timeout:10000}, fixture);
+      await page.locator('main button ::-p-text(All)').click();
+      card = (await findCard()).asElement();
+      await card.$eval('button[title="Edit Details"]', e => e.click());
+      await page.locator('h2 ::-p-text(Edit Audition Details)').wait();
+      const projectInput = await page.$('h2 + div input');
+      if (!projectInput) throw new Error('Edit project input not found');
+      await projectInput.click({clickCount:3});
+      await projectInput.type('Unsaved synthetic change');
+      await page.locator('button ::-p-text(Cancel)').click();
+      await card.$eval('button[title="Edit Details"]', e => e.click());
+      await page.waitForFunction(p => document.querySelector('h2 + div input')?.value === p, {timeout:10000}, fixture);
+      await page.locator('button ::-p-text(Cancel)').click();
+      await card.$eval('button[title="Delete"]', e => e.click());
+      await page.locator('[role="alertdialog"] ::-p-text(Delete Audition)').wait();
+      await page.locator('[role="alertdialog"] button ::-p-text(Cancel)').click();
+      await page.waitForFunction(p => [...document.querySelectorAll('main h3')].some(e => e.textContent.trim().toLowerCase() === p.toLowerCase()), {timeout:10000}, fixture);
+      console.log(JSON.stringify({journey:'audition-tracker', projectSearch:true, roleSearch:true, nonmatchingSearch:true, statusFilter:true, editCancel:true, deleteCancel:true}));
+    }
     if (process.env.AC_CHECK_PICKER === '1' && path === '/auditions/new/sides') {
       const project = process.env.AC_TEST_PROJECT;
       if (!project) throw new Error('AC_TEST_PROJECT is required for the picker check');
