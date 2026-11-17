@@ -20,6 +20,8 @@ A production attempt on 2026-11-17 showed an intermittent login/redirect loop in
 
 With `AC_CHECK_WIZARD=1`, pass `/auditions/new/brief` and/or `/auditions/new/sides` to fill synthetic project/role/text, reach review, verify Generate is enabled and confirm text survives Back. It does not generate or save by default. Optional `AC_GENERATE=1` invokes the real AI endpoint, saves a uniquely named synthetic audition and checks it after reload. This incurs a provider call and leaves a test record in the selected account; use only where that effect is intended and never pass customer material. A response and a saved record do not prove the quality of the generated content. A production test account is not an isolated backend.
 
+To exercise document extraction for sides, set `AC_SIDES_FILE` to the absolute path of `fixtures/synthetic-sides.docx` within this skill, then run `/auditions/new/sides` with `AC_CHECK_WIZARD=1` and, if a real generation and saved fixture are intended, `AC_GENERATE=1`. The file is fictional and tracked. Follow with the linked Reader check using the printed unique fixture title. Unset `AC_SIDES_FILE` for text-input checks.
+
 With `AC_CHECK_READER=1` and `/reader-copilot`, the inspector submits a fictional two-person script to the real parsing endpoint, selects ALEX and waits for the Partner Voices control. It does not record audio or prove playback. Provider calls may incur cost.
 
 With `AC_MOBILE=1` the viewport is 390×844. Add `AC_CHECK_NAV=1` and `/dashboard` to open the mobile menu, navigate to Auditions and verify the menu closes. This checks one navigation path, not general responsive or accessibility compliance.

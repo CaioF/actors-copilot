@@ -209,7 +209,13 @@ try {
       await page.locator('#project').fill(project);
       await page.locator('#role').fill('Alex');
       await page.locator('button ::-p-text(Next)').click();
-      await page.locator('textarea[placeholder="Paste your details here..."]').fill('Fictional scene: Alex asks Sam to return a borrowed key.');
+      if (path.endsWith('/sides') && process.env.AC_SIDES_FILE) {
+        const fileInput = await page.$('input[type="file"]');
+        if (!fileInput) throw new Error('Sides file input was not found');
+        await fileInput.uploadFile(process.env.AC_SIDES_FILE);
+      } else {
+        await page.locator('textarea[placeholder="Paste your details here..."]').fill('Fictional scene: Alex asks Sam to return a borrowed key.');
+      }
       await page.locator('button ::-p-text(Next)').click();
       const review = await page.evaluate(() => ({
         headings: [...document.querySelectorAll('h1,h2,h3')].map(e => e.innerText.trim()).filter(Boolean),
@@ -235,8 +241,10 @@ try {
         continue;
       }
       await page.locator('button ::-p-text(Back)').click();
-      const restored = await page.$eval('textarea', el => el.value.includes('Fictional scene'));
-      console.log(JSON.stringify({journey: path, review, textRetainedAfterBack: restored}));
+      const restored = process.env.AC_SIDES_FILE && path.endsWith('/sides')
+        ? await page.evaluate(() => !!document.querySelector('button[title="Remove file"]'))
+        : await page.$eval('textarea', el => el.value.includes('Fictional scene'));
+      console.log(JSON.stringify({journey: path, review, inputRetainedAfterBack: restored}));
       if (!restored) throw new Error(`Wizard back-navigation failed: ${path}`);
     }
   }
