@@ -75,6 +75,26 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_BASELINE_SHORT === '1' && path === '/dashboard') {
+      const draft = 'Synthetic short text.';
+      const input = 'textarea[placeholder="Paste your details here..."]';
+      await page.locator('button ::-p-text(Upload Baseline)').click();
+      await page.locator(input).fill(draft);
+      const [response] = await Promise.all([
+        page.waitForResponse(r => new URL(r.url()).origin === url.origin && new URL(r.url()).pathname === '/api/dna/baseline' && r.request().method() === 'POST', {timeout:30000}),
+        page.locator('button ::-p-text(Save Baseline)').click(),
+      ]);
+      const body = await response.json();
+      await page.waitForFunction(() => document.body.innerText.includes("Couldn't save your baseline"), {timeout:30000});
+      const result = await page.evaluate(() => ({
+        fileMessage: document.body.innerText.includes("We couldn't read that file"),
+        shortMessage: /too short|at least 50 characters/i.test(document.body.innerText),
+        draftRetained: document.querySelector('textarea[placeholder="Paste your details here..."]')?.value === 'Synthetic short text.',
+      }));
+      const serverSaysTooShort = typeof body.error === 'string' && /too short/i.test(body.error);
+      console.log(JSON.stringify({journey:'baseline-short', status:response.status(), serverSaysTooShort, ...result}));
+      if (response.status() !== 400 || !serverSaysTooShort || !result.draftRetained || !result.shortMessage) throw new Error('Short baseline was not explained correctly');
+    }
     if (process.env.AC_CHECK_BASELINE_FORM === '1' && path === '/dashboard') {
       let submissions = 0;
       const countBaseline = request => {
