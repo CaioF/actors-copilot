@@ -224,6 +224,13 @@ try {
       if (vaultState === 'empty') {
         const extractionLink = await page.$('a[href="/chat"]');
         if (!extractionLink) throw new Error('Empty vault did not link to DNA chat');
+        if (process.env.AC_EXPECT_VAULT_EXTRACTION_PATH) {
+          await page.locator('a ::-p-text(Start First Extraction Session)').click();
+          await page.waitForFunction(expected => location.pathname === expected, {timeout:30000}, process.env.AC_EXPECT_VAULT_EXTRACTION_PATH);
+          if (process.env.AC_EXPECT_VAULT_EXTRACTION_PATH === '/upgrade') await page.locator('button ::-p-text(Monthly)').wait();
+          else if (process.env.AC_EXPECT_VAULT_EXTRACTION_PATH === '/chat') await page.waitForSelector('textarea', {timeout:30000});
+          console.log(JSON.stringify({journey:'empty-vault-extraction-link', destination:new URL(page.url()).pathname}));
+        }
       } else {
         const checkSections = async kind => {
           const all = await page.$('button::-p-text(All Sections)');

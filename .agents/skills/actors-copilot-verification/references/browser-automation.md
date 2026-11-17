@@ -46,6 +46,8 @@ With `AC_CHECK_CHAT_CONTROLS=1` and `/chat`, it opens and closes the help modal,
 
 With `AC_CHECK_VAULT=1` and `/dna-vault`, it waits for the empty, populated or error state. For a populated vault it opens Overview, Profiler Insights and Verbatim Memory Bank, tests nonmatching search where entries exist and clears both searches. Where section buttons exist, it selects the first, verifies visible section labels and restores All Sections; `narrowed` reports whether the selection actually reduced the count. A false `narrowed` means the check did not demonstrate exclusion of another section. It reports state and flags, not personal text; it does not trigger extraction, export or writes.
 
+For an empty vault, optionally set `AC_EXPECT_VAULT_EXTRACTION_PATH` (for example `/upgrade` for the observed Free account) to click `Start First Extraction Session` and assert the final route. This follows a navigation link; it does not start extraction or change billing.
+
 With `AC_CHECK_SAVED=1`, `AC_TEST_PROJECT=<unique fixture title>` and `/auditions`, it searches for that named fixture and opens its detail. `AC_CHECK_ENRICH=1` additionally chooses Attach Sides on a brief-only fixture, sends fictional sides to the real analysis service, saves and verifies both analyses on the same detail URL. This mutates the existing fixture and is not repeatable against the same already-enriched record; create a fresh, explicitly disposable brief first. Record the fixture and effect.
 
 With `AC_CHECK_PICKER=1`, `AC_TEST_PROJECT=<unique fixture title>` and `/auditions/new/sides`, it selects that named saved audition, waits for its result and clears the selection. It checks that the new-scene project field is blank; it does not generate, save or delete anything.
