@@ -21,3 +21,21 @@ Source: `app/(interior)/dashboard/page.tsx`, `app/(interior)/profile/page.tsx`, 
 | Public profile | Open `/actors/<slug>` in a fresh context after publishing a synthetic profile. Check draft/unpublished and missing slug separately. | Public read is gated by published status; verify both HTML and `index.md` when affected. Never publish real personal data for a test. |
 
 Profile sections include photos, basic and physical details, bio, agent, showreels, credits, training, external profiles, skills and CV. File uploads and IMDb autofill cross Storage or external scraping/AI boundaries. Inspect validation and preview, then reload; tests of form rendering alone do not verify upload or public exposure. For every mutation, note whether a test fixture remains and verify only that fixture.
+
+### Profile form coverage
+
+The following controls come from `components/profile/sections/`; verify against the deployed UI before automating. Business access and safe test data are prerequisites.
+
+| Section | Inputs and meaningful checks |
+| --- | --- |
+| Photos | Headshot and additional PNG/JPEG/WebP inputs. Check add/remove, invalid type/size, preview, upload failure and saved URLs independently. |
+| Basic Information | Full Name, playing age Min/Max, location and gender. Change name and inspect generated slug and preview; verify that an established custom slug is not unintentionally replaced. |
+| Physical & Professional Details | Height with imperial/metric control, eye and hair, nationalities, permits, ethnicity and appearance. Test conversion, multi-value add/remove and reload. |
+| About Me | Awards callout and bio; textarea has a 500-character limit in source. Test boundary and displayed preview. |
+| Agent | Add/remove representation and edit name, email, phone, website and contact visibility. Test public visibility separately from editor state. |
+| Showreels and Credits | Repeatable rows; reels have title/URL, credits title, role, year and production. Test add/remove/reorder where available, validation and reload. |
+| Training, External Profiles, Skills & Accents | Repeatable training rows, external links and skill chips (`Add a skill and press Enter`). Verify that additions and removals persist without changing unrelated rows. |
+| CV Upload | PDF input; verify invalid file, upload progress/error, replacement/removal and public visibility where applicable. |
+| AI Autofill | IMDb URL input and import action invokes external scraping and AI. Use a suitable synthetic or authorized reference, inspect merge behavior and existing fields, and account for provider failures. |
+
+The profile is autosaved as well as manually saved. Treat Publish/Unpublish and public slug retrieval as separate checkpoints; an editor preview does not prove public accessibility. Do not assume `actorProfiles/{uid}` and `users/{userPath}/profile/master` are the same document.
