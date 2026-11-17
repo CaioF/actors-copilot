@@ -10,7 +10,9 @@ Behavior-level index for deciding what to exercise. Source inventory: `8ab8fe2af
 
 ## Evidence recorded during initial mapping
 
-On the preceding feature-branch checkout `b68a6ce08b998006d58a0da8b8dfd05a9b455573` (no content diff against mapped main), local Next dev on 2026-11-17: `/login` rendered sign-in controls; navigating signed out to `/dashboard` returned to `/login`; selecting Create Account displayed the trial sign-up form. No form was submitted. Focused Jest command in [verification](../verification.md) passed 5 suites / 54 tests. These are point-in-time observations, not a full regression or production certification. Authenticated, Stripe, AI, media and admin journeys were not browser-tested because isolated service fixtures were not established.
+On the preceding feature-branch checkout `b68a6ce08b998006d58a0da8b8dfd05a9b455573` (no content diff against mapped main), local Next dev on 2026-11-17: `/login` rendered sign-in controls; navigating signed out to `/dashboard` returned to `/login`; selecting Create Account displayed the trial sign-up form. No form was submitted. Focused Jest command in [verification](../verification.md) passed 5 suites / 54 tests. These are point-in-time observations, not a full regression or production certification. Authenticated, Stripe, AI, media and authenticated admin journeys were not browser-tested.
+
+On 2026-11-17, the production origin `https://app.theactorscopilot.com` rendered sign-in and registration modes at `/login`, and an independent admin login form at `/admin-dashboard`. The deployed commit was not established. No account was created and the admin login was not submitted; these observations do not establish authenticated behavior.
 
 ## Entry convention
 
