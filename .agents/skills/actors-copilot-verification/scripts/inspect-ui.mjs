@@ -7,6 +7,7 @@ const chrome = process.env.AC_CHROME_PATH;
 const email = process.env.AC_TEST_EMAIL;
 const password = process.env.AC_TEST_PASSWORD;
 const paths = process.argv.slice(2);
+const viewport = process.env.AC_MOBILE === '1' ? {width:390, height:844} : {width:1440, height:900};
 if (!chrome || !email || !password || !paths.length || paths.some(p => !p.startsWith('/') || p.startsWith('//'))) {
   console.error('Set AC_CHROME_PATH, AC_TEST_EMAIL and AC_TEST_PASSWORD; pass one or more relative paths.');
   process.exit(2);
@@ -19,9 +20,9 @@ if (!(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '1
 if (paths.some(path => new URL(path, url).origin !== url.origin)) throw new Error('Paths must stay on the configured origin');
 const browser = await puppeteer.launch({executablePath: chrome, headless: true});
 try {
-  console.log(JSON.stringify({origin:url.origin, browser:await browser.version(), viewport:'1440x900', sessionSeeded:process.env.AC_SEED_SESSION === '1'}));
+  console.log(JSON.stringify({origin:url.origin, browser:await browser.version(), viewport, sessionSeeded:process.env.AC_SEED_SESSION === '1'}));
   const page = await browser.newPage();
-  await page.setViewport({width: 1440, height: 900});
+  await page.setViewport(viewport);
   if (process.env.AC_SEED_SESSION === '1') {
     const apiKey = process.env.AC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey) throw new Error('AC_FIREBASE_API_KEY is required for session seeding');
@@ -48,7 +49,7 @@ try {
   for (const path of paths) {
     await page.goto(new URL(path, url).href, {waitUntil: 'domcontentloaded'});
     // The interior auth guard initially renders a branded loading screen.
-    if (new URL(page.url()).pathname !== '/chat') await page.waitForSelector('aside', {visible: true, timeout: 30000});
+    if (new URL(page.url()).pathname !== '/chat') await page.waitForSelector('main', {visible: true, timeout: 30000});
     else await page.waitForSelector('textarea, [contenteditable="true"]', {timeout: 30000});
     if (path === '/auditions/new/sides') await page.waitForFunction(() => !document.body.innerText.includes('Loading your saved auditions...'), {timeout:30000});
     const view = await page.evaluate(() => ({
@@ -60,6 +61,14 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_MOBILE === '1' && process.env.AC_CHECK_NAV === '1' && path === '/dashboard') {
+      await page.locator('[aria-label="Open menu"]').click();
+      await page.locator('nav a[href="/auditions"]').click();
+      await page.waitForFunction(() => location.pathname === '/auditions', {timeout:30000});
+      await page.waitForSelector('input[placeholder="Search auditions by project or role..."]', {visible:true, timeout:30000});
+      await page.waitForFunction(() => document.querySelector('aside')?.getBoundingClientRect().right <= 0, {timeout:5000});
+      console.log(JSON.stringify({journey:'mobile-navigation', destination:'/auditions', menuClosed:true}));
+    }
     if (process.env.AC_CHECK_SAVED === '1' && path === '/auditions') {
       const project = process.env.AC_TEST_PROJECT;
       if (!project) throw new Error('AC_TEST_PROJECT is required for the saved-audition check');

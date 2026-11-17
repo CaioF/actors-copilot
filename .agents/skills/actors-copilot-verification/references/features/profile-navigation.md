@@ -20,6 +20,8 @@ Source: `app/(interior)/dashboard/page.tsx`, `app/(interior)/profile/page.tsx`, 
 | Settings | Open `/settings`; Profile, Subscription & Billing, Privacy & Data and Danger Zone are visible. Change display name and Save Changes calls `/api/profile/display-name`; email is disabled. Change photo uploads; Change password sends a reset email. | Use a disposable account. A display-name change affects Firebase identity and user-path migration, so reload and check existing DNA/auditions remain reachable. Do not use reset, upload, portal or deletion as read-only smoke checks. |
 | Public profile | Open `/actors/<slug>` in a fresh context after publishing a synthetic profile. Check draft/unpublished and missing slug separately. | Public read is gated by published status; verify both HTML and `index.md` when affected. Never publish real personal data for a test. |
 
+Observed on production 2026-11-17 with the seeded Economy session, Chrome 157 at 390×844: Open menu → Auditions reached the tracker and the sidebar closed. This is one mobile path, not a full responsive sweep.
+
 Profile sections include photos, basic and physical details, bio, agent, showreels, credits, training, external profiles, skills and CV. File uploads and IMDb autofill cross Storage or external scraping/AI boundaries. Inspect validation and preview, then reload; tests of form rendering alone do not verify upload or public exposure. For every mutation, note whether a test fixture remains and verify only that fixture.
 
 ### Profile form coverage
