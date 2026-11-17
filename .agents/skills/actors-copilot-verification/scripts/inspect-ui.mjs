@@ -74,6 +74,41 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_VAULT === '1' && path === '/dna-vault') {
+      const state = await page.waitForFunction(() => {
+        const text = document.body.innerText;
+        if (text.includes('Error loading DNA Vault')) return 'error';
+        if (text.includes('No DNA Extracted Yet')) return 'empty';
+        if (text.includes('Overview & Core Traits') && text.includes('Profiler Insights') && text.includes('Verbatim Memory Bank')) return 'populated';
+        return false;
+      }, {timeout:30000});
+      const vaultState = await state.jsonValue();
+      if (vaultState === 'error') throw new Error('DNA Vault reported a loading error');
+      if (vaultState === 'empty') {
+        const extractionLink = await page.$('a[href="/chat"]');
+        if (!extractionLink) throw new Error('Empty vault did not link to DNA chat');
+      } else {
+        await page.locator('button ::-p-text(Profiler Insights)').click();
+        await page.waitForSelector('input[placeholder="Filter deductions..."]', {visible:true});
+        const noInsights = await page.evaluate(() => document.body.innerText.includes('No Profiler Deductions Yet'));
+        await page.type('input[placeholder="Filter deductions..."]', 'zz-nonmatching-test-47391');
+        await page.waitForSelector('[aria-label="Clear search"]', {visible:true});
+        if (!noInsights) await page.waitForFunction(() => document.body.innerText.includes('No deductions match your search filter'));
+        await page.locator('[aria-label="Clear search"]').click();
+        await page.waitForFunction(() => document.querySelector('input[placeholder="Filter deductions..."]')?.value === '');
+        await page.locator('button ::-p-text(Verbatim Memory Bank)').click();
+        await page.waitForSelector('input[placeholder="Search actor quotes..."]', {visible:true});
+        const noQuotes = await page.evaluate(() => document.body.innerText.includes('No Recorded Quotes Yet'));
+        await page.type('input[placeholder="Search actor quotes..."]', 'zz-nonmatching-test-47391');
+        await page.waitForSelector('[aria-label="Clear search"]', {visible:true});
+        if (!noQuotes) await page.waitForFunction(() => document.body.innerText.includes('No memory quotes match your search filter'));
+        await page.locator('[aria-label="Clear search"]').click();
+        await page.waitForFunction(() => document.querySelector('input[placeholder="Search actor quotes..."]')?.value === '');
+        await page.locator('button ::-p-text(Overview & Core Traits)').click();
+        console.log(JSON.stringify({journey:'dna-vault-filters', noInsights, noQuotes, searchCleared:true}));
+      }
+      console.log(JSON.stringify({journey:'dna-vault', state:vaultState, tabsVisited:vaultState === 'populated'}));
+    }
     if (process.env.AC_CHECK_PICKER === '1' && path === '/auditions/new/sides') {
       const project = process.env.AC_TEST_PROJECT;
       if (!project) throw new Error('AC_TEST_PROJECT is required for the picker check');

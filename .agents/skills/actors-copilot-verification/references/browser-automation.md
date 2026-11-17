@@ -28,6 +28,8 @@ With `AC_MOBILE=1` the viewport is 390×844. Add `AC_CHECK_NAV=1` and `/dashboar
 
 With `AC_CHECK_DNA=1` and `/chat`, it types a uniquely marked fictional message, waits for the real DNA endpoint, processing to finish and an assistant bubble, then reloads and checks the exchange again. It persists test conversation data and may cause extractions; use an authorized disposable identity. See the DNA map for observed evidence. Do not automatically retry submission after a timeout: the message or response may already have been saved.
 
+With `AC_CHECK_VAULT=1` and `/dna-vault`, it waits for the empty, populated or error state. For a populated vault it opens Overview, Profiler Insights and Verbatim Memory Bank, tests nonmatching search where entries exist and clears both searches. It reports state and empty-list flags, not personal text; it does not trigger extraction, export or writes.
+
 With `AC_CHECK_SAVED=1`, `AC_TEST_PROJECT=<unique fixture title>` and `/auditions`, it searches for that named fixture and opens its detail. `AC_CHECK_ENRICH=1` additionally chooses Attach Sides on a brief-only fixture, sends fictional sides to the real analysis service, saves and verifies both analyses on the same detail URL. This mutates the existing fixture and is not repeatable against the same already-enriched record; create a fresh, explicitly disposable brief first. Record the fixture and effect.
 
 With `AC_CHECK_PICKER=1`, `AC_TEST_PROJECT=<unique fixture title>` and `/auditions/new/sides`, it selects that named saved audition, waits for its result and clears the selection. It checks that the new-scene project field is blank; it does not generate, save or delete anything.
