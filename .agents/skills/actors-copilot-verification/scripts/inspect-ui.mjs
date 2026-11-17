@@ -92,9 +92,10 @@ try {
         await page.locator('button ::-p-text(Next)').click();
         await page.locator('textarea[placeholder="Paste your details here..."]').fill('ALEX\nWhere is the key?\n\nSAM\nI left it on the table.\n\nALEX\nThank you.');
         await page.locator('button ::-p-text(Next)').click();
-        const responsePromise = page.waitForResponse(r => r.url().includes('/api/auditions/analyzeSides') && r.request().method() === 'POST', {timeout:180000});
-        await page.locator('button ::-p-text(Generate Breakdown)').click();
-        const analysisResponse = await responsePromise;
+        const [analysisResponse] = await Promise.all([
+          page.waitForResponse(r => r.url().includes('/api/auditions/analyzeSides') && r.request().method() === 'POST', {timeout:180000}),
+          page.locator('button ::-p-text(Generate Breakdown)').click(),
+        ]);
         if (!analysisResponse.ok()) throw new Error(`Sides analysis HTTP ${analysisResponse.status()}`);
         await page.locator('button ::-p-text(Save Output)').setTimeout(180000).wait();
         await page.locator('button ::-p-text(Save Output)').click();
@@ -118,6 +119,39 @@ try {
       await page.locator('[aria-label="Partner Voices"]').wait();
       console.log(JSON.stringify({journey:path, characters, rehearsalControlsVisible:true}));
     }
+    if (process.env.AC_CHECK_DNA === '1' && path === '/chat') {
+      const message = `Fictional acting exercise ${Date.now()}: I enjoy playing a character who solves problems through patience.`;
+      await page.waitForSelector('[aria-label="Change the subject"]:not([disabled])', {timeout:30000});
+      await page.locator('textarea').click();
+      await page.type('textarea', message);
+      try {
+        await page.waitForSelector('[aria-label="Send message"]', {visible:true, timeout:10000});
+      } catch (error) {
+        const state = await page.evaluate(() => ({
+          textLength: document.querySelector('textarea')?.value.length,
+          inputDisabled: document.querySelector('textarea')?.disabled,
+          actionLabels: [...document.querySelectorAll('button[aria-label]')].map(e => e.getAttribute('aria-label')),
+        }));
+        console.error(JSON.stringify({journey:'dna-chat', stage:'send-control', ...state}));
+        throw error;
+      }
+      const [response] = await Promise.all([
+        page.waitForResponse(r => r.url().includes('/api/dna/chat') && r.request().method() === 'POST', {timeout:120000}),
+        page.locator('[aria-label="Send message"]').click(),
+      ]);
+      if (!response.ok()) throw new Error(`DNA chat HTTP ${response.status()}`);
+      await page.waitForSelector('[aria-label="Change the subject"]:not([disabled])', {timeout:120000});
+      const hasReply = m => {
+        const bubbles = [...document.querySelectorAll('div.group.w-full')];
+        const index = bubbles.findIndex(e => e.innerText.includes(m));
+        return index >= 0 && bubbles.slice(index + 1).some(e => e.classList.contains('justify-start'));
+      };
+      await page.waitForFunction(hasReply, {timeout:120000}, message);
+      console.log(JSON.stringify({journey:'dna-chat', responseVisibleBeforeReload:true}));
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(hasReply, {timeout:60000}, message);
+      console.log(JSON.stringify({journey:'dna-chat', responseVisible:true, exchangeVisibleAfterReload:true}));
+    }
     if (process.env.AC_CHECK_WIZARD === '1' && ['/auditions/new/brief', '/auditions/new/sides'].includes(path)) {
       const project = `Verification Fixture ${Date.now()}`;
       await page.locator('#project').fill(project);
@@ -133,9 +167,10 @@ try {
       if (!review.generateEnabled || !review.fixtureVisible) throw new Error(`Wizard review failed: ${path}`);
       if (process.env.AC_GENERATE === '1') {
         const endpoint = path.endsWith('/brief') ? '/api/auditions/analyzeBrief' : '/api/auditions/analyzeSides';
-        const responsePromise = page.waitForResponse(r => r.url().includes(endpoint) && r.request().method() === 'POST', {timeout:180000});
-        await page.locator('button ::-p-text(Generate Breakdown)').click();
-        const analysisResponse = await responsePromise;
+        const [analysisResponse] = await Promise.all([
+          page.waitForResponse(r => r.url().includes(endpoint) && r.request().method() === 'POST', {timeout:180000}),
+          page.locator('button ::-p-text(Generate Breakdown)').click(),
+        ]);
         if (!analysisResponse.ok()) throw new Error(`Analysis HTTP ${analysisResponse.status()}`);
         await page.locator('button ::-p-text(Save Output)').setTimeout(180000).wait();
         console.log(JSON.stringify({journey:path, generated:true}));
