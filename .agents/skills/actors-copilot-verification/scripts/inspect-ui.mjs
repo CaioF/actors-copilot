@@ -13,6 +13,7 @@ if (!chrome || !email || !password || !paths.length || paths.some(p => !p.starts
   console.error('Set AC_CHROME_PATH, AC_TEST_EMAIL and AC_TEST_PASSWORD; pass one or more relative paths.');
   process.exit(2);
 }
+if (process.env.AC_EXPECT_FINAL_PATH && paths.length !== 1) throw new Error('AC_EXPECT_FINAL_PATH requires exactly one requested path');
 const url = new URL(origin);
 if (!(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) || url.pathname !== '/' || url.username || url.password || url.search || url.hash) {
   console.error('AC_BASE_URL must be an HTTPS origin or a local HTTP origin.');
@@ -75,6 +76,9 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_EXPECT_FINAL_PATH && view.path !== process.env.AC_EXPECT_FINAL_PATH) {
+      throw new Error(`Unexpected final path: ${view.path}`);
+    }
     if (process.env.AC_CHECK_CHAT_CONTROLS === '1' && path === '/chat') {
       let dnaPosts = 0;
       const countDnaPosts = request => {
