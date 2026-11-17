@@ -61,6 +61,26 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_PICKER === '1' && path === '/auditions/new/sides') {
+      const project = process.env.AC_TEST_PROJECT;
+      if (!project) throw new Error('AC_TEST_PROJECT is required for the picker check');
+      await page.waitForSelector('section[aria-label="Saved auditions"]', {visible:true, timeout:30000});
+      const cards = await page.$$('section[aria-label="Saved auditions"] button[aria-pressed]');
+      let selected;
+      for (const card of cards) {
+        if ((await card.evaluate(e => e.innerText)).toLowerCase().includes(project.toLowerCase())) {
+          selected = card;
+          break;
+        }
+      }
+      if (!selected) throw new Error('Named fixture was not found in Saved auditions');
+      await selected.click();
+      await page.waitForFunction(p => [...document.querySelectorAll('section[aria-label="Saved auditions"] button[aria-pressed="true"]')].some(e => e.innerText.toLowerCase().includes(p.toLowerCase())), {timeout:30000}, project);
+      await page.locator('button ::-p-text(Save Output)').setTimeout(30000).wait();
+      await page.locator('button ::-p-text(Start a new scene instead)').click();
+      await page.waitForFunction(() => document.querySelector('#project')?.value === '', {timeout:30000});
+      console.log(JSON.stringify({journey:'saved-scene-picker', selectedFixture:true, savedResultVisible:true, clearRestoredBlankScene:true}));
+    }
     if (process.env.AC_MOBILE === '1' && process.env.AC_CHECK_NAV === '1' && path === '/dashboard') {
       await page.locator('[aria-label="Open menu"]').click();
       await page.locator('nav a[href="/auditions"]').click();
