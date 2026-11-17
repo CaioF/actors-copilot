@@ -41,6 +41,7 @@ export interface AuditionDocument {
   actorLocalDeadline?: string | null;
   castingDirectorName?: string | null;
   breakdownDepth?: "complete" | "quick";
+  sidesText?: string;
   performanceMap?: PerformanceMap | null;
   sidesPerformanceMap?: PerformanceMap | null;
   briefPerformanceMap?: PerformanceMap | null;

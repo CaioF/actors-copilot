@@ -66,6 +66,7 @@ export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: Au
   const [formData, setFormData] = useState<AuditionFormData>(initialAuditionData);
   const [isGenerating, setIsGenerating] = useState(false);
   const [resultData, setResultData] = useState<AuditionAnalysisResult | null>(null);
+  const [analyzedSidesText, setAnalyzedSidesText] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [localDeadlineStr, setLocalDeadlineStr] = useState<string | null>(null);
   const [pendingDup, setPendingDup] = useState<{
@@ -117,6 +118,8 @@ export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: Au
 
         if (!existing) return;
 
+        setAnalyzedSidesText(existing.sidesText || "");
+
         setFormData((prev) => ({
           ...prev,
           project: existing.project || "",
@@ -126,6 +129,7 @@ export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: Au
           castingDirectorName: existing.castingDirectorName || "",
           projectType: existing.projectType || prev.projectType,
           breakdownDepth: existing.breakdownDepth || prev.breakdownDepth,
+          ...(loadSavedResult ? { sidesText: existing.sidesText || "" } : {}),
         }));
 
         // Scene Study resumes an audition the member already saved: show the
@@ -411,6 +415,9 @@ export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: Au
       const data = await response.json();
 
       if (response.ok && data.data?.sections) {
+        if (mode === "sides") {
+          setAnalyzedSidesText(typeof data.sidesText === "string" ? data.sidesText : formData.sidesText);
+        }
         setResultData(data.data as AuditionAnalysisResult);
         setIsGenerating(false);
       } else {
@@ -481,6 +488,7 @@ export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: Au
     breakdownDepth: formData.breakdownDepth || "complete",
     performanceMap: resultData,
     analysisType: mode,
+    ...(mode === "sides" && analyzedSidesText.trim() ? { sidesText: analyzedSidesText } : {}),
     sidesPerformanceMap: mode === "sides" ? resultData : null,
     briefPerformanceMap: mode === "brief" ? resultData : null,
     criticalBriefFacts: resultData?.criticalBriefFacts ?? null,
@@ -549,7 +557,7 @@ export function AuditionWizard({ mode, auditionId, loadSavedResult = false }: Au
       criticalBriefFacts: nextCriticalBriefFacts,
       // Merge the newly generated performance map
       ...(mode === "sides"
-        ? { sidesPerformanceMap: resultData, hasSides: true }
+        ? { sidesPerformanceMap: resultData, hasSides: true, ...(analyzedSidesText.trim() ? { sidesText: analyzedSidesText } : {}) }
         : { briefPerformanceMap: resultData, hasBrief: true }),
     };
   };
