@@ -2,6 +2,8 @@
 
 The repository pins `puppeteer-core`; it does not download Chrome. Use Node 22.12+ and a compatible local Chrome, `pnpm install --frozen-lockfile`, and an isolated browser profile. The inspector starts a fresh headless Chrome, closes it in `finally`, and uses Puppeteer's Chrome DevTools Protocol transport. It does not attach to the user's everyday browser or expose a remote debugging port. When manually using CDP, bind it to localhost and use a separate `--user-data-dir`: Chrome 136+ ignores remote-debugging switches for the default profile. See [Chrome's guidance](https://developer.chrome.com/blog/remote-debugging-port) and [Puppeteer launch options](https://pptr.dev/api/puppeteer.launchoptions).
 
+For a signed-out HTTP check of both public-profile representations, run `node .agents/skills/actors-copilot-verification/scripts/missing-profile-smoke.mjs https://app.theactorscopilot.com` or pass a local HTTP origin. It requests a freshly generated synthetic slug and checks both HTML and Markdown for 404 and the missing-profile message. It performs no writes and does not verify published or unpublished profiles, browser rendering or access control for a known slug.
+
 ## Run the inspector
 
 Set variables in the current shell without committing them. Obtain credentials securely; do not save passwords, session cookies, Firebase ID tokens, or traces containing them in the repository. Use a disposable test identity and identify the environment. PowerShell example (replace placeholders locally):
