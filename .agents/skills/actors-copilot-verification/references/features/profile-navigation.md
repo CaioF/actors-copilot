@@ -26,6 +26,8 @@ Observed on production 2026-11-17 with the seeded Economy session, Chrome 157 at
 
 Observed on production 2026-11-17 with the seeded Economy session, Chrome 157 at 1440×900: Support opened “Need Help?” with a support email link and its close button dismissed it. Selecting Dark changed the document theme and survived a reload in the same isolated browser profile; selecting Light changed it again. Header Settings navigated to `/settings`, and the sidebar marked Settings as the active page. The mail link was not opened, theme behavior in another browser or account was not tested, and the test profile was discarded when Chrome closed. The modal close button has no accessible name in the reviewed source; the inspector uses its position within the modal as a fallback, not a stable accessibility selector.
 
+In a separate production run with the seeded Economy test session, Settings showed a disabled email field. Entering a synthetic display name without saving and reloading restored the original field value once account data loaded; no POST to `/api/profile/display-name` was observed during that check. Saving, user-path migration, photo upload, password reset, billing portal and deletion were not tested.
+
 Profile sections include photos, basic and physical details, bio, agent, showreels, credits, training, external profiles, skills and CV. File uploads and IMDb autofill cross Storage or external scraping/AI boundaries. Inspect validation and preview, then reload; tests of form rendering alone do not verify upload or public exposure. For every mutation, note whether a test fixture remains and verify only that fixture.
 
 ### Profile form coverage

@@ -34,6 +34,8 @@ With `AC_MOBILE=1` the viewport is 390×844. Add `AC_CHECK_NAV=1` and `/dashboar
 
 With `AC_CHECK_HEADER=1` and `/dashboard` at the default desktop viewport, the inspector opens and closes Support, checks its email link, selects Dark and reloads to check persistence within the temporary browser profile, selects Light, then navigates to Settings and checks the active sidebar link. It does not send email or change the account profile. Chrome's temporary profile is discarded on exit; this is not a cross-device theme test.
 
+With `AC_CHECK_SETTINGS_DRAFT=1` and `/settings`, it checks that the email field is disabled, enters a synthetic display name without saving, reloads after authentication and checks the original name is restored. It expects no display-name API POST and does not print the original value. The check does not save or test name migration, uploads, password reset, billing or deletion.
+
 With `AC_CHECK_PLAN_CONTROLS=1` and `/upgrade`, the inspector selects EUR, GBP and USD, checks the selected radio and currency symbol on each plan card, switches to annual and back to monthly, and expects no checkout POST. This exercises displayed controls only; it does not click plan buttons or prove checkout availability, price correctness or an entitlement change.
 
 With `AC_CHECK_BASELINE_FORM=1` and `/dashboard`, the inspector opens Upload Baseline, checks the empty and text-filled button states, cancels and reopens to check the draft is cleared, selects the tracked synthetic DOCX and removes it. It counts baseline POST requests and expects zero. This tests local form interaction only: it does not submit, parse the document, invoke AI or test saved DNA.

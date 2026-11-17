@@ -79,6 +79,27 @@ try {
     if (process.env.AC_EXPECT_FINAL_PATH && view.path !== process.env.AC_EXPECT_FINAL_PATH) {
       throw new Error(`Unexpected final path: ${view.path}`);
     }
+    if (process.env.AC_CHECK_SETTINGS_DRAFT === '1' && path === '/settings') {
+      const displayName = 'input[placeholder="e.g., Viola Davis"]';
+      const emailInput = 'input[type="email"][placeholder="actor@email.com"]';
+      await page.waitForFunction(selector => !!document.querySelector(selector)?.value, {timeout:30000}, emailInput);
+      const original = await page.$eval(displayName, e => e.value);
+      if (!await page.$eval(emailInput, e => e.disabled)) throw new Error('Settings email is unexpectedly editable');
+      let saveRequests = 0;
+      const countSaves = request => {
+        const target = new URL(request.url());
+        if (target.origin === url.origin && target.pathname === '/api/profile/display-name' && request.method() === 'POST') saveRequests++;
+      };
+      page.on('request', countSaves);
+      await page.locator(displayName).fill('Synthetic Unsaved Name');
+      await page.waitForFunction(selector => document.querySelector(selector)?.value === 'Synthetic Unsaved Name', {}, displayName);
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(selector => !!document.querySelector(selector)?.value, {timeout:30000}, emailInput);
+      await page.waitForFunction((selector, value) => document.querySelector(selector)?.value === value, {timeout:30000}, displayName, original);
+      page.off('request', countSaves);
+      if (saveRequests) throw new Error('Unexpected settings save request');
+      console.log(JSON.stringify({journey:'settings-draft', emailDisabled:true, unsavedNameDiscardedAfterReload:true, saveRequests}));
+    }
     if (process.env.AC_CHECK_CHAT_CONTROLS === '1' && path === '/chat') {
       let dnaPosts = 0;
       const countDnaPosts = request => {
