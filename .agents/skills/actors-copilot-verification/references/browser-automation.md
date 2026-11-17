@@ -24,6 +24,8 @@ To exercise document extraction for sides, set `AC_SIDES_FILE` to the absolute p
 
 With `AC_CHECK_READER=1` and `/reader-copilot`, the inspector submits a fictional two-person script to the real parsing endpoint, selects ALEX and waits for the Partner Voices control. It does not record audio or prove playback. Provider calls may incur cost.
 
+Add `AC_CHECK_READER_CONTROLS=1` to that run to turn Auto-Flow off, mute audio, select Slow and Fast, change a partner voice and reopen the settings, then use Next Line and Restart Scene. It verifies UI state in the current rehearsal, not recording, playback, a complete scene or cross-reload persistence. The app can prefetch partner speech even without pressing the voice-test button, so this run may also invoke TTS.
+
 With `AC_MOBILE=1` the viewport is 390×844. Add `AC_CHECK_NAV=1` and `/dashboard` to open the mobile menu, navigate to Auditions and verify the menu closes. This checks one navigation path, not general responsive or accessibility compliance.
 
 With `AC_CHECK_HEADER=1` and `/dashboard` at the default desktop viewport, the inspector opens and closes Support, checks its email link, selects Dark and reloads to check persistence within the temporary browser profile, selects Light, then navigates to Settings and checks the active sidebar link. It does not send email or change the account profile. Chrome's temporary profile is discarded on exit; this is not a cross-device theme test.

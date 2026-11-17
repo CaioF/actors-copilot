@@ -418,6 +418,33 @@ try {
       const characters = await page.$$eval('h3', headings => headings.map(e => e.innerText));
       await page.locator('button ::-p-text(ALEX)').click();
       await page.locator('[aria-label="Partner Voices"]').wait();
+      if (process.env.AC_CHECK_READER_CONTROLS === '1') {
+        await page.locator('button ::-p-text(Auto-Flow ON)').click();
+        await page.locator('button ::-p-text(Auto-Flow OFF)').wait();
+        await page.locator('[aria-label="Mute AI audio"]').click();
+        await page.locator('[aria-label="Unmute AI audio"]').wait();
+        await page.locator('[aria-label="AI voice speed"] button ::-p-text(Slow)').click();
+        await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="AI voice speed"] button')].some(e => e.textContent.trim() === 'Slow' && e.getAttribute('aria-pressed') === 'true'));
+        await page.locator('[aria-label="AI voice speed"] button ::-p-text(Fast)').click();
+        await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="AI voice speed"] button')].some(e => e.textContent.trim() === 'Fast' && e.getAttribute('aria-pressed') === 'true'));
+        await page.locator('[aria-label="Partner Voices"]').click();
+        await page.locator('h3 ::-p-text(Scene Partner Voice Settings)').wait();
+        const voiceSelect = await page.$('select');
+        if (!voiceSelect) throw new Error('Partner voice selector missing');
+        const alternate = await voiceSelect.evaluate(e => [...e.options].find(option => option.value !== e.value)?.value);
+        if (!alternate) throw new Error('No alternate partner voice available');
+        await voiceSelect.select(alternate);
+        await page.locator('button ::-p-text(Save & Close)').click();
+        await page.waitForFunction(() => ![...document.querySelectorAll('h3')].some(e => e.textContent.includes('Scene Partner Voice Settings')));
+        await page.locator('[aria-label="Partner Voices"]').click();
+        await page.waitForFunction(value => document.querySelector('select')?.value === value, {}, alternate);
+        await page.locator('button ::-p-text(Save & Close)').click();
+        await page.locator('button[title="Next Line"]').click();
+        await page.waitForFunction(() => document.querySelector('[data-active-line="true"]') !== document.querySelector('[data-active-line]'));
+        await page.locator('[aria-label="Restart Scene"]').click();
+        await page.waitForFunction(() => document.querySelector('[data-active-line="true"]') === document.querySelector('[data-active-line]'));
+        console.log(JSON.stringify({journey:'reader-controls', autoFlowDisabled:true, muted:true, speedSelected:true, voiceReopened:true, nextThenRestart:true}));
+      }
       console.log(JSON.stringify({journey:path, characters, rehearsalControlsVisible:true}));
     }
     if (process.env.AC_CHECK_DNA === '1' && path === '/chat') {
