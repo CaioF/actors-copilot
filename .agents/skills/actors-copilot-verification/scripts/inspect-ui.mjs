@@ -75,6 +75,37 @@ try {
       links: [...document.querySelectorAll('a[href]')].filter(e => e.getClientRects().length).map(e => ({label:(e.getAttribute('aria-label') || e.innerText).trim(), href:e.getAttribute('href')})).filter(e => e.label),
     }));
     console.log(JSON.stringify({requested: path, ...view}));
+    if (process.env.AC_CHECK_CHAT_CONTROLS === '1' && path === '/chat') {
+      let dnaPosts = 0;
+      const countDnaPosts = request => {
+        const target = new URL(request.url());
+        if (target.origin === url.origin && target.pathname.startsWith('/api/dna/') && request.method() === 'POST') dnaPosts++;
+      };
+      page.on('request', countDnaPosts);
+      await page.locator('[aria-label="How DNA Extraction Works"]').click();
+      await page.locator('h2 ::-p-text(How DNA Extraction Works)').wait();
+      await page.locator('[aria-label="Close help modal"]').click();
+      await page.waitForFunction(() => !document.querySelector('[aria-label="Close help modal"]'));
+      await page.locator('[aria-label="How DNA Extraction Works"]').click();
+      await page.locator('[aria-label="Close help modal"]').wait();
+      const help = await page.$('[aria-label="Close help modal"]');
+      const helpContainer = await help.evaluateHandle(e => e.parentElement);
+      const upload = await helpContainer.$$('button');
+      const uploadButton = await Promise.all(upload.map(async button => ({button, text:await button.evaluate(e => e.innerText.trim())})));
+      const baseline = uploadButton.find(item => item.text === 'Upload Baseline');
+      if (!baseline) throw new Error('Help modal baseline action missing');
+      await baseline.button.click();
+      await page.locator('h2 ::-p-text(Upload Your Baseline History)').wait();
+      await page.locator('button ::-p-text(Cancel)').click();
+      await page.waitForFunction(() => ![...document.querySelectorAll('h2')].some(e => e.textContent.includes('Upload Your Baseline History')));
+      await page.locator('[aria-label="DNA Reservoirs"]').click();
+      await page.locator('h3 ::-p-text(Your DNA Reservoirs)').wait();
+      await page.locator('[aria-label="DNA Reservoirs"]').click();
+      await page.waitForFunction(() => ![...document.querySelectorAll('h3')].some(e => e.textContent.includes('Your DNA Reservoirs')));
+      page.off('request', countDnaPosts);
+      if (dnaPosts) throw new Error('Unexpected DNA request during chat controls check');
+      console.log(JSON.stringify({journey:'chat-controls', helpOpenClose:true, helpToBaselineCancel:true, reservoirsOpenClose:true, dnaPosts}));
+    }
     if (process.env.AC_CHECK_PLAN_CONTROLS === '1' && path === '/upgrade') {
       let checkoutRequests = 0;
       const countCheckout = request => {
