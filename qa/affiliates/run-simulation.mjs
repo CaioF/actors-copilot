@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { expect as playwrightExpect } from 'playwright/test';
 const expect = playwrightExpect.configure({ timeout: 90000 });
 import { navigateAddress } from './browser-address.mjs';
-import { affiliateRow, header, installMask, memberRow, stripeSummary } from './camera.mjs';
+import { affiliateRow, header, memberRow, openAffiliates, stripeSummary } from './camera.mjs';
 
 const mode = process.argv[2];
 assert(
@@ -55,12 +55,12 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 page.setDefaultTimeout(120000);
-await installMask(page, origin);
 const report = {
   origin,
   language: 'en-US',
   browser: browser.version(),
   journey: 'affiliate-signup',
+  presentation: 'full browser viewport',
   status: 'incomplete',
   confirmation: 'not attempted',
   timeline: [],
@@ -89,6 +89,12 @@ async function click(locator) {
   await hold(320);
   await locator.click();
 }
+async function signInOperator() {
+  if (record) mark('Operator signs in again at the admin prompt');
+  await page.getByLabel('Username', { exact: true }).fill(process.env.AC_ADMIN_USERNAME);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.AC_ADMIN_PASSWORD);
+  await click(page.getByRole('button', { name: 'Log in', exact: true }));
+}
 async function watch(name, task) {
   stage = name;
   return task();
@@ -105,9 +111,7 @@ function demoCall(method, body) {
 try {
   // Open the operator's entry point once. All application routes after registration are observed.
   await page.goto(origin + '/admin-dashboard', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.getByLabel('Username', { exact: true }).fill(process.env.AC_ADMIN_USERNAME);
-  await page.getByLabel('Password', { exact: true }).fill(process.env.AC_ADMIN_PASSWORD);
-  await click(page.getByRole('button', { name: 'Log in', exact: true }));
+  await signInOperator();
   await page.locator('header h1').filter({ hasText: 'Member dashboard' }).waitFor({ state: 'attached' });
   const affiliates = await header(page);
   await page.screencast.showActions({
@@ -123,14 +127,13 @@ try {
   record = true;
   started = performance.now();
   mark('Member dashboard after operator login');
-  await click(affiliates);
-  await page.waitForURL(origin + '/admin-dashboard/affiliates');
-  await header(page);
+  await hold(2000);
+  await openAffiliates(page, affiliates, signInOperator);
   const { address, link } = await watch('locating the referral in the affiliate row', () =>
     affiliateRow(page, origin),
   );
   mark('Lucas coupon and referral address in the operator panel');
-  await hold(1700);
+  await hold(3200);
   stage = 'opening the referral address displayed by admin';
   if (await link.evaluate((el) => Boolean(el.closest('a[href]')))) {
     await click(link);
@@ -244,17 +247,16 @@ try {
   mark(
     confirm ? 'Same member shows Lucas, Trial and Simulated QA' : 'Same new member shows Lucas as referrer',
   );
-  await hold(2600);
-  await click(nav);
-  await page.waitForURL(origin + '/admin-dashboard/affiliates');
-  await header(page);
+  await hold(4000);
+  await openAffiliates(page, nav, signInOperator);
   await affiliateRow(page, origin, confirm);
   mark(
     confirm
       ? 'Lucas shows the separately labeled simulated referral'
       : 'Lucas coupon and referral link verified again',
   );
-  await hold(2600);
+  await hold(4000);
+  await expect(page.getByRole('heading', { name: 'Affiliate program', exact: true })).toBeVisible();
   await page.screencast.stop();
   record = false;
   await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));

@@ -93,7 +93,8 @@ try {
     const run = JSON.parse(await readFile(join(affiliate, "report.json"), "utf8"));
     assert(run.journey === "affiliate-signup" && run.status === "demo-complete" &&
       run.cleanup === "verified" && run.demoHttpStatus === 303 && run.language === "en-US",
-      "Expected the completed, cleaned-up affiliate browser take from PR #115");
+      "Expected a completed affiliate browser take with verified cleanup");
+    assert.equal(run.presentation, "full browser viewport", "Select a full-view affiliate recording");
     const where = run.origin === "https://app.theactorscopilot.com" ? "Production" : "Pre-merge app";
     await card("Lucas referral, checkout and admin", where + " · Stripe confirmation simulated");
     segment(["-i", join(affiliate, "affiliate.mp4")]);
@@ -105,6 +106,7 @@ try {
     );
     assert.equal(report.status, "passed");
     assert.equal(report.language, "en-US");
+    assert.equal(report.presentation, "full browser viewport", "Select a full-view actor recording");
     assert(["browser sign-in form","component fixture"].includes(report.authentication));
     for (const clip of report.clips) {
       assert(Object.hasOwn(titles, clip.name));
