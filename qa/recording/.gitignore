@@ -1,0 +1,6 @@
+/node_modules/
+/evidence/
+.env*
+*.webm
+*.mp4
+*.zip

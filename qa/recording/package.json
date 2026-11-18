@@ -1,0 +1,14 @@
+{
+  "name": "actors-copilot-recording",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "record": "node record.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.65.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

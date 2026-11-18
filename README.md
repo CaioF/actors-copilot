@@ -2,6 +2,8 @@
 
 An AI-powered self-tape audition preparation platform that extracts an actor's psychological "Personal DNA" through Socratic questioning, synthesizes a Master Profile, and generates personalized audition coaching.
 
+Recorded browser QA covers affiliate checkout, audition breakdowns, and Acting Coach. [Run or review a recording](qa/recording/README.md).
+
 ## Table of Contents
 
 - [Tech Stack](#tech-stack)
