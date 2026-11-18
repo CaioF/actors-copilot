@@ -24,6 +24,7 @@ export type AdminMemberDto = Pick<
 > & {
   /** The affiliate code that brought this member in, when there is one. */
   referredBy: string | null;
+  qaSimulation?: boolean;
 };
 
 export interface AdminMembersResponse {
@@ -39,6 +40,7 @@ export function serializeAdminMember(
     displayName: member.displayName,
     email: member.email,
     referredBy: member.referredBy ?? null,
+    ...(member.qaSimulation ? { qaSimulation: true } : {}),
     tier: member.tier,
     subscriptionStatus: member.subscriptionStatus,
     membershipState: member.membershipState,

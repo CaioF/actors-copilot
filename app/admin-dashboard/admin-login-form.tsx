@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -22,6 +22,8 @@ export function AdminLoginForm({
   redirectTo = '/admin-dashboard',
 }: AdminLoginFormProps = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [error, setError] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -72,14 +74,14 @@ export function AdminLoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form action="/api/admin/login" method="post" className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label className="text-sm font-medium text-[#3D4A3C]" htmlFor="admin-username">
                 Username
               </label>
               <Input
                 autoComplete="username"
-                disabled={isSubmitting}
+                disabled={!ready || isSubmitting}
                 id="admin-username"
                 name="username"
                 required
@@ -91,7 +93,7 @@ export function AdminLoginForm({
               </label>
               <Input
                 autoComplete="current-password"
-                disabled={isSubmitting}
+                disabled={!ready || isSubmitting}
                 id="admin-password"
                 name="password"
                 required
@@ -107,7 +109,7 @@ export function AdminLoginForm({
             </div>
             <Button
               className="w-full bg-[#3D4A3C] text-white hover:bg-[#303B30]"
-              disabled={isSubmitting}
+              disabled={!ready || isSubmitting}
               type="submit"
             >
               {isSubmitting ? 'Logging in...' : 'Log in'}

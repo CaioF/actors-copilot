@@ -1,6 +1,8 @@
 import { auth, db } from '@/lib/firebase.admin';
 import type { AdminMemberProjection } from './domain';
 import { listAdminMemberSnapshot } from './members';
+import { listQaTrials } from '@/lib/qa-affiliate-run';
+jest.mock('@/lib/qa-affiliate-run', () => ({...jest.requireActual('@/lib/qa-affiliate-run'),listQaTrials:jest.fn(async () => new Map())}));
 import { listAdminMembers } from './repository';
 
 jest.mock('@/lib/firebase.admin', () => ({
@@ -292,6 +294,16 @@ describe('listAdminMemberSnapshot', () => {
     expect((db.getAll as jest.Mock).mock.calls[1]).toHaveLength(20);
     expect((db.getAll as jest.Mock).mock.calls[2]).toHaveLength(100);
     expect((db.getAll as jest.Mock).mock.calls[3]).toHaveLength(20);
+  });
+
+  it('labels an approved demonstration while keeping a real subscription authoritative', async () => {
+    (auth.listUsers as jest.Mock).mockResolvedValue({users:[authUser('qa','qa@example.test'),authUser('paid','paid@example.test')]});
+    (listQaTrials as jest.Mock).mockResolvedValueOnce(new Map([['qa',{}],['paid',{}]]));
+    mockDocuments({qa:{tier:'free'},paid:{tier:'business',status:'active'}});
+    const {members} = await listAdminMemberSnapshot(NOW);
+    expect(members.find(member => member.uid === 'qa')).toMatchObject({qaSimulation:true,tier:'economy',subscriptionStatus:'trialing'});
+    expect(members.find(member => member.uid === 'paid')).toMatchObject({tier:'business',subscriptionStatus:'active'});
+    expect(members.find(member => member.uid === 'paid')?.qaSimulation).toBeUndefined();
   });
 
   it('reads the referral from the member document, not from the projection', async () => {

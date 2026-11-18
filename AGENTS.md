@@ -57,6 +57,13 @@ The entitlement is always owned by **Stripe + webhook**, never by Firestore alon
 - `POST /api/billing/checkout` reuses the customer already stored in Firestore. It only mints a new
   one when no customer is mapped yet.
 
+**Explicit QA exception:** an operator may simulate a trial for specifically authorized test
+accounts through the disabled-by-default, allowlisted QA simulation endpoint. Simulated access
+is not a Stripe subscription or payment. It must be marked as QA, excluded from real affiliate
+revenue, protected by admin authentication and a separate secret, and cleaned up after testing.
+The endpoint must reject accounts with a real active/trialing subscription and fail closed when
+its allowlists or secret are missing. A fresh browser signup may use one exact preapproved address at `example.test`; existing identities require an exact UID and email. The endpoint verifies the already-open checkout and records a signed 15-minute QA receipt. The Stripe webhook retains ownership of real billing documents.
+
 ## Trial recovery flow
 
 Accounts whose first checkout failed because of a server-side fault (for example inactive Stripe

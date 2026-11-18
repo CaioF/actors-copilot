@@ -1,5 +1,6 @@
 import type { UserRecord } from 'firebase-admin/auth';
 import { auth, db } from '@/lib/firebase.admin';
+import { listQaTrials, realEntitlement } from '@/lib/qa-affiliate-run';
 import {
   resolveAdminDisplayName,
   resolveMembershipState,
@@ -141,10 +142,12 @@ function buildMember(params: {
   billing: SourceData | undefined;
   projection: AdminMemberProjection | undefined;
   referredBy: string | null;
+  qaSimulation: boolean;
   authCreatedAt: string;
   now: number;
 }): AdminMemberProjection {
-  const billing = params.billing ?? {};
+  const qa = params.qaSimulation && !realEntitlement(params.billing);
+  const billing = qa ? { ...params.billing, tier: 'economy', status: 'trialing' } : params.billing ?? {};
   const subscriptionStatus =
     nullableString(billing.status) ?? nullableString(billing.subscriptionStatus);
   const cancelAtPeriodEnd = billing.cancelAtPeriodEnd === true;
@@ -157,6 +160,7 @@ function buildMember(params: {
     email: params.email,
     displayName: params.displayName,
     referredBy: params.referredBy,
+    ...(qa ? { qaSimulation: true } : {}),
     tier: tier(billing.tier),
     subscriptionStatus,
     membershipState: resolveMembershipState({
@@ -226,6 +230,7 @@ export async function listAdminMemberSnapshot(
     ...liveUids,
     ...archivedUids,
   ]);
+  const qaSimulations = await listQaTrials();
 
   const members: AdminMemberProjection[] = authUsers.map((user) => {
     const projection = projectionByUid.get(user.uid);
@@ -242,6 +247,7 @@ export async function listAdminMemberSnapshot(
       billing: billing.get(user.uid),
       projection,
       referredBy: referrals.get(user.uid) ?? projection?.referredBy ?? null,
+      qaSimulation: qaSimulations.has(user.uid),
       authCreatedAt,
       now,
     });
@@ -259,6 +265,7 @@ export async function listAdminMemberSnapshot(
       // An account whose member document is gone keeps its referral in the
       // projection, which is the only place it is left.
       referredBy: referrals.get(uid) ?? projection?.referredBy ?? null,
+      qaSimulation: qaSimulations.has(uid),
       authCreatedAt: projection?.authCreatedAt ?? new Date(now * 1000).toISOString(),
       now,
     });

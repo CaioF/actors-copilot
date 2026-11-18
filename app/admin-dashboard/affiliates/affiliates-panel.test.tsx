@@ -64,6 +64,12 @@ describe('AffiliatesPanel', () => {
     expect(screen.getByText(/\/login\?ref=tracey$/)).toBeInTheDocument();
   });
 
+  it('labels simulated QA referrals separately from real totals', () => {
+    render(<AffiliatesPanel report={[affiliate({ qaReferredCount: 1 })]} payouts={[]} />);
+    expect(screen.getByText('2 referred · 1 converted')).toBeInTheDocument();
+    expect(screen.getByText('1 simulated QA referral(s), excluded from real totals')).toBeInTheDocument();
+  });
+
   it('renders the empty state when there is no affiliate', () => {
     render(<AffiliatesPanel report={[]} payouts={[]} />);
 

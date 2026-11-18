@@ -8,6 +8,7 @@ import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 import { normalizeCurrency } from '@/lib/plan-selection';
 import { buildAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { logger } from '@/lib/logger';
+import { eligibleIdentity, readQaTrial, realEntitlement } from '@/lib/qa-affiliate-run';
 
 /**
  * Upper bound of automatic checkout attempts for a single recovery flag.
@@ -123,12 +124,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       hasUsedTrial = false;
     }
 
+    let qaExpiresAt: number | undefined;
+    if (eligibleIdentity(uid,email) && !realEntitlement(billingDoc.data()) && !realEntitlement(userData)) {
+      const demo = await readQaTrial(uid,email);
+      if (demo) {
+        tier = 'economy';
+        subscriptionStatus = 'trialing';
+        qaExpiresAt = demo.expiresAt;
+      }
+    }
+
     // 3. Serialize and commit entitlement metadata into the secure platform session.
     await setPlatformSession({
       uid,
       email,
       tier,
       subscriptionStatus,
+      ...(qaExpiresAt ? { qaExpiresAt } : {}),
       stripeCustomerId,
       stripeSubscriptionId,
       stripePriceId,

@@ -249,13 +249,16 @@ export function AffiliatesPanel({
                           </div>
                         ) : null}
                         <div className="mt-1 break-all text-xs text-muted-foreground">
-                          <span className="font-mono">
-                            {`${APP_ORIGIN}/login?ref=${affiliate.code}`}
-                          </span>
+                          <a className="font-mono underline" href={`${APP_ORIGIN}/login?ref=${encodeURIComponent(affiliate.code)}`}>
+                            {`${APP_ORIGIN}/login?ref=${encodeURIComponent(affiliate.code)}`}
+                          </a>
                         </div>
                       </TableCell>
                       <TableCell className="px-6 align-top text-sm text-muted-foreground">
                         {affiliate.referredCount} referred · {affiliate.convertedCount} converted
+                        {(affiliate.qaReferredCount ?? 0) > 0 && (
+                          <div className="mt-1 font-semibold text-amber-700">{affiliate.qaReferredCount} simulated QA referral(s), excluded from real totals</div>
+                        )}
                       </TableCell>
                       <TableCell className="px-6 align-top text-sm text-muted-foreground">
                         {formatTotals(affiliate.totals, (total) => total.netCollected)}

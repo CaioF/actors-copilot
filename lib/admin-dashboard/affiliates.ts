@@ -1,6 +1,7 @@
 import type Stripe from 'stripe';
 import { db } from '@/lib/firebase.admin';
 import { stripe } from '@/lib/stripe';
+import { listQaTrials } from '@/lib/qa-affiliate-run';
 import { DEFAULT_COMMISSION_RATE, normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 import {
   ensureAffiliatePromotionCode,
@@ -97,6 +98,7 @@ export interface AffiliateReportRow {
   /** Customer-facing Stripe promotion code, e.g. `LUCAS`. */
   promotionCode: string;
   referredCount: number;
+  qaReferredCount?: number;
   convertedCount: number;
   totals: AffiliateCurrencyTotals[];
   members: AffiliateReferredMember[];
@@ -499,7 +501,7 @@ export async function recordAffiliatePayout(
  * @returns One report row per affiliate.
  */
 export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
-  const [affiliates, payouts] = await Promise.all([listAffiliates(), listAffiliatePayouts()]);
+  const [affiliates, payouts, demos] = await Promise.all([listAffiliates(), listAffiliatePayouts(), listQaTrials()]);
 
   const paidOutByAffiliate = new Map<string, Map<string, MinorUnits>>();
   for (const payout of payouts) {
@@ -588,6 +590,7 @@ export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
       notes: affiliate.notes,
       promotionCode: affiliate.promotionCode,
       referredCount: members.length,
+      qaReferredCount: [...demos.values()].filter(demo => demo.affiliateCode === affiliate.code).length,
       convertedCount: members.filter((member) => member.converted).length,
       totals,
       members: members.sort((left, right) => right.netCollected - left.netCollected),

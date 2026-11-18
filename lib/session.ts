@@ -15,6 +15,8 @@ export interface PlatformSession {
   stripeSubscriptionId?: string;
   stripePriceId?: string;
   currentPeriodEnd?: number;
+  /** Server-authorized simulated QA entitlement; never lasts longer than this time. */
+  qaExpiresAt?: number;
 }
 
 const SESSION_COOKIE_NAME = 'platform_session';
@@ -35,7 +37,7 @@ export async function encryptSession(payload: PlatformSession): Promise<string> 
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d') // Explicit token longevity set to 1 week
+    .setExpirationTime(payload.qaExpiresAt ? Math.floor(payload.qaExpiresAt / 1000) : '7d')
     .sign(encodedSecret);
 }
 
@@ -50,6 +52,7 @@ export async function decryptSession(sessionToken: string): Promise<PlatformSess
     const { payload } = await jwtVerify(sessionToken, encodedSecret, {
       algorithms: ['HS256'],
     });
+    if (payload.qaExpiresAt && process.env.QA_SIMULATION_ENABLED !== 'true') return null;
     return payload as unknown as PlatformSession;
   } catch (error) {
     console.error('⚠️ Platform session token decryption failed:', error);
@@ -71,7 +74,7 @@ export async function setPlatformSession(payload: PlatformSession): Promise<void
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // Restrict persistence matrix to exactly 7 days
+    maxAge: payload.qaExpiresAt ? Math.max(0, Math.min(60 * 60 * 24 * 7, Math.floor((payload.qaExpiresAt - Date.now()) / 1000))) : 60 * 60 * 24 * 7,
   });
 }
 

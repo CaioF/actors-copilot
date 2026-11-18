@@ -1,0 +1,330 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { setTimeout as hold } from 'node:timers/promises';
+import { chromium } from 'playwright';
+import { expect as playwrightExpect } from 'playwright/test';
+const expect = playwrightExpect.configure({ timeout: 90000 });
+import { navigateAddress } from './browser-address.mjs';
+import { affiliateRow, header, installMask, memberRow, stripeSummary } from './camera.mjs';
+
+const mode = process.argv[2];
+assert(
+  ['--observe', '--confirm-demo'].includes(mode),
+  'Choose --observe or --confirm-demo. Each creates a new QA account through the signup form.',
+);
+const confirm = mode === '--confirm-demo';
+const origin = new URL(process.env.AC_BASE_URL || 'https://app.theactorscopilot.com').origin;
+assert(
+  origin === 'https://app.theactorscopilot.com' ||
+    ['localhost', '127.0.0.1'].includes(new URL(origin).hostname),
+);
+const email = (process.env.AC_SIGNUP_EMAIL || process.env.QA_SIMULATION_SIGNUP_EMAIL || '')
+  .trim()
+  .toLowerCase();
+const password = process.env.AC_SIGNUP_PASSWORD;
+assert(
+  /^[a-z0-9._+-]+@example\.test$/.test(email) &&
+    password?.length >= 12 &&
+    process.env.AC_ADMIN_USERNAME &&
+    process.env.AC_ADMIN_PASSWORD,
+  'Configure the fresh synthetic signup and operator credentials.',
+);
+if (confirm)
+  assert(
+    /^[a-f0-9]{64}$/i.test(process.env.QA_SIMULATION_SECRET || ''),
+    'Configure the QA endpoint secret.',
+  );
+const ffmpeg = process.env.AC_FFMPEG_PATH || 'ffmpeg';
+execFileSync(ffmpeg, ['-version'], { stdio: 'ignore', windowsHide: true });
+const dir = fileURLToPath(
+  new URL('./evidence/signup-' + new Date().toISOString().replaceAll(':', '-') + '/', import.meta.url),
+);
+await mkdir(dir, { recursive: true });
+const browser = await chromium.launch({
+  headless: false,
+  args: ['--lang=en-US'],
+  ...(process.env.AC_CHROME_PATH ? { executablePath: process.env.AC_CHROME_PATH } : {}),
+});
+const context = await browser.newContext({
+  locale: 'en-US',
+  viewport: { width: 1440, height: 900 },
+  permissions: ['clipboard-read', 'clipboard-write'],
+});
+const page = await context.newPage();
+page.setDefaultTimeout(120000);
+await installMask(page, origin);
+const report = {
+  origin,
+  language: 'en-US',
+  browser: browser.version(),
+  journey: 'affiliate-signup',
+  status: 'incomplete',
+  confirmation: 'not attempted',
+  timeline: [],
+  cleanup: 'not needed',
+};
+let runId;
+let stage = 'operator login',
+  record = false,
+  started,
+  cleanup = false,
+  uid;
+report.requests = [];
+page.on('response', (r) => {
+  const url = new URL(r.url());
+  if (
+    url.origin === origin &&
+    ['/api/auth/callback', '/api/billing/recovery', '/api/billing/affiliate'].includes(url.pathname)
+  )
+    report.requests.push({ method: r.request().method(), path: url.pathname, status: r.status() });
+});
+function mark(name) {
+  report.timeline.push({ name, ms: Math.round(performance.now() - started) });
+}
+async function click(locator) {
+  await locator.hover();
+  await hold(320);
+  await locator.click();
+}
+async function watch(name, task) {
+  stage = name;
+  return task();
+}
+function demoCall(method, body) {
+  return context.request.fetch(origin + '/api/admin/affiliate-qa', {
+    method,
+    headers: { authorization: 'Bearer ' + process.env.QA_SIMULATION_SECRET },
+    data: body,
+    maxRedirects: 0,
+    timeout: 60000,
+  });
+}
+try {
+  // Open the operator's entry point once. All application routes after registration are observed.
+  await page.goto(origin + '/admin-dashboard', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.getByLabel('Username', { exact: true }).fill(process.env.AC_ADMIN_USERNAME);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.AC_ADMIN_PASSWORD);
+  await click(page.getByRole('button', { name: 'Log in', exact: true }));
+  await page.locator('header h1').filter({ hasText: 'Member dashboard' }).waitFor({ state: 'attached' });
+  const affiliates = await header(page);
+  await page.screencast.showActions({
+    cursor: 'pointer',
+    duration: 550,
+    style: { title: 'display:none', highlight: 'outline:2px solid #d97237' },
+  });
+  await page.screencast.start({
+    path: join(dir, 'take.partial.webm'),
+    fps: 30,
+    size: { width: 1440, height: 900 },
+  });
+  record = true;
+  started = performance.now();
+  mark('Member dashboard after operator login');
+  await click(affiliates);
+  await page.waitForURL(origin + '/admin-dashboard/affiliates');
+  await header(page);
+  const { address, link } = await watch('locating the referral in the affiliate row', () =>
+    affiliateRow(page, origin),
+  );
+  mark('Lucas coupon and referral address in the operator panel');
+  await hold(1700);
+  stage = 'opening the referral address displayed by admin';
+  if (await link.evaluate((el) => Boolean(el.closest('a[href]')))) {
+    await click(link);
+    await page.waitForURL(address);
+  } else {
+    await link.click({ clickCount: 3 });
+    await page.keyboard.press('Control+c');
+    assert.equal((await page.evaluate(() => navigator.clipboard.readText())).trim(), address);
+    await navigateAddress(page, address, true);
+  }
+  const submit = page.locator('button[type=submit]').filter({ hasText: /^Create Account$/ });
+  await expect(submit).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Create Your Account/i })).toBeVisible();
+  mark('Create Account selected on arrival');
+  await hold(1600);
+  stage = 'registering the new QA member through the form';
+  await click(page.locator('input[type=email]'));
+  await page.locator('input[type=email]').pressSequentially(email, { delay: 38 });
+  await page.locator('input[type=password]').fill(password);
+  await expect(page.locator('input[type=password]')).toHaveAttribute('type', 'password');
+  await hold(700);
+  const [signupResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        new URL(r.url()).hostname === 'identitytoolkit.googleapis.com' &&
+        new URL(r.url()).pathname.endsWith('accounts:signUp') &&
+        r.request().method() === 'POST',
+    ),
+    click(submit),
+  ]);
+  assert(signupResponse.ok(), 'Signup was rejected');
+  uid = (await signupResponse.json()).localId;
+  assert.equal(typeof uid, 'string');
+  mark('Firebase accepted the new account from the Create Account form');
+  stage = 'waiting for the automatic trial-ready redirect';
+  await page.waitForURL(origin + '/start-trial', { timeout: 90000 });
+  await expect(page.getByRole('heading', { name: 'Your free trial is ready to start' })).toBeVisible();
+  mark('New account automatically redirected to Your free trial is ready to start');
+  await hold(2400);
+  stage = 'choosing Economy monthly in the trial screen';
+  await click(page.getByRole('button', { name: /Monthly/i }).first());
+  await click(page.getByRole('button', { name: /^Economy Class/i }));
+  await click(page.getByRole('button', { name: 'USD', exact: true }));
+  await expect(page.getByText(/LUCAS applied.*20% off/i)).toBeVisible();
+  mark('Economy selected and affiliate discount displayed on the trial page');
+  await hold(1600);
+  stage = 'opening the hosted checkout using Start my free trial';
+  const [checkoutResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        new URL(r.url()).origin === origin &&
+        new URL(r.url()).pathname === '/api/billing/recovery' &&
+        r.request().method() === 'POST',
+    ),
+    click(page.getByRole('button', { name: 'Start my free trial', exact: true })),
+  ]);
+  assert(checkoutResponse.ok(), 'The app could not start checkout');
+  await page.waitForURL((url) => url.origin === 'https://checkout.stripe.com', {
+    waitUntil: 'domcontentloaded',
+  });
+  // Chrome can discard the fetch body once it replaces the document. Read the
+  // session from the checkout that the browser actually reached.
+  const checkoutId = new URL(page.url()).pathname.match(/\bcs_(?:live|test)_[A-Za-z0-9]+\b/)?.[0];
+  assert(checkoutId);
+  stage = 'reading the applied coupon in Stripe Checkout';
+  await stripeSummary(page);
+  mark('Hosted Stripe Checkout shows LUCAS, 20% for one cycle, $15.20 after trial and $0 today');
+  await hold(3500);
+  if (confirm) {
+    stage = 'confirming this exact open checkout with the demo endpoint';
+    // Move from the hosted provider to its single, explicitly labeled substitute.
+    await navigateAddress(page, origin + '/api/admin/affiliate-qa');
+    await expect(page.getByRole('heading', { name: 'QA payment confirmation' })).toBeVisible();
+    runId = await page.locator('input[name=runId]').inputValue();
+    report.runId = runId;
+    await page.getByLabel('Hosted checkout ID').fill(checkoutId);
+    await page.getByLabel('Affiliate code').fill('lucas');
+    await page.getByLabel('Operator key').fill(process.env.QA_SIMULATION_SECRET);
+    mark('Operator uses QA payment confirmation for the observed hosted checkout');
+    await hold(1600);
+    cleanup = true;
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) => new URL(r.url()).pathname === '/api/admin/affiliate-qa' && r.request().method() === 'POST',
+      ),
+      click(page.getByRole('button', { name: 'Confirm demo trial' })),
+    ]);
+    report.demoHttpStatus = response.status();
+    if (response.status() !== 303) {
+      if ([400, 403, 404, 409].includes(response.status())) cleanup = false;
+      const data = await response.json().catch(() => null);
+      if (typeof data?.error === 'string' && /^[A-Za-z .]{1,90}$/.test(data.error))
+        report.demoError = data.error;
+      throw Error('Demo confirmation was not accepted');
+    }
+    assert.equal(new URL(await response.headerValue('location'), origin).href, origin + '/dashboard');
+    await page.waitForURL(origin + '/dashboard');
+    report.confirmation = 'QA endpoint returned HTTP 303 to the dashboard; no Stripe payment';
+    mark('Browser followed the demo server redirect');
+    const skip = page.getByRole('button', { name: 'Close intro video' });
+    await page.addLocatorHandler(skip, () => skip.click(), { times: 1 });
+    const dashboard = page.getByRole('heading', { name: 'My Acting Copilot', exact: true });
+    await expect(dashboard).toBeVisible();
+    mark('Dashboard displayed after the demo return');
+    await hold(2200);
+  } else report.confirmation = 'Checkout left open; no payment or demo confirmation';
+  stage = 'returning to the operator dashboard';
+  await navigateAddress(page, origin + '/admin-dashboard');
+  const nav = await header(page);
+  await memberRow(page, email, confirm);
+  mark(
+    confirm ? 'Same member shows Lucas, Trial and Simulated QA' : 'Same new member shows Lucas as referrer',
+  );
+  await hold(2600);
+  await click(nav);
+  await page.waitForURL(origin + '/admin-dashboard/affiliates');
+  await header(page);
+  await affiliateRow(page, origin, confirm);
+  mark(
+    confirm
+      ? 'Lucas shows the separately labeled simulated referral'
+      : 'Lucas coupon and referral link verified again',
+  );
+  await hold(2600);
+  await page.screencast.stop();
+  record = false;
+  await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));
+  stage = 'encoding the continuous recording';
+  execFileSync(
+    ffmpeg,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      'take.webm',
+      '-map',
+      '0:v:0',
+      '-an',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-threads',
+      '4',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '19',
+      '-movflags',
+      '+faststart',
+      'affiliate.partial.mp4',
+    ],
+    { cwd: dir, windowsHide: true },
+  );
+  execFileSync(
+    ffmpeg,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      'affiliate.partial.mp4',
+      '-map',
+      '0:v:0',
+      '-f',
+      'null',
+      '-',
+    ],
+    { cwd: dir, windowsHide: true },
+  );
+  await rename(join(dir, 'affiliate.partial.mp4'), join(dir, 'affiliate.mp4'));
+  report.status = confirm ? 'demo-complete' : 'observed-through-checkout';
+} catch (error) {
+  report.failedStage = stage;
+  const line = error.stack?.match(/(?:run-simulation|camera|browser-address)\.mjs:\d+:\d+/)?.[0];
+  console.error('Stopped at ' + stage + ' (' + [error.name, line].filter(Boolean).join(', ') + ')');
+  process.exitCode = 1;
+} finally {
+  if (record) await page.screencast.stop().catch(() => {});
+  if (cleanup) {
+    try {
+      const resp = await demoCall('DELETE', { uid, runId });
+      if (!resp.ok() || (await resp.json()).cleaned !== true) throw Error();
+      report.cleanup = 'verified';
+    } catch {
+      report.qaUid = uid;
+      report.cleanup = 'requires operator review';
+      process.exitCode = 1;
+    }
+  }
+  await browser.close();
+  await writeFile(join(dir, 'report.json'), JSON.stringify(report, null, 2));
+  console.log(report.status, dir);
+}
