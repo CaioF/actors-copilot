@@ -7,12 +7,14 @@ if (origin !== "https://app.theactorscopilot.com" && !local.has(origin)) {
   throw new Error("Choose the production app or a local server on port 3000");
 }
 
-export async function signIn(page) {
-  const {
-    AC_TEST_EMAIL: email,
-    AC_TEST_PASSWORD: password,
-    NEXT_PUBLIC_FIREBASE_API_KEY: key,
-  } = process.env;
+export async function signIn(
+  page,
+  {
+    email = process.env.AC_TEST_EMAIL,
+    password = process.env.AC_TEST_PASSWORD,
+  } = {},
+) {
+  const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   if (!email || !password || !key)
     throw new Error("Missing test identity or Firebase configuration");
   const tokenResponse = await fetch(
