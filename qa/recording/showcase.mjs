@@ -7,9 +7,11 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const evidence = fileURLToPath(new URL("./evidence/", import.meta.url));
-const inputs = process.argv.slice(2);
+const args = process.argv.slice(2);
+const affiliate = args[0]?.startsWith('--affiliate=') ? resolve(args.shift().slice('--affiliate='.length)) : undefined;
+const inputs = args;
 if (
-  !inputs.length ||
+  (!inputs.length && !affiliate) ||
   inputs.some((name) => !/^[\w.-]+$/.test(name) || name.startsWith("."))
 ) {
   throw new Error("Pass completed run directory names in playback order.");
@@ -27,14 +29,11 @@ const encode = (args) =>
     { cwd: dir },
   );
 const titles = {
-  referral: "Abrir el enlace de Lucas",
-  plan: "Elegir Economy mensual",
-  "checkout-labels": "Comprobar el cupón en Stripe",
-  brief: "Preparar un casting brief",
-  sides: "Estudiar los sides de Mara",
-  "coach-entry": "Abrir Acting Coach",
-  "coach-fixture": "Ensayar una pregunta para el Coach",
-  coach: "Conversar con Acting Coach",
+  brief: "Prepare a casting brief",
+  sides: "Study Mara's sides",
+  "coach-entry": "Open Acting Coach",
+  "coach-fixture": "Rehearse a question with the coach",
+  coach: "Talk to Acting Coach",
 };
 const segments = [];
 const chapters = [";FFMETADATA1"];
@@ -90,24 +89,36 @@ async function card(title, subtitle, duration = 1.6) {
 }
 
 try {
+  if (affiliate) {
+    const run = JSON.parse(await readFile(join(affiliate, "report.json"), "utf8"));
+    assert(run.journey === "affiliate-signup" && run.status === "demo-complete" &&
+      run.cleanup === "verified" && run.demoHttpStatus === 303 && run.language === "en-US",
+      "Expected the completed, cleaned-up affiliate browser take from PR #115");
+    const where = run.origin === "https://app.theactorscopilot.com" ? "Production" : "Pre-merge app";
+    await card("Lucas referral, checkout and admin", where + " · Stripe confirmation simulated");
+    segment(["-i", join(affiliate, "affiliate.mp4")]);
+    chapters.push("[CHAPTER]", "TIMEBASE=1/30", "START=0", "END="+frames, "title=Lucas referral, checkout and admin");
+  }
   for (const input of inputs) {
     const report = JSON.parse(
       await readFile(join(evidence, input, "report.json"), "utf8"),
     );
     assert.equal(report.status, "passed");
+    assert.equal(report.language, "en-US");
+    assert(["browser sign-in form","component fixture"].includes(report.authentication));
     for (const clip of report.clips) {
       assert(Object.hasOwn(titles, clip.name));
       const chapterStart = frames;
       const video = resolve(evidence, input, clip.name + ".webm");
       const context =
         report.origin === "https://app.theactorscopilot.com"
-          ? "Producción"
-          : "Prueba local";
+          ? "Production"
+          : "Local test";
       await card(
         titles[clip.name],
         context +
           (clip.name === "coach-fixture"
-            ? " · Respuesta ficticia"
+            ? " · Scripted response"
             : " · Actors Copilot"),
       );
       const review = report.checks.find(
@@ -121,8 +132,8 @@ try {
         const to = result.ms / 1000 - 2;
         segment(["-i", video, "-t", String(from)]);
         await card(
-          "Espera de análisis abreviada",
-          context + " · Se omitieron " + Math.round(to - from) + " s",
+          "Analysis wait shortened",
+          context + " · " + Math.round(to - from) + " seconds omitted",
         );
         segment(["-ss", String(to), "-i", video]);
       } else {

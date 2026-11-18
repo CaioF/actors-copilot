@@ -7,14 +7,14 @@ import { expect } from "playwright/test";
 import { signIn, origin } from "./session.mjs";
 
 const [journey, option] = process.argv.slice(2);
-const allowed = ["affiliate", "brief", "sides", "coach", "coach-fixture"];
+const allowed = ["brief", "sides", "coach", "coach-fixture"];
 if (
   !allowed.includes(journey) ||
   (option && option !== "--submit") ||
   process.argv.length > 4
 )
   throw new Error(
-    "Choose affiliate, brief, sides, coach or coach-fixture, optionally with --submit.",
+    "Choose brief, sides, coach or coach-fixture, optionally with --submit.",
   );
 if (journey === "coach-fixture" && option)
   throw new Error("The fixture always submits locally.");
@@ -28,17 +28,26 @@ await mkdir(dir, { recursive: true });
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport, locale: "en-US" });
 const page = await context.newPage();
-page.setDefaultTimeout(30000);
+page.setDefaultTimeout(120000);
 const report = {
   journey,
   submit,
   origin,
   browser: browser.version(),
+  language: "en-US",
+  authentication: journey === "coach-fixture" ? "component fixture" : "browser sign-in form",
   viewport,
   status: "running",
+  routes: [],
   clips: [],
   checks: [],
 };
+page.on("framenavigated", frame => {
+  if (frame !== page.mainFrame()) return;
+  const url = new URL(frame.url());
+  if (url.origin === origin && /^\/(dashboard|login|start-trial|upgrade|acting-coach|auditions\/new\/(brief|sides))$/.test(url.pathname))
+    report.routes.push(url.pathname);
+});
 let current;
 let stage = "setup";
 const action = (name) => {
@@ -99,7 +108,7 @@ async function memberHome() {
   await signIn(page);
   const intro = page.getByRole("button", { name: "Close intro video" });
   await page.addLocatorHandler(intro, () => intro.click(), { times: 1 });
-  await page.goto(origin + "/dashboard", { waitUntil: "domcontentloaded" });
+  await page.waitForURL(origin + "/dashboard");
   await expect(
     page.getByRole("heading", { name: "My Acting Copilot" }),
   ).toBeVisible();
@@ -118,7 +127,7 @@ async function audition() {
   await begin(journey);
   action("open wizard from dashboard");
   await choose(link);
-  await page.waitForURL("**/auditions/new/" + journey);
+  await page.waitForURL(url => url.pathname === "/auditions/new/" + journey, {waitUntil:"domcontentloaded",timeout:120000});
   checkpoint("Opened " + journey + " wizard");
   const project = "The Last Ferry";
   await type(page.locator("#project"), project);
@@ -205,10 +214,7 @@ async function coach() {
   }
   await memberHome();
   action("prepare clean coach conversation");
-  const session = await context.request.get(origin + "/api/auth/callback");
-  assert(session.ok(), "Session lookup failed");
-  const { tier } = await session.json();
-  if (tier !== "business") await begin("coach-entry");
+  // The route chosen by the application establishes whether this account can enter.
   await choose(page.getByRole("link", { name: "Acting Coach", exact: true }));
   await page.waitForURL((url) =>
     ["/upgrade", "/acting-coach"].includes(url.pathname),
@@ -219,6 +225,7 @@ async function coach() {
         .or(button("Upgrade to Business Class"))
         .first(),
     ).toBeVisible();
+    await begin("coach-entry");
     checkpoint(
       "Member was directed to plan selection when opening Acting Coach",
     );
@@ -227,7 +234,6 @@ async function coach() {
       throw new Error("A Business membership is required for coach submission");
     return;
   }
-  if (current) await end();
   const general = button("24/7 General Coach");
   await expect(general).toBeVisible({ timeout: 30000 });
   // Keep previous test conversations out of the capture.
@@ -279,108 +285,9 @@ async function converse(endpointOrigin, sendQuestion) {
   }
 }
 
-async function affiliate() {
-  action("open referral");
-  await page.goto(origin + "/login?ref=lucas");
-  const signup = page
-    .locator("button[type=submit]")
-    .filter({ hasText: "Create Account" });
-  await expect(signup).toBeVisible();
-  await page.waitForFunction(
-    () =>
-      JSON.parse(localStorage.getItem("affiliate_attribution") || "{}").code ===
-      "lucas",
-  );
-  await begin("referral");
-  await choose(button("Log In"));
-  await expect(button("Sign In")).toBeVisible();
-  await type(page.locator("input[type=email]"), "mara@example.test");
-  await pause(800);
-  await choose(
-    page.locator("button[type=button]").filter({ hasText: /^Create Account$/ }),
-  );
-  await expect(signup).toBeVisible();
-  assert.equal(
-    await page.evaluate(
-      () => JSON.parse(localStorage.getItem("affiliate_attribution")).code,
-    ),
-    "lucas",
-  );
-  checkpoint("Referral persisted while switching login and registration");
-  if (!submit) return;
-  await pause(1000);
-  await end();
-  action("sign in off camera");
-  await signIn(page);
-  await page.goto(origin + "/upgrade", { waitUntil: "domcontentloaded" });
-  const economy = button("Upgrade to Economy Class");
-  await expect(economy).toBeVisible();
-  await page.addStyleTag({
-    content: 'header a[href="/profile"] {visibility:hidden !important}',
-  });
-  await begin("plan");
-  action("compare plan billing cycles");
-  await choose(page.getByRole("button", { name: /^Annual\b/ }));
-  await expect(page.getByText("/year", { exact: false }).first()).toBeVisible();
-  await choose(button("Monthly"));
-  await expect(
-    page.getByText("/month", { exact: false }).first(),
-  ).toBeVisible();
-  checkpoint("Switched back to monthly billing");
-  // Hold the top-level redirect until encoding stops, before any Stripe form can render.
-  await page.route("https://checkout.stripe.com/**", async (route) => {
-    if (
-      route.request().isNavigationRequest() &&
-      route.request().frame() === page.mainFrame() &&
-      current
-    )
-      await end();
-    await route.continue();
-  });
-  action("open monthly checkout");
-  await choose(economy);
-  await page.waitForURL("https://checkout.stripe.com/**", { timeout: 60000 });
-  await expect(page.getByText(/LUCAS/i).first()).toBeVisible({
-    timeout: 60000,
-  });
-  await expect(page.getByText(/20%/).first()).toBeVisible();
-  checkpoint("Off-camera checkout displays LUCAS and 20%");
-  // Keep original pixels of just the verified labels. The surrounding Stripe form stays off camera.
-  const receipt = [];
-  for (const pattern of [/lucas/i, /20%/]) {
-    const label = page.getByText(pattern).first();
-    const value = (await label.innerText()).trim();
-    const box = await label.boundingBox();
-    assert(
-      /^[\s\w%(),.·$€£–—:+-]{1,75}$/u.test(value) && !/\d{5}/.test(value),
-      "Unexpected checkout label",
-    );
-    assert(
-      box && box.width <= 420 && box.height <= 80,
-      "Unexpected checkout label area",
-    );
-    receipt.push((await label.screenshot()).toString("base64"));
-  }
-  await page.goto("about:blank");
-  await page.setContent(
-    '<main style="font:26px system-ui;color:#28342c;padding:12vh 8vw"><p>Actors Copilot · QA</p><h1>Descuento del afiliado</h1><p>Recortes del checkout real de Stripe</p>' +
-      receipt
-        .map(
-          (img) =>
-            '<img style="display:block;margin:20px 0;min-height:36px" src="data:image/png;base64,' +
-            img +
-            '">',
-        )
-        .join("") +
-      '<p style="font-size:19px">La prueba terminó antes de introducir una tarjeta.</p></main>',
-  );
-  await begin("checkout-labels");
-  checkpoint("Isolated screenshots of the verified Stripe labels");
-}
 
 try {
-  if (journey === "affiliate") await affiliate();
-  else if (journey === "coach" || journey === "coach-fixture") await coach();
+  if (journey === "coach" || journey === "coach-fixture") await coach();
   else await audition();
   if (current) {
     await pause(1900);

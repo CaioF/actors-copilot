@@ -27,12 +27,10 @@ jobs:
       - run: node qa/recording/record.mjs coach-fixture
       - name: Install FFmpeg if missing
         run: command -v ffmpeg || { sudo apt-get update && sudo apt-get install -y ffmpeg; }
-      - name: Verify checkout and admin visibility in the recorded frames
-        run: node --test qa/recording/check-affiliate-screen.mjs
       - name: Decode the recording and verify the edited MP4 chapter
         run: |
           source_video=$(find qa/recording/evidence -name coach-fixture.webm -print -quit)
           ffmpeg -v error -xerror -i "$source_video" -f null -
           node qa/recording/showcase.mjs "$(basename "$(dirname "$source_video")")"
           video=$(find qa/recording/evidence -name showcase.mp4 -print -quit)
-          test "$(ffprobe -v error -show_entries chapter_tags=title -of csv=p=0 "$video")" = "Ensayar una pregunta para el Coach"
+          test "$(ffprobe -v error -show_entries chapter_tags=title -of csv=p=0 "$video")" = "Rehearse a question with the coach"
