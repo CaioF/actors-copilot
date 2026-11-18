@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { expect as playwrightExpect } from 'playwright/test';
 const expect = playwrightExpect.configure({ timeout: 90000 });
 import { navigateAddress } from './browser-address.mjs';
-import { affiliateRow, header, installMask, memberRow, stripeSummary } from './camera.mjs';
+import { affiliateRow, header, memberRow, stripeSummary } from './camera.mjs';
 
 const mode = process.argv[2];
 assert(
@@ -55,12 +55,12 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 page.setDefaultTimeout(120000);
-await installMask(page, origin);
 const report = {
   origin,
   language: 'en-US',
   browser: browser.version(),
   journey: 'affiliate-signup',
+  presentation: 'full browser viewport',
   status: 'incomplete',
   confirmation: 'not attempted',
   timeline: [],
@@ -123,6 +123,7 @@ try {
   record = true;
   started = performance.now();
   mark('Member dashboard after operator login');
+  await hold(2000);
   await click(affiliates);
   await page.waitForURL(origin + '/admin-dashboard/affiliates');
   await header(page);
@@ -130,7 +131,7 @@ try {
     affiliateRow(page, origin),
   );
   mark('Lucas coupon and referral address in the operator panel');
-  await hold(1700);
+  await hold(3200);
   stage = 'opening the referral address displayed by admin';
   if (await link.evaluate((el) => Boolean(el.closest('a[href]')))) {
     await click(link);
@@ -244,7 +245,7 @@ try {
   mark(
     confirm ? 'Same member shows Lucas, Trial and Simulated QA' : 'Same new member shows Lucas as referrer',
   );
-  await hold(2600);
+  await hold(4000);
   await click(nav);
   await page.waitForURL(origin + '/admin-dashboard/affiliates');
   await header(page);
@@ -254,7 +255,7 @@ try {
       ? 'Lucas shows the separately labeled simulated referral'
       : 'Lucas coupon and referral link verified again',
   );
-  await hold(2600);
+  await hold(4000);
   await page.screencast.stop();
   record = false;
   await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));

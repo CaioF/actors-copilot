@@ -1,4 +1,4 @@
-name: Affiliate recording privacy
+name: Affiliate recording visibility
 on:
   pull_request:
     paths:

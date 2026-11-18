@@ -35,6 +35,7 @@ const report = {
   origin,
   browser: browser.version(),
   language: "en-US",
+  presentation: "full browser viewport",
   authentication: journey === "coach-fixture" ? "component fixture" : "browser sign-in form",
   viewport,
   status: "running",
@@ -112,9 +113,6 @@ async function memberHome() {
   await expect(
     page.getByRole("heading", { name: "My Acting Copilot" }),
   ).toBeVisible();
-  await page.addStyleTag({
-    content: 'header a[href="/profile"] {visibility:hidden !important}',
-  });
 }
 
 async function audition() {

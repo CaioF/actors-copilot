@@ -29,4 +29,4 @@ Set `AC_FFMPEG_PATH` if FFmpeg is outside PATH. Pass the completed affiliate evi
 node qa/recording/showcase.mjs --affiliate=/absolute/path/to/signup-UTC brief-UTC sides-UTC coach-UTC
 ```
 
-The affiliate take is included from beginning to end. Chapter cards name the actual environment and the simulated Stripe confirmation. Any shortened wait for an AI analysis is labeled in English. The generated MP4, source clips, reports and chapter files stay under local Git-ignored evidence directories. The assembler rejects incomplete affiliate runs and older actor runs that predate form-based authentication.
+The affiliate take is included from beginning to end. Chapter cards name the actual environment and the simulated Stripe confirmation. Any shortened wait for an AI analysis is labeled in English. The generated MP4, source clips, reports and chapter files stay under local Git-ignored evidence directories. For internal showcases the assembler requires `presentation: full browser viewport` in every input report. Record fresh takes with the current recorder when the previous video hid parts of the interface.
