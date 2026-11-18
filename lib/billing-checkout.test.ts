@@ -271,6 +271,10 @@ describe('resolveStripeCustomerId', () => {
         });
 
         expect(customerId).toBe('cus_fresh');
+        expect(setMock).toHaveBeenCalledWith(
+            { customerId: 'cus_fresh', updatedAt: expect.any(String) },
+            { merge: true },
+        );
         expect(stripe.customers.retrieve).not.toHaveBeenCalled();
         expect(stripe.customers.create).toHaveBeenCalledWith(
             expect.objectContaining({ email: 'member@example.com' }),

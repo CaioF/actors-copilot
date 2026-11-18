@@ -1,7 +1,8 @@
 import type { UserRecord } from 'firebase-admin/auth';
 import { auth, db } from '@/lib/firebase.admin';
-import { listQaTrials, realEntitlement } from '@/lib/qa-affiliate-run';
+import { listQaTrials, realEntitlement, type QaTrial } from '@/lib/qa-affiliate-run';
 import {
+  adminSubscriptionStatus,
   resolveAdminDisplayName,
   resolveMembershipState,
   type AdminMemberProjection,
@@ -142,14 +143,13 @@ function buildMember(params: {
   billing: SourceData | undefined;
   projection: AdminMemberProjection | undefined;
   referredBy: string | null;
-  qaSimulation: boolean;
+  qaTrial: QaTrial | undefined;
   authCreatedAt: string;
   now: number;
 }): AdminMemberProjection {
-  const qa = params.qaSimulation && !realEntitlement(params.billing);
-  const billing = qa ? { ...params.billing, tier: 'economy', status: 'trialing' } : params.billing ?? {};
-  const subscriptionStatus =
-    nullableString(billing.status) ?? nullableString(billing.subscriptionStatus);
+  const qa = !realEntitlement(params.billing) ? params.qaTrial : undefined;
+  const billing = params.billing ?? {};
+  const subscriptionStatus = qa ? 'trialing' : adminSubscriptionStatus(billing);
   const cancelAtPeriodEnd = billing.cancelAtPeriodEnd === true;
   const trialStart = nullableNumber(billing.trialStart);
   const trialEnd = nullableNumber(billing.trialEnd);
@@ -159,9 +159,9 @@ function buildMember(params: {
     uid: params.uid,
     email: params.email,
     displayName: params.displayName,
-    referredBy: params.referredBy,
+    referredBy: params.referredBy ?? qa?.affiliateCode ?? null,
     ...(qa ? { qaSimulation: true } : {}),
-    tier: tier(billing.tier),
+    tier: qa?.tier ?? tier(billing.tier),
     subscriptionStatus,
     membershipState: resolveMembershipState({
       status: subscriptionStatus,
@@ -247,7 +247,7 @@ export async function listAdminMemberSnapshot(
       billing: billing.get(user.uid),
       projection,
       referredBy: referrals.get(user.uid) ?? projection?.referredBy ?? null,
-      qaSimulation: qaSimulations.has(user.uid),
+      qaTrial: qaSimulations.get(user.uid),
       authCreatedAt,
       now,
     });
@@ -265,7 +265,7 @@ export async function listAdminMemberSnapshot(
       // An account whose member document is gone keeps its referral in the
       // projection, which is the only place it is left.
       referredBy: referrals.get(uid) ?? projection?.referredBy ?? null,
-      qaSimulation: qaSimulations.has(uid),
+      qaTrial: qaSimulations.get(uid),
       authCreatedAt: projection?.authCreatedAt ?? new Date(now * 1000).toISOString(),
       now,
     });

@@ -150,21 +150,10 @@ export async function resolveStripeCustomerId(params: {
       { idempotencyKey: customerIdempotencyKey(uid, replacedCustomerId) },
     );
 
-    // A brand new account is seeded with the free tier. A replacement customer
-    // only replaces the pointer: the entitlement of an account that already
-    // has a plan is owned by Stripe and the webhook, never by this path.
+    // Opening Checkout creates a customer, not a subscription. A concurrent
+    // webhook may already have written the member's actual tier and status.
     await billingDocRef.set(
-      replacedCustomerId
-        ? {
-            customerId: customer.id,
-            updatedAt: new Date().toISOString(),
-          }
-        : {
-            customerId: customer.id,
-            tier: 'free',
-            status: 'canceled',
-            updatedAt: new Date().toISOString(),
-          },
+      { customerId: customer.id, updatedAt: new Date().toISOString() },
       { merge: true },
     );
 

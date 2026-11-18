@@ -13,6 +13,7 @@ export type QaTrial = {
   id: string;
   affiliateCode: string;
   source: Source;
+  tier: 'economy' | 'business';
   checkout: string;
   expiresAt: number;
 };
@@ -55,6 +56,16 @@ function generation(snapshot: Snapshot) {
   return snapshot.createTime && `${snapshot.createTime.seconds}:${snapshot.createTime.nanoseconds}`;
 }
 
+export function qaCheckoutFingerprint(checkoutId: string): string {
+  return createHash('sha256').update(checkoutId).digest('hex');
+}
+
+// Signed receipts issued before tier was recorded were exclusively Economy.
+function receiptTier(data: DocumentData): QaTrial['tier'] | null {
+  if (data.tier === undefined || data.tier === 'economy') return 'economy';
+  return data.tier === 'business' ? 'business' : null;
+}
+
 function activeRun(uid: string, snapshot: Snapshot): QaTrial | null {
   const data = snapshot.data();
   const created = generation(snapshot);
@@ -70,10 +81,13 @@ function activeRun(uid: string, snapshot: Snapshot): QaTrial | null {
     !isValidQaRun(uid, data)
   )
     return null;
+  const tier = receiptTier(data);
+  if (!tier) return null;
   return {
     id: data.id,
     affiliateCode: data.affiliateCode,
     source: data.source,
+    tier,
     checkout: data.checkout,
     expiresAt: data.expiresAt,
   };
@@ -135,6 +149,7 @@ export async function startQaTrial(
         return (
           prior.id === request.id &&
           prior.checkout === request.checkout &&
+          receiptTier(prior) === request.tier &&
           prior.affiliateCode === request.affiliateCode &&
           prior.source === request.source
         );
@@ -151,6 +166,9 @@ export async function startQaTrial(
       !data ||
       data.id !== request.id ||
       data.checkout !== request.checkout ||
+      receiptTier(data) !== request.tier ||
+      data.affiliateCode !== request.affiliateCode ||
+      data.source !== request.source ||
       data.expiresAt <= Date.now() ||
       !isValidQaRun(uid, data)
     )

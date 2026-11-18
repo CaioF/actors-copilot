@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,9 @@ assert(
   'Choose --observe or --confirm-demo. Each creates a new QA account through the signup form.',
 );
 const confirm = mode === '--confirm-demo';
+const tier = process.env.AC_TRIAL_TIER || 'economy';
+assert(['economy', 'business'].includes(tier), 'AC_TRIAL_TIER must be economy or business.');
+const tierLabel = tier === 'business' ? 'Business' : 'Economy';
 const origin = new URL(process.env.AC_BASE_URL || 'https://app.theactorscopilot.com').origin;
 assert(
   origin === 'https://app.theactorscopilot.com' ||
@@ -60,6 +64,7 @@ const report = {
   language: 'en-US',
   browser: browser.version(),
   journey: 'affiliate-signup',
+  tier,
   presentation: 'full browser viewport',
   status: 'incomplete',
   confirmation: 'not attempted',
@@ -77,7 +82,7 @@ page.on('response', (r) => {
   const url = new URL(r.url());
   if (
     url.origin === origin &&
-    ['/api/auth/callback', '/api/billing/recovery', '/api/billing/affiliate'].includes(url.pathname)
+    ['/api/auth/callback', '/api/billing/recovery', '/api/billing/affiliate', '/api/billing/success'].includes(url.pathname)
   )
     report.requests.push({ method: r.request().method(), path: url.pathname, status: r.status() });
 });
@@ -108,6 +113,55 @@ function demoCall(method, body) {
     timeout: 60000,
   });
 }
+async function encodeRecording() {
+  execFileSync(
+    ffmpeg,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      'take.webm',
+      '-map',
+      '0:v:0',
+      '-an',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-threads',
+      '4',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '19',
+      '-movflags',
+      '+faststart',
+      'affiliate.partial.mp4',
+    ],
+    { cwd: dir, windowsHide: true },
+  );
+  execFileSync(
+    ffmpeg,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      'affiliate.partial.mp4',
+      '-map',
+      '0:v:0',
+      '-f',
+      'null',
+      '-',
+    ],
+    { cwd: dir, windowsHide: true },
+  );
+  await rename(join(dir, 'affiliate.partial.mp4'), join(dir, 'affiliate.mp4'));
+}
+
 try {
   // Open the operator's entry point once. All application routes after registration are observed.
   await page.goto(origin + '/admin-dashboard', { waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -173,12 +227,12 @@ try {
   await expect(page.getByRole('heading', { name: 'Your free trial is ready to start' })).toBeVisible();
   mark('New account automatically redirected to Your free trial is ready to start');
   await hold(2400);
-  stage = 'choosing Economy monthly in the trial screen';
+  stage = 'choosing ' + tierLabel + ' monthly in the trial screen';
   await click(page.getByRole('button', { name: /Monthly/i }).first());
-  await click(page.getByRole('button', { name: /^Economy Class/i }));
+  await click(page.getByRole('button', { name: new RegExp('^' + tierLabel + ' Class', 'i') }));
   await click(page.getByRole('button', { name: 'USD', exact: true }));
   await expect(page.getByText(/LUCAS applied.*20% off/i)).toBeVisible();
-  mark('Economy selected and affiliate discount displayed on the trial page');
+  mark(tierLabel + ' selected and affiliate discount displayed on the trial page');
   await hold(1600);
   stage = 'opening the hosted checkout using Start my free trial';
   const [checkoutResponse] = await Promise.all([
@@ -198,9 +252,10 @@ try {
   // session from the checkout that the browser actually reached.
   const checkoutId = new URL(page.url()).pathname.match(/\bcs_(?:live|test)_[A-Za-z0-9]+\b/)?.[0];
   assert(checkoutId);
+  report.checkoutFingerprint = createHash('sha256').update(checkoutId).digest('hex');
   stage = 'reading the applied coupon in Stripe Checkout';
-  await stripeSummary(page);
-  mark('Hosted Stripe Checkout shows LUCAS, 20% for one cycle, $15.20 after trial and $0 today');
+  await stripeSummary(page, tierLabel);
+  mark('Hosted Stripe Checkout shows ' + tierLabel + ', LUCAS, 20% for one cycle and $0 today');
   await hold(3500);
   if (confirm) {
     stage = 'confirming this exact open checkout with the demo endpoint';
@@ -215,6 +270,13 @@ try {
     mark('Operator uses QA payment confirmation for the observed hosted checkout');
     await hold(1600);
     cleanup = true;
+    const successUrl = new URL('/api/billing/success', origin);
+    successUrl.searchParams.set('session_id', checkoutId);
+    let successResponse;
+    page.on('response', (response) => {
+      if (response.url() === successUrl.href && response.request().isNavigationRequest())
+        successResponse = response;
+    });
     const [response] = await Promise.all([
       page.waitForResponse(
         (r) => new URL(r.url()).pathname === '/api/admin/affiliate-qa' && r.request().method() === 'POST',
@@ -229,10 +291,22 @@ try {
         report.demoError = data.error;
       throw Error('Demo confirmation was not accepted');
     }
-    assert.equal(new URL(await response.headerValue('location'), origin).href, origin + '/dashboard');
+    assert.equal(new URL(await response.headerValue('location'), origin).href, successUrl.href);
     await page.waitForURL(origin + '/dashboard');
-    report.confirmation = 'QA endpoint returned HTTP 303 to the dashboard; no Stripe payment';
-    mark('Browser followed the demo server redirect');
+    assert(successResponse && successResponse.request().method() === 'GET', 'Checkout success return was skipped');
+    assert([302, 303, 307].includes(successResponse.status()));
+    assert.equal(new URL(await successResponse.headerValue('location'), origin).href, origin + '/dashboard');
+    assert((await successResponse.headerValues('set-cookie')).some((cookie) => cookie.startsWith('platform_session=')),
+      'Checkout success did not issue the buyer session');
+    const sessionResponse = await context.request.get(origin + '/api/auth/callback');
+    assert(sessionResponse.ok());
+    const session = await sessionResponse.json();
+    assert.equal(session.authenticated, true);
+    assert.equal(session.subscriptionStatus, 'trialing');
+    assert.equal(session.tier, tier);
+    report.confirmation = 'Browser followed the QA 303 through checkout success to the dashboard';
+    report.session = { tier: session.tier, subscriptionStatus: session.subscriptionStatus };
+    mark('Browser followed checkout success and the signed-in session shows a ' + tierLabel + ' trial');
     const skip = page.getByRole('button', { name: 'Close intro video' });
     await page.addLocatorHandler(skip, () => skip.click(), { times: 1 });
     const dashboard = page.getByRole('heading', { name: 'My Acting Copilot', exact: true });
@@ -243,9 +317,9 @@ try {
   stage = 'returning to the operator dashboard';
   await navigateAddress(page, origin + '/admin-dashboard');
   const nav = await header(page);
-  await memberRow(page, email, confirm);
+  await memberRow(page, email, confirm ? tierLabel : null);
   mark(
-    confirm ? 'Same member shows Lucas, Trial and Simulated QA' : 'Same new member shows Lucas as referrer',
+    confirm ? 'Same member shows Lucas, Trial, ' + tierLabel + ' and Simulated QA' : 'Same new member shows Lucas and No plan',
   );
   await hold(4000);
   await openAffiliates(page, nav, signInOperator);
@@ -260,53 +334,6 @@ try {
   await page.screencast.stop();
   record = false;
   await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));
-  stage = 'encoding the continuous recording';
-  execFileSync(
-    ffmpeg,
-    [
-      '-nostdin',
-      '-v',
-      'error',
-      '-xerror',
-      '-i',
-      'take.webm',
-      '-map',
-      '0:v:0',
-      '-an',
-      '-c:v',
-      'libx264',
-      '-pix_fmt',
-      'yuv420p',
-      '-threads',
-      '4',
-      '-preset',
-      'veryfast',
-      '-crf',
-      '19',
-      '-movflags',
-      '+faststart',
-      'affiliate.partial.mp4',
-    ],
-    { cwd: dir, windowsHide: true },
-  );
-  execFileSync(
-    ffmpeg,
-    [
-      '-nostdin',
-      '-v',
-      'error',
-      '-xerror',
-      '-i',
-      'affiliate.partial.mp4',
-      '-map',
-      '0:v:0',
-      '-f',
-      'null',
-      '-',
-    ],
-    { cwd: dir, windowsHide: true },
-  );
-  await rename(join(dir, 'affiliate.partial.mp4'), join(dir, 'affiliate.mp4'));
   report.status = confirm ? 'demo-complete' : 'observed-through-checkout';
 } catch (error) {
   report.failedStage = stage;
@@ -323,10 +350,38 @@ try {
     } catch {
       report.qaUid = uid;
       report.cleanup = 'requires operator review';
+      report.status = 'incomplete';
+      report.failedStage ??= 'removing the QA receipt';
+      process.exitCode = 1;
+    }
+  }
+  if (report.status === 'demo-complete' && report.cleanup === 'verified') {
+    try {
+      await page.getByRole('link', { name: 'Back to members', exact: true }).click();
+      const members = page.getByRole('heading', { name: 'Member dashboard', exact: true });
+      const login = page.getByRole('heading', { name: 'Admin access', exact: true });
+      await expect(members.or(login)).toBeVisible();
+      if (await login.isVisible()) await signInOperator();
+      await expect(members).toBeVisible();
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await memberRow(page, email, null);
+      report.afterCleanup = { status: 'No plan', tier: 'Free', referredBy: 'lucas' };
+    } catch {
+      report.status = 'incomplete';
+      report.failedStage = 'verifying the original member row after cleanup';
       process.exitCode = 1;
     }
   }
   await browser.close();
+  if (report.status !== 'incomplete') {
+    try {
+      await encodeRecording();
+    } catch {
+      report.status = 'incomplete';
+      report.failedStage = 'encoding the continuous recording';
+      process.exitCode = 1;
+    }
+  }
   await writeFile(join(dir, 'report.json'), JSON.stringify(report, null, 2));
   console.log(report.status, dir);
 }

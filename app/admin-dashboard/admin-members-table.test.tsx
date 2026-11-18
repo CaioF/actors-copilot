@@ -3,7 +3,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
-import type { AdminMemberDto } from '@/app/api/admin/members/route';
+import type { AdminMemberDto } from '@/lib/admin-dashboard/member-response';
 import { AdminMembersTable } from './admin-members-table';
 
 const stateCases: Array<[AdminMemberDto['membershipState'], string]> = [

@@ -35,6 +35,21 @@ export interface AdminMemberProjection {
   updatedAt: string;
 }
 
+// Older checkouts wrote exactly these fields before a first subscription
+// existed. Webhook and migration records carry additional billing evidence.
+const checkoutSeedFields = new Set(['customerId', 'tier', 'status', 'updatedAt', 'checkoutAttempt']);
+
+export function adminSubscriptionStatus(billing: Record<string, unknown>): string | null {
+  if (
+    billing.status === 'canceled' && billing.tier === 'free' &&
+    typeof billing.customerId === 'string' && billing.customerId.length > 0 &&
+    Object.keys(billing).every((field) => checkoutSeedFields.has(field))
+  ) return null;
+
+  if (typeof billing.status === 'string') return billing.status;
+  return typeof billing.subscriptionStatus === 'string' ? billing.subscriptionStatus : null;
+}
+
 export function classifyMembership(
   status: string | null | undefined,
   cancelAtPeriodEnd = false,
@@ -100,10 +115,9 @@ export function isTrialWindowOpen(
  * Resolves the membership state shown by the admin dashboard.
  *
  * The Stripe status is the primary signal, but an open trial window wins over
- * a stored `active` status: the Stripe webhook promotes a trialing
- * subscription to `active` when the $0 trial invoice is paid, so the stored
- * status alone would report a trial as a paid plan. The trial window is the
- * fact that survives that promotion.
+ * a stored `active` status. Older webhook versions promoted trials to
+ * `active` on their $0 initial invoice. The recorded trial dates preserve
+ * the correct display for those existing members.
  *
  * @param input - Stored status, cancellation flag and trial window.
  * @returns The membership state to render.

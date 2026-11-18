@@ -8,6 +8,11 @@ import { stripe } from '@/lib/stripe';
 import { readQaTrial } from '@/lib/qa-affiliate-run';
 import { createHash } from 'node:crypto';
 import type { fixtureStore } from '@/qa/affiliates/fixture-store';
+import { signQaRun } from '@/lib/qa-affiliate-integrity';
+
+jest.mock('@/lib/billing', () => ({
+  getStripePriceIdForTier: (tier: string, cycle: string) => 'price_' + tier + '_' + cycle,
+}));
 
 jest.mock('@/lib/firebase.admin', () => ({
   auth: { getUser: jest.fn() },
@@ -46,6 +51,7 @@ const checkout = {
   customer: 'cus_qa',
   client_reference_id: uid,
   subscription: null,
+  line_items: { data: [{ price: { id: 'price_economy_monthly' } }], has_more: false },
   success_url: 'https://app.example/api/billing/success?session_id={CHECKOUT_SESSION_ID}',
   discounts: [{ promotion_code: 'promo_qa' }],
   metadata: {
@@ -117,6 +123,9 @@ it.each([
   { customer: 'cus_other' },
   { discounts: [] },
   { success_url: 'https://another.example/done' },
+  { success_url: 'https://app.example/dashboard' },
+  { line_items: { data: [], has_more: false } },
+  { metadata: { ...checkout.metadata, billingCycle: 'weekly' } },
   { metadata: { ...checkout.metadata, targetTier: 'business' } },
 ])('rejects a mismatched or undiscounted checkout %j', async (change) => {
   (stripe.checkout.sessions.retrieve as jest.Mock).mockResolvedValue({ ...checkout, ...change });
@@ -161,7 +170,8 @@ it('serves an operator form and lets the browser follow its own successful 303 r
   expect((await POST(form('https://elsewhere.example'))).status).toBe(404);
   const result = await POST(form('https://app.example'));
   expect(result.status).toBe(303);
-  expect(result.headers.get('location')).toBe('/dashboard');
+  expect(result.headers.get('location')).toBe('/api/billing/success?session_id=' + checkoutId);
+  expect(setPlatformSession).not.toHaveBeenCalled();
   (getAdminSession as jest.Mock).mockResolvedValue(null);
   expect((await GET()).status).toBe(404);
 });
@@ -169,16 +179,9 @@ it('confirms the actual checkout idempotently, returns the app landing page, and
   const responses = await Promise.all([POST(request('POST', payload)), POST(request('POST', payload))]);
   expect(responses.map((r) => r.status)).toEqual([200, 200]);
   const first = await responses[0].json();
-  expect(first).toMatchObject({ simulated: true, runId, returnPath: '/dashboard' });
+  expect(first).toMatchObject({ simulated: true, runId, returnPath: '/api/billing/success?session_id=' + checkoutId });
   expect(await responses[1].json()).toEqual(first);
-  expect(setPlatformSession).toHaveBeenCalledWith(
-    expect.objectContaining({
-      uid,
-      tier: 'economy',
-      subscriptionStatus: 'trialing',
-      qaExpiresAt: first.expiresAt,
-    }),
-  );
+  expect(await readQaTrial(uid, email)).toMatchObject({ tier: 'economy', expiresAt: first.expiresAt });
   expect(store.read('users/' + uid)).toEqual({ affiliateCode: code });
   expect(store.read('users/' + uid + '/billing/current')).toEqual({ customerId: 'cus_qa', tier: 'free' });
   const other = '550e8400-e29b-41d4-a716-446655440001';
@@ -207,4 +210,26 @@ it('recognizes manually applied discounts from Stripe and refuses an expired dem
   } finally {
     clock.mockRestore();
   }
+});
+
+it('accepts the selected annual Business price and ignores tier supplied by the operator', async () => {
+  (stripe.checkout.sessions.retrieve as jest.Mock).mockResolvedValue({
+    ...checkout,
+    metadata: { ...checkout.metadata, targetTier: 'business', billingCycle: 'annual' },
+    line_items: { data: [{ price: { id: 'price_business_annual' } }], has_more: false },
+  });
+  expect((await POST(request('POST', { ...payload, tier: 'economy' }))).status).toBe(200);
+  expect(await readQaTrial(uid, email)).toMatchObject({ tier: 'business', affiliateCode: 'lucas' });
+  const stored = store.read(qaPath)!;
+  store.seed(qaPath, { ...stored, tier: 'economy' });
+  expect(await readQaTrial(uid, email)).toBeNull();
+});
+
+it('reads still-active signed Economy receipts issued before tier was recorded', async () => {
+  expect((await POST(request('POST', payload))).status).toBe(200);
+  const legacy = { ...store.read(qaPath) };
+  delete legacy.tier;
+  delete legacy.signature;
+  store.seed(qaPath, { ...legacy, signature: signQaRun(uid, legacy) });
+  expect(await readQaTrial(uid, email)).toMatchObject({ tier: 'economy' });
 });

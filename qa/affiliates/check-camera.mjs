@@ -17,7 +17,7 @@ test('recording preserves complete operator tables, controls and the hosted chec
     body: `<header><p>Internal operator</p><h1>Member dashboard</h1>
       <a href="/admin-dashboard/affiliates">Affiliates</a><button>Log out</button></header>
       <h2>Members</h2><table><thead><tr><th>Name</th><th>Email</th><th>Referred by</th><th>Status</th></tr></thead>
-      <tbody><tr><td>Test Actor</td><td>${email}</td><td>lucas</td><td><b>Trial</b> <b>Simulated QA</b></td></tr>
+      <tbody><tr><td>Test Actor</td><td>${email}</td><td>lucas</td><td><b>Trial</b> <b>Simulated QA</b> <span>Business</span></td></tr>
       <tr><td>Second actor</td><td>second@example.test</td><td>partner</td><td>Paid</td></tr></tbody></table>`,
   }));
   await page.route(origin + '/admin-dashboard/affiliates', route => route.fulfill({
@@ -33,7 +33,7 @@ test('recording preserves complete operator tables, controls and the hosted chec
   }));
   await page.goto(origin + '/admin-dashboard');
   const affiliates = await header(page);
-  await memberRow(page, email, true);
+  await memberRow(page, email, 'Business');
   await expect(page.getByText('Second actor')).toBeVisible();
   await expect(page.getByText('Test Actor')).toBeVisible();
   await openAffiliates(page, affiliates, () => assert.fail('Unexpected sign-in prompt'));
@@ -50,12 +50,12 @@ test('recording preserves complete operator tables, controls and the hosted chec
   }));
   await page.route('https://checkout.stripe.com/fixture', route => route.fulfill({
     contentType: 'text/html',
-    body: `<aside class="OrderSummaryColumn"><p>LUCAS</p><p>20% off 1 billing cycle</p>
-      <p>Total after trial $15.20</p><p>Total due today $0.00</p></aside>
+    body: `<aside class="OrderSummaryColumn"><p>Business Class</p><p>LUCAS</p><p>20% off 1 billing cycle</p>
+      <p>Total after trial $23.20</p><p>Total due today $0.00</p></aside>
       <iframe title="Payment form" src="https://js.stripe.com/payment-frame"></iframe>`,
   }));
   await page.goto('https://checkout.stripe.com/fixture');
-  await stripeSummary(page);
+  await stripeSummary(page, 'Business');
   const payment = page.frameLocator('iframe[title="Payment form"]');
   await expect(payment.getByText(email)).toBeVisible();
   await expect(payment.getByLabel('Card number')).toBeVisible();
