@@ -1,7 +1,8 @@
 import type { UserRecord } from 'firebase-admin/auth';
 import { auth, db } from '@/lib/firebase.admin';
 import {
-  classifyMembership,
+  adminSubscriptionStatus,
+  resolveMembershipState,
   resolveAdminDisplayName,
   type AdminMemberProjection,
 } from './domain';
@@ -59,8 +60,10 @@ export async function syncAdminMember(
   const billingData: SourceData = billing.exists ? (billing.data() ?? {}) : {};
   const userData: SourceData = user.exists ? (user.data() ?? {}) : {};
   const synchronizedAt = new Date().toISOString();
-  const subscriptionStatus = nullableString(billingData.status);
+  const subscriptionStatus = adminSubscriptionStatus(billingData);
   const cancelAtPeriodEnd = billingData.cancelAtPeriodEnd === true;
+  const trialStart = nullableNumber(billingData.trialStart);
+  const trialEnd = nullableNumber(billingData.trialEnd);
 
   const member: AdminMemberProjection = {
     uid,
@@ -72,12 +75,9 @@ export async function syncAdminMember(
     referredBy: nullableString(userData.affiliateCode),
     tier: tier(billingData.tier),
     subscriptionStatus,
-    membershipState: classifyMembership(
-      subscriptionStatus,
-      cancelAtPeriodEnd,
-    ),
-    trialStart: nullableNumber(billingData.trialStart),
-    trialEnd: nullableNumber(billingData.trialEnd),
+    membershipState: resolveMembershipState({ status: subscriptionStatus, cancelAtPeriodEnd, trialStart, trialEnd }),
+    trialStart,
+    trialEnd,
     currentPeriodEnd: nullableNumber(billingData.currentPeriodEnd),
     cancelAtPeriodEnd,
     cancelAt: nullableNumber(billingData.cancelAt),

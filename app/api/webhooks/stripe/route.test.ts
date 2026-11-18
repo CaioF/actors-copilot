@@ -315,6 +315,19 @@ describe('Stripe Webhook Route Handler', () => {
     expect(syncAdminMember).toHaveBeenCalledWith(mockUid);
   });
 
+  it('preserves the subscription status when Stripe pays the initial zero-dollar invoice', async () => {
+    (verifyStripeWebhookEvent as jest.Mock).mockReturnValue({
+      type: 'invoice.payment_succeeded',
+      data: { object: { customer: mockCustomerId, billing_reason: 'subscription_create', amount_due: 0, amount_paid: 0 } },
+    });
+    const response = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST', headers: { 'stripe-signature': 'sig_123' }, body: '{}',
+    }) as NextRequest);
+    expect(response.status).toBe(200);
+    expect(db.doc).not.toHaveBeenCalled();
+    expect(syncAdminMember).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['invoice.payment_succeeded', 'active', true],
     ['invoice.payment_failed', 'past_due', false],
@@ -326,6 +339,8 @@ describe('Stripe Webhook Route Handler', () => {
         object: {
           customer: mockCustomerId,
           customer_email: 'billing@example.com',
+          billing_reason: 'subscription_create',
+          amount_paid: type === 'invoice.payment_succeeded' ? 2900 : 0,
         },
       },
     });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { AdminMemberDto } from '@/app/api/admin/members/route';
+import type { AdminMemberDto } from '@/lib/admin-dashboard/member-response';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

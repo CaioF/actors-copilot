@@ -1,10 +1,25 @@
 import {
   type AdminMemberProjection,
+  adminSubscriptionStatus,
   classifyMembership,
   isTrialWindowOpen,
   resolveAdminDisplayName,
   resolveMembershipState,
 } from './domain';
+
+describe('adminSubscriptionStatus', () => {
+  const seed = { customerId: 'cus_new', status: 'canceled', tier: 'free', updatedAt: '2026-11-18', checkoutAttempt: 1 };
+  it('recognizes old and current checkout-only records', () => {
+    expect(adminSubscriptionStatus(seed)).toBeNull();
+    expect(adminSubscriptionStatus({ customerId: 'cus_new', checkoutAttempt: 1 })).toBeNull();
+  });
+  it('preserves cancellation evidence and legacy subscription status', () => {
+    expect(adminSubscriptionStatus({ ...seed, subscriptionId: 'sub_canceled' })).toBe('canceled');
+    expect(adminSubscriptionStatus({ ...seed, subscriptionStatus: 'canceled' })).toBe('canceled');
+    expect(adminSubscriptionStatus({ ...seed, hasUsedTrial: true })).toBe('canceled');
+    expect(adminSubscriptionStatus({ subscriptionStatus: 'trialing' })).toBe('trialing');
+  });
+});
 
 describe('classifyMembership', () => {
   it.each([

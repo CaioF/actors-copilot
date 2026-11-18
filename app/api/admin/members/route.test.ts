@@ -2,7 +2,8 @@ import type { AdminMemberProjection } from '@/lib/admin-dashboard/domain';
 import { listAdminMemberSnapshot } from '@/lib/admin-dashboard/members';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
 import { logger } from '@/lib/logger';
-import { GET, serializeAdminMember } from './route';
+import { GET } from './route';
+import { serializeAdminMember } from '@/lib/admin-dashboard/member-response';
 
 jest.mock('@/lib/admin-dashboard/members', () => ({
   listAdminMemberSnapshot: jest.fn(),

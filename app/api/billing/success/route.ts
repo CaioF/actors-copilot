@@ -1,121 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import type Stripe from 'stripe';
+import type { UserBilling } from '@/lib/billing';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
-import { setPlatformSession, PlatformSession } from '@/lib/session';
-import type Stripe from 'stripe';
-import { UserBilling, SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
+import { eligibleIdentity, qaCheckoutFingerprint, readQaTrial, realEntitlement } from '@/lib/qa-affiliate-run';
+import { getPlatformSession, setPlatformSession } from '@/lib/session';
+import { stripe } from '@/lib/stripe';
 
-/**
- * Handles the Stripe Checkout success redirect. It verifies the incoming
- * checkout session, reads the authoritative billing tier from Firestore (the
- * value the webhook should have written), and issues an updated
- * `platform_session` cookie containing the refreshed entitlement state.
- *
- * If any step fails, the user is redirected to the dashboard without
- * modifying session state.
- *
- * @param {NextRequest} req - Next.js incoming request for this route.
- * @returns {Promise<NextResponse>} Redirect response to the application dashboard.
- */
+async function approvedOpenCheckout(checkout: Stripe.Checkout.Session, uid: string, billing: Partial<UserBilling>) {
+    if (checkout.status !== 'open' || checkout.mode !== 'subscription' || checkout.subscription || realEntitlement(billing)) {
+        return null;
+    }
+    const buyer = await getPlatformSession();
+    if (buyer?.uid !== uid || !eligibleIdentity(uid, buyer.email)) return null;
+    const [trial, member] = await Promise.all([
+        readQaTrial(uid, buyer.email),
+        db.doc(`users/${uid}`).get(),
+    ]);
+    if (!trial || trial.checkout !== qaCheckoutFingerprint(checkout.id) || realEntitlement(member.data())) {
+        return null;
+    }
+    return { tier: trial.tier, expiresAt: trial.expiresAt, email: buyer.email };
+}
+
+/** Exchange the provider return for the buyer's refreshed platform session. */
 export async function GET(req: NextRequest): Promise<NextResponse> {
+    const dashboard = NextResponse.redirect(new URL('/dashboard', req.url));
+    dashboard.headers.set('Cache-Control', 'no-store');
     try {
-        const { searchParams } = new URL(req.url);
-        const sessionId = searchParams.get('session_id');
+        const sessionId = new URL(req.url).searchParams.get('session_id');
+        if (!sessionId) return dashboard;
 
-        if (!sessionId) {
-            return NextResponse.redirect(new URL('/dashboard', req.url));
-        }
+        const checkout = await stripe.checkout.sessions.retrieve(sessionId);
+        const uid = checkout.client_reference_id;
+        if (!uid) return dashboard;
 
-        // Retrieve the Stripe Checkout session to obtain the platform user id and
-        // any customer contact details Stripe captured at payment time.
-        const sessionDetails = await stripe.checkout.sessions.retrieve(sessionId as string, {
-            expand: ['customer_details'],
-        });
+        const ref = db.doc(`users/${uid}/billing/current`);
+        let billing: Partial<UserBilling> = (await ref.get()).data() ?? {};
+        const completed = checkout.status === 'complete';
+        const demo = completed ? null : await approvedOpenCheckout(checkout, uid, billing);
+        if (!completed && !demo) return dashboard;
 
-        const uid = sessionDetails.client_reference_id as string | undefined;
-        const emailFromStripe = (sessionDetails as any)?.customer_details?.email as string | undefined;
-
-        if (!uid) {
-            logger.error('UID not found on Stripe Checkout session');
-            return NextResponse.redirect(new URL('/dashboard', req.url));
-        }
-
-        // Read the authoritative billing document where the webhook writes the
-        // user's updated entitlement (tier/status). This ensures we set the
-        // session based on persisted state and not on client-supplied values.
-        const billingDocRef = db.doc(`users/${uid}/billing/current`);
-        const billingDoc = await billingDocRef.get();
-        let billingData = billingDoc.exists ? billingDoc.data() : {};
-
-        // The webhook that grants the entitlement can land a moment after
-        // Stripe redirects the member back. Waiting for it here avoids handing
-        // them a session that still says "free" right after they paid.
-        const subscriptionId =
-            typeof sessionDetails.subscription === 'string'
-                ? sessionDetails.subscription
-                : sessionDetails.subscription?.id;
-
-        if (subscriptionId) {
+        // A genuine subscription's webhook may arrive just after the browser.
+        if (completed && checkout.subscription) {
             for (let attempt = 0; attempt < 4; attempt += 1) {
-                const tier = (billingData?.tier as string) || 'free';
-                const status = (billingData?.status as string) || 'canceled';
-                if (tier !== 'free' && status !== 'canceled') break;
-
+                if (billing.tier && billing.tier !== 'free' && billing.status && billing.status !== 'canceled') break;
                 await new Promise((resolve) => setTimeout(resolve, 500));
-                const retry = await billingDocRef.get();
-                billingData = retry.exists ? retry.data() : billingData;
+                billing = (await ref.get()).data() ?? billing;
             }
         }
 
-        const currentTier = (billingData?.tier as string) || 'free';
-        const subscriptionStatus = (billingData?.status as string) || 'canceled';
-
-        // Try to determine the user's email from Stripe first, then fall back to
-        // Firestore user record if available. We prefer Stripe's captured email
-        // because it reflects the address used for the transaction.
-        let email = emailFromStripe;
+        let email = demo?.email || checkout.customer_details?.email;
         if (!email) {
             try {
-                const userDoc = await db.doc(`users/${uid}`).get();
-                const userData = userDoc.exists ? userDoc.data() : undefined;
-                email = (userData && (userData as any).email) || undefined;
+                email = (await db.doc(`users/${uid}`).get()).data()?.email;
             } catch (err) {
-                logger.warn({ err, msg: 'Failed to read users/{uid} profile for email fallback' });
+                logger.warn({ err, msg: 'Failed to read checkout email from user profile' });
             }
         }
-
-
-        // Build the canonical platform session payload to persist in the cookie.
-        // The `setPlatformSession` helper handles JWT signing and cookie attributes
-        // consistently with the authentication flow used elsewhere in the app.
-        const response = NextResponse.redirect(new URL('/dashboard', req.url));
-
-        const billing = billingData as Partial<UserBilling> | undefined;
-
-        const sessionPayload: PlatformSession = {
+        await setPlatformSession({
             uid,
             email: email ?? '',
-            tier: currentTier as SubscriptionTier,
-            subscriptionStatus: subscriptionStatus as SubscriptionStatus,
-            stripeCustomerId: billing?.customerId,
-            stripeSubscriptionId: billing?.subscriptionId,
-            stripePriceId: billing?.priceId,
-            currentPeriodEnd: billing?.currentPeriodEnd,
-        };
-
-        // If `setPlatformSession` returns a token instead of writing the cookie,
-        // the token should be attached to the `response` cookie store. In this
-        // codebase `setPlatformSession` writes the signed JWT into Next's cookie
-        // store, so calling it here will persist the session for the outgoing
-        // response context.
-        await setPlatformSession(sessionPayload);
-
-        logger.info(`Platform session refreshed for uid=${uid} with tier=${currentTier}`);
-
-        return response;
+            tier: demo?.tier ?? billing.tier ?? 'free',
+            subscriptionStatus: demo ? 'trialing' : billing.status ?? 'canceled',
+            ...(demo ? { qaExpiresAt: demo.expiresAt } : {}),
+            stripeCustomerId: billing.customerId,
+            stripeSubscriptionId: billing.subscriptionId,
+            stripePriceId: billing.priceId,
+            currentPeriodEnd: billing.currentPeriodEnd,
+        });
     } catch (error) {
         logger.error({ err: error, msg: 'Error handling Stripe success redirect' });
-        return NextResponse.redirect(new URL('/dashboard', req.url));
     }
+    return dashboard;
 }

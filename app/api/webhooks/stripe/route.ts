@@ -405,6 +405,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 const customerId = extractCustomerId(invoice.customer);
                 const isPaid = event.type === 'invoice.payment_succeeded';
 
+                // Stripe also marks the initial $0 invoice of a trial as paid.
+                // The checkout and subscription events supply its actual status;
+                // this invoice can arrive before or after either event.
+                if (isPaid && invoice.billing_reason === 'subscription_create' &&
+                    invoice.amount_due === 0 && invoice.amount_paid === 0) {
+                    break;
+                }
+
                 const platformUserId = await resolvePlatformUserId({
                     customerId,
                     email: invoice.customer_email,

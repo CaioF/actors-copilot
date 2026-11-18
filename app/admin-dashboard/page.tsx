@@ -1,7 +1,7 @@
 import {
   buildAdminMembersResponse,
   type AdminMemberDto,
-} from '@/app/api/admin/members/route';
+} from '@/lib/admin-dashboard/member-response';
 import { listAdminMemberSnapshot } from '@/lib/admin-dashboard/members';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
 import { AdminLoginForm } from './admin-login-form';

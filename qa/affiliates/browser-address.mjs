@@ -47,17 +47,27 @@ $qaShell = New-Object -ComObject WScript.Shell
 $qaBrowserPid = [int]$env:QA_CHROME_PID
 $qaHandle = (Get-Process -Id $qaBrowserPid).MainWindowHandle
 if ($qaHandle -eq [IntPtr]::Zero) { throw 'QA browser has no window' }
-[QAWindow]::Activate($qaHandle)
-Start-Sleep -Milliseconds 200
 function Test-QAFocus { [uint32]$qaWindowPid = 0; $null = [QAWindow]::GetWindowThreadProcessId([QAWindow]::GetForegroundWindow(), [ref]$qaWindowPid); return $qaWindowPid -eq $qaBrowserPid }
+for ($attempt = 0; $attempt -lt 5; $attempt++) {
+  [QAWindow]::Activate($qaHandle)
+  Start-Sleep -Milliseconds 200
+  if (Test-QAFocus) { break }
+}
 if (-not (Test-QAFocus)) { throw 'QA browser window is not focused' }
 $qaShell.SendKeys('^l')
-Start-Sleep -Milliseconds 140
-if (-not (Test-QAFocus)) { throw 'QA browser lost focus' }
-$addressBar = [System.Windows.Automation.AutomationElement]::FocusedElement
-if ($addressBar.Current.ProcessId -ne $qaBrowserPid -or $addressBar.Current.ControlType -ne [System.Windows.Automation.ControlType]::Edit) {
-  throw 'The QA address bar is not focused'
+$addressBar = $null
+for ($attempt = 0; $attempt -lt 20; $attempt++) {
+  Start-Sleep -Milliseconds 100
+  if (-not (Test-QAFocus)) { throw 'QA browser lost focus' }
+  $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+  if ($focused -and $focused.Current.ProcessId -eq $qaBrowserPid -and
+      $focused.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit -and
+      $focused.Current.Name -match '^Address (and search )?bar$') {
+    $addressBar = $focused
+    break
+  }
 }
+if (-not $addressBar) { throw 'The QA address bar is not focused' }
 $addressValue = $addressBar.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
 if ($env:QA_PASTE_ADDRESS -eq '1') {
   $qaShell.SendKeys('^v')
@@ -66,21 +76,36 @@ if ($env:QA_PASTE_ADDRESS -eq '1') {
   $addressValue.SetValue($env:QA_PUBLIC_ADDRESS)
 }
 if (-not (Test-QAFocus)) { throw 'QA browser lost focus' }
+for ($attempt = 0; $attempt -lt 15 -and $addressValue.Current.Value -cne $env:QA_PUBLIC_ADDRESS; $attempt++) {
+  Start-Sleep -Milliseconds 100
+}
 if ($addressValue.Current.Value -cne $env:QA_PUBLIC_ADDRESS) { throw 'The address bar does not contain the intended URL' }
+if (-not (Test-QAFocus)) { throw 'QA browser lost focus' }
 $qaShell.SendKeys('{ENTER}')
 `;
     // Only public navigation destinations enter the address bar. No credentials or hosted checkout URLs.
-    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
-      env: {
-        ...process.env,
-        QA_CHROME_PID: String(pid),
-        QA_PASTE_ADDRESS: pasted ? '1' : '0',
-        QA_PUBLIC_ADDRESS: address,
-      },
-      stdio: ['ignore', 'ignore', 'pipe'],
-      windowsHide: true,
-      timeout: 12000,
-    });
+    for (let attempt = 0; attempt < 2 && page.url() !== address; attempt++) {
+      try {
+        await page.bringToFront();
+        execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
+          env: {
+            ...process.env,
+            QA_CHROME_PID: String(pid),
+            QA_PASTE_ADDRESS: pasted ? '1' : '0',
+            QA_PUBLIC_ADDRESS: address,
+          },
+          stdio: ['ignore', 'ignore', 'pipe'],
+          windowsHide: true,
+          timeout: 30000,
+        });
+        break;
+      } catch (error) {
+        if (attempt === 1) {
+          const reason = error.code === 'ETIMEDOUT' ? 'timed out' : 'could not verify native browser focus or the address';
+          throw new Error('Chrome address bar ' + reason);
+        }
+      }
+    }
   } else if (process.platform === 'linux') {
     const x = (args) => execFileSync('xdotool', args, { encoding: 'utf8' }).trim();
     assert.equal(Number(x(['getactivewindow', 'getwindowpid'])), pid, 'QA browser must have focus in X11');

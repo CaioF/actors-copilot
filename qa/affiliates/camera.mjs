@@ -57,7 +57,7 @@ export async function affiliateRow(page, appOrigin, withDemo = false) {
   return { link, address };
 }
 
-export async function memberRow(page, email, demo) {
+export async function memberRow(page, email, demoTier) {
   assert(/^[a-z0-9._+-]+@example\.test$/i.test(email));
   const account = page.getByText(email, { exact: true });
   const row = page.getByRole('row').filter({ has: account });
@@ -66,20 +66,27 @@ export async function memberRow(page, email, demo) {
   await expect(table.getByRole('columnheader')).toContainText(['Name', 'Email', 'Referred by', 'Status']);
   await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
   await expect(row.getByText('lucas', { exact: true })).toBeVisible();
-  if (demo) {
+  if (demoTier) {
     await expect(row.getByText('Simulated QA', { exact: true })).toBeVisible();
     await expect(row.getByText('Trial', { exact: true })).toBeVisible();
+    await expect(row.getByText(demoTier, { exact: true })).toBeVisible();
+  } else {
+    await expect(row.getByText('No plan', { exact: true })).toBeVisible();
+    await expect(row.getByText('Free', { exact: true })).toBeVisible();
+    await expect(row.getByText('Simulated QA', { exact: true })).toHaveCount(0);
   }
   await account.hover();
 }
 
-export async function stripeSummary(page) {
+export async function stripeSummary(page, tierLabel) {
   assert.equal(new URL(page.url()).origin, 'https://checkout.stripe.com');
   const region = page.locator('.OrderSummaryColumn');
   await expect(region).toBeVisible({ timeout: 60000 });
+  await expect(region).toContainText(tierLabel + ' Class');
   await expect(region.getByText('LUCAS', { exact: true })).toBeVisible({ timeout: 45000 });
   await expect(region.getByText(/20% off 1 billing cycle/i)).toBeVisible();
-  await expect(region).toContainText(/Total after trial\s*\$15\.20/i);
+  const discountedPrice = tierLabel === 'Business' ? /Total after trial\s*\$23\.20/i : /Total after trial\s*\$15\.20/i;
+  await expect(region).toContainText(discountedPrice);
   await expect(region).toContainText(/Total due today\s*\$0\.00/i);
   // In hosted Checkout the order summary and payment form can live in different frames.
   await expect.poll(async () => {

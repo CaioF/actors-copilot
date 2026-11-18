@@ -134,13 +134,12 @@ describe('Stripe Subscription Checkout Route Handler', () => {
             { idempotencyKey: `cust_${mockUid}` },
         );
 
-        // 4. Verify baseline structural bindings flush down safely to Firestore
+        // Opening Checkout records only the customer mapping.
         expect(mockSet).toHaveBeenCalledWith(
-            expect.objectContaining({
+            {
                 customerId: 'cus_newly_minted_111',
-                tier: 'free',
-                status: 'canceled',
-            }),
+                updatedAt: expect.any(String),
+            },
             { merge: true }
         );
     });

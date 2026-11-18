@@ -2,17 +2,19 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase.admin';
 import { getAdminSession } from '@/lib/admin-dashboard/session';
-import { getPlatformSession, setPlatformSession, deletePlatformSession } from '@/lib/session';
+import { getPlatformSession, deletePlatformSession } from '@/lib/session';
 import { extractSessionAffiliateCandidates, findAffiliateByCode } from '@/lib/admin-dashboard/affiliates';
 import {
   configuredList,
   eligibleIdentity,
   endQaTrial,
   issuedForNewSignup,
+  qaCheckoutFingerprint,
   realEntitlement,
   startQaTrial,
 } from '@/lib/qa-affiliate-run';
 import { stripe } from '@/lib/stripe';
+import { getStripePriceIdForTier } from '@/lib/billing';
 import { resolveAppUrl } from '@/lib/app-origin';
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -82,8 +84,8 @@ async function customerIsUnused(customer: string): Promise<boolean> {
   return true;
 }
 
-// This is the sole replacement for Stripe's completion and return. A native
-// form POST lets the browser follow the application's real 303 response.
+// Only the provider's payment confirmation is simulated. The native POST
+// sends the browser through the same success route as a completed Checkout.
 export async function GET(): Promise<NextResponse> {
   if (process.env.QA_SIMULATION_ENABLED !== 'true' || !(await getAdminSession()))
     return error('Not found', 404);
@@ -150,7 +152,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return error('This demo address requires a new signup', 409);
     }
     const [checkout, billingSnap, memberSnap, affiliate] = await Promise.all([
-      stripe.checkout.sessions.retrieve(body.checkoutSessionId),
+      stripe.checkout.sessions.retrieve(body.checkoutSessionId, { expand: ['line_items'] }),
       db.doc(`users/${buyer.uid}/billing/current`).get(),
       db.doc(`users/${buyer.uid}`).get(),
       findAffiliateByCode(body.affiliateCode),
@@ -158,6 +160,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const billing = billingSnap.data() || {};
     const member = memberSnap.data() || {};
     const meta = checkout.metadata || {};
+    const selectedTier = meta.targetTier;
+    const items = checkout.line_items;
+    const successUrl = checkout.success_url ? new URL(checkout.success_url) : null;
     if (
       !affiliate?.active ||
       !affiliate.promotionCodeId ||
@@ -167,13 +172,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       checkout.subscription ||
       checkout.client_reference_id !== buyer.uid ||
       meta.platformUserId !== buyer.uid ||
-      meta.targetTier !== 'economy' ||
-      meta.billingCycle !== 'monthly' ||
+      (selectedTier !== 'economy' && selectedTier !== 'business') ||
+      (meta.billingCycle !== 'monthly' && meta.billingCycle !== 'annual') ||
+      !items || items.has_more || items.data.length !== 1 ||
+      items.data[0].price?.id !== getStripePriceIdForTier(selectedTier, meta.billingCycle) ||
       meta.isTrial !== 'true' ||
       typeof checkout.customer !== 'string' ||
       checkout.customer !== billing.customerId ||
-      !checkout.success_url ||
-      new URL(checkout.success_url).origin !== requestOrigin(request)
+      successUrl?.origin !== requestOrigin(request) ||
+      successUrl.pathname !== '/api/billing/success' ||
+      successUrl.searchParams.get('session_id') !== '{CHECKOUT_SESSION_ID}'
     ) {
       return error('Checkout does not match the current QA trial', 409);
     }
@@ -195,24 +203,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const run = await startQaTrial(buyer.uid, {
       id: body.runId,
       affiliateCode: affiliate.code,
+      tier: selectedTier,
       source: meta.affiliateCode ? 'link' : 'coupon',
-      checkout: createHash('sha256').update(checkout.id).digest('hex'),
+      checkout: qaCheckoutFingerprint(checkout.id),
     });
     if (!run) return error('Another demo is active or this run cannot be resumed', 409);
-    await setPlatformSession({
-      ...buyer,
-      tier: 'economy',
-      subscriptionStatus: 'trialing',
-      qaExpiresAt: run.expiresAt,
-    });
+    successUrl.searchParams.set('session_id', checkout.id);
+    const returnPath = successUrl.pathname + successUrl.search;
     if (form) {
       return new NextResponse(null, {
         status: 303,
-        headers: { Location: '/dashboard', 'Cache-Control': 'no-store' },
+        headers: { Location: returnPath, 'Cache-Control': 'no-store' },
       });
     }
     return NextResponse.json(
-      { simulated: true, runId: run.id, returnPath: '/dashboard', expiresAt: run.expiresAt },
+      { simulated: true, runId: run.id, returnPath, expiresAt: run.expiresAt },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch {

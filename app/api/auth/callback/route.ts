@@ -128,7 +128,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (eligibleIdentity(uid,email) && !realEntitlement(billingDoc.data()) && !realEntitlement(userData)) {
       const demo = await readQaTrial(uid,email);
       if (demo) {
-        tier = 'economy';
+        tier = demo.tier;
         subscriptionStatus = 'trialing';
         qaExpiresAt = demo.expiresAt;
       }
