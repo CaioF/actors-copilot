@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { getAuth, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { getAuth, getAdditionalUserInfo, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
 import { logger } from '@/lib/logger';
 import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
@@ -96,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const app = getApp();
     const auth = getAuth(app);
     
+    // Firebase announces a user before the token exchange sets the application cookie.
+    const exchangingSession = useRef(false);
+
     // State initialization
     const [user, setUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -105,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * initiates a Stripe checkout session if present, and redirects to Stripe Checkout URL.
      * Otherwise redirects to /dashboard.
      */
-    const handlePostAuthRedirect = async () => {
+    const handlePostAuthRedirect = async (defaultPath = "/dashboard") => {
         if (typeof window !== 'undefined') {
             const trialTier = consumeTrialIntent();
 
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return;
             }
         }
-        window.location.href = "/dashboard";
+        redirectTo(defaultPath);
     };
 
     /**
@@ -155,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * @returns {Promise<void>}
      */
     const loginWithGoogle = async () => {
+        exchangingSession.current = true;
         setLoading(true);
         try {
             const result = await signInWithPopup(auth, googleProvider);
@@ -182,11 +186,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // free trial. Show the interstitial that explains what happened
             // before handing over to Stripe.
             if (data.billingRecovery?.required) {
-                window.location.href = "/start-trial";
+                redirectTo('/start-trial');
                 return;
             }
 
-            await handlePostAuthRedirect();
+            await handlePostAuthRedirect(getAdditionalUserInfo(result)?.isNewUser ? '/start-trial' : '/dashboard');
 
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
@@ -201,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             logger.error({ err: error, msg: 'Failed to log in with Google OAuth' });
             throw error;
         } finally {
+            exchangingSession.current = false;
             setLoading(false);
         }
     };
@@ -212,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * @throws {Error} Throws if Firebase auth fails or the backend rejects the session.
      */
     const loginWithEmail = async (email: string, password: string) => {
+        exchangingSession.current = true;
         setLoading(true);
         try {
             const result = await signInWithEmailAndPassword(auth, email, password);
@@ -236,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // free trial. Show the interstitial that explains what happened
             // before handing over to Stripe.
             if (data.billingRecovery?.required) {
-                window.location.href = "/start-trial";
+                redirectTo('/start-trial');
                 return;
             }
 
@@ -251,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             logger.error({ err: error, msg: 'Login Error' });
             throw error;
         } finally {
+            exchangingSession.current = false;
             setLoading(false);
         }
     };
@@ -262,6 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * @throws {Error} Throws if Firebase registration fails or the backend rejects the session.
      */
     const signupWithEmail = async (email: string, password: string) => {
+        exchangingSession.current = true;
         setLoading(true);
         try {
             const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -292,11 +300,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // free trial. Show the interstitial that explains what happened
             // before handing over to Stripe.
             if (data.billingRecovery?.required) {
-                window.location.href = "/start-trial";
+                redirectTo('/start-trial');
                 return;
             }
 
-            await handlePostAuthRedirect();
+            await handlePostAuthRedirect('/start-trial');
         } catch (error: unknown) {
             if (isFirebaseError(error)) {
                 if (error.code === 'auth/email-already-in-use') {
@@ -306,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             logger.error({ err: error, msg: 'Signup Error' });
             throw error;
         } finally {
+            exchangingSession.current = false;
             setLoading(false);
         }
     };
@@ -357,10 +366,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * Hydrates user entitlement structures with properties returned from the secure token engine.
      */
     useEffect(() => {
+        let mounted = true;
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser && exchangingSession.current) return;
             if (currentUser) {
                 try {
                     const response = await fetch('/api/auth/callback', { method: 'GET' });
+                    if (!mounted || exchangingSession.current) return;
                     
                     if (response.ok) {
                         const data = await response.json();
@@ -382,6 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         setUser(fallbackUser);
                     }
                 } catch (err) {
+                    if (!mounted || exchangingSession.current) return;
                     logger.error({ err, msg: "[AuthContext] Fatal runtime crash during subscription metadata synchronization" });
                     const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: 'canceled' as SubscriptionStatus });
                     setUser(fallbackUser);
@@ -389,10 +402,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
                 setUser(null);
             }
-            setLoading(false);
+            if (!exchangingSession.current) setLoading(false);
         });
         
-        return () => unsubscribe();
+        return () => { mounted = false; unsubscribe(); };
     }, [auth]);
 
     return (

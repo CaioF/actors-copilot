@@ -1,6 +1,8 @@
 import { auth, db } from '@/lib/firebase.admin';
 import type { AdminMemberProjection } from './domain';
 import { listAdminMemberSnapshot } from './members';
+import { listQaTrials } from '@/lib/qa-affiliate-run';
+jest.mock('@/lib/qa-affiliate-run', () => ({...jest.requireActual('@/lib/qa-affiliate-run'),listQaTrials:jest.fn(async () => new Map())}));
 import { listAdminMembers } from './repository';
 
 jest.mock('@/lib/firebase.admin', () => ({
@@ -16,7 +18,6 @@ jest.mock('@/lib/firebase.admin', () => ({
 jest.mock('./repository', () => ({
   listAdminMembers: jest.fn(),
 }));
-jest.mock('@/lib/qa-affiliate-integrity', () => ({ isValidQaRun: jest.fn(() => true) }));
 
 const NOW = 1_800_000_000;
 
@@ -67,18 +68,17 @@ function authUser(
 function mockDocuments(
   billing: Record<string, Record<string, unknown>>,
   members: Record<string, Record<string, unknown>> = {},
-  qaRuns: Record<string, Record<string, unknown>> = {},
 ): void {
   (db.doc as jest.Mock).mockImplementation((path: string) => ({ path }));
   (db.getAll as jest.Mock).mockImplementation(async (...references: Array<{ path: string }>) =>
     references.map((reference) => {
       const segments = reference.path.split('/');
       const uid = segments[1];
-      const data = segments[0] === 'qaAffiliateSimulations' ? qaRuns[uid] : segments.length === 2 ? members[uid] : billing[uid];
+      const data = segments.length === 2 ? members[uid] : billing[uid];
 
       return {
         exists: Boolean(data),
-        data: () => data,
+        data: () => data ?? {},
       };
     }),
   );
@@ -288,22 +288,22 @@ describe('listAdminMemberSnapshot', () => {
 
     await listAdminMemberSnapshot(NOW);
 
-    // 120 accounts: two batches each for billing, referrals and QA markers.
-    expect(db.getAll).toHaveBeenCalledTimes(6);
+    // 120 accounts: two batches for the billing documents, two for the referrals.
+    expect(db.getAll).toHaveBeenCalledTimes(4);
     expect((db.getAll as jest.Mock).mock.calls[0]).toHaveLength(100);
     expect((db.getAll as jest.Mock).mock.calls[1]).toHaveLength(20);
     expect((db.getAll as jest.Mock).mock.calls[2]).toHaveLength(100);
     expect((db.getAll as jest.Mock).mock.calls[3]).toHaveLength(20);
-    expect((db.getAll as jest.Mock).mock.calls[4]).toHaveLength(100);
-    expect((db.getAll as jest.Mock).mock.calls[5]).toHaveLength(20);
   });
 
-  it('marks only server-owned active QA simulations in the member list', async () => {
-    (auth.listUsers as jest.Mock).mockResolvedValue({ users: [authUser('qa', 'qa@example.com'), authUser('real', 'real@example.com')] });
-    mockDocuments({ qa: { status: 'trialing' }, real: { status: 'trialing' } }, {}, { qa: { active: true } });
-    const snapshot = await listAdminMemberSnapshot(NOW);
-    expect(snapshot.members.find(member => member.uid === 'qa')?.qaSimulation).toBe(true);
-    expect(snapshot.members.find(member => member.uid === 'real')?.qaSimulation).toBeUndefined();
+  it('labels an approved demonstration while keeping a real subscription authoritative', async () => {
+    (auth.listUsers as jest.Mock).mockResolvedValue({users:[authUser('qa','qa@example.test'),authUser('paid','paid@example.test')]});
+    (listQaTrials as jest.Mock).mockResolvedValueOnce(new Map([['qa',{}],['paid',{}]]));
+    mockDocuments({qa:{tier:'free'},paid:{tier:'business',status:'active'}});
+    const {members} = await listAdminMemberSnapshot(NOW);
+    expect(members.find(member => member.uid === 'qa')).toMatchObject({qaSimulation:true,tier:'economy',subscriptionStatus:'trialing'});
+    expect(members.find(member => member.uid === 'paid')).toMatchObject({tier:'business',subscriptionStatus:'active'});
+    expect(members.find(member => member.uid === 'paid')?.qaSimulation).toBeUndefined();
   });
 
   it('reads the referral from the member document, not from the projection', async () => {

@@ -1,7 +1,7 @@
 import type Stripe from 'stripe';
 import { db } from '@/lib/firebase.admin';
 import { stripe } from '@/lib/stripe';
-import { isValidQaRun } from '@/lib/qa-affiliate-integrity';
+import { listQaTrials } from '@/lib/qa-affiliate-run';
 import { DEFAULT_COMMISSION_RATE, normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 import {
   ensureAffiliatePromotionCode,
@@ -84,8 +84,6 @@ export interface AffiliateReferredMember {
   converted: boolean;
   /** True when the account was excluded as a self referral. */
   selfReferral: boolean;
-  /** Explicit test simulation; never counted as actual revenue or a real referral. */
-  qaSimulation?: boolean;
   /** Epoch milliseconds of the referral click, when it is known. */
   capturedAt?: number;
 }
@@ -503,7 +501,7 @@ export async function recordAffiliatePayout(
  * @returns One report row per affiliate.
  */
 export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
-  const [affiliates, payouts] = await Promise.all([listAffiliates(), listAffiliatePayouts()]);
+  const [affiliates, payouts, demos] = await Promise.all([listAffiliates(), listAffiliatePayouts(), listQaTrials()]);
 
   const paidOutByAffiliate = new Map<string, Map<string, MinorUnits>>();
   for (const payout of payouts) {
@@ -522,23 +520,9 @@ export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
 
     const members: AffiliateReferredMember[] = [];
     const collected = new Map<string, MinorUnits>();
-    const qaRecords = new Map<string, Record<string, unknown>>();
-    for (let index = 0; index < referred.docs.length; index += 100) {
-      const chunk = referred.docs.slice(index, index + 100);
-      const snapshots = await db.getAll(...chunk.map(document => db.doc(`qaAffiliateSimulations/${document.id}`)));
-      snapshots.forEach((snapshot, position) => {
-        const data = snapshot.data();
-        if (data) qaRecords.set(chunk[position].id, data);
-      });
-    }
 
     for (const document of referred.docs) {
       const data = document.data() ?? {};
-      // The authoritative marker is in a server-only collection, not in the
-      // client-writable user document. This prevents customers hiding revenue.
-      const qaRecord = qaRecords.get(document.id);
-      if (qaRecord && !isValidQaRun(document.id, qaRecord)) throw new Error('Invalid QA record');
-      const qaSimulation = qaRecord?.active === true && qaRecord.affiliateCode === affiliate.code;
       const email = typeof data.email === 'string' ? data.email : '';
       const selfReferral =
         affiliate.email.length > 0 && email.toLowerCase() === affiliate.email.toLowerCase();
@@ -551,7 +535,7 @@ export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
         typeof data.affiliateCapturedAt === 'number' ? data.affiliateCapturedAt : undefined;
 
       let memberTotals = new Map<string, MinorUnits>();
-      if (!selfReferral && !qaSimulation && customerId) {
+      if (!selfReferral && customerId) {
         memberTotals = netCollectedFromInvoices(await listPaidInvoices(customerId, capturedAt));
       }
 
@@ -571,7 +555,6 @@ export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
         netCollected: memberTotal,
         converted: memberTotal > 0,
         selfReferral,
-        ...(qaSimulation ? { qaSimulation: true } : {}),
         ...(typeof capturedAt === 'number' ? { capturedAt } : {}),
       });
     }
@@ -606,8 +589,8 @@ export async function buildAffiliateReport(): Promise<AffiliateReportRow[]> {
       active: affiliate.active,
       notes: affiliate.notes,
       promotionCode: affiliate.promotionCode,
-      referredCount: members.filter((member) => !member.qaSimulation).length,
-      qaReferredCount: members.filter((member) => member.qaSimulation).length,
+      referredCount: members.length,
+      qaReferredCount: [...demos.values()].filter(demo => demo.affiliateCode === affiliate.code).length,
       convertedCount: members.filter((member) => member.converted).length,
       totals,
       members: members.sort((left, right) => right.netCollected - left.netCollected),

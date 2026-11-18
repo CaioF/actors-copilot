@@ -62,7 +62,7 @@ accounts through the disabled-by-default, allowlisted QA simulation endpoint. Si
 is not a Stripe subscription or payment. It must be marked as QA, excluded from real affiliate
 revenue, protected by admin authentication and a separate secret, and cleaned up after testing.
 The endpoint must reject accounts with a real active/trialing subscription and fail closed when
-its allowlists or secret are missing. This exception never applies to ordinary customer accounts.
+its allowlists or secret are missing. A fresh browser signup may use one exact preapproved address at `example.test`; existing identities require an exact UID and email. The endpoint verifies the already-open checkout and records a signed 15-minute QA receipt. The Stripe webhook retains ownership of real billing documents.
 
 ## Trial recovery flow
 

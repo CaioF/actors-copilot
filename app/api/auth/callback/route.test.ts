@@ -6,7 +6,6 @@ import { setPlatformSession, getPlatformSession } from '@/lib/session';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 import { logger } from '@/lib/logger';
 import { NextRequest } from 'next/server';
-import { signQaRun } from '@/lib/qa-affiliate-integrity';
 
 // --- STABLE DEPENDENCY MOCKS ---
 
@@ -43,35 +42,6 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
     });
 
     describe('POST /api/auth/callback', () => {
-
-        it('limits an active QA entitlement to the server-only run expiration', async () => {
-            const expiresAt = Date.now() + 60000;
-            let marker: { id: string } | undefined = { id: 'run-1' };
-            process.env.QA_SIMULATION_ENABLED = 'true';
-            process.env.QA_SIMULATION_SECRET = 'a'.repeat(64);
-            const qaRun = { active: true, id: 'run-1', expiresAt };
-            jest.mocked(auth.verifyIdToken).mockResolvedValue({ uid: 'qa_uid', email: 'qa@example.com' } as never);
-            (db.doc as jest.Mock).mockImplementation((path: string) => ({ get: async () => ({ exists: true, data: () =>
-                path.endsWith('/billing/current') ? { tier: 'economy', status: 'trialing', qaSimulation: marker }
-                  : path.startsWith('qaAffiliateSimulations/') ? { ...qaRun, signature: signQaRun('qa_uid', qaRun) }
-                  : {},
-            }) }));
-            try {
-                const req = () => new Request('http://localhost/api/auth/callback', { method: 'POST', body: JSON.stringify({ idToken: 'token' }) }) as NextRequest;
-                expect((await POST(req())).status).toBe(200);
-                expect(setPlatformSession).toHaveBeenLastCalledWith(expect.objectContaining({ tier: 'economy', subscriptionStatus: 'trialing', qaExpiresAt: expiresAt }));
-                marker = undefined;
-                expect((await POST(req())).status).toBe(200);
-                expect(setPlatformSession).toHaveBeenLastCalledWith(expect.objectContaining({ tier: 'free', subscriptionStatus: 'canceled' }));
-                marker = { id: 'run-1' };
-                process.env.QA_SIMULATION_ENABLED = 'false';
-                expect((await POST(req())).status).toBe(200);
-                expect(setPlatformSession).toHaveBeenLastCalledWith(expect.objectContaining({ tier: 'free', subscriptionStatus: 'canceled' }));
-            } finally {
-                delete process.env.QA_SIMULATION_ENABLED;
-                delete process.env.QA_SIMULATION_SECRET;
-            }
-        });
 
         it('routes a verified legacy test-mode record to trial signup with a free session', async () => {
             jest.mocked(canRestartInvalidBillingTrial).mockResolvedValue(true);
@@ -144,9 +114,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                 exists: false,
                 data: () => null,
             });
-            (db.doc as jest.Mock).mockImplementation((path: string) => path.startsWith('qaAffiliateSimulations/')
-                ? { get: async () => ({ exists: false, data: () => undefined }) }
-                : { get: mockGet });
+            (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
 
             const req = new Request('http://localhost/api/auth/callback', {
                 method: 'POST',
@@ -210,9 +178,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                 exists: true,
                 data: () => mockBillingDocData,
             });
-            (db.doc as jest.Mock).mockImplementation((path: string) => path.startsWith('qaAffiliateSimulations/')
-                ? { get: async () => ({ exists: false, data: () => undefined }) }
-                : { get: mockGet });
+            (db.doc as jest.Mock).mockReturnValue({ get: mockGet });
 
             const req = new Request('http://localhost/api/auth/callback', {
                 method: 'POST',

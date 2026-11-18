@@ -20,6 +20,8 @@ describe('AdminLoginForm', () => {
     expect(screen.getByRole('textbox', { name: 'Username' })).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
     expect(container).not.toHaveTextContent(/expected|default password/i);
+    expect(container.querySelector('form')).toHaveAttribute('method', 'post');
+    expect(container.querySelector('form')).toHaveAttribute('action', '/api/admin/login');
     expect(container.querySelector('script')).not.toBeInTheDocument();
   });
 

@@ -8,7 +8,7 @@ import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 import { normalizeCurrency } from '@/lib/plan-selection';
 import { buildAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { logger } from '@/lib/logger';
-import { isValidQaRun } from '@/lib/qa-affiliate-integrity';
+import { eligibleIdentity, readQaTrial, realEntitlement } from '@/lib/qa-affiliate-run';
 
 /**
  * Upper bound of automatic checkout attempts for a single recovery flag.
@@ -59,7 +59,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let stripePriceId: string | undefined;
     let currentPeriodEnd: number | undefined;
     let hasUsedTrial = false;
-    let qaExpiresAt: number | undefined;
 
     const billingDocRef = db.doc(`users/${uid}/billing/current`);
     const billingDoc = await billingDocRef.get();
@@ -73,14 +72,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       stripePriceId = billingData.priceId;
       currentPeriodEnd = billingData.currentPeriodEnd;
       hasUsedTrial = billingData.hasUsedTrial === true;
-      const qaMarker = (billingData as Omit<UserBilling, 'uid'> & { qaSimulation?: { id?: string } }).qaSimulation;
-      // Check the server-only run even if a client-writable marker was removed.
-      const qaRun = (await db.doc(`qaAffiliateSimulations/${uid}`).get()).data();
-      if (qaMarker || qaRun) {
-        const valid = process.env.QA_SIMULATION_ENABLED === 'true' && isValidQaRun(uid, qaRun) && qaRun?.active === true && qaRun.id === qaMarker?.id && typeof qaRun.expiresAt === 'number' && qaRun.expiresAt > Date.now();
-        if (valid) qaExpiresAt = qaRun.expiresAt;
-        else { tier = 'free'; subscriptionStatus = 'canceled'; }
-      }
     }
 
     // The root user document also carries the trial marker and the optional
@@ -131,6 +122,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       stripePriceId = undefined;
       currentPeriodEnd = undefined;
       hasUsedTrial = false;
+    }
+
+    let qaExpiresAt: number | undefined;
+    if (eligibleIdentity(uid,email) && !realEntitlement(billingDoc.data()) && !realEntitlement(userData)) {
+      const demo = await readQaTrial(uid,email);
+      if (demo) {
+        tier = 'economy';
+        subscriptionStatus = 'trialing';
+        qaExpiresAt = demo.expiresAt;
+      }
     }
 
     // 3. Serialize and commit entitlement metadata into the secure platform session.

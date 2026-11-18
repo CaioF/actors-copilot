@@ -7,7 +7,10 @@ function canonical(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`)
+    .join(',')}}`;
 }
 
 export function signQaRun(uid: string, run: Record<string, unknown>): string {
@@ -22,5 +25,7 @@ export function isValidQaRun(uid: string, data: Record<string, unknown> | undefi
     const { signature, ...run } = data;
     const expected = Buffer.from(signQaRun(uid, run), 'hex');
     return timingSafeEqual(expected, Buffer.from(signature as string, 'hex'));
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }

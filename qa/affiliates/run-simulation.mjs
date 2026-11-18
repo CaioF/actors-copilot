@@ -1,108 +1,330 @@
-#!/usr/bin/env node
-// Run only after the QA endpoint and its allowlists are deliberately enabled.
-// Signs in off-camera and always attempts cleanup; it never sends card data.
-import puppeteer from 'puppeteer-core';
-import {mkdir} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {randomUUID} from 'node:crypto';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { setTimeout as hold } from 'node:timers/promises';
+import { chromium } from 'playwright';
+import { expect as playwrightExpect } from 'playwright/test';
+const expect = playwrightExpect.configure({ timeout: 45000 });
+import { navigateAddress } from './browser-address.mjs';
+import { affiliateRow, header, installMask, memberRow, stripeSummary } from './camera.mjs';
 
-const origin = process.env.AC_BASE_URL || 'https://app.theactorscopilot.com';
-const {AC_ADMIN_USERNAME:username, AC_ADMIN_PASSWORD:password, AC_CHROME_PATH:chrome, AC_FFMPEG_PATH:ffmpeg, AC_QA_UID:uid, QA_SIMULATION_SECRET:key} = process.env;
-const {AC_TEST_EMAIL:email, AC_TEST_PASSWORD:passwordForTest} = process.env;
-const apiKey = process.env.AC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const source = process.env.AC_QA_SOURCE || 'link';
-const affiliateCode = process.env.AC_QA_AFFILIATE || 'lucas';
-if (!username || !password || !chrome || !ffmpeg || !uid || !email || !passwordForTest || !apiKey || !/^[a-f0-9]{64}$/i.test(key || '') || !['link','coupon'].includes(source) || new URL(origin).origin !== origin) throw new Error('Missing or invalid QA configuration');
-const output = resolve('qa/affiliates/evidence');
-await mkdir(output,{recursive:true});
-const browser = await puppeteer.launch({executablePath:chrome,headless:true});
-let recorder;
+const mode = process.argv[2];
+assert(
+  ['--observe', '--confirm-demo'].includes(mode),
+  'Choose --observe or --confirm-demo. Each creates a new QA account through the signup form.',
+);
+const confirm = mode === '--confirm-demo';
+const origin = new URL(process.env.AC_BASE_URL || 'https://app.theactorscopilot.com').origin;
+assert(
+  origin === 'https://app.theactorscopilot.com' ||
+    ['localhost', '127.0.0.1'].includes(new URL(origin).hostname),
+);
+const email = (process.env.AC_SIGNUP_EMAIL || process.env.QA_SIMULATION_SIGNUP_EMAIL || '')
+  .trim()
+  .toLowerCase();
+const password = process.env.AC_SIGNUP_PASSWORD;
+assert(
+  /^[a-z0-9._+-]+@example\.test$/.test(email) &&
+    password?.length >= 12 &&
+    process.env.AC_ADMIN_USERNAME &&
+    process.env.AC_ADMIN_PASSWORD,
+  'Configure the fresh synthetic signup and operator credentials.',
+);
+if (confirm)
+  assert(
+    /^[a-f0-9]{64}$/i.test(process.env.QA_SIMULATION_SECRET || ''),
+    'Configure the QA endpoint secret.',
+  );
+const ffmpeg = process.env.AC_FFMPEG_PATH || 'ffmpeg';
+execFileSync(ffmpeg, ['-version'], { stdio: 'ignore', windowsHide: true });
+const dir = fileURLToPath(
+  new URL('./evidence/signup-' + new Date().toISOString().replaceAll(':', '-') + '/', import.meta.url),
+);
+await mkdir(dir, { recursive: true });
+const browser = await chromium.launch({
+  headless: false,
+  args: ['--lang=en-US'],
+  ...(process.env.AC_CHROME_PATH ? { executablePath: process.env.AC_CHROME_PATH } : {}),
+});
+const context = await browser.newContext({
+  locale: 'en-US',
+  viewport: { width: 1440, height: 900 },
+  permissions: ['clipboard-read', 'clipboard-write'],
+});
+const page = await context.newPage();
+page.setDefaultTimeout(60000);
+await installMask(page, origin);
+const report = {
+  origin,
+  language: 'en-US',
+  browser: browser.version(),
+  journey: 'affiliate-signup',
+  status: 'incomplete',
+  confirmation: 'not attempted',
+  timeline: [],
+  cleanup: 'not needed',
+};
 let runId;
-let page;
-let cleanupFailed = false;
+let stage = 'operator login',
+  record = false,
+  started,
+  cleanup = false,
+  uid;
+report.requests = [];
+page.on('response', (r) => {
+  const url = new URL(r.url());
+  if (
+    url.origin === origin &&
+    ['/api/auth/callback', '/api/billing/recovery', '/api/billing/affiliate'].includes(url.pathname)
+  )
+    report.requests.push({ method: r.request().method(), path: url.pathname, status: r.status() });
+});
+function mark(name) {
+  report.timeline.push({ name, ms: Math.round(performance.now() - started) });
+}
+async function click(locator) {
+  await locator.hover();
+  await hold(320);
+  await locator.click();
+}
+async function watch(name, task) {
+  stage = name;
+  return task();
+}
+function demoCall(method, body) {
+  return context.request.fetch(origin + '/api/admin/affiliate-qa', {
+    method,
+    headers: { authorization: 'Bearer ' + process.env.QA_SIMULATION_SECRET },
+    data: body,
+    maxRedirects: 0,
+    timeout: 60000,
+  });
+}
 try {
-  page = await browser.newPage();
-  await page.setViewport({width:1280,height:800});
-  await page.goto(new URL('/admin-dashboard/affiliates',origin).href,{waitUntil:'domcontentloaded'});
-  await page.locator('#admin-username').fill(username);
-  await page.locator('#admin-password').fill(password);
-  const [login] = await Promise.all([
-    page.waitForResponse(r => new URL(r.url()).pathname === '/api/admin/login' && r.request().method() === 'POST',{timeout:30000}),
-    page.locator('button ::-p-text(Log in)').click(),
-  ]);
-  if (!login.ok()) throw new Error('Admin login failed');
-  await page.waitForFunction(code => [...document.querySelectorAll('tbody tr')].some(row => row.innerText.toLowerCase().includes(code)),{timeout:60000},affiliateCode);
-  const call = async (method, body) => page.evaluate(async (method, body, secret) => {
-    const response = await fetch('/api/admin/affiliate-qa',{method,headers:{'content-type':'application/json',authorization:`Bearer ${secret}`},body:JSON.stringify(body)});
-    return {status:response.status, data:await response.json()};
-  },method,body,key);
-  const auth = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
-    method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({email,password:passwordForTest,returnSecureToken:true}),
+  // Open the operator's entry point once. All application routes after registration are observed.
+  await page.goto(origin + '/admin-dashboard', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.getByLabel('Username', { exact: true }).fill(process.env.AC_ADMIN_USERNAME);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.AC_ADMIN_PASSWORD);
+  await click(page.getByRole('button', { name: 'Log in', exact: true }));
+  await page.locator('header h1').filter({ hasText: 'Member dashboard' }).waitFor({ state: 'attached' });
+  const affiliates = await header(page);
+  await page.screencast.showActions({
+    cursor: 'pointer',
+    duration: 550,
+    style: { title: 'display:none', highlight: 'outline:2px solid #d97237' },
   });
-  if (!auth.ok) throw new Error('Test identity sign-in failed');
-  const identity = await auth.json();
-  if (identity.localId !== uid) throw new Error('Test identity does not match allowlisted UID');
-  // Keep the ID before sending so cleanup is possible even if the response is lost.
-  runId = randomUUID();
-  const response = await call('POST',{uid,affiliateCode,source,runId,idToken:identity.idToken});
-  if (response.status !== 200 || !response.data.simulated) {
-    if ([400, 404, 409].includes(response.status)) runId = undefined; // Rejected before writes.
-    throw new Error(`Simulation failed with HTTP ${response.status}`);
+  await page.screencast.start({
+    path: join(dir, 'take.partial.webm'),
+    fps: 30,
+    size: { width: 1440, height: 900 },
+  });
+  record = true;
+  started = performance.now();
+  mark('Member dashboard after operator login');
+  await click(affiliates);
+  await page.waitForURL(origin + '/admin-dashboard/affiliates');
+  await header(page);
+  const { address, link } = await watch('locating the referral in the affiliate row', () =>
+    affiliateRow(page, origin),
+  );
+  mark('Lucas coupon and referral address in the operator panel');
+  await hold(1700);
+  stage = 'opening the referral address displayed by admin';
+  if (await link.evaluate((el) => Boolean(el.closest('a[href]')))) {
+    await click(link);
+    await page.waitForURL(address);
+  } else {
+    await link.click({ clickCount: 3 });
+    await page.keyboard.press('Control+c');
+    assert.equal((await page.evaluate(() => navigator.clipboard.readText())).trim(), address);
+    await navigateAddress(page, address, true);
   }
-  if (response.data.runId !== runId) throw new Error('Unexpected simulation identifier');
-  if (!response.data.projectionUpdated) throw new Error('Admin member projection did not update');
-  const callback = await fetch(new URL('/api/auth/callback',origin), {
-    method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({idToken:identity.idToken}),
+  const submit = page.locator('button[type=submit]').filter({ hasText: /^Create Account$/ });
+  await expect(submit).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Create Your Account/i })).toBeVisible();
+  mark('Create Account selected on arrival');
+  await hold(1600);
+  stage = 'registering the new QA member through the form';
+  await click(page.locator('input[type=email]'));
+  await page.locator('input[type=email]').pressSequentially(email, { delay: 38 });
+  await page.locator('input[type=password]').fill(password);
+  await expect(page.locator('input[type=password]')).toHaveAttribute('type', 'password');
+  await hold(700);
+  const [signupResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        new URL(r.url()).hostname === 'identitytoolkit.googleapis.com' &&
+        new URL(r.url()).pathname.endsWith('accounts:signUp') &&
+        r.request().method() === 'POST',
+    ),
+    click(submit),
+  ]);
+  assert(signupResponse.ok(), 'Signup was rejected');
+  uid = (await signupResponse.json()).localId;
+  assert.equal(typeof uid, 'string');
+  mark('Firebase accepted the new account from the Create Account form');
+  stage = 'waiting for the automatic trial-ready redirect';
+  await page.waitForURL(origin + '/start-trial', { timeout: 90000 });
+  await expect(page.getByRole('heading', { name: 'Your free trial is ready to start' })).toBeVisible();
+  mark('New account automatically redirected to Your free trial is ready to start');
+  await hold(2400);
+  stage = 'choosing Economy monthly in the trial screen';
+  await click(page.getByRole('button', { name: /Monthly/i }).first());
+  await click(page.getByRole('button', { name: /^Economy Class/i }));
+  await click(page.getByRole('button', { name: 'USD', exact: true }));
+  await expect(page.getByText(/LUCAS applied.*20% off/i)).toBeVisible();
+  mark('Economy selected and affiliate discount displayed on the trial page');
+  await hold(1600);
+  stage = 'opening the hosted checkout using Start my free trial';
+  const [checkoutResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        new URL(r.url()).origin === origin &&
+        new URL(r.url()).pathname === '/api/billing/recovery' &&
+        r.request().method() === 'POST',
+    ),
+    click(page.getByRole('button', { name: 'Start my free trial', exact: true })),
+  ]);
+  assert(checkoutResponse.ok(), 'The app could not start checkout');
+  await page.waitForURL((url) => url.origin === 'https://checkout.stripe.com', {
+    waitUntil: 'domcontentloaded',
   });
-  const session = await callback.json();
-  const cookie = callback.headers.getSetCookie().find(value => value.startsWith('platform_session='));
-  if (!callback.ok || !cookie || session.user?.tier !== 'economy' || session.user?.subscriptionStatus !== 'trialing') throw new Error('Simulated trial did not hydrate the expected session');
-  await browser.setCookie({name:'platform_session',value:cookie.split(';',1)[0].slice('platform_session='.length),url:origin,httpOnly:true,secure:true,sameSite:'Lax'});
-  const memberPage = await browser.newPage();
-  await memberPage.goto(new URL('/login',origin).href,{waitUntil:'domcontentloaded'});
-  await memberPage.locator('input[type="email"]').fill(email);
-  await memberPage.locator('input[type="password"]').fill(passwordForTest);
-  await memberPage.locator('button ::-p-text(Sign In)').click();
-  await memberPage.waitForFunction(() => location.pathname !== '/login',{timeout:30000});
-  await memberPage.goto(new URL('/auditions',origin).href,{waitUntil:'domcontentloaded'});
-  await memberPage.waitForFunction(() => location.pathname === '/auditions' && !!document.querySelector('input[placeholder="Search auditions by project or role..."]'),{timeout:30000});
-  await page.reload({waitUntil:'domcontentloaded'});
-  await page.waitForFunction(code => [...document.querySelectorAll('tbody tr')].some(row => row.innerText.toLowerCase().includes(code) && row.innerText.includes('simulated QA referral')),{timeout:60000},affiliateCode);
-  await page.evaluate(code => {
-    const rows = [...document.querySelectorAll('tbody tr')];
-    const target = rows.find(row => row.innerText.toLowerCase().includes(code));
-    const card = target.closest('[data-slot="card"]');
-    for (const other of document.querySelectorAll('[data-slot="card"]')) if (other !== card) other.style.display='none';
-    for (const row of rows) if (row !== target) row.style.display='none';
-    for (const el of target.querySelectorAll('div,span')) if (!el.children.length && el.textContent.includes('@')) el.style.visibility='hidden';
-    const cells = [...target.querySelectorAll('td')];
-    cells[0].querySelector('div').textContent='Affiliate (redacted)';
-    for (const badge of cells[0].querySelectorAll('[data-slot="badge"]')) badge.style.visibility='hidden';
-    for (const node of cells[1].childNodes) if (node.nodeType === Node.TEXT_NODE) node.textContent='[Real totals redacted]';
-    for (const cell of cells.slice(2)) cell.style.visibility='hidden';
-  },affiliateCode);
-  recorder = await page.screencast({path:`${output}/simulation-${source}.webm`,ffmpegPath:ffmpeg,fps:12});
-  await page.evaluate(() => { document.querySelector('tbody tr:not([style*="display: none"])').style.outline='2px solid #e8721a'; });
-  await page.mouse.move(850,360,{steps:10});
-  await new Promise(resolve=>setTimeout(resolve,3000));
-  await recorder.stop(); recorder=undefined;
-  console.log(JSON.stringify({simulated:true,source,memberAccess:true,qaLabelVisible:true,realPayment:false}));
+  // Chrome can discard the fetch body once it replaces the document. Read the
+  // session from the checkout that the browser actually reached.
+  const checkoutId = new URL(page.url()).pathname.match(/\bcs_(?:live|test)_[A-Za-z0-9]+\b/)?.[0];
+  assert(checkoutId);
+  stage = 'reading the applied coupon in Stripe Checkout';
+  await stripeSummary(page);
+  mark('Hosted Stripe Checkout shows LUCAS, 20% for one cycle, $15.20 after trial and $0 today');
+  await hold(3500);
+  if (confirm) {
+    stage = 'confirming this exact open checkout with the demo endpoint';
+    // Move from the hosted provider to its single, explicitly labeled substitute.
+    await navigateAddress(page, origin + '/api/admin/affiliate-qa');
+    await expect(page.getByRole('heading', { name: 'QA payment confirmation' })).toBeVisible();
+    runId = await page.locator('input[name=runId]').inputValue();
+    report.runId = runId;
+    await page.getByLabel('Hosted checkout ID').fill(checkoutId);
+    await page.getByLabel('Affiliate code').fill('lucas');
+    await page.getByLabel('Operator key').fill(process.env.QA_SIMULATION_SECRET);
+    mark('Operator uses QA payment confirmation for the observed hosted checkout');
+    await hold(1600);
+    cleanup = true;
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) => new URL(r.url()).pathname === '/api/admin/affiliate-qa' && r.request().method() === 'POST',
+      ),
+      click(page.getByRole('button', { name: 'Confirm demo trial' })),
+    ]);
+    report.demoHttpStatus = response.status();
+    if (response.status() !== 303) {
+      if ([400, 403, 404, 409].includes(response.status())) cleanup = false;
+      const data = await response.json().catch(() => null);
+      if (typeof data?.error === 'string' && /^[A-Za-z .]{1,90}$/.test(data.error))
+        report.demoError = data.error;
+      throw Error('Demo confirmation was not accepted');
+    }
+    assert.equal(new URL(await response.headerValue('location'), origin).href, origin + '/dashboard');
+    await page.waitForURL(origin + '/dashboard');
+    report.confirmation = 'QA endpoint returned HTTP 303 to the dashboard; no Stripe payment';
+    mark('Browser followed the demo server redirect');
+    const skip = page.getByRole('button', { name: 'Close intro video' });
+    await page.addLocatorHandler(skip, () => skip.click(), { times: 1 });
+    const dashboard = page.getByRole('heading', { name: 'My Acting Copilot', exact: true });
+    await expect(dashboard).toBeVisible();
+    mark('Dashboard displayed after the demo return');
+    await hold(2200);
+  } else report.confirmation = 'Checkout left open; no payment or demo confirmation';
+  stage = 'returning to the operator dashboard';
+  await navigateAddress(page, origin + '/admin-dashboard');
+  const nav = await header(page);
+  await memberRow(page, email, confirm);
+  mark(
+    confirm ? 'Same member shows Lucas, Trial and Simulated QA' : 'Same new member shows Lucas as referrer',
+  );
+  await hold(2600);
+  await click(nav);
+  await page.waitForURL(origin + '/admin-dashboard/affiliates');
+  await header(page);
+  await affiliateRow(page, origin, confirm);
+  mark(
+    confirm
+      ? 'Lucas shows the separately labeled simulated referral'
+      : 'Lucas coupon and referral link verified again',
+  );
+  await hold(2600);
+  await page.screencast.stop();
+  record = false;
+  await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));
+  stage = 'encoding the continuous recording';
+  execFileSync(
+    ffmpeg,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      'take.webm',
+      '-map',
+      '0:v:0',
+      '-an',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-threads',
+      '4',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '19',
+      '-movflags',
+      '+faststart',
+      'affiliate.partial.mp4',
+    ],
+    { cwd: dir, windowsHide: true },
+  );
+  execFileSync(
+    ffmpeg,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      'affiliate.partial.mp4',
+      '-map',
+      '0:v:0',
+      '-f',
+      'null',
+      '-',
+    ],
+    { cwd: dir, windowsHide: true },
+  );
+  await rename(join(dir, 'affiliate.partial.mp4'), join(dir, 'affiliate.mp4'));
+  report.status = confirm ? 'demo-complete' : 'observed-through-checkout';
 } catch (error) {
-  console.error(`Simulation QA failed: ${error instanceof Error ? error.message : 'unknown error'}`);
-  process.exitCode=1;
+  report.failedStage = stage;
+  const line = error.stack?.match(/(?:run-simulation|camera|browser-address)\.mjs:\d+:\d+/)?.[0];
+  console.error('Stopped at ' + stage + ' (' + [error.name, line].filter(Boolean).join(', ') + ')');
+  process.exitCode = 1;
 } finally {
-  if (recorder) await recorder.stop();
-  if (runId && page) {
+  if (record) await page.screencast.stop().catch(() => {});
+  if (cleanup) {
     try {
-      const cleanup = await page.evaluate(async (id, account, secret) => {
-        const response=await fetch('/api/admin/affiliate-qa',{method:'DELETE',headers:{'content-type':'application/json',authorization:`Bearer ${secret}`},body:JSON.stringify({uid:account,runId:id})});
-        const data=await response.json();
-        return {ok:response.ok,projectionUpdated:data.projectionUpdated};
-      },runId,uid,key);
-      if (!cleanup.ok || !cleanup.projectionUpdated) cleanupFailed=true;
-    } catch { cleanupFailed=true; }
-    if (cleanupFailed) { console.error('QA cleanup did not complete; review the test account before retrying.'); process.exitCode=1; }
-    else console.log(JSON.stringify({cleanupRestored:true}));
+      const resp = await demoCall('DELETE', { uid, runId });
+      if (!resp.ok() || (await resp.json()).cleaned !== true) throw Error();
+      report.cleanup = 'verified';
+    } catch {
+      report.qaUid = uid;
+      report.cleanup = 'requires operator review';
+      process.exitCode = 1;
+    }
   }
   await browser.close();
+  await writeFile(join(dir, 'report.json'), JSON.stringify(report, null, 2));
+  console.log(report.status, dir);
 }

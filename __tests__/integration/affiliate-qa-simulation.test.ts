@@ -1,78 +1,124 @@
 import type { NextRequest } from 'next/server';
 import { POST, DELETE } from '@/app/api/admin/affiliate-qa/route';
-import { POST as callback } from '@/app/api/auth/callback/route';
+import { POST as exchange } from '@/app/api/auth/callback/route';
 import { buildAffiliateReport } from '@/lib/admin-dashboard/affiliates';
-import { db } from '@/lib/firebase.admin';
-import { setPlatformSession } from '@/lib/session';
+import { auth, db } from '@/lib/firebase.admin';
+import { getPlatformSession, setPlatformSession } from '@/lib/session';
+import { stripe } from '@/lib/stripe';
+import type { fixtureStore } from '@/qa/affiliates/fixture-store';
 
-jest.mock('firebase-admin/firestore', () => ({ FieldValue: { delete: () => '__DELETE__' } }));
-jest.mock('@/lib/admin-dashboard/session', () => ({ getAdminSession: jest.fn(async () => ({ sub: 'admin' })) }));
+jest.mock('@/lib/admin-dashboard/session', () => ({ getAdminSession: async () => ({ sub: 'admin' }) }));
 jest.mock('@/lib/admin-dashboard/sync', () => ({ syncAdminMember: jest.fn() }));
-jest.mock('@/lib/verified-trial-restart', () => ({ canRestartInvalidBillingTrial: jest.fn(async () => false) }));
-jest.mock('@/lib/session', () => ({ setPlatformSession: jest.fn(), getPlatformSession: jest.fn() }));
-jest.mock('@/lib/affiliate-promotion-codes', () => ({ ensureAffiliatePromotionCode: jest.fn(), readPromotionCodeAffiliateCode: jest.fn(async () => 'lucas') }));
-jest.mock('@/lib/stripe', () => ({ stripe: { subscriptions: { list: jest.fn() }, invoices: { list: jest.fn() } } }));
-jest.mock('@/lib/firebase.admin', () => {
-  const store = new Map<string, Record<string, unknown>>();
-  const snapshot = (path: string) => ({ exists: store.has(path), data: () => store.get(path) });
-  const ref = (path: string) => ({ path, get: async () => snapshot(path) });
-  const write = (path: string, data: Record<string, unknown>, merge: boolean) => {
-    const result = merge ? { ...(store.get(path) || {}) } : {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value === '__DELETE__') delete result[key]; else result[key] = value;
-    }
-    store.set(path, result);
-  };
-  return {
-    auth: { getUser: jest.fn(async () => ({ email: 'qa@example.com' })), verifyIdToken: jest.fn(async () => ({ uid: 'qa', email: 'qa@example.com' })) },
-    db: {
-      __clear: () => store.clear(),
-      __seed: (path: string, data: Record<string, unknown>) => store.set(path, { ...data }),
-      doc: ref,
-      getAll: async (...refs: Array<{ path: string }>) => refs.map(item => snapshot(item.path)),
-      collection: (name: string) => ({
-        get: async () => ({ docs: [...store.entries()].filter(([path]) => path.startsWith(`${name}/`) && path.split('/').length === 2).map(([path, data]) => ({ id: path.split('/')[1], data: () => data })) }),
-        where: (_field: string, _op: string, value: string) => ({ get: async () => ({ docs: [...store.entries()].filter(([path, data]) => path.startsWith(`${name}/`) && path.split('/').length === 2 && data.affiliateCode === value).map(([path, data]) => ({ id: path.split('/')[1], data: () => data })) }) }),
-      }),
-      runTransaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({
-        get: async (item: { path: string }) => snapshot(item.path),
-        set: (item: { path: string }, data: Record<string, unknown>, options?: { merge?: boolean }) => write(item.path, data, !!options?.merge),
-        delete: (item: { path: string }) => store.delete(item.path),
-      }),
-    },
-  };
-});
+jest.mock('@/lib/verified-trial-restart', () => ({ canRestartInvalidBillingTrial: async () => false }));
+jest.mock('@/lib/session', () => ({
+  setPlatformSession: jest.fn(),
+  getPlatformSession: jest.fn(),
+  deletePlatformSession: jest.fn(),
+}));
+jest.mock('@/lib/stripe', () => ({
+  stripe: {
+    checkout: { sessions: { retrieve: jest.fn() } },
+    subscriptions: { list: async () => ({ data: [], has_more: false }) },
+    invoices: { list: async () => ({ data: [], has_more: false }) },
+  },
+}));
+jest.mock('@/lib/firebase.admin', () => ({
+  auth: { getUser: jest.fn(), getUsers: jest.fn(), verifyIdToken: jest.fn() },
+  db: jest.requireActual('@/qa/affiliates/fixture-store').fixtureStore(),
+}));
 
-const fakeDb = db as unknown as { __clear(): void; __seed(path: string, data: Record<string, unknown>): void };
+const store = db as unknown as ReturnType<typeof fixtureStore>;
 const key = 'a'.repeat(64);
 const runId = '550e8400-e29b-41d4-a716-446655440000';
-const request = (method: 'POST' | 'DELETE', body: unknown) => new Request('https://app.example/api/admin/affiliate-qa', {
-  method, headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify(body),
-}) as NextRequest;
+const email = 'actor@example.test';
+const buyer = { uid: 'qa', email };
+const checkoutSessionId = 'cs_test_0123456789';
+const request = (method: string, body: unknown) =>
+  new Request('https://app.example/api/admin/affiliate-qa', {
+    method,
+    headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }) as NextRequest;
 
-it('shows a simulated coupon trial separately and restores it after the test', async () => {
-  process.env.QA_SIMULATION_ENABLED = 'true';
-  process.env.QA_SIMULATION_SECRET = key;
-  process.env.QA_SIMULATION_ALLOWED_UIDS = 'qa';
-  process.env.QA_SIMULATION_ALLOWED_EMAILS = 'qa@example.com';
-  process.env.QA_SIMULATION_ALLOWED_AFFILIATES = 'lucas';
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'test-project';
-  global.fetch = jest.fn(async (url: string | URL | Request) => ({ status: String(url).includes('/documents/users/') ? 200 : 403 })) as unknown as typeof fetch;
-  fakeDb.__clear();
-  fakeDb.__seed('users/qa', { email: 'qa@example.com' });
-  fakeDb.__seed('affiliates/lucas', { name: 'Lucas', active: true, promotionCodeId: 'promo_lucas', rate: 0.3 });
-  try {
-    const result = await POST(request('POST', { uid: 'qa', affiliateCode: 'lucas', source: 'coupon', runId, idToken: 'synthetic' }));
-    expect(result.status).toBe(200);
-    const session = await callback(new Request('https://app.example/api/auth/callback', { method: 'POST', body: JSON.stringify({ idToken: 'synthetic' }) }) as NextRequest);
-    expect(session.status).toBe(200);
-    expect(setPlatformSession).toHaveBeenCalledWith(expect.objectContaining({ tier: 'economy', subscriptionStatus: 'trialing', qaExpiresAt: expect.any(Number) }));
-    const [during] = await buildAffiliateReport();
-    expect(during).toMatchObject({ referredCount: 0, qaReferredCount: 1, convertedCount: 0, totals: [] });
-    expect((await DELETE(request('DELETE', { uid: 'qa', runId }))).status).toBe(200);
-    const [after] = await buildAffiliateReport();
-    expect(after).toMatchObject({ referredCount: 0, qaReferredCount: 0, convertedCount: 0, totals: [] });
-  } finally {
-    for (const name of ['QA_SIMULATION_ENABLED','QA_SIMULATION_SECRET','QA_SIMULATION_ALLOWED_UIDS','QA_SIMULATION_ALLOWED_EMAILS','QA_SIMULATION_ALLOWED_AFFILIATES']) delete process.env[name];
-  }
-});
+it.each(['link', 'coupon'])(
+  'preserves ordinary %s attribution and billing before, during and after the demo',
+  async (source) => {
+    const original = { ...process.env };
+    Object.assign(process.env, {
+      QA_SIMULATION_ENABLED: 'true',
+      QA_SIMULATION_SECRET: key,
+      QA_SIMULATION_ALLOWED_UIDS: 'qa',
+      QA_SIMULATION_ALLOWED_EMAILS: email,
+      QA_SIMULATION_ALLOWED_AFFILIATES: 'lucas',
+    });
+    const member = source === 'link' ? { email, affiliateCode: 'lucas' } : { email };
+    const billing = { customerId: 'cus_demo', tier: 'free' };
+    store.clear();
+    store.seed('users/qa', member);
+    store.seed('users/qa/billing/current', billing);
+    store.seed('affiliates/lucas', {
+      name: 'Lucas',
+      active: true,
+      promotionCodeId: 'promo_demo',
+      rate: 0.3,
+    });
+    (auth.getUser as jest.Mock).mockResolvedValue(buyer);
+    (auth.getUsers as jest.Mock).mockResolvedValue({ users: [buyer] });
+    (auth.verifyIdToken as jest.Mock).mockResolvedValue(buyer);
+    (getPlatformSession as jest.Mock).mockResolvedValue({
+      ...buyer,
+      tier: 'free',
+      subscriptionStatus: 'canceled',
+    });
+    (stripe.checkout.sessions.retrieve as jest.Mock).mockResolvedValue({
+      id: checkoutSessionId,
+      mode: 'subscription',
+      status: 'open',
+      client_reference_id: 'qa',
+      customer: 'cus_demo',
+      discounts: [{ promotion_code: 'promo_demo' }],
+      success_url: 'https://app.example/api/billing/success',
+      metadata: {
+        platformUserId: 'qa',
+        targetTier: 'economy',
+        isTrial: 'true',
+        billingCycle: 'monthly',
+        ...(source === 'link' ? { affiliateCode: 'lucas' } : {}),
+      },
+    });
+    const reauthenticate = () =>
+      exchange(
+        new Request('https://app.example/api/auth/callback', {
+          method: 'POST',
+          body: JSON.stringify({ idToken: 'synthetic-token' }),
+        }) as NextRequest,
+      );
+    try {
+      const [before] = await buildAffiliateReport();
+      expect(before.referredCount).toBe(source === 'link' ? 1 : 0);
+      expect(
+        (await POST(request('POST', { runId, checkoutSessionId, affiliateCode: 'lucas' }))).status,
+      ).toBe(200);
+      expect((await reauthenticate()).status).toBe(200);
+      expect(setPlatformSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          tier: 'economy',
+          subscriptionStatus: 'trialing',
+          qaExpiresAt: expect.any(Number),
+        }),
+      );
+      const [during] = await buildAffiliateReport();
+      expect(during).toEqual({ ...before, qaReferredCount: 1 });
+      expect((await DELETE(request('DELETE', { uid: 'qa', runId }))).status).toBe(200);
+      expect(await buildAffiliateReport()).toEqual([before]);
+      expect((await reauthenticate()).status).toBe(200);
+      expect(setPlatformSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ tier: 'free', subscriptionStatus: 'canceled' }),
+      );
+      expect(store.read('users/qa')).toEqual(member);
+      expect(store.read('users/qa/billing/current')).toEqual(billing);
+    } finally {
+      process.env = original;
+    }
+  },
+);

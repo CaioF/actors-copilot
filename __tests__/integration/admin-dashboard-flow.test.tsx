@@ -280,9 +280,6 @@ describe('admin dashboard integration flow', () => {
     (db.getAll as jest.Mock).mockImplementation(
       async (...references: Array<{ path: string }>) =>
         references.map((reference) => {
-          if (reference.path.startsWith('qaAffiliateSimulations/')) {
-            return { exists: false, data: () => undefined };
-          }
           const uid = reference.path.split('/')[1];
           const projection = projections.find((entry) => entry.uid === uid);
 

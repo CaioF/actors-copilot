@@ -2,7 +2,7 @@
 import { render, waitFor, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
-import { signOut, onAuthStateChanged, getAuth, signInWithEmailAndPassword, Auth, User } from 'firebase/auth';
+import { signOut, onAuthStateChanged, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, Auth, User } from 'firebase/auth';
 import { logger } from '@/lib/logger';
 import { redirectTo } from '@/lib/navigate';
 
@@ -71,11 +71,12 @@ describe('AuthContext', () => {
     let consoleErrorSpy: jest.SpyInstance;
 
     const TestComponent = () => {
-        const { logout, loginWithEmail, loading, user } = useAuth();
+        const { logout, loginWithEmail, signupWithEmail, loading, user } = useAuth();
         return (
             <div>
                 <span data-testid="loading">{loading.toString()}</span>
                 <span data-testid="user">{user ? 'has-user' : 'no-user'}</span>
+                <button onClick={() => signupWithEmail('actor@example.test', 'password')} data-testid="signup-btn">Create Account</button>
                 <button onClick={() => logout()} data-testid="logout-btn">Logout</button>
                 <button onClick={() => loginWithEmail('member@example.com', 'password')} data-testid="login-btn">Login</button>
             </div>
@@ -120,6 +121,28 @@ describe('AuthContext', () => {
         expect(redirectTo).toHaveBeenCalledWith('/start-trial');
         expect((global.fetch as jest.Mock).mock.calls.filter(([path]) => path === '/api/billing/checkout')).toHaveLength(1);
         expect(sessionStorage.getItem('trial_intent')).toBeNull();
+    });
+
+    it('waits for the platform session before routing a fresh signup to its trial', async () => {
+        const user = { getIdToken: jest.fn().mockResolvedValue('token') } as unknown as User;
+        jest.mocked(createUserWithEmailAndPassword).mockResolvedValue({ user } as never);
+        let finishExchange!: (value: Response) => void;
+        (global.fetch as jest.Mock).mockImplementation(() => new Promise(resolve => { finishExchange = resolve; }));
+        const { getByTestId } = render(<AuthProvider><TestComponent /></AuthProvider>);
+        await waitFor(() => expect(getByTestId('loading').textContent).toBe('false'));
+        fireEvent.click(getByTestId('signup-btn'));
+        await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/auth/callback', expect.objectContaining({ method: 'POST' })));
+        const observer = mockOnAuthStateChanged.mock.calls[0][1];
+        if (typeof observer !== 'function') throw Error('Missing Firebase observer');
+        await act(async () => { await observer(user); });
+        expect(getByTestId('loading').textContent).toBe('true');
+        expect(getByTestId('user').textContent).toBe('no-user');
+        expect(redirectTo).not.toHaveBeenCalled();
+        await act(async () => {
+            finishExchange({ ok: true, json: async () => ({ user: { tier: 'free' } }) } as Response);
+        });
+        expect(redirectTo).toHaveBeenCalledWith('/start-trial');
+        expect(getByTestId('user').textContent).toBe('has-user');
     });
 
     describe('logout', () => {
