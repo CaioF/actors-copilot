@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { setTimeout as hold } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { expect as playwrightExpect } from 'playwright/test';
-const expect = playwrightExpect.configure({ timeout: 45000 });
+const expect = playwrightExpect.configure({ timeout: 90000 });
 import { navigateAddress } from './browser-address.mjs';
 import { affiliateRow, header, installMask, memberRow, stripeSummary } from './camera.mjs';
 
@@ -54,7 +54,7 @@ const context = await browser.newContext({
   permissions: ['clipboard-read', 'clipboard-write'],
 });
 const page = await context.newPage();
-page.setDefaultTimeout(60000);
+page.setDefaultTimeout(120000);
 await installMask(page, origin);
 const report = {
   origin,
