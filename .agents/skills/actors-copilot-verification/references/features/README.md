@@ -20,7 +20,7 @@ The following is a point-in-time guide to recorded production checks on 2026-11-
 | [Auditions and Reader](auditions-reader.md) | Brief and sides wizard validation, synthetic generation/save/reload, brief→sides enrichment, linked Reader, tracker search and cancellation, selected rehearsal controls. | Reverse enrichment, actual deletion, PDF browser extraction, microphone, audio playback and full rehearsal progression remain unverified. |
 | [DNA and coach](dna-coach.md) | Synthetic chat exchange persisted after reload; chat help and baseline cancellation; empty and populated vault navigation and filtering. | Baseline short-text error is misleading; successful baseline upload, extraction quality, multi-section exclusion and Business coaching remain unverified. |
 | [Profile and navigation](profile-navigation.md) | Desktop header and theme, one mobile menu route, settings unsaved draft, missing public HTML/Markdown. | Business editor, actual profile save, publication, known unpublished slug and full mobile accessibility remain unverified. |
-| [Administration](admin.md) | Signed-out admin login form rendered. | Authenticated administrative operations, affiliate and payout flows were not exercised. |
+| [Administration](admin.md) | Production operator sign-in and Lucas referral address verified on November 18. PR #115 also verified new signup, hosted coupon, demo return and the same member in admin in one recording. | See the admin map for environment-specific evidence. Real paid conversion and payout remain unverified. |
 
 ## Evidence recorded during initial mapping
 

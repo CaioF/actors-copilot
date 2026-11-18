@@ -8,4 +8,6 @@ Run the relevant journey only when a verified isolated environment and disposabl
 4. **Profile publication:** edit synthetic profile → save/reload → publish → open public slug in a clean context → unpublish and verify public behavior. Only in isolated test infrastructure; record exposure and cleanup.
 5. **Billing recovery:** isolated Stripe test customer and signed webhook → recovery checkout → complete test flow → verify subscription and webhook-owned billing state → refresh session → check access. Include cancellation/failure as relevant. Hosted checkout, async webhook and client session are separate checkpoints.
 
+6. **Affiliate signup and coupon.** Start at the operator's actual affiliate row. Record the default Create Account form, real Firebase signup, automatic trial-ready redirect, hosted Checkout with the applied offer, and the same member back in admin. When explicitly testing the demo endpoint, let the native operator form submit and Chrome follow the server's 303. The browser session and the provider outcome are distinct evidence. [Affiliate controls and assertions](admin.md#follow-one-referral-from-the-operators-row)
+
 If any checkpoint is unavailable, report the exact blocker and nearest check performed; a mocked route test is not an end-to-end pass. See [verification](../verification.md).

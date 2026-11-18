@@ -1,6 +1,6 @@
 # Internal administration and affiliates
 
-This is an operator surface, separate from member accounts. Only the signed-out form was observed in production on 2026-11-17; authenticated details below are source-derived. Do not inspect real member data or record payouts as test fixtures unless the current task authorizes that scope.
+This is an operator surface, separate from member accounts. On 2026-11-18 an operator signed in through the production form, clicked **Affiliates**, and read Lucas's coupon and public referral address from his row. Do not inspect real member data or record payouts as test fixtures unless the current task authorizes that scope.
 
 ## Admin sign-in and members
 
@@ -11,3 +11,13 @@ The dashboard reads a member reporting projection and renders member tables with
 ## Affiliates
 
 `/admin-dashboard/affiliates` contains an Affiliates table (Affiliate, Referred, Collected, Commission, Paid, Pending), create form with code and name, and a “Record a transfer” form and Transfers history. Create, attribution and payout recording mutate administrative or financial records; exercise against isolated disposable fixtures only, respecting the task's authorization. Check duplicate/invalid codes, attribution, amounts and reconciliation at the appropriate boundary; a recorded transfer is not itself proof that funds moved. Source: `affiliates/affiliates-panel.tsx`, `app/api/admin/{affiliates,affiliate-payouts}/`, `lib/admin-dashboard/affiliates.ts`, `affiliate-attribution.ts`; tests: `app/admin-dashboard/affiliates/affiliates-panel.test.tsx`, `lib/admin-dashboard/affiliates.test.ts`, `lib/admin-dashboard/affiliate-attribution.test.ts`.
+
+### Follow one referral from the operator's row
+
+Use a fresh browser profile. From **Member dashboard**, click **Affiliates**, find **Coupon code: LUCAS** and open the address *actually displayed there*. On the observed production version it was plain text ending in `/login?ref=lucas`: select the address, copy it, paste it into Chrome's address bar and press Enter. A version that renders it as an anchor can be clicked. Do not substitute the marketing homepage from older instructions.
+
+The landing form must already offer **Create Account** as its submit action. Type a new dedicated test identity and submit it. Wait for the app to exchange the Firebase token and navigate to **Your free trial is ready to start**. Choose **Monthly**, **Economy Class**, **USD**, then click **Start my free trial**. That button submits a selection to `POST /api/billing/recovery`. Keep recording as the app opens `checkout.stripe.com`. Expect the native order summary to show the referral code, duration of the discount, amount due today and amount after trial. In the November 18 browser run against the PR branch the offer was LUCAS, 20% for one cycle, $0.00 today and $15.20 after trial.
+
+Verify the same new email in **Member dashboard → Referred by**. A real link signup can increase the real referral count before any payment. A confirmed QA trial adds a separate **Simulated QA** designation. Do not infer a conversion, commission or paid invoice from either the signup or the trial. The opt-in recorder, operator handoff, configuration and cleanup are maintained with the endpoint. [Affiliate QA runbook on PR #115](https://github.com/CaioF/actors-copilot/blob/codex/affiliate-coupon-qa/qa/affiliates/README.md)
+
+**Observed on November 18, 2026.** On PR #115 before deployment, English Chromium 159 at 1440 × 900 recorded the complete signup against the configured Firebase and hosted Stripe backends. The QA form returned HTTP 303. Chrome followed it to the dashboard. The same synthetic member was labeled Lucas, Trial and Simulated QA in admin; the affiliate row showed its separate demo count. Cleanup succeeded. The provider completion was simulated, and the recording is local. Recheck the deployed build separately after release.
