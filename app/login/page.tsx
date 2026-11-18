@@ -118,6 +118,10 @@ function LoginContent() {
 
   useEffect(() => {
     if (!loading && user) {
+      if (user.billingRecoveryRequired) {
+        redirectTo('/start-trial');
+        return;
+      }
       if (trialCheckoutStarted.current) return;
       const trialTier = consumeTrialIntent();
       if (trialTier) {
@@ -160,14 +164,6 @@ function LoginContent() {
     }
   }, [user, loading, requestedPlanKey, requestedCurrencyKey]);
 
-  const redirectAfterAuth = () => {
-    const trialIntent = typeof window !== 'undefined' ? sessionStorage.getItem('trial_intent') : null;
-    const selection = requestedSelection ?? readPlanSelection();
-    if (!trialIntent && selection) {
-      redirectTo(buildUpgradeUrl(selection));
-    }
-  };
-
   const handleModeSwitch = (newMode: "login" | "signup") => {
     setMode(newMode);
     setErrorMsg("");
@@ -200,7 +196,6 @@ function LoginContent() {
     setInfoMsg("");
     try {
       await loginWithGoogle();
-      redirectAfterAuth();
     } catch (error: unknown) {
       if (isFirebaseError(error)) {
         if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
@@ -227,7 +222,6 @@ function LoginContent() {
     if (mode === "login") {
       try {
         await loginWithEmail(email, password);
-        redirectAfterAuth();
       } catch (error: any) {
         const errorCode = error.cause?.code || error.code;
         if (errorCode === "auth/invalid-credential" || errorCode === "auth/user-not-found") {
@@ -240,7 +234,6 @@ function LoginContent() {
       // Create Account mode
       try {
         await signupWithEmail(email, password);
-        redirectAfterAuth();
       } catch (signupError: any) {
         const signupErrorCode = signupError.cause?.code || signupError.code;
         if (signupErrorCode === "auth/email-already-in-use") {

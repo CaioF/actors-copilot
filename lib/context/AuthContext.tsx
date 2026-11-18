@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useRef } fro
 import { getAuth, getAdditionalUserInfo, signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getApp } from "@/lib/firebase"; 
 import { logger } from '@/lib/logger';
-import type { SubscriptionTier, SubscriptionStatus } from '@/lib/billing';
+import type { SubscriptionTier, MemberStatus } from '@/lib/billing';
 import { buildUpgradeUrl, readPlanSelection } from '@/lib/plan-selection';
 import { clearAffiliateAttribution, readAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { consumeTrialIntent } from '@/lib/trial-intent';
@@ -36,12 +36,18 @@ function clearAffiliateAfterAttribution(data: unknown): void {
     }
 }
 
+// Marketing links with an explicit Checkout or upgrade selection already own their redirect.
+function startsOnTrialPage() {
+    return !readPlanSelection() && !sessionStorage.getItem('trial_intent');
+}
+
 /**
  * Extends the default Firebase User to include modern Stripe billing context attributes.
  */
 export interface AppUser extends User {
     tier?: SubscriptionTier;
-    subscriptionStatus?: SubscriptionStatus;
+    subscriptionStatus?: MemberStatus;
+    billingRecoveryRequired?: boolean;
     stripeCustomerId?: string;
 }
 
@@ -169,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ idToken, ...readAffiliatePayload() })
+                body: JSON.stringify({ idToken, trialSignup: getAdditionalUserInfo(result)?.isNewUser && startsOnTrialPage(), ...readAffiliatePayload() })
             }); 
 
             const data = await response.json();
@@ -180,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish platform billing session");
             }
 
-            setUser(result.user as AppUser);
+            setUser(Object.assign(result.user, { tier: data.user?.tier, subscriptionStatus: data.user?.subscriptionStatus, billingRecoveryRequired: data.billingRecovery?.required === true }));
 
             // Billing recovery: this account still owes the activation of its
             // free trial. Show the interstitial that explains what happened
@@ -236,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error(data.error || "Failed to establish platform billing session.");
             }
 
-            setUser(result.user as AppUser);
+            setUser(Object.assign(result.user, { tier: data.user?.tier, subscriptionStatus: data.user?.subscriptionStatus, billingRecoveryRequired: data.billingRecovery?.required === true }));
 
             // Billing recovery: this account still owes the activation of its
             // free trial. Show the interstitial that explains what happened
@@ -274,13 +280,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const result = await createUserWithEmailAndPassword(auth, email, password);
             const idToken = await result.user.getIdToken();
-            
             const response = await fetch('/api/auth/callback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken, ...readAffiliatePayload() })
+                body: JSON.stringify({ idToken, trialSignup: startsOnTrialPage(), ...readAffiliatePayload() })
             });
-            
+
             const data = await response.json();
             clearAffiliateAfterAttribution(data);
             
@@ -291,7 +296,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             const userWithBilling: AppUser = Object.assign(result.user, { 
                 tier: data.user?.tier || 'free',
-                subscriptionStatus: data.user?.subscriptionStatus || 'canceled'
+                subscriptionStatus: data.user?.subscriptionStatus,
+                billingRecoveryRequired: data.billingRecovery?.required === true
             });
 
             setUser(userWithBilling);
@@ -371,32 +377,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (currentUser && exchangingSession.current) return;
             if (currentUser) {
                 try {
-                    const response = await fetch('/api/auth/callback', { method: 'GET' });
+                    let response = await fetch('/api/auth/callback', { method: 'GET' });
                     if (!mounted || exchangingSession.current) return;
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        
-                        // CORRIGIDO: Asserção de tipo sênior para alinhar as strings da API com as tipagens estritas do domínio
-                        const userWithBilling: AppUser = Object.assign(currentUser, { 
-                            tier: data.tier as SubscriptionTier,
-                            subscriptionStatus: data.subscriptionStatus as SubscriptionStatus,
-                            stripeCustomerId: data.stripeCustomerId as string | undefined
+                    const expired = response.status === 401;
+                    if (expired) {
+                        const idToken = await currentUser.getIdToken();
+                        if (!mounted || exchangingSession.current) return;
+                        response = await fetch('/api/auth/callback', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ idToken }),
                         });
-                        setUser(userWithBilling);
+                    }
+                    const data = await response.json();
+                    if (!mounted || exchangingSession.current) return;
+                    if (response.ok) {
+                        const profile = expired ? data.user : data;
+                        setUser(Object.assign(currentUser, {
+                            tier: profile.tier, subscriptionStatus: profile.subscriptionStatus,
+                            stripeCustomerId: profile.stripeCustomerId,
+                            billingRecoveryRequired: data.billingRecovery?.required === true,
+                        }));
                     } else {
                         logger.error({ 
                             err: new Error(`HTTP ${response.status}: ${response.statusText}`), 
                             msg: "[AuthContext] Failed sync inside entitlement route handler context." 
                         });
                         
-                        const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: 'canceled' as SubscriptionStatus });
+                        const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: undefined, billingRecoveryRequired: false });
                         setUser(fallbackUser);
                     }
                 } catch (err) {
                     if (!mounted || exchangingSession.current) return;
                     logger.error({ err, msg: "[AuthContext] Fatal runtime crash during subscription metadata synchronization" });
-                    const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: 'canceled' as SubscriptionStatus });
+                    const fallbackUser: AppUser = Object.assign(currentUser, { tier: 'free' as SubscriptionTier, subscriptionStatus: undefined, billingRecoveryRequired: false });
                     setUser(fallbackUser);
                 }
             } else {

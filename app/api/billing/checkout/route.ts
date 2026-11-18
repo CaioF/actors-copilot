@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformSession } from '@/lib/session';
 import { db, auth } from '@/lib/firebase.admin';
 import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
-import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { CheckoutAlreadyCompleted, createOrReuseCheckoutSession } from '@/lib/billing-checkout';
 import { resolveAppUrl } from '@/lib/app-origin';
+import { owesFirstTrial } from '@/lib/first-checkout';
 import { logger } from '@/lib/logger';
 import { normalizeCurrency, type RequestedCurrency } from '@/lib/plan-selection';
 
@@ -90,35 +91,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         // 3. Fetch active customer billing configurations from Firestore to prevent duplicate client entities & check trial eligibility
-        const userDocRef = db.doc(`users/${uid}`);
-        const billingDoc = await db.doc(`users/${uid}/billing/current`).get();
-
-        let hasUsedTrial = false;
-
-        if (billingDoc.exists) {
-            const billingData = billingDoc.data();
-            if (billingData?.hasUsedTrial) {
-                hasUsedTrial = true;
-            }
-        }
-
-        if (!hasUsedTrial) {
-            try {
-                const userDoc = await userDocRef.get();
-                if (userDoc.exists && userDoc.data()?.hasUsedTrial) {
-                    hasUsedTrial = true;
-                }
-            } catch (err) {
-                logger.warn({ err, msg: 'Failed to inspect root user document for hasUsedTrial status' });
-            }
-        }
-
-        if (hasUsedTrial && isExplicitTrialReq) {
+        const [userDoc, billingDoc] = await Promise.all([
+            db.doc(`users/${uid}`).get(), db.doc(`users/${uid}/billing/current`).get(),
+        ]);
+        const isTrial = owesFirstTrial(userDoc.data() ?? {}, billingDoc.data() ?? {});
+        if (!isTrial && isExplicitTrialReq) {
             return NextResponse.json({ error: 'A free trial has already been used for this account.' }, { status: 400 });
         }
-
-        // All checkout sessions allow for 14 days of free trial unless the user has already used a trial
-        const isTrial = !hasUsedTrial;
 
         // 4. Resolve the Stripe Customer and open the checkout session.
         // Both steps are idempotent: concurrent requests for the same attempt
@@ -150,6 +129,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ url: checkoutSession.url });
 
     } catch (error) {
+        if (error instanceof CheckoutAlreadyCompleted) {
+            return NextResponse.json({ error: error.message, code: 'checkout_completed' }, { status: 409 });
+        }
         logger.error({ err: error, msg: 'Stripe subscription checkout workflow failed execution' });
         return NextResponse.json({ error: 'Internal Server Error during checkout initialization' }, { status: 500 });
     }

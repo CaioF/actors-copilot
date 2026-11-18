@@ -20,6 +20,7 @@ const member: AdminMemberProjection = {
   displayName: 'Example Actor',
   referredBy: 'lucas',
   tier: 'business',
+  selectedTier: null,
   subscriptionStatus: 'active',
   membershipState: 'paid',
   trialStart: 1_700_000_000,

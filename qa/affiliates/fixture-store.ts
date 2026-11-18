@@ -24,8 +24,26 @@ export function fixtureStore() {
   }
   const doc = (path: string) => ({
     path,
+    create: async (data: Data) => {
+      if (entries.has(path)) throw Object.assign(new Error('Already exists'), { code: 6 });
+      write(path, data);
+    },
     get: async () => snapshot(path),
     set: async (data: Data, o?: { merge?: boolean }) => write(path, data, o?.merge),
+    update: async (patch: Data) => {
+      const data = structuredClone(entries.get(path)?.data ?? {});
+      for (const [field, value] of Object.entries(patch)) {
+        const parts = field.split('.');
+        const key = parts.pop()!;
+        let target = data;
+        for (const part of parts) {
+          target[part] ??= {};
+          target = target[part] as Data;
+        }
+        target[key] = value;
+      }
+      write(path, data);
+    },
   });
   const query = (name: string, field?: string, v?: unknown) => ({
     docs: [...entries.keys()]
@@ -55,7 +73,8 @@ export function fixtureStore() {
       const result = tail.then(() =>
         fn({
           get: async (ref: Ref) => snapshot(ref.path),
-          set: (ref: Ref, d: Data, o?: { merge?: boolean }) => write(ref.path, d, o?.merge),
+          set: (ref: Ref, d: Data, o?: { merge?: boolean; mergeFields?: string[] }) =>
+            write(ref.path, d, o?.merge || Boolean(o?.mergeFields?.length)),
           delete: (ref: Ref) => entries.delete(ref.path),
         }),
       );

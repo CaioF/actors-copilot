@@ -1,4 +1,8 @@
+import { isCheckoutCustomerSeed } from '../first-checkout';
+import type { RequestedPlan } from '../plan-selection';
+
 export type AdminMembershipState =
+  | 'checkout_pending'
   | 'trial'
   | 'paid'
   | 'paid_cancelling'
@@ -20,6 +24,7 @@ export interface AdminMemberProjection {
   /** True only when a server-owned QA simulation is active. */
   qaSimulation?: boolean;
   tier: 'free' | 'economy' | 'business';
+  selectedTier?: RequestedPlan | null;
   subscriptionStatus: string | null;
   membershipState: AdminMembershipState;
   trialStart: number | null;
@@ -35,16 +40,8 @@ export interface AdminMemberProjection {
   updatedAt: string;
 }
 
-// Older checkouts wrote exactly these fields before a first subscription
-// existed. Webhook and migration records carry additional billing evidence.
-const checkoutSeedFields = new Set(['customerId', 'tier', 'status', 'updatedAt', 'checkoutAttempt']);
-
 export function adminSubscriptionStatus(billing: Record<string, unknown>): string | null {
-  if (
-    billing.status === 'canceled' && billing.tier === 'free' &&
-    typeof billing.customerId === 'string' && billing.customerId.length > 0 &&
-    Object.keys(billing).every((field) => checkoutSeedFields.has(field))
-  ) return null;
+  if (billing.status === 'canceled' && isCheckoutCustomerSeed(billing)) return null;
 
   if (typeof billing.status === 'string') return billing.status;
   return typeof billing.subscriptionStatus === 'string' ? billing.subscriptionStatus : null;

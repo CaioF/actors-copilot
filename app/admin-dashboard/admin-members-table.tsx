@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 
 const stateLabels: Record<AdminMemberDto['membershipState'], string> = {
+  checkout_pending: 'Checkout pending',
   trial: 'Trial',
   paid: 'Paid',
   paid_cancelling: 'Paid, canceling',
@@ -176,7 +177,8 @@ export function AdminMembersTable({
                             </Badge>
                             {member.qaSimulation && <Badge variant="outline">Simulated QA</Badge>}
                             <span className="text-xs text-muted-foreground">
-                              {titleCase(member.tier)}
+                              {member.membershipState === 'checkout_pending' && member.selectedTier
+                                ? `${titleCase(member.selectedTier)} selected` : titleCase(member.tier)}
                               {membershipEnd
                                 ? ` · Ends ${dateFormatter.format(new Date(membershipEnd * 1000))}`
                                 : ''}

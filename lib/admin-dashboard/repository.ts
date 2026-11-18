@@ -13,6 +13,7 @@ function toAdminMember(
     displayName: data.displayName as string,
     referredBy: typeof data.referredBy === 'string' ? data.referredBy : null,
     tier: data.tier as AdminMemberProjection['tier'],
+    selectedTier: data.selectedTier === 'economy' || data.selectedTier === 'business' ? data.selectedTier : null,
     subscriptionStatus: data.subscriptionStatus as string | null,
     membershipState: data.membershipState as AdminMemberProjection['membershipState'],
     trialStart: data.trialStart as number | null,

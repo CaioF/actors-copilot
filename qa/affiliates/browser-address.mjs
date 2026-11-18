@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 // the native admin cell if an older deployment displays it as plain text.
 export async function navigateAddress(page, address, pasted = false) {
   const url = new URL(address);
-  assert(['/login', '/admin-dashboard', '/api/admin/affiliate-qa'].includes(url.pathname));
+  assert(['/login', '/dashboard', '/admin-dashboard', '/api/admin/affiliate-qa'].includes(url.pathname));
   await page.bringToFront();
   const browser = page.context().browser();
   const cdp = await browser.newBrowserCDPSession();
@@ -114,5 +114,7 @@ $qaShell.SendKeys('{ENTER}')
     else x(['type', '--clearmodifiers', '--', address]);
     x(['key', 'Return']);
   } else throw Error('This recording requires Windows or an X11 desktop with xdotool.');
-  await page.waitForURL(address, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.waitForURL(actual => actual.href === address ||
+    (url.pathname === '/dashboard' && actual.origin === url.origin && actual.pathname === '/start-trial'),
+  { waitUntil: 'domcontentloaded', timeout: 90000 });
 }

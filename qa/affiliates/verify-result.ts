@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { deleteApp, getApp } from 'firebase-admin/app';
 import { extractSessionAffiliateCandidates } from '@/lib/admin-dashboard/affiliates';
 import { adminSubscriptionStatus } from '@/lib/admin-dashboard/domain';
+import { unfinishedCheckout } from '@/lib/first-checkout';
 import { getStripePriceIdForTier } from '@/lib/billing';
 import { auth, db } from '@/lib/firebase.admin';
 import { qaCheckoutFingerprint, realEntitlement } from '@/lib/qa-affiliate-run';
@@ -16,10 +17,19 @@ async function verify() {
   const email = process.env.QA_SIMULATION_SIGNUP_EMAIL?.trim().toLowerCase();
   assert(directory && email && /^[a-z0-9.+_-]+@example\.test$/.test(email), 'Provide the run directory and its reserved QA email.');
   const run = JSON.parse(await readFile(join(directory, 'report.json'), 'utf8'));
-  assert(run.status === 'demo-complete' && run.demoHttpStatus === 303 && run.cleanup === 'verified', 'The recorded run did not complete.');
+  const abandoned = run.status === 'recovery-verified';
   assert((run.tier === 'business' || run.tier === 'economy') && /^[a-f0-9]{64}$/.test(run.checkoutFingerprint), 'Missing selected tier or Checkout fingerprint.');
-  assert.deepEqual(run.session, { tier: run.tier, subscriptionStatus: 'trialing' });
-  assert.deepEqual(run.afterCleanup, { status: 'No plan', tier: 'Free', referredBy: 'lucas' });
+  if (abandoned) {
+    assert(run.recoveryVersion === 1 && run.freshLoginResumedOriginalCheckout === true &&
+      run.cleanup === 'not needed', 'Fresh-login recovery was not verified.');
+  } else {
+    assert(run.status === 'demo-complete' && run.demoHttpStatus === 303 && run.cleanup === 'verified', 'The recorded run did not complete.');
+    assert.deepEqual(run.session, { tier: run.tier, subscriptionStatus: 'trialing' });
+    const cleanupState = run.recoveryVersion === 1
+      ? { status: 'Checkout pending', tier: 'Free', selectedTier: run.tier, referredBy: 'lucas' }
+      : { status: 'No plan', tier: 'Free', referredBy: 'lucas' };
+    assert.deepEqual(run.afterCleanup, cleanupState);
+  }
 
   const { uid } = await auth.getUserByEmail(email);
   const handle = createHash('sha256').update('affiliate-qa:' + uid).digest('hex');
@@ -31,6 +41,10 @@ async function verify() {
   assert(typeof customer === 'string' && member.get('affiliateCode') === 'lucas', 'Customer mapping or referral missing.');
   assert(!receipt.exists && !realEntitlement(billing.data()) && !realEntitlement(member.data()), 'A demo or subscription remains.');
   assert.equal(adminSubscriptionStatus(billing.data() ?? {}), null);
+  if (run.recoveryVersion === 1) {
+    assert.deepEqual(unfinishedCheckout(member.data() ?? {}, billing.data() ?? {})?.choice,
+      { tier: run.tier, billingCycle: 'monthly', currency: 'usd' });
+  }
   const [subscriptions, invoices] = await Promise.all([
     stripe.subscriptions.list({ customer, status: 'all', limit: 1 }),
     stripe.invoices.list({ customer, status: 'paid', limit: 1 }),
@@ -48,9 +62,10 @@ async function verify() {
     const promotion = affiliate.get('promotionCodeId');
     assert(typeof promotion === 'string' && extractSessionAffiliateCandidates(checkout).promotionCodeIds.includes(promotion));
     console.info(JSON.stringify({
-      origin: run.origin, recordedTier: run.tier, trialStatus: run.session.subscriptionStatus,
+      origin: run.origin, recordedTier: run.tier,
+      ...(abandoned ? { memberStatus: 'checkout_pending' } : { trialStatus: run.session.subscriptionStatus, qaReceiptRemoved: true }),
       stripeCheckoutStatus: checkout.status, verifiedReferral: 'lucas',
-      qaReceiptRemoved: true, realSubscriptions: 0, paidInvoices: 0,
+      qaReceiptPresent: false, realSubscriptions: 0, paidInvoices: 0,
     }));
     return;
   }

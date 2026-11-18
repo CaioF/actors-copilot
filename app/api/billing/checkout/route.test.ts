@@ -18,7 +18,10 @@ jest.mock('@/lib/stripe', () => ({
 }));
 
 jest.mock('@/lib/firebase.admin', () => ({
-    db: { doc: jest.fn() },
+    db: { doc: jest.fn(), runTransaction: (callback: (tx: unknown) => unknown) => callback({
+        get: (ref: { get: () => unknown }) => ref.get(),
+        set: (ref: { set: (...args: unknown[]) => unknown }, ...args: unknown[]) => ref.set(...args),
+    }) },
     auth: { verifyIdToken: jest.fn() },
 }));
 
@@ -259,7 +262,7 @@ describe('Stripe Subscription Checkout Route Handler', () => {
                 billingCycle: 'monthly',
                 isTrial: 'false',
             },
-        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_default_0_localhost-3000_cus_historical_888` });
+        }, { idempotencyKey: `checkout_${mockUid}_price_economy_id_abc_default_0_localhost-3000_cus_historical_888_no-trial` });
 
         // 3. Ensure no redundant customer objects get initialized during mapped flows
         expect(stripe.customers.create).not.toHaveBeenCalled();

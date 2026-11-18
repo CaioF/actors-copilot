@@ -541,7 +541,7 @@ export default function SettingsPage() {
                         ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
                         : 'bg-muted text-muted-foreground'
                     }`}>
-                      {user?.subscriptionStatus ? user.subscriptionStatus.toUpperCase() : 'INACTIVE'}
+                      {user?.subscriptionStatus ? user.subscriptionStatus.replaceAll('_', ' ').toUpperCase() : 'INACTIVE'}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">

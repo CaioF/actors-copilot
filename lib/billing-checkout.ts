@@ -5,6 +5,36 @@ import { logger } from '@/lib/logger';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
 import { findAffiliateByCode, type AffiliateRecord } from '@/lib/admin-dashboard/affiliates';
 import { isSameAppOrigin } from '@/lib/app-origin';
+import { checkoutChoice, type CheckoutChoice } from '@/lib/first-checkout';
+import { rememberFirstCheckout } from '@/lib/billing-recovery';
+import { DEFAULT_CURRENCY } from '@/lib/plan-selection';
+
+/** Look up the member's own subscription checkout, including expired pre-recovery sessions. */
+export async function priorFirstCheckout(uid: string, customer: string, completedOnly: boolean) {
+  let cursor: string | undefined;
+  let latestChoice: CheckoutChoice | null = null;
+  do {
+    const page: Stripe.ApiList<Stripe.Checkout.Session> | null = await stripe.checkout.sessions.list({
+      customer, limit: 100, ...(completedOnly ? { status: 'complete' as const } : {}),
+      ...(cursor ? { starting_after: cursor } : {}),
+    }).catch(error => {
+      if (isMissingResource(error)) return null;
+      throw error;
+    });
+    if (!page) return null;
+    for (const session of page.data) {
+      if (session.mode !== 'subscription' || session.client_reference_id !== uid) continue;
+      if (session.status === 'complete') return { completed: true, choice: null };
+      if (!completedOnly && !latestChoice && session.metadata?.isTrial === 'true') {
+        latestChoice = checkoutChoice(session.metadata.targetTier, session.metadata.billingCycle, session.currency);
+      }
+    }
+    cursor = page.has_more ? page.data.at(-1)?.id : undefined;
+  } while (cursor);
+  return latestChoice ? { completed: false, choice: latestChoice } : null;
+}
+
+export class CheckoutAlreadyCompleted extends Error {}
 
 /**
  * Detects the Stripe "idempotency key is already in use" conflict.
@@ -277,6 +307,7 @@ export async function createIdempotentCheckoutSession(params: {
         // stored customer is gone gets a fresh one, and Stripe rejects a key
         // that is reused with different parameters.
         customerId,
+        ...(isTrial ? [] : ['no-trial']),
         // The affiliate changes the session parameters, so it belongs in the
         // key: Stripe rejects a key reused with different parameters.
         ...(affiliate?.code ? [affiliate.code] : []),
@@ -306,6 +337,7 @@ export async function findOpenCheckoutSession(params: {
   tier: SubscriptionTier;
   billingCycle: BillingCycle;
   currency?: string;
+  isTrial?: boolean;
   appUrl: string;
   affiliateCode?: string;
 }): Promise<Stripe.Checkout.Session | null> {
@@ -324,6 +356,7 @@ export async function findOpenCheckoutSession(params: {
 
     const match = listed.data.find(
       (session) =>
+        (params.isTrial === undefined || session.metadata?.isTrial === String(params.isTrial)) &&
         session.metadata?.targetTier === tier &&
         session.metadata?.billingCycle === billingCycle &&
         session.expires_at > now &&
@@ -415,6 +448,7 @@ export async function createOrReuseCheckoutSession(params: {
   isTrial: boolean;
   appUrl: string;
   affiliateCode?: string;
+  verifiedTrialRestart?: boolean;
 }): Promise<Stripe.Checkout.Session> {
   const { uid, email, tier, billingCycle, currency, isTrial, appUrl, affiliateCode } = params;
 
@@ -426,6 +460,17 @@ export async function createOrReuseCheckoutSession(params: {
   // requests derive the very same idempotency key and collapse into a single
   // Stripe Session.
   const attempt = Number(billingData.checkoutAttempt ?? 0);
+
+  const choice = checkoutChoice(tier, billingCycle, currency ?? DEFAULT_CURRENCY);
+  if (isTrial && choice && !params.verifiedTrialRestart) {
+    if (!await rememberFirstCheckout(uid, choice)) {
+      throw new CheckoutAlreadyCompleted('This account already has subscription history.');
+    }
+    if (typeof billingData.customerId === 'string' &&
+        await priorFirstCheckout(uid, billingData.customerId, true)) {
+      throw new CheckoutAlreadyCompleted('Your checkout has already been completed.');
+    }
+  }
 
   const customerId = await resolveStripeCustomerId({
     uid,
@@ -447,11 +492,10 @@ export async function createOrReuseCheckoutSession(params: {
     billingCycle,
     currency,
     appUrl,
+    isTrial,
     ...(affiliateRef ? { affiliateCode: affiliateRef.code } : {}),
   });
-  if (reusable) return reusable;
-
-  const session = await createIdempotentCheckoutSession({
+  const createSession = (sequence: number) => createIdempotentCheckoutSession({
     uid,
     email,
     tier,
@@ -459,18 +503,31 @@ export async function createOrReuseCheckoutSession(params: {
     currency,
     isTrial,
     customerId,
-    attempt,
+    attempt: sequence,
     appUrl,
     affiliate: affiliateRef,
   });
 
-  await billingDocRef.set(
-    {
-      checkoutAttempt: attempt + 1,
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true },
-  );
+  const recordAttempt = (next: number) => db.runTransaction(async transaction => {
+    const latest = (await transaction.get(billingDocRef)).data();
+    if (Number(latest?.checkoutAttempt ?? 0) < next) {
+      transaction.set(billingDocRef, { checkoutAttempt: next, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  });
+  if (reusable) {
+    // Stripe may have created the session just before a previous process stopped.
+    if (attempt === 0) await recordAttempt(1);
+    return reusable;
+  }
 
+  let sequence = attempt;
+  let session = await createSession(sequence);
+  await recordAttempt(++sequence);
+  // An interrupted handoff can replay an idempotent response whose URL has since expired.
+  if (session.status === 'expired' || session.expires_at * 1000 <= Date.now()) {
+    session = await createSession(sequence);
+    await recordAttempt(sequence + 1);
+  }
+  if (session.status === 'complete') throw new CheckoutAlreadyCompleted('Your checkout has already been completed.');
   return session;
 }

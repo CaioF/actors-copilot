@@ -11,6 +11,7 @@ jest.mock("next/image", () => ({
 }));
 
 jest.mock("@/lib/navigate", () => ({ redirectTo: jest.fn() }));
+jest.mock("@/lib/context/AuthContext", () => ({ useAuth: () => ({ loading: false }) }));
 
 import { redirectTo } from "@/lib/navigate";
 
@@ -46,7 +47,7 @@ describe("StartTrialPage", () => {
   /**
    * Mocks the two calls the page makes on mount plus the checkout call.
    */
-  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial'; status?: number; affiliate?: { code: string; promotionCode: string; percentOff: number } | null }) => {
+  const mockFetches = (options?: { pending?: boolean; ok?: boolean; reason?: 'recovery' | 'trial' | 'checkout_pending' | 'processing'; choice?: { tier: string; billingCycle: string; currency: string }; status?: number; affiliate?: { code: string; promotionCode: string; percentOff: number } | null }) => {
     const pending = options?.pending ?? true;
     const ok = options?.ok ?? true;
     const reason = options?.reason ?? 'recovery';
@@ -71,13 +72,36 @@ describe("StartTrialPage", () => {
       return Promise.resolve({
         ok,
         status,
-        json: async () => (pending ? { pending: true, tier: "business", currency: "usd", reason } : { error: "Unauthorized" }),
+        json: async () => (pending ? { pending: true, tier: "business", currency: "usd", ...options?.choice, reason } : { pending: false, reason }),
       });
     });
 
     global.fetch = fetchMock as unknown as typeof fetch;
     return fetchMock;
   };
+
+  it('returns to the saved annual, non-default currency choice and waits for an explicit resume', async () => {
+    const choice = { tier: 'economy', currency: 'eur', billingCycle: 'annual' };
+    const fetchMock = mockFetches({ reason: 'checkout_pending', choice });
+    await renderPage();
+    expect(screen.getByRole('heading', { name: 'Finish setting up your free trial' })).toBeVisible();
+    for (const name of [/^Economy Class/i, /^Annual/, /^EUR$/]) {
+      expect(screen.getByRole('button', { name, pressed: true })).toBeVisible();
+    }
+    expect(redirectMock).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Resume checkout' })); });
+    expect(fetchMock).toHaveBeenCalledWith('/api/billing/recovery', expect.objectContaining({
+      body: JSON.stringify({ tier: 'economy', billingCycle: 'annual', currency: 'eur' }),
+    }));
+  });
+
+  it('shows the processing screen without reopening checkout while waiting for the webhook', async () => {
+    mockFetches({ pending: false, reason: 'processing' });
+    await renderPage();
+    expect(screen.getByRole('heading', { name: 'Your checkout is complete' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Resume checkout' })).toBeNull();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
 
   const renderPage = async () => {
     render(<StartTrialPage />);

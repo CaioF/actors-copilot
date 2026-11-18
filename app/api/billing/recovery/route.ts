@@ -4,11 +4,12 @@ import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
-import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { CheckoutAlreadyCompleted, createOrReuseCheckoutSession, priorFirstCheckout } from '@/lib/billing-checkout';
 import { resolveAppUrl } from '@/lib/app-origin';
-import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending } from '@/lib/billing-recovery';
+import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending, rememberFirstCheckout } from '@/lib/billing-recovery';
 import { normalizeCurrency } from '@/lib/plan-selection';
 import { logger } from '@/lib/logger';
+import { owesFirstTrial, unfinishedCheckout } from '@/lib/first-checkout';
 
 /**
  * POST /api/billing/recovery
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const billingData = (billingDoc.exists ? billingDoc.data() : null) ?? ({} as Record<string, unknown>);
         const invalidBillingRestart = await canRestartInvalidBillingTrial(uid, flag, billingData);
 
-        if (!invalidBillingRestart && (billingData.subscriptionId || billingData.hasUsedTrial === true)) {
+        if (session.qaExpiresAt || (!invalidBillingRestart && !owesFirstTrial(userData, billingData))) {
             logger.info(
                 {
                     uid,
@@ -77,37 +78,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // the checkout. That is not only the account whose first checkout was
         // interrupted by a server side fault: it is also the member who signed
         // up and never chose a plan, whoever brought them in.
-        const owesTrial = !billingData.subscriptionId && billingData.hasUsedTrial !== true;
-
-        if (!pendingRecovery && !owesTrial) {
-            return NextResponse.json({ pending: false }, { status: 200 });
-        }
-
-        const defaultTier: SubscriptionTier = flag?.tier || DEFAULT_RECOVERY_TIER;
-        const defaultCurrency = normalizeCurrency(flag?.currency ?? DEFAULT_RECOVERY_CURRENCY);
+        const unfinished = unfinishedCheckout(userData, billingData);
+        const reason = unfinished?.awaitingSelection ? 'trial' : unfinished ? 'checkout_pending' : pendingRecovery ? 'recovery' : 'trial';
+        const defaultCurrency = normalizeCurrency((pendingRecovery && flag.currency) || DEFAULT_RECOVERY_CURRENCY);
 
         // Phase 1: the caller only wants to know whether a checkout is pending.
         const wantsSelection = body.tier !== undefined;
         if (!wantsSelection) {
-            logger.info(
-                {
-                    uid,
-                    reason: pendingRecovery ? 'recovery' : 'trial',
-                    tier: defaultTier,
-                    currency: defaultCurrency,
-                    hasBillingDocument: billingDoc.exists,
-                },
-                'Trial screen state resolved',
-            );
+            let choice = unfinished?.choice;
+            if (unfinished && billingData.checkoutAttempt > 0 && typeof billingData.customerId === 'string') {
+                const prior = await priorFirstCheckout(uid, billingData.customerId, Boolean(choice));
+                if (prior?.completed) return NextResponse.json({ pending: false, reason: 'processing' });
+                if (!choice && prior?.choice) {
+                    choice = prior.choice;
+                    await rememberFirstCheckout(uid, choice, billingData.customerId);
+                }
+            }
             return NextResponse.json(
                 {
                     pending: true,
-                    // "recovery" means the first checkout was interrupted and
-                    // the member is owed an apology; "trial" means the member
-                    // simply has not picked a plan yet.
-                    reason: pendingRecovery ? 'recovery' : 'trial',
-                    tier: defaultTier,
-                    currency: defaultCurrency,
+                    reason,
+                    tier: choice?.tier ?? (pendingRecovery && flag.tier ? flag.tier : DEFAULT_RECOVERY_TIER),
+                    billingCycle: choice?.billingCycle ?? 'monthly',
+                    currency: choice?.currency ?? defaultCurrency,
                 },
                 { status: 200 },
             );
@@ -147,6 +140,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             billingCycle,
             ...(currency ? { currency } : {}),
             isTrial: true,
+            ...(invalidBillingRestart ? { verifiedTrialRestart: true } : {}),
             appUrl,
         });
 
@@ -154,7 +148,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // simply has not picked a plan yet is not recovering from anything,
         // and writing a partial flag on it would only leave a half record
         // behind on an account that never had one.
-        if (pendingRecovery) {
+        if (pendingRecovery && !unfinished) {
             await userDocRef.update({
                 'billingRecovery.attempt': (flag?.attempt ?? 0) + 1,
                 'billingRecovery.lastAttemptAt': new Date().toISOString(),
@@ -163,7 +157,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json({
             pending: true,
-            reason: pendingRecovery ? 'recovery' : 'trial',
+            reason,
             tier,
             billingCycle,
             currency: currency ?? null,
@@ -171,6 +165,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }, { status: 200 });
 
     } catch (error) {
+        if (error instanceof CheckoutAlreadyCompleted) {
+            return NextResponse.json({ pending: false, reason: 'processing' });
+        }
         logger.error({ err: error, msg: 'Billing recovery checkout could not be opened' });
         return NextResponse.json({ error: 'Could not open your checkout' }, { status: 500 });
     }

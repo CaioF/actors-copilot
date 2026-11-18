@@ -66,14 +66,23 @@ its allowlists or secret are missing. A fresh browser signup may use one exact p
 
 ## Trial recovery flow
 
-Accounts whose first checkout failed because of a server-side fault (for example inactive Stripe
-Price IDs) carry a `billingRecovery` flag on `users/{uid}`.
+The initial trial signup records `users/{uid}.billingRecovery`. Choosing a plan records its tier,
+billing cycle and currency before the app requests hosted Stripe Checkout. This navigation state
+survives a closed tab, a failed request, an expired Checkout and a sign-in on another device.
 
-- `POST /api/auth/callback` reports the flag as `billingRecovery.required`.
-- The client routes those accounts to `/start-trial`, a branded interstitial that explains what
-  happened and hands over to the Stripe Checkout after a short countdown.
-- `POST /api/billing/recovery` opens (or reuses) the checkout session for the signed in account.
-- The webhook clears the flag once a real subscription exists.
+- Email and Google sign-in and restored member sessions check for pending recovery. A returning
+  actor lands on `/start-trial`, reviews their selection and explicitly clicks **Resume checkout**.
+- `POST /api/billing/recovery` without a selection reads the state. Submitting a selection reuses
+  a matching open Stripe session or opens a new one when the previous session expired. If Stripe
+  already completed Checkout, the actor can check for webhook confirmation without starting again.
+- Older records with a customer and a checkout attempt can qualify even when the old customer
+  record says `free/canceled`. The recovery page looks up that actor’s actual choice in Stripe.
+  Subscription history, used trials and resolved recovery flags take precedence.
+- The admin member row shows **Checkout pending** and the selected plan when known. Entitlement
+  stays Free until the webhook records the subscription. An authorized QA receipt temporarily
+  shows **Trial** and its plan. The underlying recovery survives receipt removal.
+- The existing operator-reviewed restart for invalid historical billing retains its own checks.
+  See [the browser procedure](qa/affiliates/README.md#reproduce-an-unfinished-first-checkout).
 
 ## Local environment caveat
 

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
-import { SubscriptionTier, SubscriptionStatus } from './billing';
+import type { SubscriptionTier, MemberStatus } from './billing';
 
 /**
  * Expected payload structure encoded within the signed platform session JWT.
@@ -10,7 +10,7 @@ export interface PlatformSession {
   uid: string;
   email: string;
   tier: SubscriptionTier;
-  subscriptionStatus: SubscriptionStatus;
+  subscriptionStatus: MemberStatus;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   stripePriceId?: string;
