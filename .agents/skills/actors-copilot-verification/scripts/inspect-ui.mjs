@@ -14,6 +14,7 @@ if (!chrome || !email || !password || !paths.length || paths.some(p => !p.starts
   process.exit(2);
 }
 if (process.env.AC_EXPECT_FINAL_PATH && paths.length !== 1) throw new Error('AC_EXPECT_FINAL_PATH requires exactly one requested path');
+if (process.env.AC_CHECK_LOGOUT === '1' && (paths.length !== 1 || paths[0] !== '/dashboard')) throw new Error('AC_CHECK_LOGOUT requires only /dashboard');
 const url = new URL(origin);
 if (!(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) || url.pathname !== '/' || url.username || url.password || url.search || url.hash) {
   console.error('AC_BASE_URL must be an HTTPS origin or a local HTTP origin.');
@@ -78,6 +79,20 @@ try {
     console.log(JSON.stringify({requested: path, ...view}));
     if (process.env.AC_EXPECT_FINAL_PATH && view.path !== process.env.AC_EXPECT_FINAL_PATH) {
       throw new Error(`Unexpected final path: ${view.path}`);
+    }
+    if (process.env.AC_CHECK_LOGOUT === '1' && path === '/dashboard') {
+      const [response] = await Promise.all([
+        page.waitForResponse(r => new URL(r.url()).origin === url.origin && new URL(r.url()).pathname === '/api/auth/logout' && r.request().method() === 'POST', {timeout:30000}),
+        page.locator('button ::-p-text(Logout)').click(),
+      ]);
+      if (!response.ok()) throw new Error(`Logout endpoint returned HTTP ${response.status()}`);
+      await page.waitForFunction(() => location.pathname === '/login', {timeout:30000});
+      const hasSessionCookie = (await browser.cookies()).some(cookie => cookie.name === 'platform_session' && (cookie.domain === url.hostname || `.${url.hostname}` === cookie.domain));
+      if (hasSessionCookie) throw new Error('Platform session cookie remained after logout');
+      await page.goto(new URL('/dashboard', url).href, {waitUntil:'domcontentloaded'});
+      await page.waitForFunction(() => location.pathname === '/login', {timeout:30000});
+      await page.waitForSelector('input[type="email"]', {visible:true, timeout:30000});
+      console.log(JSON.stringify({journey:'logout', endpointOk:true, platformCookieRemoved:true, dashboardReturnedToLogin:true}));
     }
     if (process.env.AC_CHECK_SETTINGS_DRAFT === '1' && path === '/settings') {
       const displayName = 'input[placeholder="e.g., Viola Davis"]';
