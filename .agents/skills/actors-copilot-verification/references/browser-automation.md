@@ -4,6 +4,8 @@ The repository pins `puppeteer-core`; it does not download Chrome. Use Node 22.1
 
 For a signed-out HTTP check of both public-profile representations, run `node .agents/skills/actors-copilot-verification/scripts/missing-profile-smoke.mjs https://app.theactorscopilot.com` or pass a local HTTP origin. It requests a freshly generated synthetic slug and checks both HTML and Markdown for 404 and the missing-profile message. It performs no writes and does not verify published or unpublished profiles, browser rendering or access control for a known slug.
 
+For signed-out login controls, set `AC_BASE_URL` and `AC_CHROME_PATH` and run `node .agents/skills/actors-copilot-verification/scripts/login-controls.mjs`. It checks the empty-email reset error, mode switching and password visibility with local synthetic text; it asserts zero Identity Toolkit or callback POSTs, sends no credentials and does not initiate reset mail. Optionally set `AC_MOBILE=1` for a 390×844 viewport. This does not verify authentication, account creation, email delivery or physical-device behavior.
+
 ## Run the inspector
 
 Set variables in the current shell without committing them. Obtain credentials securely; do not save passwords, session cookies, Firebase ID tokens, or traces containing them in the repository. Use a disposable test identity and identify the environment. PowerShell example (replace placeholders locally):
