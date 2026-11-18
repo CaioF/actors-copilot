@@ -26,6 +26,8 @@ With `AC_CHECK_WIZARD=1`, pass `/auditions/new/brief` and/or `/auditions/new/sid
 
 With `AC_CHECK_WIZARD_REQUIRED=1`, pass either or both wizard paths to reload a fresh wizard for each independently missing project, role or content. The inspector reaches review, checks Generate is disabled with a title, and expects no analysis POST. This verifies client controls, not backend validation; do not combine it with `AC_CHECK_WIZARD=1` in the same invocation because the required-fields check ends on review.
 
+Add `AC_MOBILE=1` to either wizard check to use the 390×844 viewport. Run the required-input and complete-input checks separately. This changes viewport dimensions only; it does not emulate a physical device or prove touch, accessibility or visual layout quality.
+
 To exercise document extraction for sides, set `AC_SIDES_FILE` to the absolute path of `fixtures/synthetic-sides.docx` within this skill, then run `/auditions/new/sides` with `AC_CHECK_WIZARD=1` and, if a real generation and saved fixture are intended, `AC_GENERATE=1`. The file is fictional and tracked. Follow with the linked Reader check using the printed unique fixture title. Unset `AC_SIDES_FILE` for text-input checks.
 
 With `AC_CHECK_READER=1` and `/reader-copilot`, the inspector submits a fictional two-person script to the real parsing endpoint, selects ALEX and waits for the Partner Voices control. It does not record audio or prove playback. Provider calls may incur cost.
