@@ -160,8 +160,9 @@ async function audition() {
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByText(project, { exact: true })).toBeVisible();
-  await expect(page.getByText("Mara", { exact: true })).toBeVisible();
+  const basics = page.getByRole("heading", {name:"Basics",exact:true}).locator("..");
+  await expect(basics.getByText(project, {exact:true})).toBeVisible();
+  await expect(basics.getByText("Mara", {exact:true})).toBeVisible();
   await expect(page.getByText(/Text pasted \(\d+ words\)/)).toBeVisible();
   const generate = button("Generate Breakdown");
   await expect(generate).toBeEnabled();
