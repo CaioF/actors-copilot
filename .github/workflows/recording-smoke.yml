@@ -1,0 +1,31 @@
+name: Recording smoke
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'qa/recording/**'
+      - '.github/workflows/recording-smoke.yml'
+      - 'app/(interior)/acting-coach/**'
+      - 'components/chat-input.tsx'
+permissions:
+  contents: read
+jobs:
+  local-coach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir qa/recording install --frozen-lockfile
+      - run: pnpm --dir qa/recording exec playwright install --with-deps chromium
+      - run: node qa/recording/record.mjs coach-fixture
+      - name: Install FFmpeg if missing
+        run: command -v ffmpeg || { sudo apt-get update && sudo apt-get install -y ffmpeg; }
+      - name: Decode captured video
+        run: ffmpeg -v error -xerror -i "$(find qa/recording/evidence -name coach-fixture.webm -print -quit)" -f null -
