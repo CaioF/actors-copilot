@@ -17,6 +17,8 @@ export interface AdminMemberProjection {
   displayName: string;
   /** The affiliate code that brought this member in, when there is one. */
   referredBy?: string | null;
+  /** True only when a server-owned QA simulation is active. */
+  qaSimulation?: boolean;
   tier: 'free' | 'economy' | 'business';
   subscriptionStatus: string | null;
   membershipState: AdminMembershipState;

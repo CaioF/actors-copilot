@@ -256,6 +256,9 @@ export function AffiliatesPanel({
                       </TableCell>
                       <TableCell className="px-6 align-top text-sm text-muted-foreground">
                         {affiliate.referredCount} referred · {affiliate.convertedCount} converted
+                        {(affiliate.qaReferredCount ?? 0) > 0 && (
+                          <div className="mt-1 font-semibold text-amber-700">{affiliate.qaReferredCount} simulated QA referral(s), excluded from real totals</div>
+                        )}
                       </TableCell>
                       <TableCell className="px-6 align-top text-sm text-muted-foreground">
                         {formatTotals(affiliate.totals, (total) => total.netCollected)}

@@ -66,6 +66,11 @@ describe('AdminMembersTable', () => {
     expect(within(row).getByText('lucas')).toBeInTheDocument();
   });
 
+  it('labels a simulated test membership', () => {
+    render(<AdminMembersTable members={[{ ...member('trial'), qaSimulation: true }]} />);
+    expect(screen.getByText('Simulated QA')).toBeInTheDocument();
+  });
+
   it('shows a dash when nobody referred the member', () => {
     render(<AdminMembersTable members={[member('trial')]} />);
 

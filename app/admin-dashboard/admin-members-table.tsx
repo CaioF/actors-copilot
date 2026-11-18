@@ -174,6 +174,7 @@ export function AdminMembersTable({
                             >
                               {stateLabels[member.membershipState]}
                             </Badge>
+                            {member.qaSimulation && <Badge variant="outline">Simulated QA</Badge>}
                             <span className="text-xs text-muted-foreground">
                               {titleCase(member.tier)}
                               {membershipEnd

@@ -55,6 +55,7 @@ scripts/python/venv/
 
 # implementation plans
 .plans/
+qa/affiliates/evidence/
 package-lock.json
 *.bak
 subscriptions.private.csv

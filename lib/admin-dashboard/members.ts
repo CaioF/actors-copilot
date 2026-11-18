@@ -1,5 +1,6 @@
 import type { UserRecord } from 'firebase-admin/auth';
 import { auth, db } from '@/lib/firebase.admin';
+import { isValidQaRun } from '@/lib/qa-affiliate-integrity';
 import {
   resolveAdminDisplayName,
   resolveMembershipState,
@@ -134,6 +135,21 @@ async function readReferralDocuments(
   return referrals;
 }
 
+async function readQaSimulationUids(uids: string[]): Promise<Set<string>> {
+  const active = new Set<string>();
+  for (let index = 0; index < uids.length; index += BILLING_BATCH_SIZE) {
+    const chunk = uids.slice(index, index + BILLING_BATCH_SIZE);
+    const snapshots = await db.getAll(...chunk.map(uid => db.doc(`qaAffiliateSimulations/${uid}`)));
+    snapshots.forEach((snapshot, position) => {
+      const data = snapshot.data();
+      const uid = chunk[position];
+      if (data && uid && !isValidQaRun(uid, data)) throw new Error('Invalid QA record');
+      if (data?.active === true && uid) active.add(uid);
+    });
+  }
+  return active;
+}
+
 function buildMember(params: {
   uid: string;
   email: string;
@@ -141,6 +157,7 @@ function buildMember(params: {
   billing: SourceData | undefined;
   projection: AdminMemberProjection | undefined;
   referredBy: string | null;
+  qaSimulation: boolean;
   authCreatedAt: string;
   now: number;
 }): AdminMemberProjection {
@@ -157,6 +174,7 @@ function buildMember(params: {
     email: params.email,
     displayName: params.displayName,
     referredBy: params.referredBy,
+    ...(params.qaSimulation ? { qaSimulation: true } : {}),
     tier: tier(billing.tier),
     subscriptionStatus,
     membershipState: resolveMembershipState({
@@ -226,6 +244,7 @@ export async function listAdminMemberSnapshot(
     ...liveUids,
     ...archivedUids,
   ]);
+  const qaSimulations = await readQaSimulationUids([...liveUids, ...archivedUids]);
 
   const members: AdminMemberProjection[] = authUsers.map((user) => {
     const projection = projectionByUid.get(user.uid);
@@ -242,6 +261,7 @@ export async function listAdminMemberSnapshot(
       billing: billing.get(user.uid),
       projection,
       referredBy: referrals.get(user.uid) ?? projection?.referredBy ?? null,
+      qaSimulation: qaSimulations.has(user.uid),
       authCreatedAt,
       now,
     });
@@ -259,6 +279,7 @@ export async function listAdminMemberSnapshot(
       // An account whose member document is gone keeps its referral in the
       // projection, which is the only place it is left.
       referredBy: referrals.get(uid) ?? projection?.referredBy ?? null,
+      qaSimulation: qaSimulations.has(uid),
       authCreatedAt: projection?.authCreatedAt ?? new Date(now * 1000).toISOString(),
       now,
     });

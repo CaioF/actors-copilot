@@ -21,5 +21,10 @@ service cloud.firestore {
     match /adminMembers/{document=**} {
       allow read, write: if false;
     }
+
+    // QA simulations are written and read only by server-side Admin SDK code.
+    match /qaAffiliateSimulations/{document=**} {
+      allow read, write: if false;
+    }
   }
 }
