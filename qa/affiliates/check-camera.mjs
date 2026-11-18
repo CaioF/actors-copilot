@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chromium, expect } from 'playwright/test';
+import { navigateAddress } from './browser-address.mjs';
 import { affiliateRow, header, memberRow, openAffiliates, stripeSummary } from './camera.mjs';
 
 test('recording preserves complete operator tables, controls and the hosted checkout', async (t) => {
@@ -84,4 +85,22 @@ test('the operator resumes through the visible sign-in form if the panel asks fo
   });
   assert.equal(signIns, 1);
   await expect(page.getByRole('heading', { name: 'Affiliate program' })).toBeVisible();
+});
+
+test('Windows enters the exact operator URLs in Chrome’s native address bar', {
+  skip: process.platform !== 'win32',
+}, async (t) => {
+  const browser = await chromium.launch({ headless: false, args: ['--lang=en-US'] });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  const origin = 'https://operator.example.test';
+  await page.route(origin + '/**', route => route.fulfill({
+    contentType: 'text/html',
+    body: '<h1>Operator destination</h1>',
+  }));
+  await page.goto(origin + '/login');
+  for (const path of ['/api/admin/affiliate-qa', '/admin-dashboard']) {
+    await navigateAddress(page, origin + path);
+    assert.equal(page.url(), origin + path);
+  }
 });

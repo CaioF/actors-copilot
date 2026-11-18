@@ -41,6 +41,8 @@ public class QAWindow {
   }
 }
 "@
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
 $qaShell = New-Object -ComObject WScript.Shell
 $qaBrowserPid = [int]$env:QA_CHROME_PID
 $qaHandle = (Get-Process -Id $qaBrowserPid).MainWindowHandle
@@ -52,9 +54,19 @@ if (-not (Test-QAFocus)) { throw 'QA browser window is not focused' }
 $qaShell.SendKeys('^l')
 Start-Sleep -Milliseconds 140
 if (-not (Test-QAFocus)) { throw 'QA browser lost focus' }
-if ($env:QA_PASTE_ADDRESS -eq '1') { $qaShell.SendKeys('^v') } else { $qaShell.SendKeys($env:QA_PUBLIC_ADDRESS) }
-Start-Sleep -Milliseconds 180
+$addressBar = [System.Windows.Automation.AutomationElement]::FocusedElement
+if ($addressBar.Current.ProcessId -ne $qaBrowserPid -or $addressBar.Current.ControlType -ne [System.Windows.Automation.ControlType]::Edit) {
+  throw 'The QA address bar is not focused'
+}
+$addressValue = $addressBar.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+if ($env:QA_PASTE_ADDRESS -eq '1') {
+  $qaShell.SendKeys('^v')
+  Start-Sleep -Milliseconds 100
+} else {
+  $addressValue.SetValue($env:QA_PUBLIC_ADDRESS)
+}
 if (-not (Test-QAFocus)) { throw 'QA browser lost focus' }
+if ($addressValue.Current.Value -cne $env:QA_PUBLIC_ADDRESS) { throw 'The address bar does not contain the intended URL' }
 $qaShell.SendKeys('{ENTER}')
 `;
     // Only public navigation destinations enter the address bar. No credentials or hosted checkout URLs.

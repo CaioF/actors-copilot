@@ -8,6 +8,8 @@ These internal recordings show the browser's full viewport. In the operator pane
 
 If the operator encounters **Admin access** while opening **Affiliates**, sign in through the displayed form. If it returns to **Member dashboard**, click **Affiliates** again. Keep that interaction in the same recording. Success requires the affiliate panel to be visible at the end.
 
+On Windows the recorder focuses Chrome’s native address bar and checks its value before pressing Enter. Run `node --test qa/affiliates/check-camera.mjs` on an interactive Windows desktop to verify both operator destinations against a local fixture.
+
 | Step | Operator or actor interaction | Evidence the recorder requires |
 | --- | --- | --- |
 | 1 | In a fresh Chrome profile, sign in at `/admin-dashboard`. Click **Affiliates** and find **Coupon code: LUCAS**. | Read the referral address from that row. Click it, or select, copy and open it in the address bar on deployments that display plain text. |
@@ -53,3 +55,5 @@ On a deployed build, set `AC_BASE_URL=https://app.theactorscopilot.com`. Observa
 ## Verified run
 
 On November 18, 2026 the pre-merge app ran on loopback with the configured live Firebase project and Stripe-hosted Checkout. Chromium 159, English locale, 1440 × 900, captured one uninterrupted journey. The new account reached the trial-ready page automatically, Stripe displayed LUCAS and the asserted amounts, and the operator submitted the protected confirmation form. Chrome followed HTTP 303 to the dashboard. The same actor and the separate simulated referral were visible in admin. The report recorded `demo-complete` and verified cleanup. The original capture and MP4 are local. This result covers the PR version; deployment and production confirmation are separate.
+
+On production commit `90acfb0`, a fresh actor completed a full-viewport observation through the hosted payment form and referral verification. A separate full-viewport recording starts at the open Economy Checkout of the earlier demo actor. The operator confirmed that session, Chrome followed HTTP 303, the full member table showed **Trial** and **Simulated QA**, and the affiliate table displayed the separate QA count. Cleanup removed the temporary receipt. These two recordings use different QA actors. A single-take signup-to-confirmation result requires one fresh actor throughout.
