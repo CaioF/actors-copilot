@@ -512,6 +512,30 @@ try {
       await page.waitForFunction(hasReply, {timeout:60000}, message);
       console.log(JSON.stringify({journey:'dna-chat', responseVisible:true, exchangeVisibleAfterReload:true}));
     }
+    if (process.env.AC_CHECK_WIZARD_REQUIRED === '1' && ['/auditions/new/brief', '/auditions/new/sides'].includes(path)) {
+      let analysisRequests = 0;
+      const countAnalysis = request => {
+        const target = new URL(request.url());
+        if (target.origin === url.origin && /^\/api\/auditions\/analyze(?:Brief|Sides)$/.test(target.pathname) && request.method() === 'POST') analysisRequests++;
+      };
+      page.on('request', countAnalysis);
+      for (const missing of ['project', 'role', 'content']) {
+        await page.goto(new URL(path, url).href, {waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#project', {visible:true, timeout:30000});
+        if (missing !== 'project') await page.locator('#project').fill('Synthetic validation project');
+        if (missing !== 'role') await page.locator('#role').fill('Alex');
+        await page.locator('button ::-p-text(Next)').click();
+        await page.waitForSelector('textarea[placeholder="Paste your details here..."]', {visible:true});
+        if (missing !== 'content') await page.locator('textarea[placeholder="Paste your details here..."]').fill('Synthetic dialogue for validation.');
+        await page.locator('button ::-p-text(Next)').click();
+        const generate = await page.locator('button ::-p-text(Generate Breakdown)').waitHandle();
+        const state = await generate.evaluate(e => ({disabled:e.disabled, explanation:e.title}));
+        if (!state.disabled || !state.explanation) throw new Error(`Wizard did not explain the missing ${missing} requirement`);
+      }
+      page.off('request', countAnalysis);
+      if (analysisRequests) throw new Error('Unexpected analysis request during required-field checks');
+      console.log(JSON.stringify({journey:'wizard-required-fields', path, missingProject:true, missingRole:true, missingContent:true, analysisRequests}));
+    }
     if (process.env.AC_CHECK_WIZARD === '1' && ['/auditions/new/brief', '/auditions/new/sides'].includes(path)) {
       const project = `Verification Fixture ${Date.now()}`;
       await page.locator('#project').fill(project);
