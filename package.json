@@ -106,6 +106,7 @@
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "postcss": "^8.5",
+    "puppeteer-core": "25.17.0",
     "tailwindcss": "^4.2.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.1",

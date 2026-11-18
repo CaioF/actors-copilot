@@ -36,7 +36,10 @@ docs/feature-plans/
 # ai
 .claude/
 .coderlm/
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/actors-copilot-verification/
 
 # local dev tools
 .serena/
