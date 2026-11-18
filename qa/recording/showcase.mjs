@@ -37,6 +37,8 @@ const titles = {
   coach: "Conversar con Acting Coach",
 };
 const segments = [];
+const chapters = [";FFMETADATA1"];
+let frames = 0;
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 function segment(args) {
@@ -56,6 +58,24 @@ function segment(args) {
     "4",
     name,
   ]);
+  const progress = encode([
+    "-i",
+    name,
+    "-map",
+    "0:v:0",
+    "-c",
+    "copy",
+    "-progress",
+    "pipe:1",
+    "-f",
+    "null",
+    "-",
+  ]).toString();
+  const count = Number(
+    [...progress.matchAll(/^frame=(\d+)\s*$/gm)].at(-1)?.[1],
+  );
+  assert(count > 0, "Empty encoded segment");
+  frames += count;
   segments.push(name);
 }
 async function card(title, subtitle, duration = 1.6) {
@@ -77,6 +97,7 @@ try {
     assert.equal(report.status, "passed");
     for (const clip of report.clips) {
       assert(Object.hasOwn(titles, clip.name));
+      const chapterStart = frames;
       const video = resolve(evidence, input, clip.name + ".webm");
       const context =
         report.origin === "https://app.theactorscopilot.com"
@@ -107,12 +128,20 @@ try {
       } else {
         segment(["-i", video]);
       }
+      chapters.push(
+        "[CHAPTER]",
+        "TIMEBASE=1/30",
+        "START=" + chapterStart,
+        "END=" + frames,
+        "title=" + titles[clip.name],
+      );
     }
   }
   await writeFile(
     join(dir, "parts.txt"),
     segments.map((name) => "file '" + name + "'").join("\n"),
   );
+  await writeFile(join(dir, "chapters.txt"), chapters.join("\n") + "\n");
   encode([
     "-f",
     "concat",
@@ -120,6 +149,14 @@ try {
     "1",
     "-i",
     "parts.txt",
+    "-f",
+    "ffmetadata",
+    "-i",
+    "chapters.txt",
+    "-map",
+    "0:v:0",
+    "-map_chapters",
+    "1",
     "-c",
     "copy",
     "-movflags",
