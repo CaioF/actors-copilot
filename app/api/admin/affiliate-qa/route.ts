@@ -28,7 +28,7 @@ function requestOrigin(request: NextRequest): string {
     : new URL(request.url).origin;
 }
 
-async function authorized(request: NextRequest, formKey?: FormDataEntryValue | null): Promise<boolean> {
+async function authorized(request: NextRequest, formKey?: unknown): Promise<boolean> {
   const secret = process.env.QA_SIMULATION_SECRET || '';
   if (process.env.QA_SIMULATION_ENABLED !== 'true' || !/^[a-f0-9]{64}$/i.test(secret)) return false;
   const form = formKey !== undefined;
@@ -105,7 +105,7 @@ button{background:#254236;color:white;border:0;border-radius:6px;padding:12px 18
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
-        'Referrer-Policy': 'no-referrer',
+        'Referrer-Policy': 'same-origin',
         'Content-Security-Policy':
           "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
       },

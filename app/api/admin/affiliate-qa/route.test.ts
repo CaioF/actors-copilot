@@ -149,6 +149,8 @@ it('supports one exact preapproved new signup and refuses an old or different ac
 it('serves an operator form and lets the browser follow its own successful 303 return', async () => {
   const page = await GET();
   expect(page.status).toBe(200);
+  // Browsers send a null Origin on native POST under no-referrer.
+  expect(page.headers.get('referrer-policy')).toBe('same-origin');
   expect(await page.text()).toContain('Confirm demo trial');
   const form = (origin: string) =>
     new Request('https://app.example/api/admin/affiliate-qa', {

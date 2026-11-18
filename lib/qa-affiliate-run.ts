@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
+import type { DocumentData } from 'firebase-admin/firestore';
 import { auth, db } from '@/lib/firebase.admin';
 import { isValidQaRun, signQaRun } from '@/lib/qa-affiliate-integrity';
 
 export const QA_WINDOW_MS = 15 * 60_000;
 type Source = 'link' | 'coupon';
 type Snapshot = {
-  data(): FirebaseFirestore.DocumentData | undefined;
+  data(): DocumentData | undefined;
   createTime?: { seconds: number; nanoseconds: number };
 };
 export type QaTrial = {
@@ -42,7 +43,7 @@ export function issuedForNewSignup(email: string) {
   return email.toLowerCase() === signupEmail();
 }
 
-export function realEntitlement(data: FirebaseFirestore.DocumentData = {}) {
+export function realEntitlement(data: DocumentData = {}) {
   return (
     data.hasAccess === true ||
     Boolean(data.subscriptionId || data.stripeSubscriptionId) ||
