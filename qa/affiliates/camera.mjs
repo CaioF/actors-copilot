@@ -57,7 +57,7 @@ export async function affiliateRow(page, appOrigin, withDemo = false) {
   return { link, address };
 }
 
-export async function memberRow(page, email, demoTier) {
+export async function memberRow(page, email, tierLabel, simulated = true) {
   assert(/^[a-z0-9._+-]+@example\.test$/i.test(email));
   const account = page.getByText(email, { exact: true });
   const row = page.getByRole('row').filter({ has: account });
@@ -66,13 +66,13 @@ export async function memberRow(page, email, demoTier) {
   await expect(table.getByRole('columnheader')).toContainText(['Name', 'Email', 'Referred by', 'Status']);
   await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
   await expect(row.getByText('lucas', { exact: true })).toBeVisible();
-  if (demoTier) {
+  if (simulated) {
     await expect(row.getByText('Simulated QA', { exact: true })).toBeVisible();
     await expect(row.getByText('Trial', { exact: true })).toBeVisible();
-    await expect(row.getByText(demoTier, { exact: true })).toBeVisible();
+    await expect(row.getByText(tierLabel, { exact: true })).toBeVisible();
   } else {
-    await expect(row.getByText('No plan', { exact: true })).toBeVisible();
-    await expect(row.getByText('Free', { exact: true })).toBeVisible();
+    await expect(row.getByText('Checkout pending', { exact: true })).toBeVisible();
+    await expect(row.getByText(tierLabel + ' selected', { exact: true })).toBeVisible();
     await expect(row.getByText('Simulated QA', { exact: true })).toHaveCount(0);
   }
   await account.hover();

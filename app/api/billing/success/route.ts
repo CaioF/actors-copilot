@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { eligibleIdentity, qaCheckoutFingerprint, readQaTrial, realEntitlement } from '@/lib/qa-affiliate-run';
 import { getPlatformSession, setPlatformSession } from '@/lib/session';
 import { stripe } from '@/lib/stripe';
+import { isCheckoutCustomerSeed } from '@/lib/first-checkout';
 
 async function approvedOpenCheckout(checkout: Stripe.Checkout.Session, uid: string, billing: Partial<UserBilling>) {
     if (checkout.status !== 'open' || checkout.mode !== 'subscription' || checkout.subscription || realEntitlement(billing)) {
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             uid,
             email: email ?? '',
             tier: demo?.tier ?? billing.tier ?? 'free',
-            subscriptionStatus: demo ? 'trialing' : billing.status ?? 'canceled',
+            subscriptionStatus: demo ? 'trialing' : isCheckoutCustomerSeed(billing) ? 'checkout_pending' : billing.status ?? 'checkout_pending',
             ...(demo ? { qaExpiresAt: demo.expiresAt } : {}),
             stripeCustomerId: billing.customerId,
             stripeSubscriptionId: billing.subscriptionId,

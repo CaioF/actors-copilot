@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Check, Lock, Ticket, Zap } from "lucide-react"
 import { redirectTo } from "@/lib/navigate"
+import { useAuth } from "@/lib/context/AuthContext"
 import {
   DEFAULT_CURRENCY,
   SUPPORTED_CURRENCIES,
@@ -17,7 +18,7 @@ import {
 } from "@/lib/plan-selection"
 import type { BillingCycle } from "@/lib/billing"
 
-type ViewState = "loading" | "ready" | "error" | "skipped"
+type ViewState = "loading" | "ready" | "error" | "skipped" | "processing"
 
 type CurrencySupportMap = Record<
   BillingCycle,
@@ -93,6 +94,7 @@ function formatExactAmount(amount: number, currency: RequestedCurrency): string 
  * @returns The branded recovery and plan selection screen
  */
 export default function StartTrialPage() {
+  const { loading: sessionLoading } = useAuth()
   const [view, setView] = useState<ViewState>("loading")
   const [support, setSupport] = useState<CurrencySupportMap | null>(null)
   const [plan, setPlan] = useState<RequestedPlan>("business")
@@ -102,7 +104,7 @@ export default function StartTrialPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   // "recovery" means the first checkout was interrupted; "trial" means the
   // member has not picked a plan yet. The copy has to match.
-  const [reason, setReason] = useState<"recovery" | "trial">("trial")
+  const [reason, setReason] = useState<"recovery" | "trial" | "checkout_pending">("trial")
   // Why the server could not answer. "unauthorized" means the session was
   // gone, "unreachable" means the call itself failed.
   const [failure, setFailure] = useState<"unauthorized" | "unreachable" | null>(null)
@@ -116,6 +118,8 @@ export default function StartTrialPage() {
 
   // 1. Check whether there is a pending recovery and load the currency map.
   useEffect(() => {
+    // Firebase may still be restoring an expired platform cookie on a direct visit.
+    if (sessionLoading) return
     let cancelled = false
 
     const load = async () => {
@@ -147,13 +151,18 @@ export default function StartTrialPage() {
         // The server answered and the member already has a plan. The
         // dashboard is where they belong.
         if (!recovery?.pending) {
+          if (recovery?.reason === "processing") {
+            setView("processing")
+            return
+          }
           setView("skipped")
           window.setTimeout(() => redirectTo("/dashboard"), 1200)
           return
         }
 
-        if (recovery.reason === "recovery") setReason("recovery")
+        setReason(recovery.reason)
         setPlan(recovery.tier === "economy" ? "economy" : "business")
+        setBillingCycle(recovery.billingCycle === "annual" ? "annual" : "monthly")
         if (recovery.currency) setCurrency(recovery.currency)
 
         setView("ready")
@@ -167,7 +176,7 @@ export default function StartTrialPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [sessionLoading])
 
   const priceUnit = billingCycle === "annual" ? "/year" : "/month"
   const annualSavingsPercent = getMaxAnnualSavingsPercent(currency)
@@ -237,6 +246,11 @@ export default function StartTrialPage() {
 
       const data = await response.json()
 
+      if (response.ok && data.pending === false) {
+        if (data.reason === "processing") setView("processing")
+        else redirectTo("/dashboard")
+        return
+      }
       if (!response.ok || !data.checkoutUrl) {
         setCheckoutError(data.error || "We could not start the checkout. Please try again.")
         setSubmitting(false)
@@ -313,6 +327,13 @@ export default function StartTrialPage() {
               </>
             )}
 
+            {view === "processing" && (
+              <>
+                <h1 className="font-title mt-3 text-4xl font-bold text-[#EFEADD]">Your checkout is complete</h1>
+                <p className="mt-4 text-[#EFEADD]/75">Stripe is confirming your subscription.</p>
+                <button className="mt-5 rounded-full bg-[#F2671A] px-7 py-3 font-semibold text-white" onClick={() => window.location.reload()}>Check status</button>
+              </>
+            )}
             {view === "skipped" && (
               <>
                 <h1 className="font-title mt-3 text-4xl font-bold leading-[1.05] tracking-tight text-[#EFEADD] sm:text-5xl">
@@ -376,11 +397,14 @@ export default function StartTrialPage() {
             {view === "ready" && (
               <>
                 <h1 className="font-title mt-3 text-4xl font-bold leading-[1.05] tracking-tight text-[#EFEADD] sm:text-5xl">
-                  Your <span className="text-[#F2671A]">free trial</span> is ready to start
+                  {reason === "checkout_pending" ? "Finish setting up your free trial" :
+                    <>Your <span className="text-[#F2671A]">free trial</span> is ready to start</>}
                 </h1>
 
                 <p className="mt-4 max-w-lg text-sm leading-relaxed text-[#EFEADD]/75">
-                  {reason === "recovery" ? (
+                  {reason === "checkout_pending" ? (
+                    <>Your trial hasn’t started yet. Review your plan, billing cycle and currency, then continue to Stripe.</>
+                  ) : reason === "recovery" ? (
                     <>
                       A brief delay on our side meant your {TRIAL_DAYS}-day free trial never started. Nothing has
                       been charged, and your account is ready. Pick the plan that fits you and we&apos;ll switch it
@@ -542,7 +566,7 @@ export default function StartTrialPage() {
                     disabled={submitting || Boolean(selectedBlockedReason)}
                     className="mt-1 w-full rounded-full bg-[#F2671A] px-8 py-4 text-base font-semibold text-white shadow-[0_14px_40px_-16px_rgba(242,103,26,0.9)] transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[300px]"
                   >
-                    {submitting ? "Opening secure checkout..." : "Start my free trial"}
+                    {submitting ? "Opening secure checkout..." : reason === "checkout_pending" ? "Resume checkout" : "Start my free trial"}
                   </button>
 
                   <p className="mt-2 flex items-center justify-center gap-2 text-[11px] text-[#EFEADD]/45">

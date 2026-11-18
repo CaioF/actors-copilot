@@ -55,6 +55,7 @@ function projection(
     referredBy: null,
     tier: 'business',
     subscriptionStatus: 'active',
+    selectedTier: null,
     membershipState: 'paid',
     trialStart: 1_700_000_000,
     trialEnd: 1_701_209_600,

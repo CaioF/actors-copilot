@@ -6,7 +6,7 @@ import { getPlatformSession } from '@/lib/session';
 import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
-import { createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { CheckoutAlreadyCompleted, createOrReuseCheckoutSession, priorFirstCheckout } from '@/lib/billing-checkout';
 import { resolveAppUrl } from '@/lib/app-origin';
 
 jest.mock('@/lib/session', () => ({
@@ -14,7 +14,9 @@ jest.mock('@/lib/session', () => ({
 }));
 
 jest.mock('@/lib/firebase.admin', () => ({
-    db: { doc: jest.fn() },
+    db: { doc: jest.fn(), runTransaction: (callback: (tx: unknown) => unknown) => callback({
+        get: (ref: { get: () => unknown }) => ref.get(), set: jest.fn(),
+    }) },
 }));
 
 jest.mock('@/lib/billing', () => ({
@@ -27,6 +29,8 @@ jest.mock('@/lib/billing-currency', () => ({
 
 jest.mock('@/lib/billing-checkout', () => ({
     createOrReuseCheckoutSession: jest.fn(),
+    priorFirstCheckout: jest.fn(),
+    CheckoutAlreadyCompleted: class extends Error {},
 }));
 
 jest.mock('@/lib/app-origin', () => ({
@@ -125,6 +129,31 @@ describe('POST /api/billing/recovery', () => {
         expect(res.status).toBe(200);
         expect(data.pending).toBe(true);
         expect(data.reason).toBe('recovery');
+    });
+
+    it('restores an expired historical Checkout using its actual Stripe selection', async () => {
+        mockUserGet.mockResolvedValue({ exists: true, data: () => ({ affiliateCode: 'lucas' }) });
+        mockBillingGet.mockResolvedValue({ exists: true, data: () => ({
+            customerId: 'cus_first', checkoutAttempt: 1, status: 'canceled', tier: 'free',
+        }) });
+        const choice = { tier: 'economy', billingCycle: 'annual', currency: 'eur' } as const;
+        jest.mocked(priorFirstCheckout).mockResolvedValue({ completed: false, choice });
+        expect(await (await POST(buildRequest())).json()).toMatchObject({ pending: true, reason: 'checkout_pending', ...choice });
+        expect(priorFirstCheckout).toHaveBeenCalledWith(mockUid, 'cus_first', false);
+        expect(createOrReuseCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('waits for a real completed Checkout when its webhook arrives later', async () => {
+        const choice = { tier: 'business', billingCycle: 'monthly', currency: 'usd' };
+        mockUserGet.mockResolvedValue({ exists: true, data: () => ({ billingRecovery: {
+            required: true, reason: 'checkout_pending', ...choice,
+        } }) });
+        mockBillingGet.mockResolvedValue({ exists: true, data: () => ({ customerId: 'cus_first', checkoutAttempt: 1 }) });
+        jest.mocked(priorFirstCheckout).mockResolvedValue({ completed: true, choice: null });
+        expect(await (await POST(buildRequest())).json()).toEqual({ pending: false, reason: 'processing' });
+        expect(createOrReuseCheckoutSession).not.toHaveBeenCalled();
+        jest.mocked(createOrReuseCheckoutSession).mockRejectedValueOnce(new CheckoutAlreadyCompleted());
+        expect(await (await POST(buildRequest(choice))).json()).toEqual({ pending: false, reason: 'processing' });
     });
 
     it('reports pending:false when the account already redeemed the trial', async () => {

@@ -17,6 +17,8 @@ export type SubscriptionStatus =
   | 'past_due'
   | 'unpaid';
 
+export type MemberStatus = SubscriptionStatus | 'checkout_pending' | 'no_plan';
+
 export type BillingCycle = 'monthly' | 'annual';
 
 /**

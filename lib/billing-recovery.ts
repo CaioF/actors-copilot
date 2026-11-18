@@ -1,23 +1,23 @@
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
-import type { SubscriptionTier } from '@/lib/billing';
+import type { BillingCycle, SubscriptionTier } from '@/lib/billing';
+import { owesFirstTrial, type CheckoutChoice } from './first-checkout';
 import { DEFAULT_CURRENCY, type RequestedCurrency } from '@/lib/plan-selection';
 
 /**
  * Billing recovery flag.
  *
- * Marks an account whose checkout attempt failed because of a server-side
- * configuration fault (e.g. inactive Stripe Price IDs). While the flag is
- * pending, the login callback re-opens a checkout session so the user can
- * complete the purchase instead of being stuck on the upgrade screen.
+ * Routes a member back to trial selection or an unfinished first checkout.
+ * Older operator-issued recovery flags can also carry expiry and retry terms.
  *
  * The flag never grants entitlement on its own: the subscription is still
  * created by Stripe and persisted by the webhook.
  */
 export interface BillingRecoveryFlag {
   required: boolean;
-  tier: SubscriptionTier;
+  tier?: SubscriptionTier;
   currency?: RequestedCurrency;
+  billingCycle?: BillingCycle;
   reason?: string;
   attempt?: number;
   lastAttemptAt?: string | null;
@@ -29,6 +29,25 @@ export interface BillingRecoveryFlag {
 
 export const DEFAULT_RECOVERY_TIER: SubscriptionTier = 'business';
 export const DEFAULT_RECOVERY_CURRENCY: RequestedCurrency = DEFAULT_CURRENCY;
+
+/** Persist a first-trial choice, or return false if subscription history now rules it out. */
+export async function rememberFirstCheckout(uid: string, choice: CheckoutChoice, previousCustomer?: string): Promise<boolean> {
+  const user = db.doc(`users/${uid}`);
+  const billing = db.doc(`users/${uid}/billing/current`);
+  return db.runTransaction(async transaction => {
+    const [member, current] = await Promise.all([transaction.get(user), transaction.get(billing)]);
+    const data = member.data() ?? {};
+    const stored = current.data() ?? {};
+    if (!owesFirstTrial(data, stored)) return false;
+    const flag = data.billingRecovery;
+    // A lookup of historical metadata must not overwrite a newer choice from another tab.
+    if (previousCustomer && (flag || stored.customerId !== previousCustomer)) return true;
+    if (flag && (flag.invalidBillingRestart || !isRecoveryPending(flag))) return true;
+    transaction.set(user, { billingRecovery: { required: true, reason: 'checkout_pending', ...choice } },
+      { mergeFields: ['billingRecovery'] });
+    return true;
+  });
+}
 
 /**
  * Decides whether a stored recovery flag must still be honoured.

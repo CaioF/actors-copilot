@@ -19,6 +19,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     useEffect(() => {
         if (!loading && !user) {
             router.push('/login');
+        } else if (!loading && user?.billingRecoveryRequired) {
+            router.replace('/start-trial');
         }
     }, [user, loading, router]);
 
@@ -51,5 +53,5 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
 }
 
-    return user ? <>{children}</> : null;
+    return user && !user.billingRecoveryRequired ? <>{children}</> : null;
 }

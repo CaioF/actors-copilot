@@ -16,7 +16,29 @@ On Windows the recorder focuses Chrome’s native address bar and checks its val
 | 2 | Leave the selected **Create Account** tab as it is. Enter the designated new email and a password and submit. | Firebase accepts the signup. The actor lands on **Your free trial is ready to start** via the app's redirect. |
 | 3 | Choose **Monthly**, the requested class, **USD** and **Start my free trial**. | The trial page and the hosted Stripe Checkout show LUCAS. The Checkout order summary names the chosen class, shows 20% off one billing cycle and $0 due today. The discounted monthly total is $15.20 for Economy or $23.20 for Business. |
 | 4 | Open **QA payment confirmation** for the Checkout actually displayed and click **Confirm demo trial**. | The operator endpoint verifies the buyer, affiliate, promotion and purchased line item against the configured price. Chrome follows the POST's 303 to `GET /api/billing/success?session_id=…`. That handler issues the buyer session and redirects to the dashboard. The recorder checks the session reports `trialing` and the chosen tier. |
-| 5 | Reopen the operator dashboard. Find the same email, then click **Affiliates**. | One row must show **lucas**, **Trial**, the chosen plan and **Simulated QA**. The affiliate row shows the separate simulated referral count. After the video ends, the recorder removes the receipt, reloads the member list and verifies **lucas**, **No plan**, **Free**. |
+| 5 | Reopen the operator dashboard. Find the same email, then click **Affiliates**. | One row must show **lucas**, **Trial**, the chosen plan and **Simulated QA**. The affiliate row shows the separate simulated referral count. After the video ends, the recorder removes the receipt, reloads the member list and verifies **lucas**, **Checkout pending** and the selected plan. |
+
+## Reproduce an unfinished first checkout
+
+Use the same setup and local evidence directory as the recorded affiliate flow below. Set
+`AC_TRIAL_TIER=economy` to exercise a non-default choice, then run
+`node qa/affiliates/run-simulation.mjs --recover` with the environment files from the recording command.
+This mode requires an unused QA signup and the operator login.
+
+1. In the operator dashboard, open Lucas’s displayed URL. Create the actor, pick Economy, Monthly
+   and USD on the trial screen, and open hosted Checkout. Verify the class and LUCAS discount.
+2. Leave Stripe without submitting payment or confirming the demo. Reopen the app at
+   `/dashboard` in the same browser. It should take you to **Finish setting up your free trial**.
+   Check that the three choices are still selected. Click **Resume checkout** and verify the
+   original open Stripe session and discount. Stripe's own return link also leads back to trial setup.
+3. Return to admin. The same email should show **lucas**, **Checkout pending** and **Economy selected**.
+   After the take, the runner closes the tab, signs the same actor in using a clean Chrome context,
+   repeats the three selection checks and verifies that Resume opens the very same Checkout.
+4. For an expired session, the automated billing tests advance the provider state and check a new
+   session with the saved plan, cycle, currency and the same Stripe customer. The delayed-webhook
+   test covers a completed Checkout and the status screen. A real cancellation retains **Canceled**.
+
+The browser writes its English MP4 and result JSON only inside the ignored `qa/affiliates/evidence/` directory.
 
 ## Trace a reported member status
 
@@ -24,9 +46,10 @@ Match the exact email to its Firebase Auth UID. The member list reads `users/{ui
 
 | Point in the journey | Provider and Firestore evidence | Member row |
 | --- | --- | --- |
-| Signup or open Checkout | The referral is present. Creating a customer or selecting a price does not start a subscription. Older checkout-only billing documents may carry a placeholder `canceled`. | **lucas · No plan · Free** |
+| Trial signup before picking a plan | The actor has entered trial setup and the referral is present. | **lucas · Checkout pending · Free** |
+| Hosted Checkout opened or abandoned | The root recovery flag stores the selection. A legacy seed can instead contain a customer, an attempt and a placeholder `canceled`. | **lucas · Checkout pending · Business selected** (or **Economy selected**). For an older record the plan appears once the actor returns and the app reads the original Stripe selection. |
 | QA confirmation | The selected tier, checkout fingerprint, referral and expiration are signed in `qaAffiliateSimulations`. The signed-in buyer follows the ordinary success route. | **lucas · Trial · Business** (or **Economy**) **· Simulated QA** |
-| Cleanup or receipt expiry | The demo no longer contributes a tier or QA referral. A genuine link attribution survives. | **lucas · No plan · Free** for a fresh buyer |
+| Cleanup or receipt expiry | The demo no longer contributes a tier or QA referral. A genuine link attribution survives. | **lucas · Checkout pending** and the selected plan for a buyer with open Checkout |
 | Real trial or cancellation | A real subscription has its own ID and lifecycle in Stripe. Its webhook writes the tier, status and trial dates to billing. A zero-dollar initial invoice can arrive on either side of those lifecycle events. | **Trial** with the subscribed plan while the trial is active. A documented cancellation remains **Canceled**. |
 
 The fresh signup itself is a genuine link attribution. The demo contributes a separate QA count. A conversion, collected revenue, commission or transfer requires real financial activity. The genuine Stripe customer and open Checkout created during the browser visit, plus the synthetic Firebase account and its genuine attribution, can remain after cleanup. The test uses no card.
@@ -74,4 +97,4 @@ On production commit `90acfb0`, a fresh actor completed a full-viewport observat
 
 On November 18, production commit `c52d2e0` (PR #117) completed that single-take Economy journey. The same buyer appeared in the full member table as **lucas · Trial · Economy · Simulated QA**. Independent reads confirmed an open live Economy Checkout, the Lucas promotion, zero subscriptions and no paid invoices. The deployed QA endpoint returned directly to the dashboard.
 
-The selected-tier fix was exercised on the branch using a fresh buyer, the live Firebase project and a real monthly Business Stripe Checkout. The native form returned 303 to the ordinary billing success handler, which returned 307 to the dashboard. The buyer session reported `business / trialing`, the member row showed Lucas and Business, and the signed receipt recorded the same values. After cleanup the same row showed **lucas · No plan · Free**. This is a pre-merge Business result.
+The selected-tier fix was exercised on the branch using a fresh buyer, the live Firebase project and a real monthly Business Stripe Checkout. The native form returned 303 to the ordinary billing success handler, which returned 307 to the dashboard. The buyer session reported `business / trialing`, the member row showed Lucas and Business, and the signed receipt recorded the same values. After cleanup the same row showed **lucas · No plan · Free**. This was the pre-merge Business result for #118. The same Business flow was subsequently recorded on the production deployment of #118, including the Lucas admin row and receipt cleanup.

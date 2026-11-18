@@ -1,4 +1,5 @@
 import type { UserRecord } from 'firebase-admin/auth';
+import { unfinishedCheckout } from '../first-checkout';
 import { auth, db } from '@/lib/firebase.admin';
 import { listQaTrials, realEntitlement, type QaTrial } from '@/lib/qa-affiliate-run';
 import {
@@ -78,21 +79,21 @@ async function listAuthUsers(): Promise<UserRecord[]> {
 }
 
 /**
- * Reads the authoritative billing document of every given account.
+ * Reads the member or billing documents for a batch of account IDs.
  *
  * `users/{uid}/billing/current` is the source of truth for the tier and the
  * subscription status. The `adminMembers` projection is only a snapshot of
  * it, so a dashboard that reads the projection shows whatever was true the
  * last time the member signed in.
  */
-async function readBillingDocuments(
-  uids: string[],
+async function readMemberDocuments(
+  uids: string[], source: 'billing' | 'member',
 ): Promise<Map<string, SourceData>> {
   const billing = new Map<string, SourceData>();
 
   for (let index = 0; index < uids.length; index += BILLING_BATCH_SIZE) {
     const chunk = uids.slice(index, index + BILLING_BATCH_SIZE);
-    const references = chunk.map((uid) => db.doc(`users/${uid}/billing/current`));
+    const references = chunk.map((uid) => db.doc(source === 'billing' ? `users/${uid}/billing/current` : `users/${uid}`));
     const snapshots = await db.getAll(...references);
 
     snapshots.forEach((snapshot, position) => {
@@ -106,49 +107,21 @@ async function readBillingDocuments(
   return billing;
 }
 
-/**
- * Reads the affiliate that brought each account in.
- *
- * The referral lives on the member document, not on the billing document and
- * not on the projection, so it is read from the member itself. That way it
- * can never be a stale snapshot: the projection only keeps it for accounts
- * whose member document is gone.
- */
-async function readReferralDocuments(
-  uids: string[],
-): Promise<Map<string, string>> {
-  const referrals = new Map<string, string>();
-
-  for (let index = 0; index < uids.length; index += BILLING_BATCH_SIZE) {
-    const chunk = uids.slice(index, index + BILLING_BATCH_SIZE);
-    const references = chunk.map((uid) => db.doc(`users/${uid}`));
-    const snapshots = await db.getAll(...references);
-
-    snapshots.forEach((snapshot, position) => {
-      const uid = chunk[position];
-      const code = snapshot.data()?.affiliateCode;
-      if (uid && typeof code === 'string' && code.length > 0) {
-        referrals.set(uid, code);
-      }
-    });
-  }
-
-  return referrals;
-}
-
 function buildMember(params: {
   uid: string;
   email: string;
   displayName: string;
   billing: SourceData | undefined;
   projection: AdminMemberProjection | undefined;
-  referredBy: string | null;
+  member: SourceData | undefined;
   qaTrial: QaTrial | undefined;
   authCreatedAt: string;
   now: number;
 }): AdminMemberProjection {
-  const qa = !realEntitlement(params.billing) ? params.qaTrial : undefined;
+  const member = params.member ?? {};
+  const qa = !realEntitlement(params.billing) && !realEntitlement(member) ? params.qaTrial : undefined;
   const billing = params.billing ?? {};
+  const pending = !qa && unfinishedCheckout(member, billing);
   const subscriptionStatus = qa ? 'trialing' : adminSubscriptionStatus(billing);
   const cancelAtPeriodEnd = billing.cancelAtPeriodEnd === true;
   const trialStart = nullableNumber(billing.trialStart);
@@ -159,11 +132,12 @@ function buildMember(params: {
     uid: params.uid,
     email: params.email,
     displayName: params.displayName,
-    referredBy: params.referredBy ?? qa?.affiliateCode ?? null,
+    referredBy: nullableString(member.affiliateCode) ?? params.projection?.referredBy ?? qa?.affiliateCode ?? null,
+    selectedTier: pending ? pending.choice?.tier ?? null : null,
     ...(qa ? { qaSimulation: true } : {}),
     tier: qa?.tier ?? tier(billing.tier),
     subscriptionStatus,
-    membershipState: resolveMembershipState({
+    membershipState: pending ? 'checkout_pending' : resolveMembershipState({
       status: subscriptionStatus,
       cancelAtPeriodEnd,
       trialStart,
@@ -221,16 +195,10 @@ export async function listAdminMemberSnapshot(
     .map((projection) => projection.uid)
     .filter((uid) => !liveUids.includes(uid));
 
-  const billing = await readBillingDocuments([
-    ...liveUids,
-    ...archivedUids,
+  const uids = [...liveUids, ...archivedUids];
+  const [billing, memberDocuments, qaSimulations] = await Promise.all([
+    readMemberDocuments(uids, 'billing'), readMemberDocuments(uids, 'member'), listQaTrials(),
   ]);
-
-  const referrals = await readReferralDocuments([
-    ...liveUids,
-    ...archivedUids,
-  ]);
-  const qaSimulations = await listQaTrials();
 
   const members: AdminMemberProjection[] = authUsers.map((user) => {
     const projection = projectionByUid.get(user.uid);
@@ -246,7 +214,7 @@ export async function listAdminMemberSnapshot(
         ?? resolveAdminDisplayName(null, user.displayName),
       billing: billing.get(user.uid),
       projection,
-      referredBy: referrals.get(user.uid) ?? projection?.referredBy ?? null,
+      member: memberDocuments.get(user.uid),
       qaTrial: qaSimulations.get(user.uid),
       authCreatedAt,
       now,
@@ -264,7 +232,7 @@ export async function listAdminMemberSnapshot(
       projection,
       // An account whose member document is gone keeps its referral in the
       // projection, which is the only place it is left.
-      referredBy: referrals.get(uid) ?? projection?.referredBy ?? null,
+      member: memberDocuments.get(uid),
       qaTrial: qaSimulations.get(uid),
       authCreatedAt: projection?.authCreatedAt ?? new Date(now * 1000).toISOString(),
       now,

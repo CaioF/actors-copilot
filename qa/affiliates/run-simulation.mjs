@@ -13,9 +13,10 @@ import { affiliateRow, header, memberRow, openAffiliates, stripeSummary } from '
 
 const mode = process.argv[2];
 assert(
-  ['--observe', '--confirm-demo'].includes(mode),
-  'Choose --observe or --confirm-demo. Each creates a new QA account through the signup form.',
+  ['--observe', '--recover', '--confirm-demo'].includes(mode),
+  'Choose --observe, --recover or --confirm-demo. Each creates a new QA account through the signup form.',
 );
+const recover = mode === '--recover';
 const confirm = mode === '--confirm-demo';
 const tier = process.env.AC_TRIAL_TIER || 'economy';
 assert(['economy', 'business'].includes(tier), 'AC_TRIAL_TIER must be economy or business.');
@@ -63,7 +64,8 @@ const report = {
   origin,
   language: 'en-US',
   browser: browser.version(),
-  journey: 'affiliate-signup',
+  journey: recover ? 'unfinished-checkout' : 'affiliate-signup',
+  recoveryVersion: 1,
   tier,
   presentation: 'full browser viewport',
   status: 'incomplete',
@@ -93,6 +95,25 @@ async function click(locator) {
   await locator.hover();
   await hold(320);
   await locator.click();
+}
+async function assertSavedChoice(actorPage) {
+  await expect(actorPage).toHaveURL(origin + '/start-trial');
+  await expect(actorPage.getByRole('heading', { name: 'Finish setting up your free trial' })).toBeVisible();
+  for (const name of [new RegExp('^' + tierLabel + ' Class', 'i'), 'Monthly', 'USD']) {
+    await expect(actorPage.getByRole('button', { name, pressed: true, exact: typeof name === 'string' })).toBeVisible();
+  }
+  await expect(actorPage.getByText(/LUCAS applied.*20% off/i)).toBeVisible();
+}
+async function resumeSameCheckout(buyer, checkoutId) {
+  const [response] = await Promise.all([
+    buyer.waitForResponse(r => new URL(r.url()).pathname === '/api/billing/recovery' &&
+      r.request().method() === 'POST' && r.request().postDataJSON()?.tier === tier),
+    click(buyer.getByRole('button', { name: 'Resume checkout' })),
+  ]);
+  assert(response.ok(), 'The app could not resume Checkout');
+  await buyer.waitForURL(url => url.origin === 'https://checkout.stripe.com',
+    { waitUntil: 'domcontentloaded', timeout: 90000 });
+  assert(new URL(buyer.url()).pathname.endsWith('/' + checkoutId), 'Resume must reopen the original Stripe Checkout');
 }
 async function signInOperator() {
   if (record) mark('Operator signs in again at the admin prompt');
@@ -313,13 +334,26 @@ try {
     await expect(dashboard).toBeVisible();
     mark('Dashboard displayed after the demo return');
     await hold(2200);
-  } else report.confirmation = 'Checkout left open; no payment or demo confirmation';
+  } else {
+    report.confirmation = 'Checkout left open; no payment or demo confirmation';
+    if (recover) {
+      stage = 'reopening the app after leaving hosted Checkout';
+      await navigateAddress(page, origin + '/dashboard');
+      await assertSavedChoice(page);
+      mark('Returning from an unfinished checkout restores the selected plan and Lucas discount');
+      await hold(2600);
+      stage = 'resuming the original Stripe Checkout';
+      await resumeSameCheckout(page, checkoutId);
+      await stripeSummary(page, tierLabel);
+      mark('Resume checkout reopens the same hosted Stripe session');
+    }
+  }
   stage = 'returning to the operator dashboard';
   await navigateAddress(page, origin + '/admin-dashboard');
   const nav = await header(page);
-  await memberRow(page, email, confirm ? tierLabel : null);
+  await memberRow(page, email, tierLabel, confirm);
   mark(
-    confirm ? 'Same member shows Lucas, Trial, ' + tierLabel + ' and Simulated QA' : 'Same new member shows Lucas and No plan',
+    confirm ? 'Same member shows Lucas, Trial, ' + tierLabel + ' and Simulated QA' : 'Same member shows Lucas, Checkout pending, and ' + tierLabel + ' selected',
   );
   await hold(4000);
   await openAffiliates(page, nav, signInOperator);
@@ -334,9 +368,27 @@ try {
   await page.screencast.stop();
   record = false;
   await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));
-  report.status = confirm ? 'demo-complete' : 'observed-through-checkout';
+  if (recover) {
+    stage = 'signing back in from a clean browser context after closing the buyer tab';
+    await page.close();
+    const otherDevice = await browser.newContext({ locale: 'en-US' });
+    try {
+      const buyer = await otherDevice.newPage();
+      await buyer.goto(origin + '/login');
+      await buyer.locator('input[type=email]').fill(email);
+      await buyer.locator('input[type=password]').fill(password);
+      await buyer.locator('button[type=submit]').filter({ hasText: 'Sign In' }).click();
+      await assertSavedChoice(buyer);
+      await resumeSameCheckout(buyer, checkoutId);
+      report.freshLoginResumedOriginalCheckout = true;
+    } finally {
+      await otherDevice.close();
+    }
+  }
+  report.status = confirm ? 'demo-complete' : recover ? 'recovery-verified' : 'observed-through-checkout';
 } catch (error) {
   report.failedStage = stage;
+  if (!page.isClosed()) await page.screenshot({ path: join(dir, 'failure.png') }).catch(() => {});
   const line = error.stack?.match(/(?:run-simulation|camera|browser-address)\.mjs:\d+:\d+/)?.[0];
   console.error('Stopped at ' + stage + ' (' + [error.name, line].filter(Boolean).join(', ') + ')');
   process.exitCode = 1;
@@ -364,8 +416,8 @@ try {
       if (await login.isVisible()) await signInOperator();
       await expect(members).toBeVisible();
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await memberRow(page, email, null);
-      report.afterCleanup = { status: 'No plan', tier: 'Free', referredBy: 'lucas' };
+      await memberRow(page, email, tierLabel, false);
+      report.afterCleanup = { status: 'Checkout pending', tier: 'Free', selectedTier: tier, referredBy: 'lucas' };
     } catch {
       report.status = 'incomplete';
       report.failedStage = 'verifying the original member row after cleanup';

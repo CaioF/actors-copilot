@@ -1,4 +1,5 @@
 import type { UserRecord } from 'firebase-admin/auth';
+import { unfinishedCheckout } from '../first-checkout';
 import { auth, db } from '@/lib/firebase.admin';
 import {
   adminSubscriptionStatus,
@@ -60,6 +61,7 @@ export async function syncAdminMember(
   const billingData: SourceData = billing.exists ? (billing.data() ?? {}) : {};
   const userData: SourceData = user.exists ? (user.data() ?? {}) : {};
   const synchronizedAt = new Date().toISOString();
+  const pending = unfinishedCheckout(userData, billingData);
   const subscriptionStatus = adminSubscriptionStatus(billingData);
   const cancelAtPeriodEnd = billingData.cancelAtPeriodEnd === true;
   const trialStart = nullableNumber(billingData.trialStart);
@@ -75,7 +77,8 @@ export async function syncAdminMember(
     referredBy: nullableString(userData.affiliateCode),
     tier: tier(billingData.tier),
     subscriptionStatus,
-    membershipState: resolveMembershipState({ status: subscriptionStatus, cancelAtPeriodEnd, trialStart, trialEnd }),
+    selectedTier: pending?.choice?.tier ?? null,
+    membershipState: pending ? 'checkout_pending' : resolveMembershipState({ status: subscriptionStatus, cancelAtPeriodEnd, trialStart, trialEnd }),
     trialStart,
     trialEnd,
     currentPeriodEnd: nullableNumber(billingData.currentPeriodEnd),

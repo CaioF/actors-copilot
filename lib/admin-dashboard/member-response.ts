@@ -11,6 +11,7 @@ export type AdminMemberDto = Pick<
   | 'tier'
   | 'subscriptionStatus'
   | 'membershipState'
+  | 'selectedTier'
   | 'trialEnd'
   | 'currentPeriodEnd'
   | 'cancelAtPeriodEnd'
@@ -37,6 +38,7 @@ export function serializeAdminMember(
     tier: member.tier,
     subscriptionStatus: member.subscriptionStatus,
     membershipState: member.membershipState,
+    ...(member.membershipState === 'checkout_pending' && member.selectedTier ? { selectedTier: member.selectedTier } : {}),
     trialEnd: member.trialEnd,
     currentPeriodEnd: member.currentPeriodEnd,
     cancelAtPeriodEnd: member.cancelAtPeriodEnd,

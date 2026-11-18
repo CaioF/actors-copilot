@@ -57,7 +57,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
             const body = await res.json();
             expect(res.status).toBe(200);
             expect(body.billingRecovery.required).toBe(true);
-            expect(setPlatformSession).toHaveBeenCalledWith(expect.objectContaining({tier:'free',subscriptionStatus:'canceled',stripeSubscriptionId:undefined}));
+            expect(setPlatformSession).toHaveBeenCalledWith(expect.objectContaining({tier:'free',subscriptionStatus:'checkout_pending',stripeSubscriptionId:undefined}));
         });
         
         /**
@@ -100,7 +100,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
         /**
          * Test suite verifying safe fallback initialization parameters for newly registered users without records.
          */
-        it('defaults to free tier and canceled status if no pre-existing billing document is found in firestore', async () => {
+        it('returns free with no plan for an account without a checkout or subscription', async () => {
             const mockUid = 'new_actor_999';
             const mockEmail = 'new_actor@example.com';
 
@@ -131,7 +131,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                 uid: mockUid,
                 email: mockEmail,
                 tier: 'free',
-                subscriptionStatus: 'canceled',
+                subscriptionStatus: 'no_plan',
             });
 
             // 2. Validate targeted document reference mapping pathing
@@ -142,7 +142,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                 uid: mockUid,
                 email: mockEmail,
                 tier: 'free',
-                subscriptionStatus: 'canceled',
+                subscriptionStatus: 'no_plan',
                 stripeCustomerId: undefined,
                 stripeSubscriptionId: undefined,
                 stripePriceId: undefined,
@@ -265,7 +265,7 @@ describe('Authentication Callback Route Handlers (Stripe & Firestore Integration
                         exists: path === `users/${mockUid}` && existingRoot,
                         data: () => (path === `users/${mockUid}` ? { tier: 'business' } : null),
                     }),
-                    set: jest.fn().mockImplementation((payload: unknown) => {
+                    create: jest.fn().mockImplementation((payload: unknown) => {
                         sets.push([path, payload]);
                         return Promise.resolve();
                     }),

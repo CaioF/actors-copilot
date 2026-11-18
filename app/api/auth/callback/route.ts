@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { canRestartInvalidBillingTrial } from '@/lib/verified-trial-restart';
 import { auth, db } from '@/lib/firebase.admin';
 import { setPlatformSession, getPlatformSession } from '@/lib/session';
-import { UserBilling, SubscriptionStatus } from '@/lib/billing';
+import type { UserBilling, MemberStatus, SubscriptionStatus } from '@/lib/billing';
+import { unfinishedCheckout, owesFirstTrial, isCheckoutCustomerSeed } from '@/lib/first-checkout';
+import type { PlatformSession } from '@/lib/session';
 import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending } from '@/lib/billing-recovery';
 import { syncAdminMember } from '@/lib/admin-dashboard/sync';
 import { normalizeCurrency } from '@/lib/plan-selection';
@@ -10,13 +12,7 @@ import { buildAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { logger } from '@/lib/logger';
 import { eligibleIdentity, readQaTrial, realEntitlement } from '@/lib/qa-affiliate-run';
 
-/**
- * Upper bound of automatic checkout attempts for a single recovery flag.
- *
- * Prevents the login flow from trapping a user in a redirect loop when the
- * checkout is abandoned on purpose: after the limit the account simply keeps
- * using the regular upgrade page.
- */
+/** Existing operator offers retain their retry limit. Resuming an ordinary checkout is user initiated. */
 const MAX_RECOVERY_ATTEMPTS = 3;
 
 function projectionErrorDetails(error: unknown) {
@@ -30,6 +26,37 @@ function projectionErrorDetails(error: unknown) {
   };
 }
 
+async function memberSession(uid: string, email: string, member: Record<string, unknown>, billing: Record<string, unknown>) {
+  const stored = billing as Partial<UserBilling> & { subscriptionStatus?: SubscriptionStatus };
+  const invalidBinding = await canRestartInvalidBillingTrial(uid, member.billingRecovery, billing, true);
+  const legacy = isRecoveryPending(member.billingRecovery) ? member.billingRecovery : null;
+  const unfinished = unfinishedCheckout(member, billing);
+  const demo = eligibleIdentity(uid, email) && !realEntitlement(billing) && !realEntitlement(member)
+    ? await readQaTrial(uid, email) : null;
+  const legacyRecovery = legacy && legacy.reason !== 'checkout_pending' && legacy.reason !== 'trial_selection' &&
+    (legacy.attempt ?? 0) < MAX_RECOVERY_ATTEMPTS && (invalidBinding || owesFirstTrial(member, billing));
+  const recovery = !demo && (unfinished || legacyRecovery) ? {
+    required: true,
+    tier: unfinished?.choice?.tier ?? legacy?.tier ?? DEFAULT_RECOVERY_TIER,
+    currency: normalizeCurrency(unfinished?.choice?.currency ?? legacy?.currency ?? DEFAULT_RECOVERY_CURRENCY),
+    billingCycle: unfinished?.choice?.billingCycle ?? legacy?.billingCycle ?? 'monthly',
+  } : undefined;
+  const tier = demo?.tier ?? (invalidBinding ? 'free' : stored.tier ?? 'free');
+  let subscriptionStatus: MemberStatus = invalidBinding || (isCheckoutCustomerSeed(billing) && owesFirstTrial(member, billing))
+    ? 'no_plan' : stored.status ?? stored.subscriptionStatus ?? 'no_plan';
+  if (demo) subscriptionStatus = 'trialing';
+  else if (recovery) subscriptionStatus = 'checkout_pending';
+  const session: PlatformSession = {
+    uid, email, tier, subscriptionStatus,
+    stripeCustomerId: stored.customerId,
+    stripeSubscriptionId: invalidBinding ? undefined : stored.subscriptionId,
+    stripePriceId: invalidBinding ? undefined : stored.priceId,
+    currentPeriodEnd: invalidBinding ? undefined : stored.currentPeriodEnd,
+    ...(demo ? { qaExpiresAt: demo.expiresAt } : {}),
+  };
+  return { session, recovery };
+}
+
 /**
  * Validates the Firebase identity token, hydrates entitlement details from Firestore, and issues the active platform session.
  *
@@ -38,7 +65,7 @@ function projectionErrorDetails(error: unknown) {
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { idToken, affiliateCode, affiliateCapturedAt } = await req.json();
+    const { idToken, affiliateCode, affiliateCapturedAt, trialSignup } = await req.json();
 
     if (!idToken) {
       return NextResponse.json({ error: 'Missing Identity ID Token' }, { status: 400 });
@@ -52,37 +79,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Identity Token lacks a valid email claim' }, { status: 400 });
     }
 
-    let tier: 'free' | 'economy' | 'business' = 'free';
-    let subscriptionStatus: SubscriptionStatus = 'canceled';
-    let stripeCustomerId: string | undefined;
-    let stripeSubscriptionId: string | undefined;
-    let stripePriceId: string | undefined;
-    let currentPeriodEnd: number | undefined;
-    let hasUsedTrial = false;
-
-    const billingDocRef = db.doc(`users/${uid}/billing/current`);
-    const billingDoc = await billingDocRef.get();
-
-    if (billingDoc.exists) {
-      const billingData = billingDoc.data() as Omit<UserBilling, 'uid'>;
-      tier = billingData.tier || 'free';
-      subscriptionStatus = billingData.status || 'canceled';
-      stripeCustomerId = billingData.customerId;
-      stripeSubscriptionId = billingData.subscriptionId;
-      stripePriceId = billingData.priceId;
-      currentPeriodEnd = billingData.currentPeriodEnd;
-      hasUsedTrial = billingData.hasUsedTrial === true;
-    }
-
-    // The root user document also carries the trial marker and the optional
-    // billing recovery flag.
     const userDocRef = db.doc(`users/${uid}`);
-    const userDoc = await userDocRef.get();
-    const userData = (userDoc.exists ? userDoc.data() : null) ?? ({} as Record<string, unknown>);
-
-    if (userData.hasUsedTrial === true) {
-      hasUsedTrial = true;
-    }
+    const [billingDoc, userDoc] = await Promise.all([
+      db.doc(`users/${uid}/billing/current`).get(), userDocRef.get(),
+    ]);
+    let userData = userDoc.exists ? userDoc.data() ?? {} : {};
+    const billing = billingDoc.exists ? billingDoc.data() ?? {} : {};
 
     // Affiliate attribution is written once, when the account is created, and
     // only when the root document does not exist yet. A later visit carrying
@@ -96,56 +98,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!userDoc.exists) {
       const attribution = buildAffiliateAttribution(affiliateCode, affiliateCapturedAt);
 
-      if (attribution) {
-        await userDocRef.set(
-          {
-            affiliateCode: attribution.code,
-            affiliateCapturedAt: attribution.capturedAt,
-          },
-          { merge: true },
-        );
-
-        affiliateAttributed = true;
+      if (attribution || trialSignup === true) {
+        const initial = {
+          ...(attribution ? { affiliateCode: attribution.code, affiliateCapturedAt: attribution.capturedAt } : {}),
+          ...(trialSignup === true && owesFirstTrial(userData, billing)
+            ? { billingRecovery: { reason: 'trial_selection', required: true } } : {}),
+        };
+        try {
+          await userDocRef.create(initial);
+          userData = initial;
+          affiliateAttributed = Boolean(attribution);
+        } catch (error) {
+          // Another tab or a webhook may already have recorded a newer choice or subscription.
+          if ((error as { code?: number }).code !== 6) throw error;
+          userData = (await userDocRef.get()).data() ?? {};
+        }
       }
     }
 
-    const recoveryFlag = isRecoveryPending(userData.billingRecovery) ? userData.billingRecovery : null;
-    const invalidBillingRestart = await canRestartInvalidBillingTrial(
-      uid, userData.billingRecovery, billingDoc.exists ? billingDoc.data() ?? {} : {}, true,
-    );
-    if (invalidBillingRestart) {
-      // A reviewed test-mode subscription is not a live entitlement. Normalize
-      // the session only; the webhook owns the stored entitlement fields.
-      tier = 'free';
-      subscriptionStatus = 'canceled';
-      stripeSubscriptionId = undefined;
-      stripePriceId = undefined;
-      currentPeriodEnd = undefined;
-      hasUsedTrial = false;
-    }
-
-    let qaExpiresAt: number | undefined;
-    if (eligibleIdentity(uid,email) && !realEntitlement(billingDoc.data()) && !realEntitlement(userData)) {
-      const demo = await readQaTrial(uid,email);
-      if (demo) {
-        tier = demo.tier;
-        subscriptionStatus = 'trialing';
-        qaExpiresAt = demo.expiresAt;
-      }
-    }
-
-    // 3. Serialize and commit entitlement metadata into the secure platform session.
-    await setPlatformSession({
-      uid,
-      email,
-      tier,
-      subscriptionStatus,
-      ...(qaExpiresAt ? { qaExpiresAt } : {}),
-      stripeCustomerId,
-      stripeSubscriptionId,
-      stripePriceId,
-      currentPeriodEnd,
-    });
+    const { session, recovery: billingRecovery } = await memberSession(uid, email, userData, billing);
+    await setPlatformSession(session);
+    const { tier, subscriptionStatus } = session;
 
     try {
       await syncAdminMember(uid);
@@ -155,27 +128,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         msg: 'Admin member projection sync failed after login',
       });
     }
-
-    // 4. Billing recovery.
-    // Accounts whose previous checkout failed because of a server-side
-    // configuration fault are routed to a short interstitial that explains
-    // what happened before handing them over to Stripe. The entitlement is
-    // still granted by Stripe + webhook, never here.
-    const recoveryAttempts = recoveryFlag?.attempt ?? 0;
-    const recoveryEligible =
-      recoveryFlag !== null &&
-      recoveryAttempts < MAX_RECOVERY_ATTEMPTS &&
-      tier === 'free' &&
-      !stripeSubscriptionId &&
-      !hasUsedTrial;
-
-    const billingRecovery = recoveryEligible
-      ? {
-        required: true,
-        tier: recoveryFlag.tier || DEFAULT_RECOVERY_TIER,
-        currency: normalizeCurrency(recoveryFlag.currency ?? DEFAULT_RECOVERY_CURRENCY),
-      }
-      : undefined;
 
     return NextResponse.json({
       success: true,
@@ -197,15 +149,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  */
 export async function GET(): Promise<NextResponse> {
   try {
-    const session = await getPlatformSession();
+    let session = await getPlatformSession();
 
     if (!session) {
       return NextResponse.json({ authenticated: false, tier: 'free' }, { status: 401 });
     }
 
-    // Returns structural modern entitlement mapping data needed by frontend hydration engines [cite: 26]
+    // The platform cookie can predate a checkout started on this or another device.
+    let recovery;
+    if (session.tier === 'free' || session.qaExpiresAt) {
+      const [member, billing] = await Promise.all([
+        db.doc(`users/${session.uid}`).get(), db.doc(`users/${session.uid}/billing/current`).get(),
+      ]);
+      const current = await memberSession(session.uid, session.email, member.data() ?? {}, billing.data() ?? {});
+      recovery = current.recovery;
+      if (session.tier !== current.session.tier || session.subscriptionStatus !== current.session.subscriptionStatus ||
+          session.qaExpiresAt !== current.session.qaExpiresAt) await setPlatformSession(current.session);
+      session = current.session;
+    }
     return NextResponse.json({
       authenticated: true,
+      ...(recovery ? { billingRecovery: recovery } : {}),
       tier: session.tier,
       subscriptionStatus: session.subscriptionStatus,
       stripeCustomerId: session.stripeCustomerId,

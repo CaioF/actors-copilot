@@ -290,10 +290,8 @@ describe('listAdminMemberSnapshot', () => {
 
     // 120 accounts: two batches for the billing documents, two for the referrals.
     expect(db.getAll).toHaveBeenCalledTimes(4);
-    expect((db.getAll as jest.Mock).mock.calls[0]).toHaveLength(100);
-    expect((db.getAll as jest.Mock).mock.calls[1]).toHaveLength(20);
-    expect((db.getAll as jest.Mock).mock.calls[2]).toHaveLength(100);
-    expect((db.getAll as jest.Mock).mock.calls[3]).toHaveLength(20);
+    const sizes = (db.getAll as jest.Mock).mock.calls.map(batch => batch.length);
+    expect(sizes.sort((a, b) => a - b)).toEqual([20, 20, 100, 100]);
   });
 
   it('labels an approved demonstration while keeping a real subscription authoritative', async () => {

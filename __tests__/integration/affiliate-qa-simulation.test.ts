@@ -99,7 +99,7 @@ it.each([
     };
     (stripe.checkout.sessions.retrieve as jest.Mock).mockResolvedValue(stripeCheckout);
     const adminRow = async () => (await listAdminMemberSnapshot()).members[0];
-    const baseline = { membershipState: 'no_plan', tier: 'free', referredBy: source === 'link' ? 'lucas' : null };
+    const baseline = { membershipState: 'checkout_pending', tier: 'free', referredBy: source === 'link' ? 'lucas' : null };
     const returnTo = (path: string) => checkoutSuccess(new Request(new URL(path, 'https://app.example')) as NextRequest);
     const reauthenticate = () =>
       exchange(
@@ -152,7 +152,7 @@ it.each([
       expect(setPlatformSession).not.toHaveBeenCalled();
       expect((await reauthenticate()).status).toBe(200);
       expect(setPlatformSession).toHaveBeenLastCalledWith(
-        expect.objectContaining({ tier: 'free', subscriptionStatus: 'canceled' }),
+        expect.objectContaining({ tier: 'free', subscriptionStatus: 'checkout_pending' }),
       );
       expect(store.read('users/qa')).toEqual(member);
       expect(store.read('users/qa/billing/current')).toEqual(billing);
