@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { expect as playwrightExpect } from 'playwright/test';
 const expect = playwrightExpect.configure({ timeout: 90000 });
 import { navigateAddress } from './browser-address.mjs';
-import { affiliateRow, header, memberRow, stripeSummary } from './camera.mjs';
+import { affiliateRow, header, memberRow, openAffiliates, stripeSummary } from './camera.mjs';
 
 const mode = process.argv[2];
 assert(
@@ -89,6 +89,12 @@ async function click(locator) {
   await hold(320);
   await locator.click();
 }
+async function signInOperator() {
+  if (record) mark('Operator signs in again at the admin prompt');
+  await page.getByLabel('Username', { exact: true }).fill(process.env.AC_ADMIN_USERNAME);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.AC_ADMIN_PASSWORD);
+  await click(page.getByRole('button', { name: 'Log in', exact: true }));
+}
 async function watch(name, task) {
   stage = name;
   return task();
@@ -105,9 +111,7 @@ function demoCall(method, body) {
 try {
   // Open the operator's entry point once. All application routes after registration are observed.
   await page.goto(origin + '/admin-dashboard', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.getByLabel('Username', { exact: true }).fill(process.env.AC_ADMIN_USERNAME);
-  await page.getByLabel('Password', { exact: true }).fill(process.env.AC_ADMIN_PASSWORD);
-  await click(page.getByRole('button', { name: 'Log in', exact: true }));
+  await signInOperator();
   await page.locator('header h1').filter({ hasText: 'Member dashboard' }).waitFor({ state: 'attached' });
   const affiliates = await header(page);
   await page.screencast.showActions({
@@ -124,9 +128,7 @@ try {
   started = performance.now();
   mark('Member dashboard after operator login');
   await hold(2000);
-  await click(affiliates);
-  await page.waitForURL(origin + '/admin-dashboard/affiliates');
-  await header(page);
+  await openAffiliates(page, affiliates, signInOperator);
   const { address, link } = await watch('locating the referral in the affiliate row', () =>
     affiliateRow(page, origin),
   );
@@ -246,9 +248,7 @@ try {
     confirm ? 'Same member shows Lucas, Trial and Simulated QA' : 'Same new member shows Lucas as referrer',
   );
   await hold(4000);
-  await click(nav);
-  await page.waitForURL(origin + '/admin-dashboard/affiliates');
-  await header(page);
+  await openAffiliates(page, nav, signInOperator);
   await affiliateRow(page, origin, confirm);
   mark(
     confirm
@@ -256,6 +256,7 @@ try {
       : 'Lucas coupon and referral link verified again',
   );
   await hold(4000);
+  await expect(page.getByRole('heading', { name: 'Affiliate program', exact: true })).toBeVisible();
   await page.screencast.stop();
   record = false;
   await rename(join(dir, 'take.partial.webm'), join(dir, 'take.webm'));

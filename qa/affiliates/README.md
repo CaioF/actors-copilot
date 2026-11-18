@@ -6,6 +6,8 @@ One continuous, English-language Chromium recording follows the address actually
 
 These internal recordings show the browser's full viewport. In the operator panel, keep the other rows, table headings, balances, buttons and Transfers section visible. In Stripe, show the hosted order summary alongside its payment form. Use the app's normal password fields and leave the card fields empty. Store captures in the local Git-ignored evidence directory.
 
+If the operator encounters **Admin access** while opening **Affiliates**, sign in through the displayed form. If it returns to **Member dashboard**, click **Affiliates** again. Keep that interaction in the same recording. Success requires the affiliate panel to be visible at the end.
+
 | Step | Operator or actor interaction | Evidence the recorder requires |
 | --- | --- | --- |
 | 1 | In a fresh Chrome profile, sign in at `/admin-dashboard`. Click **Affiliates** and find **Coupon code: LUCAS**. | Read the referral address from that row. Click it, or select, copy and open it in the address bar on deployments that display plain text. |

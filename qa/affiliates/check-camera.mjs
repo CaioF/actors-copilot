@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chromium, expect } from 'playwright/test';
-import { affiliateRow, header, memberRow, stripeSummary } from './camera.mjs';
+import { affiliateRow, header, memberRow, openAffiliates, stripeSummary } from './camera.mjs';
 
 test('recording preserves complete operator tables, controls and the hosted checkout', async (t) => {
   const browser = await chromium.launch();
@@ -35,8 +35,7 @@ test('recording preserves complete operator tables, controls and the hosted chec
   await memberRow(page, email, true);
   await expect(page.getByText('Second actor')).toBeVisible();
   await expect(page.getByText('Test Actor')).toBeVisible();
-  await affiliates.click();
-  await header(page);
+  await openAffiliates(page, affiliates, () => assert.fail('Unexpected sign-in prompt'));
   const referral = await affiliateRow(page, origin, true);
   assert.equal(referral.address, address);
   await expect(page.getByText('12.00 USD')).toBeVisible();
@@ -60,4 +59,29 @@ test('recording preserves complete operator tables, controls and the hosted chec
   await expect(payment.getByText(email)).toBeVisible();
   await expect(payment.getByLabel('Card number')).toBeVisible();
   await expect(payment.getByRole('button', { name: 'Start trial' })).toBeVisible();
+});
+
+test('the operator resumes through the visible sign-in form if the panel asks for credentials', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  const origin = 'https://qa.example.test';
+  let signIns = 0;
+  await page.route(origin + '/admin-dashboard', route => route.fulfill({
+    contentType: 'text/html',
+    body: '<header><p>Internal operator</p><h1>Member dashboard</h1><a href="/admin-dashboard/affiliates">Affiliates</a></header>',
+  }));
+  await page.route(origin + '/admin-dashboard/affiliates', route => route.fulfill({
+    contentType: 'text/html',
+    body: signIns
+      ? '<header><p>Internal operator</p><h1>Affiliate program</h1><a href="/admin-dashboard">Back to members</a></header>'
+      : `<h1>Admin access</h1><button onclick="location.assign('/admin-dashboard')">Log in</button>`,
+  }));
+  await page.goto(origin + '/admin-dashboard');
+  await openAffiliates(page, await header(page), async () => {
+    signIns++;
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  });
+  assert.equal(signIns, 1);
+  await expect(page.getByRole('heading', { name: 'Affiliate program' })).toBeVisible();
 });

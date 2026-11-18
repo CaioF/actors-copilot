@@ -9,6 +9,23 @@ export async function header(page) {
   return nav;
 }
 
+export async function openAffiliates(page, link, signInOperator) {
+  const origin = new URL(page.url()).origin;
+  const panel = page.getByRole('heading', { name: 'Affiliate program', exact: true });
+  const login = page.getByRole('heading', { name: 'Admin access', exact: true });
+  await link.click();
+  await expect(panel.or(login)).toBeVisible({ timeout: 90000 });
+  if (await login.isVisible()) {
+    await signInOperator();
+    const members = page.getByRole('heading', { name: 'Member dashboard', exact: true });
+    await expect(panel.or(members)).toBeVisible({ timeout: 90000 });
+    if (await members.isVisible()) await page.getByRole('link', { name: 'Affiliates', exact: true }).click();
+  }
+  await expect(panel).toBeVisible({ timeout: 90000 });
+  await page.waitForURL(origin + '/admin-dashboard/affiliates', { waitUntil: 'domcontentloaded' });
+  await header(page);
+}
+
 export async function affiliateRow(page, appOrigin, withDemo = false) {
   const coupon = page.getByText('Coupon code: LUCAS', { exact: true });
   const row = page.getByRole('row').filter({ has: coupon });
