@@ -227,6 +227,12 @@ components/
 | `/api/billing/portal` | POST | Authorizes self-service subscription management portals for active customers |
 | `/api/webhooks/stripe` | POST | Stream interceptor with cryptographic signature verification for state mutation syncs |
 
+### Black Friday 2026 annual checkout
+
+Enter `BLACKFRIDAY` on the app's annual USD plan selection, before Stripe Checkout. The code is available from November 26 at 07:00 to December 1 at 09:00 in Brasília (10:00 UTC to 12:00 UTC). It applies once to the first annual subscription for the mapped Stripe customer. The first invoice after an eligible 14-day trial is US$149 for Economy or US$219 for Business. Subsequent annual invoices use the ordinary price.
+
+The checkout selects one Stripe coupon for the chosen tier. The coupon's Stripe redemption deadline matches the app's cutoff. The selected offer occupies the one discount slot in hosted Checkout. Without an explicit campaign code, the usual checkout and referral paths apply.
+
 ### DNA (Personal DNA Extraction)
 
 | Endpoint | Method | Purpose |

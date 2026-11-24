@@ -3,6 +3,7 @@ import { getPlatformSession } from '@/lib/session';
 import { db, auth } from '@/lib/firebase.admin';
 import { BillingCycle, getStripePriceIdForTier, SubscriptionTier } from '@/lib/billing';
 import { CheckoutAlreadyCompleted, createOrReuseCheckoutSession } from '@/lib/billing-checkout';
+import { BlackFridayCheckoutError } from '@/lib/black-friday';
 import { resolveAppUrl } from '@/lib/app-origin';
 import { owesFirstTrial } from '@/lib/first-checkout';
 import { logger } from '@/lib/logger';
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             email,
             tier: selectedTier,
             billingCycle: selectedBillingCycle,
+            ...(body.promotionCode !== undefined ? { promotionCode: body.promotionCode } : {}),
             ...(checkoutCurrency ? { currency: checkoutCurrency } : {}),
             isTrial,
             appUrl,
@@ -129,6 +131,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ url: checkoutSession.url });
 
     } catch (error) {
+        if (error instanceof BlackFridayCheckoutError) {
+            return NextResponse.json({ error: error.message, code: 'promotion_unavailable' }, { status: 400 });
+        }
         if (error instanceof CheckoutAlreadyCompleted) {
             return NextResponse.json({ error: error.message, code: 'checkout_completed' }, { status: 409 });
         }

@@ -1,5 +1,7 @@
 import type Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
+import { BLACK_FRIDAY_START, BlackFridayCheckoutError } from '@/lib/black-friday';
+import { resolveBlackFridayCoupon, validateBlackFridayCode } from '@/lib/black-friday-checkout';
 import { db } from '@/lib/firebase.admin';
 import { logger } from '@/lib/logger';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
@@ -251,8 +253,9 @@ export async function createIdempotentCheckoutSession(params: {
   attempt: number;
   appUrl: string;
   affiliate?: { code: string; promotionCodeId: string } | null;
+  blackFridayCouponId?: string;
 }): Promise<Stripe.Checkout.Session> {
-  const { uid, tier, billingCycle, currency, isTrial, customerId, attempt, appUrl, affiliate } = params;
+  const { uid, tier, billingCycle, currency, isTrial, customerId, attempt, appUrl, affiliate, blackFridayCouponId } = params;
   const priceId = getStripePriceIdForTier(tier, billingCycle);
 
   const checkoutSession = await stripe.checkout.sessions.create(
@@ -268,13 +271,14 @@ export async function createIdempotentCheckoutSession(params: {
           quantity: 1,
         },
       ],
-      // Stripe accepts either `allow_promotion_codes` or `discounts`, never
-      // both. When the member arrived through a referral link their
-      // affiliate's code is applied for them; otherwise any active
-      // promotion code can be typed at checkout.
-      ...(affiliate?.promotionCodeId
-        ? { discounts: [{ promotion_code: affiliate.promotionCodeId }] }
-        : { allow_promotion_codes: true }),
+      // Stripe Checkout accepts a pre-applied discount or lets the member
+      // enter a code. An explicit campaign code takes precedence over an
+      // affiliate discount while preserving referral attribution.
+      ...(blackFridayCouponId
+        ? { discounts: [{ coupon: blackFridayCouponId }], adaptive_pricing: { enabled: false } }
+        : affiliate?.promotionCodeId
+          ? { discounts: [{ promotion_code: affiliate.promotionCodeId }] }
+          : { allow_promotion_codes: true }),
       subscription_data: {
         metadata: {
           firebaseUid: uid,
@@ -292,26 +296,31 @@ export async function createIdempotentCheckoutSession(params: {
         targetTier: tier,
         billingCycle,
         isTrial: isTrial ? 'true' : 'false',
+        ...(blackFridayCouponId ? { blackFridayCouponId } : {}),
         ...(affiliate?.code ? { affiliateCode: affiliate.code } : {}),
       },
     },
     {
-      idempotencyKey: [
-        'checkout',
-        uid,
-        priceId,
-        currency || 'default',
-        attempt,
-        originSlug(appUrl),
-        // The customer is a parameter of the session too. An account whose
-        // stored customer is gone gets a fresh one, and Stripe rejects a key
-        // that is reused with different parameters.
-        customerId,
-        ...(isTrial ? [] : ['no-trial']),
-        // The affiliate changes the session parameters, so it belongs in the
-        // key: Stripe rejects a key reused with different parameters.
-        ...(affiliate?.code ? [affiliate.code] : []),
-      ].join('_'),
+      // Share the attempt key across promotional tiers so two simultaneous
+      // requests cannot both open a discounted Checkout.
+      idempotencyKey: blackFridayCouponId
+        ? ['checkout', 'blackfriday-2026', uid, customerId, attempt].join('_')
+        : [
+          'checkout',
+          uid,
+          priceId,
+          currency || 'default',
+          attempt,
+          originSlug(appUrl),
+          // The customer is a parameter of the session too. An account whose
+          // stored customer is gone gets a fresh one, and Stripe rejects a key
+          // that is reused with different parameters.
+          customerId,
+          ...(isTrial ? [] : ['no-trial']),
+          // The affiliate changes the session parameters, so it belongs in the
+          // key: Stripe rejects a key reused with different parameters.
+          ...(affiliate?.code ? [affiliate.code] : []),
+        ].join('_'),
     },
   );
 
@@ -359,6 +368,7 @@ export async function findOpenCheckoutSession(params: {
         (params.isTrial === undefined || session.metadata?.isTrial === String(params.isTrial)) &&
         session.metadata?.targetTier === tier &&
         session.metadata?.billingCycle === billingCycle &&
+        !session.metadata?.blackFridayCouponId &&
         session.expires_at > now &&
         (!currency || session.currency === currency) &&
         // A session created without the affiliate must not be reused for a
@@ -397,6 +407,44 @@ export async function findOpenCheckoutSession(params: {
     logger.warn({ err: error, msg: 'Could not look up an open checkout session' });
     return null;
   }
+}
+
+async function findBlackFridayCheckout(
+  customer: string,
+  couponId: string,
+  appUrl: string,
+  isTrial: boolean,
+): Promise<Stripe.Checkout.Session | null> {
+  const sessions = stripe.checkout.sessions.list({
+    customer,
+    created: { gte: BLACK_FRIDAY_START / 1000 },
+    limit: 100,
+  });
+  let match: Stripe.Checkout.Session | null = null;
+  for await (const session of sessions) {
+    if (!session.metadata?.blackFridayCouponId) continue;
+    if (session.status === 'complete') {
+      throw new BlackFridayCheckoutError('BLACKFRIDAY has already been redeemed for this account.');
+    }
+    if (session.status !== 'open' || session.expires_at * 1000 <= Date.now()) continue;
+    if (session.metadata.blackFridayCouponId === couponId &&
+        session.metadata.isTrial === String(isTrial) &&
+        isSameAppOrigin(session.success_url ?? '', appUrl)) {
+      match = session;
+      continue;
+    }
+    try {
+      await stripe.checkout.sessions.expire(session.id);
+    } catch (error) {
+      // Stripe rejects expiration if the member just completed this Checkout.
+      const latest = await stripe.checkout.sessions.retrieve(session.id);
+      if (latest.status === 'complete') {
+        throw new BlackFridayCheckoutError('BLACKFRIDAY has already been redeemed for this account.');
+      }
+      if (latest.status !== 'expired') throw error;
+    }
+  }
+  return match;
 }
 
 /**
@@ -449,8 +497,11 @@ export async function createOrReuseCheckoutSession(params: {
   appUrl: string;
   affiliateCode?: string;
   verifiedTrialRestart?: boolean;
+  promotionCode?: unknown;
 }): Promise<Stripe.Checkout.Session> {
-  const { uid, email, tier, billingCycle, currency, isTrial, appUrl, affiliateCode } = params;
+  const { uid, email, tier, billingCycle, isTrial, appUrl, affiliateCode } = params;
+  const blackFriday = validateBlackFridayCode(params.promotionCode, billingCycle, params.currency);
+  const currency = blackFriday ? DEFAULT_CURRENCY : params.currency;
 
   const billingDocRef = db.doc(`users/${uid}/billing/current`);
   const billingDoc = await billingDocRef.get();
@@ -486,15 +537,21 @@ export async function createOrReuseCheckoutSession(params: {
     ? { code: affiliate.code, promotionCodeId: affiliate.promotionCodeId }
     : null;
 
-  const reusable = await findOpenCheckoutSession({
-    customerId,
-    tier,
-    billingCycle,
-    currency,
-    appUrl,
-    isTrial,
-    ...(affiliateRef ? { affiliateCode: affiliateRef.code } : {}),
-  });
+  const blackFridayCouponId = blackFriday && tier !== 'free'
+    ? await resolveBlackFridayCoupon(customerId, tier)
+    : undefined;
+
+  const reusable = blackFridayCouponId
+    ? await findBlackFridayCheckout(customerId, blackFridayCouponId, appUrl, isTrial)
+    : await findOpenCheckoutSession({
+        customerId,
+        tier,
+        billingCycle,
+        currency,
+        appUrl,
+        isTrial,
+        ...(affiliateRef ? { affiliateCode: affiliateRef.code } : {}),
+      });
   const createSession = (sequence: number) => createIdempotentCheckoutSession({
     uid,
     email,
@@ -506,6 +563,7 @@ export async function createOrReuseCheckoutSession(params: {
     attempt: sequence,
     appUrl,
     affiliate: affiliateRef,
+    ...(blackFridayCouponId ? { blackFridayCouponId } : {}),
   });
 
   const recordAttempt = (next: number) => db.runTransaction(async transaction => {
@@ -514,6 +572,9 @@ export async function createOrReuseCheckoutSession(params: {
       transaction.set(billingDocRef, { checkoutAttempt: next, updatedAt: new Date().toISOString() }, { merge: true });
     }
   });
+  // Verify the clock again after querying Stripe, including for a reused Session.
+  if (blackFridayCouponId) validateBlackFridayCode(params.promotionCode, billingCycle, currency);
+
   if (reusable) {
     // Stripe may have created the session just before a previous process stopped.
     if (attempt === 0) await recordAttempt(1);
@@ -521,10 +582,19 @@ export async function createOrReuseCheckoutSession(params: {
   }
 
   let sequence = attempt;
-  let session = await createSession(sequence);
+  let session;
+  try {
+    session = await createSession(sequence);
+  } catch (error) {
+    if (blackFridayCouponId && isIdempotencyConflict(error)) {
+      throw new BlackFridayCheckoutError('A BLACKFRIDAY checkout is already being opened. Please try again.');
+    }
+    throw error;
+  }
   await recordAttempt(++sequence);
   // An interrupted handoff can replay an idempotent response whose URL has since expired.
   if (session.status === 'expired' || session.expires_at * 1000 <= Date.now()) {
+    if (blackFridayCouponId) validateBlackFridayCode(params.promotionCode, billingCycle, currency);
     session = await createSession(sequence);
     await recordAttempt(sequence + 1);
   }
