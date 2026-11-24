@@ -11,6 +11,7 @@ test('recording preserves complete operator tables, controls and the hosted chec
   const origin = 'https://qa.example.test';
   const email = 'qa.lucas@example.test';
   const address = origin + '/login?ref=lucas';
+  const promotionCode = 'LucasAmorim';
 
   await page.route(origin + '/admin-dashboard', route => route.fulfill({
     contentType: 'text/html',
@@ -25,7 +26,7 @@ test('recording preserves complete operator tables, controls and the hosted chec
     body: `<header><p>Internal operator</p><h1>Affiliate program</h1><a href="/admin-dashboard">Back to members</a></header>
       <section><h2>Affiliates</h2><button>Add affiliate</button><table><thead><tr>
       <th>Affiliate</th><th>Referred</th><th>Collected</th><th>Commission</th><th>Paid</th><th>Pending</th><th>Actions</th>
-      </tr></thead><tbody><tr><td>Lucas <span>Coupon code: LUCAS</span> <a href="${address}">${address}</a></td>
+      </tr></thead><tbody><tr><td>Lucas <span>Coupon code: ${promotionCode}</span> <a href="${address}">${address}</a></td>
       <td>2 referred · 0 converted <div>1 simulated QA referral(s), excluded from real totals</div></td>
       <td>12.00 USD</td><td>3.60 USD</td><td>1.25 USD</td><td>2.35 USD</td><td><button>Pay</button></td></tr>
       <tr><td>Second affiliate</td><td>5 referred</td><td colspan="5">24.00 USD</td></tr></tbody></table></section>
@@ -39,6 +40,7 @@ test('recording preserves complete operator tables, controls and the hosted chec
   await openAffiliates(page, affiliates, () => assert.fail('Unexpected sign-in prompt'));
   const referral = await affiliateRow(page, origin, true);
   assert.equal(referral.address, address);
+  assert.equal(referral.promotionCode, promotionCode);
   await expect(page.getByText('12.00 USD')).toBeVisible();
   await expect(page.getByText('2.35 USD')).toBeVisible();
   await expect(page.getByText('Second affiliate')).toBeVisible();
@@ -50,12 +52,12 @@ test('recording preserves complete operator tables, controls and the hosted chec
   }));
   await page.route('https://checkout.stripe.com/fixture', route => route.fulfill({
     contentType: 'text/html',
-    body: `<aside class="OrderSummaryColumn"><p>Business Class</p><p>LUCAS</p><p>20% off 1 billing cycle</p>
+    body: `<aside class="OrderSummaryColumn"><p>Business Class</p><p>${promotionCode}</p><p>20% off 1 billing cycle</p>
       <p>Total after trial $23.20</p><p>Total due today $0.00</p></aside>
       <iframe title="Payment form" src="https://js.stripe.com/payment-frame"></iframe>`,
   }));
   await page.goto('https://checkout.stripe.com/fixture');
-  await stripeSummary(page, 'Business');
+  await stripeSummary(page, 'Business', referral.promotionCode);
   const payment = page.frameLocator('iframe[title="Payment form"]');
   await expect(payment.getByText(email)).toBeVisible();
   await expect(payment.getByLabel('Card number')).toBeVisible();

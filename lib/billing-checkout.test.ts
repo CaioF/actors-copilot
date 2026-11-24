@@ -100,6 +100,22 @@ describe('createIdempotentCheckoutSession', () => {
         expect(calls[0][1].idempotencyKey).not.toBe(calls[1][1].idempotencyKey);
     });
 
+    it('changes the idempotency key when the affiliate promotion rotates', async () => {
+        const appUrl = 'https://app.theactorscopilot.com';
+        for (const promotionCodeId of ['promo_old', 'promo_rotated']) {
+            await createIdempotentCheckoutSession({
+                ...baseParams,
+                appUrl,
+                affiliate: { code: 'lucas', promotionCodeId },
+            });
+        }
+        const [[oldSession, oldOptions], [newSession, newOptions]] =
+            jest.mocked(stripe.checkout.sessions.create).mock.calls;
+        expect(oldSession?.metadata?.affiliateCode).toBe(newSession?.metadata?.affiliateCode);
+        expect(newSession?.discounts).toEqual([{ promotion_code: 'promo_rotated' }]);
+        expect(oldOptions?.idempotencyKey).not.toBe(newOptions?.idempotencyKey);
+    });
+
     it('builds the redirect URLs from the given origin', async () => {
         await createIdempotentCheckoutSession({ ...baseParams, appUrl: 'https://app.theactorscopilot.com' });
 
@@ -158,6 +174,33 @@ describe('findOpenCheckoutSession', () => {
         // screen, so the stale session is expired instead of reused.
         expect(session).toBeNull();
         expect(stripe.checkout.sessions.expire).toHaveBeenCalledWith('cs_test_1');
+    });
+
+    it('expires a same-origin session carrying the old promotion for the same affiliate', async () => {
+        const appUrl = 'https://app.theactorscopilot.com';
+        const olderSession = {
+            ...baseSession,
+            metadata: { ...baseSession.metadata, affiliateCode: 'lucas' },
+            success_url: appUrl + '/api/billing/success?session_id=x',
+            discounts: [{ promotion_code: 'promo_old' }],
+        };
+        jest.mocked(stripe.checkout.sessions.list).mockResolvedValue({
+            data: [olderSession],
+        } as unknown as Awaited<ReturnType<typeof stripe.checkout.sessions.list>>);
+        const input = {
+            customerId: 'cus_1',
+            tier: 'business' as const,
+            billingCycle: 'monthly' as const,
+            appUrl,
+            affiliateCode: 'lucas',
+            affiliatePromotionCodeId: 'promo_rotated',
+        };
+
+        await expect(findOpenCheckoutSession(input)).resolves.toBeNull();
+        expect(stripe.checkout.sessions.expire).toHaveBeenCalledWith(olderSession.id);
+
+        olderSession.discounts = [{ promotion_code: 'promo_rotated' }];
+        await expect(findOpenCheckoutSession(input)).resolves.toEqual(olderSession);
     });
 
     it('keeps a session for a different plan untouched', async () => {

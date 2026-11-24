@@ -308,9 +308,9 @@ export async function createIdempotentCheckoutSession(params: {
         // that is reused with different parameters.
         customerId,
         ...(isTrial ? [] : ['no-trial']),
-        // The affiliate changes the session parameters, so it belongs in the
-        // key: Stripe rejects a key reused with different parameters.
-        ...(affiliate?.code ? [affiliate.code] : []),
+        // A rotated promotion changes the parameters even when the referral
+        // key remains the same.
+        ...(affiliate ? [affiliate.promotionCodeId] : []),
       ].join('_'),
     },
   );
@@ -340,8 +340,9 @@ export async function findOpenCheckoutSession(params: {
   isTrial?: boolean;
   appUrl: string;
   affiliateCode?: string;
+  affiliatePromotionCodeId?: string;
 }): Promise<Stripe.Checkout.Session | null> {
-  const { customerId, tier, billingCycle, currency, appUrl, affiliateCode } = params;
+  const { customerId, tier, billingCycle, currency, appUrl, affiliateCode, affiliatePromotionCodeId } = params;
 
   try {
     const listed = await stripe.checkout.sessions.list({
@@ -354,6 +355,10 @@ export async function findOpenCheckoutSession(params: {
     const sameOrigin = (session: Stripe.Checkout.Session) =>
       isSameAppOrigin(session.success_url ?? '', appUrl);
 
+    const hasCurrentPromotion = (session: Stripe.Checkout.Session) =>
+      !affiliatePromotionCodeId ||
+      (session.discounts ?? []).some(discount => discount.promotion_code === affiliatePromotionCodeId);
+
     const match = listed.data.find(
       (session) =>
         (params.isTrial === undefined || session.metadata?.isTrial === String(params.isTrial)) &&
@@ -365,24 +370,26 @@ export async function findOpenCheckoutSession(params: {
         // member who arrived through a referral link: it would carry no
         // discount and no attribution.
         (!affiliateCode || session.metadata?.affiliateCode === affiliateCode) &&
+        hasCurrentPromotion(session) &&
         sameOrigin(session),
     );
 
     if (match) return match;
 
-    // Sessions for a different origin would send the member to a host without
-    // their session, so they are expired instead of being reused.
+    // A stale origin or promotion needs a fresh Checkout for the same plan.
     for (const session of listed.data) {
       const isSamePlan =
         session.metadata?.targetTier === tier &&
         session.metadata?.billingCycle === billingCycle &&
         session.expires_at > now;
-      if (!isSamePlan || sameOrigin(session)) continue;
+      const stalePromotion =
+        affiliateCode && session.metadata?.affiliateCode === affiliateCode && !hasCurrentPromotion(session);
+      if (!isSamePlan || (sameOrigin(session) && !stalePromotion)) continue;
 
       try {
         await stripe.checkout.sessions.expire(session.id);
         logger.warn({
-          msg: 'Expired a checkout session created for a different app origin',
+          msg: 'Expired a checkout session with a stale origin or affiliate promotion',
           sessionId: session.id,
           sessionOrigin: session.success_url,
           currentOrigin: appUrl,
@@ -493,7 +500,7 @@ export async function createOrReuseCheckoutSession(params: {
     currency,
     appUrl,
     isTrial,
-    ...(affiliateRef ? { affiliateCode: affiliateRef.code } : {}),
+    ...(affiliateRef ? { affiliateCode: affiliateRef.code, affiliatePromotionCodeId: affiliateRef.promotionCodeId } : {}),
   });
   const createSession = (sequence: number) => createIdempotentCheckoutSession({
     uid,

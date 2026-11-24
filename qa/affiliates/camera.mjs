@@ -27,10 +27,13 @@ export async function openAffiliates(page, link, signInOperator) {
 }
 
 export async function affiliateRow(page, appOrigin, withDemo = false) {
-  const coupon = page.getByText('Coupon code: LUCAS', { exact: true });
-  const row = page.getByRole('row').filter({ has: coupon });
-  await expect(coupon).toBeVisible();
+  const referral = page.getByText(/\/login\?ref=lucas$/);
+  const row = page.getByRole('row').filter({ has: referral });
   await expect(row).toHaveCount(1);
+  const coupon = row.getByText(/^Coupon code:\s*[a-z0-9-]+$/i);
+  await expect(coupon).toBeVisible();
+  const promotionCode = (await coupon.innerText()).trim().split(/\s+/).at(-1);
+  assert(/^[a-z0-9-]+$/i.test(promotionCode));
 
   const table = page.getByRole('table').filter({ has: row });
   await expect(table.getByRole('columnheader')).toContainText([
@@ -54,7 +57,7 @@ export async function affiliateRow(page, appOrigin, withDemo = false) {
   } else {
     await link.hover();
   }
-  return { link, address };
+  return { link, address, promotionCode };
 }
 
 export async function memberRow(page, email, tierLabel, simulated = true) {
@@ -78,12 +81,12 @@ export async function memberRow(page, email, tierLabel, simulated = true) {
   await account.hover();
 }
 
-export async function stripeSummary(page, tierLabel) {
+export async function stripeSummary(page, tierLabel, promotionCode) {
   assert.equal(new URL(page.url()).origin, 'https://checkout.stripe.com');
   const region = page.locator('.OrderSummaryColumn');
   await expect(region).toBeVisible({ timeout: 60000 });
   await expect(region).toContainText(tierLabel + ' Class');
-  await expect(region.getByText('LUCAS', { exact: true })).toBeVisible({ timeout: 45000 });
+  await expect(region.getByText(new RegExp('^' + promotionCode + '$', 'i'))).toBeVisible({ timeout: 45000 });
   await expect(region.getByText(/20% off 1 billing cycle/i)).toBeVisible();
   const discountedPrice = tierLabel === 'Business' ? /Total after trial\s*\$23\.20/i : /Total after trial\s*\$15\.20/i;
   await expect(region).toContainText(discountedPrice);

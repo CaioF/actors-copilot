@@ -7,10 +7,40 @@
  * that were already made.
  */
 
-jest.mock('@/lib/firebase.admin', () => ({ db: {} }));
+jest.mock('@/lib/firebase.admin', () => ({ db: { doc: jest.fn() } }));
 jest.mock('@/lib/stripe', () => ({ stripe: {} }));
 
-import { computeCommission, netCollectedFromInvoices } from './affiliates';
+jest.mock('@/lib/affiliate-promotion-codes', () => ({ ensureAffiliatePromotionCode: jest.fn() }));
+
+import { computeCommission, netCollectedFromInvoices, upsertAffiliate } from './affiliates';
+import { ensureAffiliatePromotionCode } from '@/lib/affiliate-promotion-codes';
+import { db } from '@/lib/firebase.admin';
+
+describe('upsertAffiliate', () => {
+  it('keeps the stored Stripe promotion when editing an existing referral profile', async () => {
+    let record = {
+      code: 'lucas',
+      name: 'Lucas',
+      promotionCode: 'LucasAmorim',
+      promotionCodeId: 'promo_rotated',
+      couponId: 'affiliate_default',
+    };
+    const set = jest.fn(async (update) => { record = { ...record, ...update }; });
+    const get = jest.fn(async () => ({ data: () => record }));
+    jest.mocked(db.doc).mockReturnValue({ get, set } as unknown as ReturnType<typeof db.doc>);
+
+    const saved = await upsertAffiliate({ code: 'lucas', name: 'Lucas Amorim', rate: 0.3 });
+
+    expect(ensureAffiliatePromotionCode).not.toHaveBeenCalled();
+    expect(set.mock.calls[0][0]).not.toHaveProperty('promotionCode');
+    expect(saved).toMatchObject({
+      code: 'lucas',
+      name: 'Lucas Amorim',
+      promotionCode: 'LucasAmorim',
+      promotionCodeId: 'promo_rotated',
+    });
+  });
+});
 
 describe('netCollectedFromInvoices', () => {
   it('sums the paid invoices per currency', () => {

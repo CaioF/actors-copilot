@@ -252,31 +252,30 @@ export async function upsertAffiliate(input: UpsertAffiliateInput): Promise<Affi
   const now = new Date().toISOString();
   const reference = db.doc(`${AFFILIATES_COLLECTION}/${code}`);
   const existing = await reference.get();
-  const createdAt =
-    existing.exists && typeof existing.data()?.createdAt === 'string'
-      ? (existing.data()?.createdAt as string)
-      : now;
+  const stored = toAffiliateRecord(code, existing.data() ?? {});
+  const hasPromotion = Boolean(stored.promotionCode && stored.promotionCodeId && stored.couponId);
 
-  // The promotion code is what a customer types at checkout, and it carries
-  // the affiliate in its metadata so the webhook can attribute the sale.
-  const promotion = await ensureAffiliatePromotionCode(code);
-
-  const record: AffiliateRecord = {
+  const profile = {
     code,
     name: input.name ?? '',
     email: input.email ?? '',
     rate,
     active: input.active !== false,
     notes: input.notes ?? '',
-    promotionCode: promotion.promotionCode,
-    promotionCodeId: promotion.promotionCodeId,
-    couponId: promotion.couponId,
-    createdAt,
+    createdAt: stored.createdAt || now,
     updatedAt: now,
   };
 
-  await reference.set(record, { merge: true });
+  if (hasPromotion) {
+    // The referral key can stay stable while the public Stripe code changes.
+    // Editing a profile leaves the stored promotion mapping untouched.
+    await reference.set(profile, { merge: true });
+    return toAffiliateRecord(code, (await reference.get()).data() ?? {});
+  }
 
+  const promotion = await ensureAffiliatePromotionCode(code);
+  const record: AffiliateRecord = { ...profile, ...promotion };
+  await reference.set(record, { merge: true });
   return record;
 }
 

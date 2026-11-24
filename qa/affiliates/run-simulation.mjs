@@ -96,13 +96,13 @@ async function click(locator) {
   await hold(320);
   await locator.click();
 }
-async function assertSavedChoice(actorPage) {
+async function assertSavedChoice(actorPage, promotionCode) {
   await expect(actorPage).toHaveURL(origin + '/start-trial');
   await expect(actorPage.getByRole('heading', { name: 'Finish setting up your free trial' })).toBeVisible();
   for (const name of [new RegExp('^' + tierLabel + ' Class', 'i'), 'Monthly', 'USD']) {
     await expect(actorPage.getByRole('button', { name, pressed: true, exact: typeof name === 'string' })).toBeVisible();
   }
-  await expect(actorPage.getByText(/LUCAS applied.*20% off/i)).toBeVisible();
+  await expect(actorPage.getByText(new RegExp(promotionCode + ' applied.*20% off', 'i'))).toBeVisible();
 }
 async function resumeSameCheckout(buyer, checkoutId) {
   const [response] = await Promise.all([
@@ -204,7 +204,7 @@ try {
   mark('Member dashboard after operator login');
   await hold(2000);
   await openAffiliates(page, affiliates, signInOperator);
-  const { address, link } = await watch('locating the referral in the affiliate row', () =>
+  const { address, link, promotionCode } = await watch('locating the referral in the affiliate row', () =>
     affiliateRow(page, origin),
   );
   mark('Lucas coupon and referral address in the operator panel');
@@ -252,7 +252,7 @@ try {
   await click(page.getByRole('button', { name: /Monthly/i }).first());
   await click(page.getByRole('button', { name: new RegExp('^' + tierLabel + ' Class', 'i') }));
   await click(page.getByRole('button', { name: 'USD', exact: true }));
-  await expect(page.getByText(/LUCAS applied.*20% off/i)).toBeVisible();
+  await expect(page.getByText(new RegExp(promotionCode + ' applied.*20% off', 'i'))).toBeVisible();
   mark(tierLabel + ' selected and affiliate discount displayed on the trial page');
   await hold(1600);
   stage = 'opening the hosted checkout using Start my free trial';
@@ -275,8 +275,8 @@ try {
   assert(checkoutId);
   report.checkoutFingerprint = createHash('sha256').update(checkoutId).digest('hex');
   stage = 'reading the applied coupon in Stripe Checkout';
-  await stripeSummary(page, tierLabel);
-  mark('Hosted Stripe Checkout shows ' + tierLabel + ', LUCAS, 20% for one cycle and $0 today');
+  await stripeSummary(page, tierLabel, promotionCode);
+  mark('Hosted Stripe Checkout shows ' + tierLabel + ', ' + promotionCode + ', 20% for one cycle and $0 today');
   await hold(3500);
   if (confirm) {
     stage = 'confirming this exact open checkout with the demo endpoint';
@@ -339,12 +339,12 @@ try {
     if (recover) {
       stage = 'reopening the app after leaving hosted Checkout';
       await navigateAddress(page, origin + '/dashboard');
-      await assertSavedChoice(page);
+      await assertSavedChoice(page, promotionCode);
       mark('Returning from an unfinished checkout restores the selected plan and Lucas discount');
       await hold(2600);
       stage = 'resuming the original Stripe Checkout';
       await resumeSameCheckout(page, checkoutId);
-      await stripeSummary(page, tierLabel);
+      await stripeSummary(page, tierLabel, promotionCode);
       mark('Resume checkout reopens the same hosted Stripe session');
     }
   }
@@ -357,7 +357,7 @@ try {
   );
   await hold(4000);
   await openAffiliates(page, nav, signInOperator);
-  await affiliateRow(page, origin, confirm);
+  assert.equal((await affiliateRow(page, origin, confirm)).promotionCode, promotionCode);
   mark(
     confirm
       ? 'Lucas shows the separately labeled simulated referral'
@@ -378,7 +378,7 @@ try {
       await buyer.locator('input[type=email]').fill(email);
       await buyer.locator('input[type=password]').fill(password);
       await buyer.locator('button[type=submit]').filter({ hasText: 'Sign In' }).click();
-      await assertSavedChoice(buyer);
+      await assertSavedChoice(buyer, promotionCode);
       await resumeSameCheckout(buyer, checkoutId);
       report.freshLoginResumedOriginalCheckout = true;
     } finally {
