@@ -100,6 +100,36 @@ describe('createIdempotentCheckoutSession', () => {
         expect(calls[0][1].idempotencyKey).not.toBe(calls[1][1].idempotencyKey);
     });
 
+    it('applies one Black Friday coupon and serializes both tiers against the same attempt', async () => {
+        const annual = {
+            ...baseParams,
+            billingCycle: 'annual' as const,
+            currency: 'usd',
+            appUrl: 'https://app.theactorscopilot.com',
+            affiliate: { code: 'lucas', promotionCodeId: 'promo_affiliate' },
+        };
+
+        await createIdempotentCheckoutSession({
+            ...annual,
+            blackFridayCouponId: 'blackfriday-2026-business-annual',
+        });
+        await createIdempotentCheckoutSession({
+            ...annual,
+            tier: 'economy',
+            blackFridayCouponId: 'blackfriday-2026-economy-annual',
+        });
+
+        const [[business, businessOptions], [economy, economyOptions]] =
+            (stripe.checkout.sessions.create as jest.Mock).mock.calls;
+        expect(business.discounts).toEqual([{ coupon: 'blackfriday-2026-business-annual' }]);
+        expect(economy.discounts).toEqual([{ coupon: 'blackfriday-2026-economy-annual' }]);
+        expect(business).not.toHaveProperty('allow_promotion_codes');
+        expect(business.adaptive_pricing).toEqual({ enabled: false });
+        expect(business.subscription_data.trial_period_days).toBe(14);
+        expect(business.metadata.affiliateCode).toBe('lucas');
+        expect(businessOptions.idempotencyKey).toBe(economyOptions.idempotencyKey);
+    });
+
     it('builds the redirect URLs from the given origin', async () => {
         await createIdempotentCheckoutSession({ ...baseParams, appUrl: 'https://app.theactorscopilot.com' });
 

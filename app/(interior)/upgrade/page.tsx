@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { useAuth } from "@/lib/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { BlackFridayCodeField, useBlackFridayCode } from "@/components/billing/black-friday-code";
 import { Check, Shield, Zap, Lock, Info, Star } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import {
@@ -246,6 +247,7 @@ function UpgradeContent() {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const blackFriday = useBlackFridayCode(billingCycle, currency);
 
   useEffect(() => {
     clearPlanSelection();
@@ -308,7 +310,7 @@ function UpgradeContent() {
     setActionLoading(true);
     setCheckoutError(null);
 
-    if (billingCycle === "annual") {
+    if (billingCycle === "annual" && !blackFriday.code) {
       window.location.href = getAnnualPaymentLink(tier, currency, {
         uid: user?.uid,
         email: user?.email,
@@ -330,6 +332,7 @@ function UpgradeContent() {
           billingCycle,
           ...(currency !== "usd" ? { currency } : {}),
           ...(attribution ? { affiliateCode: attribution.code } : {}),
+          ...(blackFriday.code ? { promotionCode: blackFriday.code } : {}),
         }),
       });
 
@@ -468,6 +471,9 @@ function UpgradeContent() {
         </div>
 
         <div className="max-w-4xl mx-auto mb-10 min-h-5 space-y-2">
+          {blackFriday.field && (
+            <BlackFridayCodeField {...blackFriday.field} className="mx-auto block max-w-64" />
+          )}
           {nonUsdUnavailable && (
             <p role="status" className="text-center text-xs text-muted-foreground leading-relaxed">
               {`Prices are shown in ${currencyLabel} for reference. Checkout in ${currencyLabel} isn't available for every option yet, and we won't charge you in a different currency without your choice.`}

@@ -5,6 +5,8 @@ import Image from "next/image"
 import Link from "next/link"
 import { Check, Lock, Ticket, Zap } from "lucide-react"
 import { redirectTo } from "@/lib/navigate"
+import { BlackFridayCodeField, useBlackFridayCode } from "@/components/billing/black-friday-code"
+import { BLACK_FRIDAY_CODE } from "@/lib/black-friday"
 import { useAuth } from "@/lib/context/AuthContext"
 import {
   DEFAULT_CURRENCY,
@@ -100,6 +102,7 @@ export default function StartTrialPage() {
   const [plan, setPlan] = useState<RequestedPlan>("business")
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
   const [currency, setCurrency] = useState<RequestedCurrency>(DEFAULT_CURRENCY)
+  const blackFriday = useBlackFridayCode(billingCycle, currency)
   const [submitting, setSubmitting] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   // "recovery" means the first checkout was interrupted; "trial" means the
@@ -241,7 +244,12 @@ export default function StartTrialPage() {
       const response = await fetch("/api/billing/recovery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: plan, billingCycle, currency }),
+        body: JSON.stringify({
+          tier: plan,
+          billingCycle,
+          currency,
+          ...(blackFriday.code ? { promotionCode: blackFriday.code } : {}),
+        }),
       })
 
       const data = await response.json()
@@ -534,7 +542,10 @@ export default function StartTrialPage() {
                       {summary} — {TRIAL_DAYS} days free
                     </p>
                   )}
-                  {affiliate && firstPayment && selectedPrice && (
+                  {blackFriday.field && (
+                    <BlackFridayCodeField {...blackFriday.field} className="block w-full max-w-64 text-[#EFEADD]" />
+                  )}
+                  {affiliate && firstPayment && selectedPrice && blackFriday.code.toUpperCase() !== BLACK_FRIDAY_CODE && (
                     <p className="max-w-md text-center text-xs leading-relaxed text-[#EFEADD]/75">
                       <span className="font-semibold text-[#F2671A]">{affiliate.promotionCode}</span>{" "}
                       applied — {affiliate.percentOff}% off your first payment:{" "}

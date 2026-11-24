@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase.admin';
 import { getStripePriceIdForTier, type BillingCycle, type SubscriptionTier } from '@/lib/billing';
 import { getPriceCurrencies } from '@/lib/billing-currency';
 import { CheckoutAlreadyCompleted, createOrReuseCheckoutSession, priorFirstCheckout } from '@/lib/billing-checkout';
+import { BlackFridayCheckoutError } from '@/lib/black-friday';
 import { resolveAppUrl } from '@/lib/app-origin';
 import { DEFAULT_RECOVERY_CURRENCY, DEFAULT_RECOVERY_TIER, isRecoveryPending, rememberFirstCheckout } from '@/lib/billing-recovery';
 import { normalizeCurrency } from '@/lib/plan-selection';
@@ -141,6 +142,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             ...(currency ? { currency } : {}),
             isTrial: true,
             ...(invalidBillingRestart ? { verifiedTrialRestart: true } : {}),
+            ...(body.promotionCode !== undefined ? { promotionCode: body.promotionCode } : {}),
             appUrl,
         });
 
@@ -165,6 +167,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }, { status: 200 });
 
     } catch (error) {
+        if (error instanceof BlackFridayCheckoutError) {
+            return NextResponse.json({ error: error.message, code: 'promotion_unavailable' }, { status: 400 });
+        }
         if (error instanceof CheckoutAlreadyCompleted) {
             return NextResponse.json({ pending: false, reason: 'processing' });
         }
