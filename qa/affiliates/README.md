@@ -12,9 +12,9 @@ On Windows the recorder focuses Chrome’s native address bar and checks its val
 
 | Step | Operator or actor interaction | Evidence the recorder requires |
 | --- | --- | --- |
-| 1 | In a fresh Chrome profile, sign in at `/admin-dashboard`. Click **Affiliates** and find **Coupon code: LUCAS**. | Read the referral address from that row. Click it, or select, copy and open it in the address bar on deployments that display plain text. |
+| 1 | In a fresh Chrome profile, sign in at `/admin-dashboard`. Click **Affiliates** and find Lucas’s row and read its **Coupon code**. | Read the referral address from that row. Click it, or select, copy and open it in the address bar on deployments that display plain text. |
 | 2 | Leave the selected **Create Account** tab as it is. Enter the designated new email and a password and submit. | Firebase accepts the signup. The actor lands on **Your free trial is ready to start** via the app's redirect. |
-| 3 | Choose **Monthly**, the requested class, **USD** and **Start my free trial**. | The trial page and the hosted Stripe Checkout show LUCAS. The Checkout order summary names the chosen class, shows 20% off one billing cycle and $0 due today. The discounted monthly total is $15.20 for Economy or $23.20 for Business. |
+| 3 | Choose **Monthly**, the requested class, **USD** and **Start my free trial**. | The trial page and hosted Stripe Checkout show the code displayed in Lucas’s row. The Checkout order summary names the chosen class, shows 20% off one billing cycle and $0 due today. The discounted monthly total is $15.20 for Economy or $23.20 for Business. |
 | 4 | Open **QA payment confirmation** for the Checkout actually displayed and click **Confirm demo trial**. | The operator endpoint verifies the buyer, affiliate, promotion and purchased line item against the configured price. Chrome follows the POST's 303 to `GET /api/billing/success?session_id=…`. That handler issues the buyer session and redirects to the dashboard. The recorder checks the session reports `trialing` and the chosen tier. |
 | 5 | Reopen the operator dashboard. Find the same email, then click **Affiliates**. | One row must show **lucas**, **Trial**, the chosen plan and **Simulated QA**. The affiliate row shows the separate simulated referral count. After the video ends, the recorder removes the receipt, reloads the member list and verifies **lucas**, **Checkout pending** and the selected plan. |
 
@@ -26,7 +26,7 @@ Use the same setup and local evidence directory as the recorded affiliate flow b
 This mode requires an unused QA signup and the operator login.
 
 1. In the operator dashboard, open Lucas’s displayed URL. Create the actor, pick Economy, Monthly
-   and USD on the trial screen, and open hosted Checkout. Verify the class and LUCAS discount.
+   and USD on the trial screen, and open hosted Checkout. Verify the class and the discount code displayed in Lucas’s row.
 2. Leave Stripe without submitting payment or confirming the demo. Reopen the app at
    `/dashboard` in the same browser. It should take you to **Finish setting up your free trial**.
    Check that the three choices are still selected. Click **Resume checkout** and verify the
